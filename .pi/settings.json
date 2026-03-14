@@ -1,0 +1,25 @@
+{
+  "defaultProvider": "github-copilot",
+  "defaultModel": "claude-opus-4.6",
+  "defaultThinkingLevel": "medium",
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "branchSummary": {
+    "reserveTokens": 16384
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "maxDelayMs": 60000
+  },
+  "steeringMode": "one-at-a-time",
+  "followUpMode": "one-at-a-time",
+  "enableSkillCommands": true,
+  "skills": ["./skills/"],
+  "prompts": ["./prompts/"],
+  "extensions": ["./extensions/"]
+}
