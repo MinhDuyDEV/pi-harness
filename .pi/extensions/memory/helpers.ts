@@ -162,12 +162,31 @@ export function formatObservation(obs: {
 	supersedes?: number | null;
 	superseded_by?: number | null;
 	source?: string | null;
+	maturity?: string | null;
+	helpful_count?: number | null;
+	harmful_count?: number | null;
+	effective_score?: number | null;
 	created_at?: string | null;
 }): string {
 	const icon = TYPE_ICONS[obs.type] ?? "📌";
 	const lines = [`${icon} **#${obs.id}** [${obs.type}] ${obs.title}`];
 	if (obs.subtitle) lines.push(`  _${obs.subtitle}_`);
 	if (obs.confidence) lines.push(`  Confidence: ${obs.confidence}`);
+	if (obs.maturity && obs.maturity !== "candidate")
+		lines.push(`  Maturity: ${obs.maturity}`);
+	if (
+		obs.effective_score !== null &&
+		obs.effective_score !== undefined &&
+		obs.effective_score !== 0
+	)
+		lines.push(`  Score: ${obs.effective_score.toFixed(2)}`);
+	if (
+		(obs.helpful_count ?? 0) > 0 ||
+		(obs.harmful_count ?? 0) > 0
+	)
+		lines.push(
+			`  Feedback: ${obs.helpful_count ?? 0}👍 / ${obs.harmful_count ?? 0}👎`,
+		);
 	if (obs.source && obs.source !== "manual")
 		lines.push(`  Source: ${obs.source}`);
 	if (obs.concepts) lines.push(`  Concepts: ${obs.concepts}`);

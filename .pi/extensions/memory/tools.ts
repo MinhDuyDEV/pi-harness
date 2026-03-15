@@ -45,6 +45,7 @@ import {
 	getDistillationStats,
 	searchDistillationsFTS,
 } from "./pipeline.js";
+import { recordFeedback, refreshAllScores } from "./scoring.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -655,7 +656,7 @@ export function registerMemoryTools(pi: any): void {
 			operation: Type.Optional(
 				Type.String({
 					description:
-						'Operation to run (default "status"): "status", "full", "archive", "checkpoint", "vacuum", "capture-stats", "distill-now", "curate-now"',
+						'Operation to run (default "status"): "status", "full", "archive", "checkpoint", "vacuum", "capture-stats", "distill-now", "curate-now", "refresh-scores"',
 				}),
 			),
 			older_than_days: Type.Optional(
@@ -815,6 +816,16 @@ export function registerMemoryTools(pi: any): void {
 						return { content: [{ type: "text", text: result }], details: {} };
 					}
 
+					case "refresh-scores": {
+						const scoreResult = refreshAllScores();
+						const result = [
+							`📊 Score refresh complete.`,
+							`  Updated    : ${scoreResult.updated} observations`,
+							`  Deprecated : ${scoreResult.deprecated} observations`,
+						].join("\n");
+						return { content: [{ type: "text", text: result }], details: {} };
+					}
+
 					default: {
 						const validOps = [
 							"status",
@@ -825,6 +836,7 @@ export function registerMemoryTools(pi: any): void {
 							"capture-stats",
 							"distill-now",
 							"curate-now",
+							"refresh-scores",
 						];
 						const result = `❌ Unknown operation "${op}". Must be one of: ${validOps.join(", ")}`;
 						return { content: [{ type: "text", text: result }], details: {} };
@@ -832,6 +844,90 @@ export function registerMemoryTools(pi: any): void {
 				}
 			} catch (err) {
 				const result = `❌ Admin operation "${op}" failed: ${err instanceof Error ? err.message : String(err)}`;
+				return { content: [{ type: "text", text: result }], details: {} };
+			}
+		},
+	});
+
+	// -------------------------------------------------------------------------
+	// Tool 8: memory-feedback
+	// -------------------------------------------------------------------------
+	pi.registerTool({
+		name: "memory-feedback",
+		label: "Memory Feedback",
+		description:
+			"Mark an observation as helpful or harmful. Updates time-decay scoring and maturity state. Use after applying an observation to record whether it was useful.",
+		parameters: Type.Object({
+			id: Type.Number({
+				description: "Observation ID to give feedback on",
+			}),
+			feedback: Type.String({
+				description: '"helpful" or "harmful"',
+			}),
+			reason: Type.Optional(
+				Type.String({
+					description: "Brief reason for the feedback",
+				}),
+			),
+		}),
+		async execute(
+			_toolCallId: string,
+			params: { id: number; feedback: string; reason?: string },
+			_signal: AbortSignal,
+			_onUpdate: (text: string) => void,
+			_ctx: any,
+		) {
+			try {
+				const feedbackType = params.feedback as "helpful" | "harmful";
+				if (feedbackType !== "helpful" && feedbackType !== "harmful") {
+					return {
+						content: [
+							{
+								type: "text",
+								text: `❌ Invalid feedback type "${params.feedback}". Must be "helpful" or "harmful".`,
+							},
+						],
+						details: {},
+					};
+				}
+
+				const result = recordFeedback(
+					params.id,
+					feedbackType,
+					params.reason,
+				);
+
+				if (!result.success) {
+					return {
+						content: [
+							{ type: "text", text: `❌ ${result.error}` },
+						],
+						details: {},
+					};
+				}
+
+				const icon = feedbackType === "helpful" ? "👍" : "👎";
+				const maturityIcon =
+					result.maturity === "proven"
+						? "🏆"
+						: result.maturity === "established"
+							? "✅"
+							: result.maturity === "deprecated"
+								? "🚫"
+								: "🔄";
+
+				const text = [
+					`${icon} Feedback recorded for observation #${params.id}`,
+					`  Score: ${result.effectiveScore.toFixed(2)} (${result.helpfulCount}👍 / ${result.harmfulCount}👎)`,
+					`  ${maturityIcon} Maturity: ${result.maturity}`,
+					result.reason ? `  Reason: ${result.reason}` : "",
+				]
+					.filter(Boolean)
+					.join("\n");
+
+				return { content: [{ type: "text", text }], details: {} };
+			} catch (err) {
+				const result = `❌ Feedback failed: ${err instanceof Error ? err.message : String(err)}`;
 				return { content: [{ type: "text", text: result }], details: {} };
 			}
 		},

@@ -8,18 +8,20 @@
  *   npm install -D @types/better-sqlite3
  *
  * WHAT THIS EXTENSION DOES:
- *   - Registers 7 memory tools (observation, search, get, read, update, timeline, admin)
- *   - Auto-captures user messages on each input event
+ *   - Registers 8 memory tools (observation, search, get, read, update, timeline, admin, feedback)
+ *   - Auto-captures user messages on each input event (with secret sanitization)
  *   - Runs TF-IDF distillation + pattern-based curation on agent_end
+ *   - Time-decay scoring on observations (CASS-inspired)
+ *   - Maturity state machine: candidate → established → proven / deprecated
+ *   - Auto-injects relevant observations into system prompt on agent start
  *   - Stores everything in SQLite with FTS5 full-text search
  *
- * WHAT IT DOES NOT DO (Pi architectural limits):
- *   - No automatic LTM injection into system prompt (use /memory-search or APPEND_SYSTEM.md)
- *   - No automatic context compression (Pi handles compaction natively)
- *   - No assistant response capture (Pi events don't expose full responses)
- *
- * The agent should be instructed (via AGENTS.md or APPEND_SYSTEM.md) to use
- * memory tools proactively: search before work, observe after decisions.
+ * UPGRADES (v3, CASS-inspired):
+ *   - Time-decay scoring: feedback events decay with 90-day half-life
+ *   - Feedback tool: mark observations as helpful/harmful
+ *   - Auto context injection: relevant observations injected before agent starts
+ *   - Secret sanitization: API keys, tokens, passwords stripped before storage
+ *   - Maturity states: candidate → established → proven (auto-deprecate on harmful)
  */
 
 import { MEMORY_CONFIG } from "./memory/config.js";
@@ -28,6 +30,8 @@ import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
 import { distillSession } from "./memory/distill.js";
 import { checkpointWAL, optimizeFTS5 } from "./memory/maintenance.js";
 import { storeTemporalMessage } from "./memory/pipeline.js";
+import { sanitize } from "./memory/sanitize.js";
+import { refreshAllScores } from "./memory/scoring.js";
 import { registerMemoryTools } from "./memory/tools.js";
 
 // ---------------------------------------------------------------------------
@@ -59,7 +63,14 @@ export default function memoryExtension(pi: any): void {
 					: (event?.text ?? event?.content ?? "");
 			if (!text || typeof text !== "string") return;
 
-			const content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);
+			let content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);
+
+			// Sanitize secrets before storage
+			if (MEMORY_CONFIG.sanitization.enabled) {
+				const { text: sanitized } = sanitize(content);
+				content = sanitized;
+			}
+
 			const tokenEstimate = Math.ceil(content.length / 4);
 			const now = Date.now();
 
@@ -99,7 +110,14 @@ export default function memoryExtension(pi: any): void {
 
 			if (!text) return;
 
-			const content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);
+			let content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);
+
+			// Sanitize secrets before storage
+			if (MEMORY_CONFIG.sanitization.enabled) {
+				const { text: sanitized } = sanitize(content);
+				content = sanitized;
+			}
+
 			const tokenEstimate = Math.ceil(content.length / 4);
 			const now = Date.now();
 			const toolName = event?.name ?? event?.toolName ?? "tool";
@@ -127,11 +145,79 @@ export default function memoryExtension(pi: any): void {
 				curateFromDistillations("default");
 			}
 
+			// Refresh time-decay scores periodically
+			refreshAllScores();
+
 			// Periodic maintenance
 			optimizeFTS5();
 			checkpointWAL();
 		} catch {
 			// Pipeline is best-effort
+		}
+	});
+
+	// --- Auto context injection on agent start ---
+	pi.on("before_agent_start", async (event: any) => {
+		if (!MEMORY_CONFIG.injection.enabled) return;
+
+		try {
+			const { getRelevantKnowledge } = await import(
+				"./memory/pipeline.js"
+			);
+			const { getObservationStats } = await import(
+				"./memory/observations.js"
+			);
+
+			const stats = getObservationStats();
+			const totalObs = Object.values(stats).reduce(
+				(sum, n) => sum + n,
+				0,
+			);
+			if (totalObs === 0) return; // No observations yet
+
+			// Extract terms from the user's task/message if available
+			const userMessage =
+				event?.userMessage ?? event?.message ?? event?.input ?? "";
+			const taskTerms = typeof userMessage === "string"
+				? userMessage
+						.toLowerCase()
+						.split(/\s+/)
+						.filter((t: string) => t.length > 2)
+						.slice(0, 20)
+				: [];
+
+			if (taskTerms.length === 0) return; // Nothing to match against
+
+			// Retrieve relevant knowledge (uses FTS5 + BM25 + recency decay)
+			const knowledge = getRelevantKnowledge(taskTerms, {
+				tokenBudget: MEMORY_CONFIG.injection.tokenBudget,
+				minScore: MEMORY_CONFIG.injection.minScore,
+			});
+
+			if (knowledge.length === 0) return;
+
+			// Build injection block
+			const lines = [
+				"\n\n## Relevant Memory (Auto-Injected)",
+				"_The following observations were retrieved from memory based on the current task. Use them as context._\n",
+			];
+
+			for (const item of knowledge) {
+				const scoreStr = item.score.toFixed(2);
+				lines.push(
+					`- **[${item.type}]** ${item.title} _(score: ${scoreStr})_`,
+				);
+				if (item.content) {
+					const snippet = item.content.slice(0, 200).replace(/\n/g, " ");
+					lines.push(`  ${snippet}`);
+				}
+			}
+
+			return {
+				systemPrompt: (event.systemPrompt ?? "") + lines.join("\n"),
+			};
+		} catch {
+			// Injection is best-effort — never break agent startup
 		}
 	});
 

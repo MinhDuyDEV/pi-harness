@@ -20,6 +20,20 @@ export type ObservationType =
 
 export type ObservationSource = "manual" | "curator" | "imported";
 
+export type MaturityState =
+	| "candidate"
+	| "established"
+	| "proven"
+	| "deprecated";
+
+export interface FeedbackEvent {
+	type: "helpful" | "harmful";
+	timestamp: number;
+	reason?: string;
+	session_id?: string;
+}
+
+
 // ---------------------------------------------------------------------------
 // Row types (database)
 // ---------------------------------------------------------------------------
@@ -41,6 +55,11 @@ export interface ObservationRow {
 	valid_until: string | null;
 	markdown_file: string | null;
 	source: ObservationSource;
+	maturity: MaturityState;
+	helpful_count: number;
+	harmful_count: number;
+	feedback_events: string | null; // JSON array of FeedbackEvent
+	effective_score: number;
 	created_at: string;
 	created_at_epoch: number;
 	updated_at: string | null;
@@ -187,6 +206,23 @@ export const MEMORY_CONFIG = {
 		enabled: true,
 		maxContextTokens: 100_000,
 		protectedMessages: 5,
+	},
+	scoring: {
+		/** Half-life in days for feedback decay */
+		decayHalfLifeDays: 90,
+		/** Harmful events are weighted this many times more than helpful */
+		harmfulMultiplier: 4,
+		/** Helpful events needed to promote candidate → established */
+		establishedThreshold: 3,
+		/** Helpful events needed to promote established → proven */
+		provenThreshold: 8,
+		/** Harmful ratio to auto-deprecate (with >= minEvents) */
+		deprecateRatio: 0.3,
+		/** Minimum feedback events before auto-deprecation */
+		deprecateMinEvents: 3,
+	},
+	sanitization: {
+		enabled: true,
 	},
 	fts: {
 		tokenizer: "porter unicode61",

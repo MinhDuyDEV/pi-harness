@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS observations (
   valid_until TEXT,
   markdown_file TEXT,
   source TEXT CHECK(source IN ('manual','curator','imported')) DEFAULT 'manual',
+  maturity TEXT CHECK(maturity IN ('candidate','established','proven','deprecated')) DEFAULT 'candidate',
+  helpful_count INTEGER NOT NULL DEFAULT 0,
+  harmful_count INTEGER NOT NULL DEFAULT 0,
+  feedback_events TEXT,
+  effective_score REAL NOT NULL DEFAULT 0.0,
   created_at TEXT NOT NULL,
   created_at_epoch INTEGER NOT NULL,
   updated_at TEXT,
@@ -199,24 +204,30 @@ function initializeSchema(db: Database.Database): void {
 			)
 			.get() as { version: number } | undefined;
 
-		if (row && row.version >= 2) return; // Already at v2
+		if (row && row.version >= 3) return; // Already at v3
+
+		if (row && row.version === 2) {
+			migrateV2ToV3(db);
+			return;
+		}
 
 		if (row && row.version === 1) {
 			migrateV1ToV2(db);
+			migrateV2ToV3(db);
 			return;
 		}
 	} catch {
 		// schema_versions doesn't exist yet — fresh install
 	}
 
-	// Fresh install: apply full v2 schema
+	// Fresh install: apply full v3 schema
 	db.exec(SCHEMA_SQL);
 	db.exec(FTS_TRIGGERS_SQL);
 
 	// Record version
 	db.prepare(
 		"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
-	).run(2, new Date().toISOString());
+	).run(3, new Date().toISOString());
 }
 
 function migrateV1ToV2(db: Database.Database): void {
@@ -294,6 +305,47 @@ function migrateV1ToV2(db: Database.Database): void {
 		db.prepare(
 			"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
 		).run(2, new Date().toISOString());
+	});
+
+	migration();
+}
+
+function migrateV2ToV3(db: Database.Database): void {
+	const migration = db.transaction(() => {
+		// Add maturity, feedback, and scoring columns
+		const columns = [
+			[
+				"maturity",
+				"TEXT CHECK(maturity IN ('candidate','established','proven','deprecated')) DEFAULT 'candidate'",
+			],
+			["helpful_count", "INTEGER NOT NULL DEFAULT 0"],
+			["harmful_count", "INTEGER NOT NULL DEFAULT 0"],
+			["feedback_events", "TEXT"], // JSON array of FeedbackEvent
+			["effective_score", "REAL NOT NULL DEFAULT 0.0"],
+		];
+
+		for (const [name, definition] of columns) {
+			try {
+				db.exec(
+					`ALTER TABLE observations ADD COLUMN ${name} ${definition}`,
+				);
+			} catch {
+				// Column may already exist
+			}
+		}
+
+		// Add index for score-based retrieval
+		db.exec(
+			"CREATE INDEX IF NOT EXISTS idx_observations_score ON observations(effective_score DESC)",
+		);
+		db.exec(
+			"CREATE INDEX IF NOT EXISTS idx_observations_maturity ON observations(maturity)",
+		);
+
+		// Record version
+		db.prepare(
+			"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
+		).run(3, new Date().toISOString());
 	});
 
 	migration();

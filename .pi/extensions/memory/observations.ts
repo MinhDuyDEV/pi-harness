@@ -15,8 +15,9 @@ export function storeObservation(input: ObservationInput): number {
 			`INSERT INTO observations
         (type, title, subtitle, narrative, facts, concepts,
          files_read, files_modified, confidence, source,
-         bead_id, supersedes, created_at, created_at_epoch)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         bead_id, supersedes, maturity, helpful_count, harmful_count,
+         feedback_events, effective_score, created_at, created_at_epoch)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.run(
 			input.type,
@@ -31,6 +32,11 @@ export function storeObservation(input: ObservationInput): number {
 			input.source ?? "manual",
 			input.bead_id ?? null,
 			input.supersedes ?? null,
+			"candidate", // New observations start as candidates
+			0, // helpful_count
+			0, // harmful_count
+			null, // feedback_events
+			0.0, // effective_score
 			now.toISOString(),
 			now.getTime(),
 		);
@@ -95,7 +101,8 @@ export function searchObservationsFTS(
       FROM observations o
       JOIN observations_fts fts ON fts.rowid = o.id
       WHERE observations_fts MATCH ?
-        AND o.superseded_by IS NULL`;
+        AND o.superseded_by IS NULL
+        AND o.maturity != 'deprecated'`;
 
 		const params: unknown[] = [ftsQuery];
 
