@@ -1,3 +1,9 @@
 .beads/
 .opencode/
 docs/
+
+# SQLite databases (local state, not source code)
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
