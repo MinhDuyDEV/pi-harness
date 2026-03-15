@@ -1,12 +1,21 @@
 ---
 description: Research a topic or bead before implementation
+argument-hint: "<topic-or-bead-id> [--quick|--thorough]"
 ---
 
-# Research: $@
+# Research: $ARGUMENTS
 
 Gather information before implementation. Find answers, document findings, stop when done.
 
 > Research can happen at any phase when you need external information or codebase understanding.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+// For --thorough mode:
+skill({ name: "deep-research" });
+```
 
 ## Parse Arguments
 
@@ -35,35 +44,44 @@ Default depth: ~30 tool calls for moderate exploration.
 
 ## Available Tools
 
-| Tool         | Use When                      |
-| ------------ | ----------------------------- |
-| `bash`       | Codebase grep/LSP analysis    |
-| `web search` | External docs, best practices |
-| `context7`   | Official API references       |
-| `codesearch` | Real-world usage examples     |
-| `grepsearch` | GitHub code search            |
+| Tool         | Use When                        |
+| ------------ | ------------------------------- |
+| `explore`    | Codebase patterns, LSP analysis |
+| `scout`      | External docs, best practices   |
+| `context7`   | Official API references         |
+| `opensrc`    | Package source code inspection  |
+| `codesearch` | Real-world usage examples       |
+| `grepsearch` | GitHub code search              |
 
 ## Phase 1: Load Context
 
 If argument is a bead ID:
 
 ```bash
-br show $@
+br show $ARGUMENTS
 ```
 
 Read PRD if it exists and extract questions that need answering.
 
-Check project notes if available for previous research on this topic.
+Check memory for previous research on this topic.
 
 ## Phase 2: Research
 
 ### Source Priority
 
-1. **Codebase patterns** — grep and LSP analysis for existing patterns, file structure, test patterns
-2. **Official docs** — query API references for known libraries
-3. **Source code** — inspect package source when docs are insufficient
-4. **GitHub examples** — real-world patterns via code search
+1. **Codebase patterns** — delegate to `explore` agent for LSP analysis
+2. **Official docs** — `context7` for API references
+3. **Source code** — `npx opensrc <package>` when docs are insufficient
+4. **GitHub examples** — `codesearch` / `grepsearch` for real-world patterns
 5. **Web search** — only if tiers 1-4 don't answer
+
+### Delegation
+
+| What              | Agent                        | When                                   |
+| ----------------- | ---------------------------- | -------------------------------------- |
+| Codebase analysis | `explore`                    | Internal patterns, file structure, LSP |
+| External docs     | `scout` (this agent)         | Library APIs, best practices           |
+| Multiple domains  | Parallel `explore` + `scout` | 3+ independent questions               |
 
 ### Confidence Levels
 
@@ -80,7 +98,7 @@ Check project notes if available for previous research on this topic.
 
 ## Phase 4: Document
 
-Write findings to `.beads/artifacts/$@/research.md` (if bead) or report directly (if topic):
+Write findings to `.beads/artifacts/$ARGUMENTS/research.md` (if bead) or report directly (if topic):
 
 - Questions asked → answered/partial/unanswered with confidence
 - Key findings with sources (file paths, docs)

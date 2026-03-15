@@ -1,15 +1,22 @@
 ---
 description: Resume work on a bead from previous session
+argument-hint: "<bead-id>"
 ---
 
-# Resume: $@
+# Resume: $ARGUMENTS
 
 Pick up where a previous session left off. Recover context, verify state, continue.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+```
 
 ## Phase 1: Verify Task
 
 ```bash
-br show $@
+br show $ARGUMENTS
 ```
 
 If not found, check `br list --status=all` — it may have been closed or the ID is wrong.
@@ -28,7 +35,7 @@ If not on the right branch, check out the feature branch. If uncommitted changes
 Check for handoff notes:
 
 ```bash
-ls .beads/artifacts/$@/handoffs/ 2>/dev/null
+ls .beads/artifacts/$ARGUMENTS/handoffs/ 2>/dev/null
 ```
 
 If a handoff exists, read the latest one. It tells you:
@@ -38,16 +45,20 @@ If a handoff exists, read the latest one. It tells you:
 - What to do next
 - Any blockers
 
-If no handoff file is found, review the git log and bead comments for context on where work stopped.
+Also search previous sessions:
+
+```typescript
+find_sessions({ query: "$ARGUMENTS" });
+```
 
 ## Phase 4: Load Artifacts
 
 Read all available context:
 
-- `.beads/artifacts/$@/prd.md`
-- `.beads/artifacts/$@/plan.md` (if exists)
-- `.beads/artifacts/$@/progress.txt` (if exists)
-- `.beads/artifacts/$@/research.md` (if exists)
+- `.beads/artifacts/$ARGUMENTS/prd.md`
+- `.beads/artifacts/$ARGUMENTS/plan.md` (if exists)
+- `.beads/artifacts/$ARGUMENTS/progress.txt` (if exists)
+- `.beads/artifacts/$ARGUMENTS/research.md` (if exists)
 
 ## Phase 5: Check Staleness
 
@@ -62,7 +73,7 @@ Check if significant changes happened on main. If so, consider rebasing. Don't b
 ## Phase 6: Continue
 
 ```bash
-br update $@ --status in_progress
+br update $ARGUMENTS --status in_progress
 ```
 
 Report:
@@ -72,4 +83,4 @@ Report:
 3. Progress (completed/remaining tasks)
 4. Next action (from handoff or PRD)
 
-Then continue with `/ship $@` or `/plan $@` as appropriate.
+Then continue with `/ship $ARGUMENTS` or `/plan $ARGUMENTS` as appropriate.

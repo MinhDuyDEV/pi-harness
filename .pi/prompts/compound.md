@@ -1,18 +1,19 @@
 ---
-description: Extract and persist learnings from completed work into project notes
+description: Extract and persist learnings from completed work into institutional memory
+argument-hint: "[bead-id]"
 ---
 
-# Compound: $@
+# Compound: $ARGUMENTS
 
 Capture what was learned. This is the flywheel step — each cycle makes the next cycle faster.
 
-> **Workflow:** `/plan` → `/ship` → `/review-codebase` → **`/compound`** → `/pr`
+> **Workflow:** `/plan` → `/ship` → `/review` → **`/compound`** → `/pr`
 >
 > Run after every completed task, review, or PR merge. The value compounds over time.
 
 ## What This Does
 
-Extracts learnings from the just-completed work and documents them as structured notes,
+Extracts learnings from the just-completed work and stores them as structured observations in memory,
 so future Plan and Ship cycles start with institutional knowledge instead of blank slates.
 
 ## Phase 1: Gather Evidence
@@ -23,10 +24,10 @@ git diff origin/main..HEAD --stat
 git log origin/main..HEAD --oneline
 
 # Get review comments if any
-br comments list $@ 2>/dev/null || echo "No bead"
+br comments list $ARGUMENTS 2>/dev/null || echo "No bead"
 
 # Get bead context if provided
-br show $@ 2>/dev/null || echo "No bead specified"
+br show $ARGUMENTS 2>/dev/null || echo "No bead specified"
 ```
 
 Collect from all available sources:
@@ -46,47 +47,63 @@ For each finding, assign a type:
 | `bugfix`    | A non-obvious bug and its root cause                       | "Bun doesn't support X, use Y instead"          |
 | `decision`  | An architectural or design choice with rationale           | "Chose JWT over sessions because..."            |
 | `gotcha`    | A footgun, constraint, or thing that looks wrong but isn't | "Don't modify dist/ directly, build overwrites" |
-| `discovery` | A non-obvious fact about the codebase or its dependencies  | "Build step copies templates to dist/"          |
+| `discovery` | A non-obvious fact about the codebase or its dependencies  | "Build copies .opencode/ to dist/template/"     |
 | `warning`   | Something that will break if not followed                  | "Always run lint:fix before commit"             |
 
 **Quality bar:** Only record learnings that would save future-you 15+ minutes.
 Skip obvious things. Skip things already in AGENTS.md.
 
-## Phase 3: Document Learnings
+## Phase 3: Store Observations
 
-For each learning worth keeping, document it with:
+For each learning worth keeping, create an observation:
 
-- **Type**: one of the types above
-- **Title**: concise, searchable (what someone would search for)
-- **Narrative**: what happened, why it matters, how to apply it
-- **Facts**: comma-separated key facts
-- **Concepts**: searchable keywords for future retrieval
-- **Files**: relevant file paths if applicable
-- **Confidence**: high (verified), medium (likely), or low (speculative)
-
-Write these to a `learnings.md` file in `.beads/artifacts/$@/` if a bead is active, or present them inline in the output.
+```typescript
+observation({
+  type: "pattern", // or bugfix, decision, gotcha, discovery, warning
+  title: "[Concise, searchable title — what someone would search for]",
+  narrative: "[What happened, why it matters, how to apply it]",
+  facts: "[comma, separated, key, facts]",
+  concepts: "[searchable, keywords, for, future, retrieval]",
+  files_modified: "[relevant/file.ts if applicable]",
+  confidence: "high", // high=verified, medium=likely, low=speculative
+});
+```
 
 **Minimum viable:** title + narrative. Everything else is bonus.
 
-## Phase 4: Check Project Notes Updates
+## Phase 4: Check AGENTS.md / Skill Updates
 
 Ask: does this learning belong as a permanent rule?
 
 If YES (it's a codebase-level constraint everyone must follow):
 
-- Suggest updating `docs/gotchas.md`
+- Suggest updating `.opencode/memory/project/gotchas.md`
 - Or the relevant skill file if it's procedure-level
 
 If MAYBE (it's a pattern, not a rule):
 
-- The documented learning is sufficient
+- The observation is sufficient
 - Don't pollute AGENTS.md with every finding
 
-**Rule:** AGENTS.md and project notes changes require user confirmation. Inline learnings are automatic.
+**Rule:** AGENTS.md changes require user confirmation. Observations are automatic.
 
-## Phase 5: Check for Related Past Learnings
+## Phase 5: Search for Related Past Observations
 
-Check project notes if available for related observations or decisions. If a newer finding contradicts or updates an older one, note explicitly which older learning is superseded and why.
+```typescript
+// Check if this updates or supersedes an older observation
+memory_search({ query: "[key concept from the finding]", limit: 3 });
+```
+
+If a newer finding contradicts or updates an older one, note it:
+
+```typescript
+observation({
+  type: "decision",
+  title: "...",
+  narrative: "...",
+  supersedes: "42", // ID of the older observation
+});
+```
 
 ## Phase 6: Output Summary
 
@@ -96,7 +113,7 @@ Report what was codified:
 ## Compound Summary
 
 **Work reviewed:** [brief description]
-**Learnings captured:** [N]
+**Learnings captured:** [N] observations
 
 | # | Type      | Title                        | Concepts               |
 |---|-----------|------------------------------|------------------------|
@@ -104,7 +121,7 @@ Report what was codified:
 | 2 | gotcha    | ...                          | node, build            |
 | 3 | bugfix    | ...                          | typecheck, strict-mode |
 
-**Project notes updates suggested:** [yes/no - describe if yes]
+**AGENTS.md updates suggested:** [yes/no - describe if yes]
 **Next recommended:** /pr  (or /plan <next-bead-id>)
 ```
 
@@ -114,13 +131,13 @@ If the work was trivial (a config change, 1-line fix with no surprises):
 
 > "Nothing worth compounding. Work was straightforward — no non-obvious patterns, bugs, or decisions encountered."
 
-Don't force learnings. Quality over quantity.
+Don't force observations. Quality over quantity.
 
 ## Related Commands
 
-| Need                   | Command            |
-| ---------------------- | ------------------ |
-| Full chain             | `/lfg`             |
-| Review before compound | `/review-codebase` |
-| Ship the work          | `/ship`            |
-| Create PR              | `/pr`              |
+| Need                   | Command   |
+| ---------------------- | --------- |
+| Full chain             | `/lfg`    |
+| Review before compound | `/review` |
+| Ship the work          | `/ship`   |
+| Create PR              | `/pr`     |

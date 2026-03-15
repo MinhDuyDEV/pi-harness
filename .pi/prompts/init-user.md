@@ -1,13 +1,20 @@
 ---
 description: Create user profile for personalized AI interactions
+argument-hint: "[--skip-questions]"
 ---
 
-# Init-User: $@
+# Init-User: $ARGUMENTS
 
 Create personalized user profile. Optional but recommended for better AI responses.
 
 > **Prerequisite:** Run `/init` first for core setup
 > **Related:** `/init-context` for project planning setup
+
+## Load Skills
+
+```typescript
+skill({ name: "memory-system" });
+```
 
 ## Options
 
@@ -17,7 +24,7 @@ Create personalized user profile. Optional but recommended for better AI respons
 
 ## Phase 1: Gather Preferences
 
-Unless `--skip-questions`, ask the user these questions in a single message:
+Unless `--skip-questions`, ask in one message:
 
 1. **Identity**: "Which git contributor are you?" (show top 5 from `git shortlog -sn --all`)
 2. **Communication**: "Terse or detailed responses?"
@@ -25,17 +32,17 @@ Unless `--skip-questions`, ask the user these questions in a single message:
 4. **Rules**: "Any rules I should always follow?"
 5. **Technical**: "Preferred languages/frameworks?"
 
-If `--skip-questions`, infer identity from git config:
-
-```bash
-git shortlog -sn --all | head -5
-git config user.name
-git config user.email
-```
+If skipped, infer from `git config user.name` and `git config user.email`.
 
 ## Phase 2: Create user.md
 
-Create `.pi/user.md` with gathered answers:
+From template `.opencode/memory/_templates/user.md`:
+
+```bash
+cp .opencode/memory/_templates/user.md .opencode/memory/project/user.md
+```
+
+Fill in gathered answers:
 
 ```markdown
 ---
@@ -72,23 +79,24 @@ updated: [today]
 - [Rule 3]
 ```
 
-## Phase 3: Reference in APPEND_SYSTEM.md
+## Phase 3: Update opencode.json
 
-If `.pi/APPEND_SYSTEM.md` exists, suggest adding a reference to user.md:
+Ensure user.md is loaded in instructions:
 
-```markdown
-## User Preferences
-
-See `.pi/user.md` for user identity, communication style, and workflow preferences.
-Always check this file at the start of a session.
+```json
+{
+  "instructions": [
+    "file://.opencode/AGENTS.md",
+    "file://.opencode/memory/project/tech-stack.md",
+    "file://.opencode/memory/project/user.md"
+  ]
+}
 ```
-
-Otherwise, note that the user profile exists at `.pi/user.md` and suggest reading it at session start.
 
 ## Phase 4: Report
 
 Output:
 
-1. user.md created at `.pi/user.md`
+1. user.md created at `.opencode/memory/project/user.md`
 2. Preferences captured
 3. Next step: `/init-context` for GSD planning workflow

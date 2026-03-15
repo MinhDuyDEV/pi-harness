@@ -1,8 +1,9 @@
 ---
 description: UI/UX visual design with aesthetic direction and code output
+argument-hint: "<component|page|system> [topic] [--quick]"
 ---
 
-# Design: $@
+# Design: $ARGUMENTS
 
 Design a component, page, or design system with a clear aesthetic point of view.
 
@@ -19,37 +20,48 @@ Design a component, page, or design system with a clear aesthetic point of view.
 | `[topic]`   | required | What to design (e.g. "button", "dashboard") |
 | `--quick`   | false    | High-level direction only, skip code        |
 
+## Load Skills
+
+```typescript
+skill({ name: "frontend-design" }); // Design system guidance, anti-patterns, references
+```
+
 ---
 
 ## Phase 1: Detect Existing Design System
 
-```bash
-find . -name "tailwind.config.*" 2>/dev/null | head -5
-find . -name "globals.css" 2>/dev/null | head -5
-find . -name "components.json" 2>/dev/null | head -5
+```typescript
+glob({ pattern: "**/tailwind.config.{js,ts,mjs}" });
+glob({ pattern: "**/globals.css" });
+glob({ pattern: "**/components.json" }); // shadcn
 ```
 
 Read what exists. Don't design in a vacuum — build on the project's current system.
 
 ---
 
-## Phase 2: Check Project Notes
+## Phase 2: Check Memory
 
-Check your project notes for existing design decisions on this topic, and any notes on design system colors or typography. Reuse existing aesthetic decisions. Don't contradict previous design choices unless the user asks.
+```typescript
+memory_search({ query: "[topic] design UI", limit: 3 });
+memory_search({ query: "design system colors typography", limit: 3 });
+```
+
+Reuse existing aesthetic decisions. Don't contradict previous design choices unless the user asks.
 
 ---
 
 ## Phase 3: Design
 
-Apply the following design guidance:
+The `frontend-design` skill provides all reference material:
 
 - Aesthetic directions and design philosophy
-- Typography and font pairing
-- Color systems (OKLCH preferred)
+- Typography and font pairing guidance
+- Color systems (OKLCH)
 - Animation patterns (Motion + Tailwind)
-- Avoid AI slop anti-patterns: generic cards, excessive shadows, hollow icons, over-rounded corners
-- shadcn/ui component patterns when applicable
-- Tailwind v4 configuration patterns
+- Anti-patterns and AI slop avoidance
+- shadcn/ui component patterns
+- Tailwind v4 configuration
 
 **Before designing, state:**
 
@@ -70,7 +82,15 @@ For `--quick`: Skip code output. Provide direction + key decisions only.
 
 ## Phase 4: Record Decision
 
-Note your design decisions (aesthetic direction, key tokens: colors, fonts) in your project notes for future reference.
+```typescript
+observation({
+  type: "decision",
+  title: "Design: [topic]",
+  narrative: "Chose [direction] because [rationale]. Key tokens: [colors, fonts].",
+  concepts: "design, ui, [topic]",
+  confidence: "high",
+});
+```
 
 ---
 

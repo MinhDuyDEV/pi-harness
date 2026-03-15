@@ -1,14 +1,22 @@
 ---
 description: Start working on a bead - claim it and prepare workspace
+argument-hint: "<bead-id> [--worktree]"
 ---
 
-# Start: $@
+# Start: $ARGUMENTS
 
 Claim a task and prepare workspace. Bridge between specification (`/create`) and implementation (`/ship`).
 
 > **Workflow:** `/create` → **`/start <id>`** → `/ship <id>`
 >
 > ⛔ Bead MUST have `prd.md` (created via `/create`).
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "prd-task" }); // PRD → executable tasks
+```
 
 ## Parse Arguments
 
@@ -30,6 +38,7 @@ Claim a task and prepare workspace. Bridge between specification (`/create`) and
 - **Check workspace**: Don't start if uncommitted changes exist (Phase 1)
 - **One task at a time**: Warn if other tasks in progress
 - **Validate spec**: Verify prd.md exists and has real content
+- **Ask about workspace**: Let user choose branch/worktree strategy
 
 ## Phase 1: Pre-flight
 
@@ -45,8 +54,8 @@ br list --status=in_progress
 ## Phase 2: Validate Specification
 
 ```bash
-br show $@
-ls .beads/artifacts/$@/
+br show $ARGUMENTS
+ls .beads/artifacts/$ARGUMENTS/
 ```
 
 Verify `prd.md` exists and has real content (not just placeholders). If missing or incomplete, tell user to run `/create` first.
@@ -54,34 +63,59 @@ Verify `prd.md` exists and has real content (not just placeholders). If missing 
 ## Phase 3: Claim
 
 ```bash
-br update $@ --status in_progress
+br update $ARGUMENTS --status in_progress
 ```
 
 ## Phase 4: Prepare Workspace
 
-Choose the appropriate workspace strategy based on the task:
+Ask user how to handle workspace:
 
-- **Create feature branch (Recommended):** `git checkout -b feat/<bead-id>-<title>` — best for isolated work
-- **Use current branch:** Continue without branch creation — suitable for quick fixes
-- **Create worktree:** Isolated git worktree — use when `--worktree` flag was passed
+```typescript
+question({
+  questions: [
+    {
+      header: "Workspace",
+      question: "How do you want to set up the workspace?",
+      options: [
+        {
+          label: "Create feature branch (Recommended)",
+          description: "git checkout -b feat/<bead-id>-<title>",
+        },
+        {
+          label: "Use current branch",
+          description: "Work on current branch",
+        },
+        {
+          label: "Create worktree",
+          description: "Isolated git worktree for this bead",
+        },
+      ],
+    },
+  ],
+});
+```
 
 **If feature branch selected:**
 
 ```bash
-git checkout -b feat/$@-$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+git checkout -b feat/$ARGUMENTS-$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
 ```
 
-**If worktree requested:** Create an isolated worktree directory for this bead (e.g., `../worktrees/<bead-id>`), then work inside it.
+**If worktree selected:**
+
+```typescript
+skill({ name: "using-git-worktrees" });
+```
 
 **If current branch:** Continue without branch creation.
 
-## Phase 5: Convert PRD to Tasks
+## Phase 4: Convert PRD to Tasks
 
-If `prd.json` doesn't exist yet, parse the PRD markdown and convert tasks to executable JSON format. Each task should have: title, description, files, verification commands, and dependency metadata.
+If `prd.json` doesn't exist yet, use `prd-task` skill to convert PRD markdown → executable JSON.
 
 If `prd.json` already exists, show progress (completed/total tasks).
 
-## Phase 6: Report and Route
+## Phase 5: Report and Route
 
 Output:
 
@@ -93,9 +127,9 @@ Output:
 
 | State              | Next Command             |
 | ------------------ | ------------------------ |
-| Has prd.json       | `/ship $@`               |
+| Has prd.json       | `/ship $ARGUMENTS`       |
 | Epic with subtasks | `/start <first-subtask>` |
-| Complex task       | `/plan $@`               |
+| Complex task       | `/plan $ARGUMENTS`       |
 
 ## Related Commands
 

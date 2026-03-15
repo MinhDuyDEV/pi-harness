@@ -1,8 +1,9 @@
 ---
 description: Full autonomous chain - Plan → Ship → Review → Compound in one command
+argument-hint: "<bead-id> [--skip-plan]"
 ---
 
-# LFG (Let's Fucking Go): $@
+# LFG (Let's Fucking Go): $ARGUMENTS
 
 Full compound engineering cycle. One command, all four steps.
 
@@ -20,8 +21,8 @@ Full compound engineering cycle. One command, all four steps.
 ## Phase 0: Preflight
 
 ```bash
-br show $1
-ls .beads/artifacts/$1/
+br show $BEAD_ID
+ls .beads/artifacts/$BEAD_ID/
 ```
 
 Verify:
@@ -36,27 +37,31 @@ Report:
 ## LFG: <bead-id> — <title>
 
 Cycle: Plan → Ship → Review → Compound
+Review mode: [Standard 3-agent / Deep 5-agent]
 Plan: [create new / use existing]
 ```
 
 ## Step 1: PLAN
 
-Create a detailed implementation plan for this bead:
+Load and execute the `/plan` command for this bead:
 
-- Read the PRD at `.beads/artifacts/$1/prd.md`
-- Research any unknowns in the codebase
-- Identify task dependencies and group into waves
-- Output plan to `.beads/artifacts/$1/plan.md`
+```typescript
+skill({ name: "writing-plans" });
+// Run full /plan flow including Phase 0 institutional research
+// Output: .beads/artifacts/$BEAD_ID/plan.md
+```
 
 Checkpoint if plan has major unknowns or architecture questions. Otherwise proceed automatically.
 
 ## Step 2: WORK
 
-Execute the plan wave-by-wave:
+Execute the plan:
 
-- Load `plan.md` and parse waves
-- Execute each wave's tasks sequentially, verifying each task before moving on
-- Per-task commits after each task passes verification
+```typescript
+skill({ name: "executing-plans" });
+// Load plan.md, execute wave-by-wave
+// Per-task commits after each task passes verification
+```
 
 Run verification after each wave:
 
@@ -73,13 +78,15 @@ BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~$(git log
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
-Review the diff from `$BASE_SHA` to `$HEAD_SHA` across these dimensions:
+Load and run the review skill:
 
-- Security/correctness
-- Performance/architecture
-- Type-safety/tests
-- Conventions/patterns
-- Simplicity/completeness
+```typescript
+skill({ name: "requesting-code-review" });
+```
+
+Dispatch 5 specialized agents in parallel.
+
+Wait for all agents to return. Synthesize findings.
 
 **Auto-fix rule:**
 
@@ -87,7 +94,7 @@ Review the diff from `$BASE_SHA` to `$HEAD_SHA` across these dimensions:
 - Important issues → fix inline, continue
 - Minor issues → add to bead comments, continue
 
-If critical issues cannot be auto-fixed:
+If Critical issues cannot be auto-fixed:
 
 ```
 ## CHECKPOINT: Review Blocker
@@ -104,13 +111,14 @@ Awaiting your decision before continuing.
 
 ## Step 4: COMPOUND
 
-Extract learnings from the full cycle:
+Load and run the compound command:
 
-- Review what files changed (`git diff origin/main..HEAD --stat`) and what patterns were used
-- Identify non-obvious decisions, bugs found, patterns confirmed, or gotchas discovered
-- For each learning worth keeping (saves 15+ min future work): note the type (pattern, bugfix, decision, gotcha, discovery, warning), title, and narrative
-- Check project notes for related past observations and note if any are superseded
-- Suggest updates to `docs/gotchas.md` if a codebase-level constraint was discovered (requires user confirmation)
+```typescript
+// Run /compound $BEAD_ID
+// Extract learnings from the full cycle
+// Store observations to memory
+// Suggest AGENTS.md updates if conventions changed
+```
 
 ## Step 5: Report & Next
 
@@ -123,11 +131,11 @@ Extract learnings from the full cycle:
 |----------|--------|------------------------------|
 | Plan     | ✓      | [N] waves, [M] tasks         |
 | Work     | ✓      | [N] commits, [M] files       |
-| Review   | ✓      | [M] fixes                    |
-| Compound | ✓      | [N] learnings captured       |
+| Review   | ✓      | [N] agents, [M] fixes        |
+| Compound | ✓      | [N] observations stored      |
 
 ### Learnings Captured
-[list of learning titles]
+[list of observation titles]
 
 ### Verification
 - typecheck: pass
@@ -140,12 +148,24 @@ Extract learnings from the full cycle:
 - Or continue with next bead: `/lfg <next-bead-id>`
 ```
 
+## Swarm Mode (sLFG)
+
+For large plans with 6+ independent tasks, run Work step in swarm mode:
+
+```typescript
+skill({ name: "swarm-coordination" });
+// Dispatch parallel worker agents per wave
+// Leader monitors and synthesizes
+```
+
+Use when: plan has 2+ independent waves with no shared file mutations.
+
 ## Related Commands
 
-| Need            | Command            |
-| --------------- | ------------------ |
-| Plan only       | `/plan <id>`       |
-| Ship only       | `/ship <id>`       |
-| Review only     | `/review-codebase` |
-| Compound only   | `/compound <id>`   |
-| Create PR after | `/pr`              |
+| Need            | Command          |
+| --------------- | ---------------- |
+| Plan only       | `/plan <id>`     |
+| Ship only       | `/ship <id>`     |
+| Review only     | `/review`        |
+| Compound only   | `/compound <id>` |
+| Create PR after | `/pr`            |

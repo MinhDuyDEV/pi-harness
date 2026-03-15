@@ -1,12 +1,19 @@
 ---
 description: Initialize core project setup (AGENTS.md + tech-stack detection only)
+argument-hint: "[--deep]"
 ---
 
-# Init: $@
+# Init: $ARGUMENTS
 
 Core project setup. Creates AGENTS.md and detects tech stack. Run once per project.
 
 > **Next steps:** `/init-user` for personalization, `/init-context` for GSD planning workflow
+
+## Load Skills
+
+```typescript
+skill({ name: "index-knowledge" });
+```
 
 ## Options
 
@@ -28,17 +35,29 @@ With `--deep`: Also analyze git history, source patterns, subsystem candidates.
 
 ## Phase 2: Preview Detection
 
-After detecting the project, show a summary of the detected tech stack. Ask the user to choose:
+After detecting project, show summary and ask for confirmation:
 
-1. Proceed and create AGENTS.md
-2. See what will be written first (display detected values without writing files, then ask again)
-3. Cancel
+```typescript
+question({
+  questions: [
+    {
+      header: "Preview",
+      question: `Detected: ${detectedTechStack}. Create AGENTS.md?`,
+      options: [
+        { label: "Yes, create it (Recommended)" },
+        { label: "Show me what you'll write first" },
+        { label: "Cancel" },
+      ],
+    },
+  ],
+});
+```
 
-Wait for the user's choice before creating any files.
+**If "Show me":** Display detected values without writing files, then ask again.
 
 ## Phase 3: Create AGENTS.md
 
-Create `./AGENTS.md` — **target <60 lines** (max 150). Include:
+Create `./AGENTS.md` — **target <60 lines** (max 150). Follow the `index-knowledge` skill format:
 
 - Tech stack with versions
 - File structure
@@ -52,17 +71,19 @@ Create `./AGENTS.md` — **target <60 lines** (max 150). Include:
 
 ## Phase 4: Create tech-stack.md
 
-Create `docs/tech-stack.md` with detected values:
+From template `.opencode/memory/_templates/tech-stack.md`:
+
+```bash
+cp .opencode/memory/_templates/tech-stack.md .opencode/memory/project/tech-stack.md
+```
+
+Fill detected values:
 
 - Framework, language, runtime
 - Styling, components, design system
 - Database, ORM, state management
 - Testing tools
 - Verification commands
-
-```bash
-mkdir -p docs
-```
 
 ## Phase 5: Subsystems (--deep only)
 
@@ -82,7 +103,7 @@ Verify:
 - [ ] Commands validated and work
 - [ ] Boundaries include Never rules
 - [ ] Code example from actual codebase
-- [ ] tech-stack.md created in `docs/`
+- [ ] tech-stack.md created
 
 Output:
 

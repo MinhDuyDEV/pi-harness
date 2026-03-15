@@ -1,14 +1,22 @@
 ---
 description: Ship a bead - implement PRD tasks, verify, review, close
+argument-hint: "<bead-id>"
 ---
 
-# Ship: $@
+# Ship: $ARGUMENTS
 
 Execute PRD tasks, verify each passes, run review, close the bead.
 
 > **Workflow:** `/create` → `/start <id>` → **`/ship <id>`**
 >
 > ⛔ Bead MUST be `in_progress` with `prd.md`. Run `/start` first if not.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "verification-before-completion" });
+```
 
 ## Determine Input Type
 
@@ -22,45 +30,57 @@ Execute PRD tasks, verify each passes, run review, close the bead.
 
 - **Be certain**: Only ship if all tasks pass verification
 - **Don't skip gates**: Build, test, lint, typecheck are non-negotiable
-- **Run the review**: Always perform a code review before closing
+- **Run the review**: Always spawn review agent before closing
 - **Verify goals**: Tasks completing ≠ goals achieved (use goal-backward verification)
 - **Commit before close**: Per-task commits required, don't ship without git history
 - **Ask before closing**: Never close bead without user confirmation
 
+## Available Tools
+
+| Tool      | Use When                                  |
+| --------- | ----------------------------------------- |
+| `explore` | Finding patterns in codebase, prior art   |
+| `scout`   | External research, best practices         |
+| `lsp`     | Finding symbol definitions, references    |
+| `grep`    | Finding code patterns                     |
+| `task`    | Spawning subagents for parallel execution |
+
 ## Phase 1: Guards
 
 ```bash
-br show $@
+br show $ARGUMENTS
 ```
 
 Verify:
 
-- Bead status is `in_progress` (if not, tell user to run `/start $@`)
-- `.beads/artifacts/$@/prd.md` exists (if not, tell user to run `/create` first)
+- Bead status is `in_progress` (if not, tell user to run `/start $ARGUMENTS`)
+- `.beads/artifacts/$ARGUMENTS/prd.md` exists (if not, tell user to run `/create` first)
 
 Check what artifacts exist:
 
 ```bash
-ls .beads/artifacts/$@/
+ls .beads/artifacts/$ARGUMENTS/
 ```
 
 ## Phase 2: Route to Execution
 
-| Artifact exists | Action                                      |
-| --------------- | ------------------------------------------- |
-| `plan.md`       | Follow its wave-based batch process         |
-| `prd.json`      | Proceed to PRD task loop below              |
-| Only `prd.md`   | Convert `prd.md` → `prd.json`, then proceed |
+| Artifact exists | Action                                                   |
+| --------------- | -------------------------------------------------------- |
+| `plan.md`       | Load `executing-plans` skill, follow its batch process   |
+| `prd.json`      | Proceed to PRD task loop below                           |
+| Only `prd.md`   | Load `prd-task` skill to create `prd.json`, then proceed |
 
 ## Phase 3: Wave-Based Execution
 
 If `plan.md` exists with dependency graph:
 
 1. **Parse waves** from plan header (Wave 1, Wave 2, etc.)
-2. **Execute Wave 1** (independent tasks)
+2. **Execute Wave 1** (independent tasks) in parallel using `task()` subagents
 3. **Wait for Wave 1 completion** — all tasks pass or report failures
-4. **Execute Wave 2** (depends on Wave 1)
+4. **Execute Wave 2** (depends on Wave 1) in parallel
 5. **Continue** until all waves complete
+
+**Parallel safety:** Only tasks within same wave run in parallel. Tasks in Wave N+1 wait for Wave N.
 
 ### Phase 3A: PRD Task Loop (Sequential Fallback)
 
@@ -75,7 +95,7 @@ For each task (wave-based or sequential fallback):
 7. **If verification fails**, fix and retry (max 2 attempts per task)
 8. **Commit** — per-task commit (see below)
 9. **Mark** `passes: true` in `prd.json`
-10. **Append** progress to `.beads/artifacts/$@/progress.txt`
+10. **Append** progress to `.beads/artifacts/$ARGUMENTS/progress.txt`
 
 ### Checkpoint Protocol
 
@@ -148,7 +168,7 @@ After each task completes (verification passed):
 3. **Commit with type prefix:**
 
    ```bash
-   git commit -m "feat(bead-$@): [task description]
+   git commit -m "feat(bead-$ARGUMENTS): [task description]
 
    - [key change 1]
    - [key change 2]"
@@ -172,9 +192,42 @@ After each task completes (verification passed):
 - Modifying files outside task scope → stop, ask user
 - Rule 4 deviation encountered → stop, present options
 
-## Phase 4: Verification Gates
+## Phase 4: Choose Verification Gates
 
-Run the appropriate gates. Default to running all gates unless a reason to skip. Detect project type:
+Ask user which gates to run:
+
+```typescript
+question({
+  questions: [
+    {
+      header: "Verification Gates",
+      question: "Which verification gates should run?",
+      options: [
+        {
+          label: "All (Recommended)",
+          description: "build + test + lint + typecheck — full validation",
+        },
+        {
+          label: "Essential only",
+          description: "build + test — faster, basic validation",
+        },
+        {
+          label: "Test only",
+          description: "Just run tests",
+        },
+        {
+          label: "Skip gates",
+          description: "Trust my changes, skip verification",
+        },
+      ],
+    },
+  ],
+});
+```
+
+## Phase 5: Run Verification Gates
+
+Based on selection, run appropriate gates. Detect project type:
 
 | Project Type    | Detect Via                    | Build            | Test            | Lint                          | Typecheck                             |
 | --------------- | ----------------------------- | ---------------- | --------------- | ----------------------------- | ------------------------------------- |
@@ -189,28 +242,32 @@ Also run PRD `Verify:` commands.
 
 If any gate fails, fix before proceeding.
 
-Recommended gates: **build + test + lint + typecheck** (full validation). Skip only with explicit user request.
+## Phase 6: Review
 
-## Phase 5: Review
+Load and run the review skill:
 
-Perform a thorough code review across these dimensions:
+```typescript
+skill({ name: "requesting-code-review" });
+```
 
-- **Security/correctness**: Are there vulnerabilities or logic errors?
-- **Performance/architecture**: Are there scalability or design issues?
-- **Type-safety/tests**: Are types correct and test coverage adequate?
-- **Conventions/patterns**: Does code follow project patterns?
-- **Simplicity/completeness**: Is code minimal and complete?
+Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
 
 ```bash
 BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~1)
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 
-Review the diff from `$BASE_SHA` to `$HEAD_SHA` against the PRD at `.beads/artifacts/$@/prd.md`.
+Fill placeholders:
+
+- `{WHAT_WAS_IMPLEMENTED}`: bead title + brief summary of what changed
+- `{PLAN_OR_REQUIREMENTS}`: `.beads/artifacts/$ARGUMENTS/prd.md`
+- `{BASE_SHA}` / `{HEAD_SHA}`: from above
+
+Wait for all 5 agents to return. Synthesize findings.
 
 **Auto-fix rule:**
 
-- Critical issues → fix inline, re-run Phase 4 gates, continue
+- Critical issues → fix inline, re-run Phase 5 gates, continue
 - Important issues → fix inline, continue
 - Minor issues → add to bead comments, note for `/compound` step
 
@@ -249,18 +306,33 @@ return Response.json({ok: true})  // Static, not query result
 
 If any artifact fails Level 2 or 3 → fix → re-verify.
 
-## Phase 6: Close
+## Phase 7: Close
 
-All tasks pass, gates green, review clean — confirm with user before closing.
+Ask user before closing:
+
+```typescript
+question({
+  questions: [
+    {
+      header: "Close",
+      question: "All tasks pass, gates green, review clean. Close bead $ARGUMENTS?",
+      options: [
+        { label: "Yes, close it (Recommended)", description: "All checks passed" },
+        { label: "No, keep open", description: "Need more work" },
+      ],
+    },
+  ],
+});
+```
 
 If confirmed:
 
 ```bash
-br close $@ --reason "Shipped: all PRD tasks pass, verification + review passed"
+br close $ARGUMENTS --reason "Shipped: all PRD tasks pass, verification + review passed"
 br sync --flush-only
 ```
 
-Record significant learnings with `/compound $@` after closing.
+Record significant learnings with `/compound $ARGUMENTS` after closing.
 
 ## Output
 

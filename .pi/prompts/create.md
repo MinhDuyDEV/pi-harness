@@ -1,14 +1,22 @@
 ---
 description: Create a bead with specification from a description
+argument-hint: "<description> [--type epic|feature|task|bug]"
 ---
 
-# Create: $@
+# Create: $ARGUMENTS
 
 Create a bead and its specification (PRD) from a description.
 
 > **Workflow:** **`/create`** → `/start <id>` → `/ship <id>`
 >
 > ⛔ This command creates the specification ONLY. Do NOT write any implementation code.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "prd" }); // PRD template guidance
+```
 
 ## Parse Arguments
 
@@ -35,10 +43,11 @@ Create a bead and its specification (PRD) from a description.
 
 ## Available Tools
 
-| Tool   | Use When                                     |
-| ------ | -------------------------------------------- |
-| `bash` | Running br commands, creating files          |
-| `grep` | Finding patterns in codebase, affected files |
+| Tool      | Use When                                     |
+| --------- | -------------------------------------------- |
+| `explore` | Finding patterns in codebase, affected files |
+| `scout`   | External research, best practices            |
+| `br`      | Creating and managing beads                  |
 
 ## Phase 1: Duplicate Check
 
@@ -59,28 +68,61 @@ If `--type` was provided, use it directly. Otherwise, suggest a type based on th
 
 ## Phase 3: Choose Research Depth
 
-Choose the appropriate research depth based on complexity:
+Ask user before spawning agents:
 
-- **Deep** (complex/unfamiliar work): Explore patterns, tests, deps, and best practices thoroughly
-- **Standard** (typical work): Explore patterns and tests
-- **Minimal** (small/clear change): Quick file scan
-- **Skip** (well-known codebase): Use existing knowledge
-
-If the work is non-trivial, err toward Standard or Deep. For bugs, always gather reproduction context.
+```typescript
+question({
+  questions: [
+    {
+      header: "Research Depth",
+      question: "How much codebase research do you need?",
+      options: [
+        {
+          label: "Deep (Recommended for complex work)",
+          description: "3-5 agents: patterns, tests, deps, best practices (~2 min)",
+        },
+        {
+          label: "Standard",
+          description: "2 agents: patterns + tests (~1 min)",
+        },
+        {
+          label: "Minimal",
+          description: "1 agent: quick file scan (~30 sec)",
+        },
+        {
+          label: "Skip",
+          description: "I know the codebase, use existing knowledge",
+        },
+      ],
+    },
+  ],
+});
+```
 
 ## Phase 4: Gather Context
 
-Based on research depth, explore the codebase:
+Based on research depth choice, spawn agents:
 
-**If Deep:** Investigate patterns, tests, deps, and (for feature/epic) external best practices. For epics, also review for correctness concerns.
+**If Deep:**
 
-**If Standard:** Investigate patterns and tests. Check external references for feature/epic work.
+- 3x `explore` (patterns, tests, deps)
+- 1x `scout` (feature/epic)
+- 1x `review` (epic)
 
-**If Minimal:** Quick scan for relevant patterns.
+**If Standard:**
 
-**If Skip:** Use existing AGENTS.md context only.
+- 2x `explore` (patterns, tests)
+- 1x `scout` (feature/epic only)
 
-**While researching**, ask clarifying questions if the description lacks scope or expected outcome. For bugs, also ask for reproduction steps and expected vs actual behavior.
+**If Minimal:**
+
+- 1x `explore` (patterns)
+
+**If Skip:**
+
+- No agents, use existing AGENTS.md context
+
+**While agents run**, ask clarifying questions if the description lacks scope or expected outcome. For bugs, also ask for reproduction steps and expected vs actual behavior.
 
 ## Phase 5: Create Bead
 
@@ -91,10 +133,10 @@ mkdir -p ".beads/artifacts/$BEAD_ID"
 
 ## Phase 6: Write PRD
 
-Copy and fill the PRD template using context from Phase 4:
+Copy and fill the PRD template using context from Phase 3:
 
 ```bash
-cp .pi/templates/prd.md ".beads/artifacts/$BEAD_ID/prd.md"
+cp .opencode/memory/_templates/prd.md ".beads/artifacts/$BEAD_ID/prd.md"
 ```
 
 ### Required Sections
@@ -105,15 +147,15 @@ cp .pi/templates/prd.md ".beads/artifacts/$BEAD_ID/prd.md"
 | Scope (In/Out)    | User input + codebase exploration                          | Always            |
 | Proposed Solution | Codebase patterns + user intent                            | Always            |
 | Success Criteria  | User verification + test commands (must include `Verify:`) | Always            |
-| Technical Context | Exploration findings                                       | Always            |
-| Affected Files    | Exploration findings (real paths from Phase 4)             | Always            |
+| Technical Context | Explore agent findings                                     | Always            |
+| Affected Files    | Explore agent findings (real paths from Phase 3)           | Always            |
 | Tasks             | Derived from scope + solution                              | Always            |
 | Risks             | Codebase exploration                                       | Feature/epic only |
-| Open Questions    | Unresolved items from Phase 4                              | If any exist      |
+| Open Questions    | Unresolved items from Phase 3                              | If any exist      |
 
 ### Task Format
 
-Tasks must follow this format:
+Tasks must follow the `prd-task` skill format:
 
 - Title with `[category]` tag
 - One-sentence **end state** description (not step-by-step)

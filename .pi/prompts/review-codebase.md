@@ -1,8 +1,16 @@
 ---
 description: Review code for quality, security, and compliance
+argument-hint: "[path|bead-id|pr-number|'all'] [--quick|--thorough]"
 ---
 
-# Review: $@
+# Review: $ARGUMENTS
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "requesting-code-review" });
+```
 
 ## Determine Input Type
 
@@ -19,7 +27,17 @@ description: Review code for quality, security, and compliance
 - **Don't invent problems**: If an edge case isn't specified, don't flag it
 - **Don't be a zealot about style**: Unless it violates project conventions, don't flag
 - **Review the changes**: Don't review pre-existing code that wasn't modified
-- **Investigate first**: If unsure, explore the codebase before flagging
+- **Investigate first**: If unsure, use explore/scout agents before flagging
+
+## Available Tools
+
+| Tool         | Use When                                |
+| ------------ | --------------------------------------- |
+| `explore`    | Finding patterns in codebase, prior art |
+| `scout`      | External research, best practices       |
+| `lsp`        | Finding symbol definitions, references  |
+| `grep`       | Finding code patterns                   |
+| `codesearch` | Real-world usage examples               |
 
 ## Phase 1: Gather Context
 
@@ -47,9 +65,9 @@ If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
 
 If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
 
-## Phase 3: Automated Checks
+## Phase 2: Automated Checks
 
-Detect project type and run the appropriate checks:
+Detect project type and run the appropriate checks in parallel:
 
 | Project Type    | Detect Via                    | Build            | Test            | Lint                          | Typecheck                             |
 | --------------- | ----------------------------- | ---------------- | --------------- | ----------------------------- | ------------------------------------- |
@@ -67,7 +85,7 @@ Also scan for common issues appropriate to the detected language:
 - `TODO|FIXME|HACK` markers
 - Hardcoded secrets patterns
 
-## Phase 4: Manual Review
+## Phase 3: Manual Review
 
 Review each category:
 
@@ -86,7 +104,7 @@ Review each category:
 - Default: Full automated + manual review
 - `--thorough`: Deep analysis of all categories
 
-## Phase 5: Report
+## Phase 4: Report
 
 Group findings by severity:
 
@@ -101,7 +119,7 @@ Include:
 3. Verdict: Ready to merge / With fixes / No
 4. Reasoning (1-2 sentences)
 
-Note significant findings in your project notes if available.
+Record significant findings with `observation()`.
 
 ## Related Commands
 

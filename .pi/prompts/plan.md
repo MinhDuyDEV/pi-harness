@@ -1,8 +1,9 @@
 ---
 description: Create detailed implementation plan with TDD steps for a bead
+argument-hint: "<bead-id> [--create-beads]"
 ---
 
-# Plan: $@
+# Plan: $ARGUMENTS
 
 Create a detailed implementation plan with TDD steps. Optional deep-planning between `/start` and `/ship`.
 
@@ -11,6 +12,20 @@ Create a detailed implementation plan with TDD steps. Optional deep-planning bet
 > ⛔ Bead MUST be `in_progress` with `prd.md`. Use `/start` first.
 >
 > **When to use:** Complex tasks where PRD verification steps aren't enough guidance. Skip for simple tasks.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "writing-plans" }); // TDD plan format
+```
+
+## Parse Arguments
+
+| Argument         | Default  | Description                       |
+| ---------------- | -------- | --------------------------------- |
+| `<bead-id>`      | required | The bead to plan                  |
+| `--create-beads` | false    | Create child beads for each phase |
 
 ## Before You Plan
 
@@ -26,9 +41,16 @@ Before touching the PRD or planning anything, load what the codebase already kno
 
 **This step is not optional.** Skipping it means planning in the dark.
 
-### Step 1: Check project notes
+### Step 1: Search institutional memory
 
-Check project notes if available for past decisions, patterns, and gotchas related to this work. If relevant notes found, incorporate them directly into the plan — don't re-solve solved problems.
+```typescript
+// Search for past decisions, patterns, gotchas related to this work
+memory_search({ query: "<bead-title or feature keywords>", limit: 5 });
+memory_search({ query: "<key technical concept from bead>", type: "bugfix", limit: 3 });
+memory_read({ file: "handoffs/last" }); // Check last session context
+```
+
+If relevant observations found: incorporate them directly into the plan. Don't re-solve solved problems.
 
 ### Step 2: Mine git history
 
@@ -50,61 +72,86 @@ Look for:
 - How similar features were implemented before
 - Any "fix:", "revert:", "hotfix:" commits near your scope (footgun zones)
 
-### Step 3: Search codebase patterns (if Level 2-3 work)
+### Step 3: Spawn learnings-researcher (if Level 2-3 work)
 
-Search the codebase for patterns related to this work:
+```typescript
+task({
+  subagent_type: "explore",
+  description: "Search codebase for patterns related to this work",
+  prompt: `Search the codebase for patterns, conventions, and existing implementations related to: [FEATURE].
 
-- grep for relevant function names and patterns
-- Find similar existing features
-- Check test patterns for this domain
-- Look for any TODO/FIXME comments in relevant files
+  Run these searches:
+  - grep for relevant function names and patterns
+  - Find similar existing features
+  - Check test patterns for this domain
+  - Look for any TODO/FIXME comments in relevant files
 
-Return: existing patterns to follow, files to be aware of, and any gotchas.
+  Return: existing patterns to follow, files to be aware of, and any gotchas.`,
+});
+```
 
 **Only after completing Phase 0** do you proceed to planning. The research phases must use this context.
 
 ## Phase 1: Guards
 
 ```bash
-br show $@
-ls .beads/artifacts/$@/
+br show $ARGUMENTS
+ls .beads/artifacts/$ARGUMENTS/
 ```
 
 Verify:
 
 - Bead is `in_progress`
 - `prd.md` exists
-- If `plan.md` already exists, confirm with the user: overwrite or skip?
+- If `plan.md` already exists, ask user: overwrite or skip?
 
 ## Phase 2: Discovery Assessment
 
 Before research, determine discovery level based on PRD:
 
-| Level | Scope                | When to Use                                                       | Action                                    |
-| ----- | -------------------- | ----------------------------------------------------------------- | ----------------------------------------- |
-| **0** | Skip                 | Pure internal work, existing patterns only (grep confirms)        | Skip research, proceed to decomposition   |
-| **1** | Quick (2-5 min)      | Single known library, confirming syntax/version                   | Query official docs                       |
-| **2** | Standard (15-30 min) | Choosing between 2-3 options, new external integration            | Web search + codebase research            |
-| **3** | Deep (1+ hour)       | Architectural decision, novel problem, multiple external services | Comprehensive research across all sources |
+| Level | Scope                | When to Use                                                       | Action                                      |
+| ----- | -------------------- | ----------------------------------------------------------------- | ------------------------------------------- |
+| **0** | Skip                 | Pure internal work, existing patterns only (grep confirms)        | Skip research, proceed to decomposition     |
+| **1** | Quick (2-5 min)      | Single known library, confirming syntax/version                   | `context7 resolve-library-id + query-docs`  |
+| **2** | Standard (15-30 min) | Choosing between 2-3 options, new external integration            | Spawn `@scout` for research                 |
+| **3** | Deep (1+ hour)       | Architectural decision, novel problem, multiple external services | Full research with parallel `@scout` agents |
 
 **Depth indicators:**
 
 - Level 2+: New library not in package.json, external API, "choose/select/evaluate"
 - Level 3: "architecture/design/system", data modeling, auth design
 
-Assess the PRD and choose the appropriate discovery level. Proceed at the suggested level unless context clearly indicates otherwise.
+**Decision:** Ask user to confirm or adjust:
+
+```typescript
+const suggestedLevel = assessDiscoveryLevel(prdContent);
+
+question({
+  questions: [
+    {
+      header: "Discovery Level",
+      question: `Suggested: Level ${suggestedLevel} (${getLevelDescription(suggestedLevel)}). Proceed?`,
+      options: [
+        { label: `Yes, Level ${suggestedLevel} (Recommended)` },
+        { label: "Lower (less research)", description: "If you know the patterns" },
+        { label: "Higher (more research)", description: "If uncertain about approach" },
+        { label: "Skip research", description: "I know the codebase" },
+      ],
+    },
+  ],
+});
+```
 
 ## Phase 3: Research (if Level 1-3)
 
 Read the PRD and extract tasks, success criteria, affected files, scope.
 
-Gather implementation context using these sources in priority order:
+Spawn parallel agents to gather implementation context:
 
-1. **Codebase patterns** — grep/LSP analysis for existing patterns, affected file structure, test patterns
-2. **Official docs** — API references for known libraries
-3. **Source code** — package source when docs are insufficient
-4. **GitHub examples** — real-world patterns
-5. **Web search** — only if tiers 1-4 don't answer
+| Agent     | Purpose                                                              |
+| --------- | -------------------------------------------------------------------- |
+| `explore` | Codebase patterns, affected file structure, test patterns, conflicts |
+| `scout`   | Best practices, common patterns, pitfalls                            |
 
 ## Phase 4: Goal-Backward Analysis
 
@@ -206,14 +253,14 @@ Wave 3: C (depends on B)
 
 ## Phase 7: Write Plan
 
-Write `.beads/artifacts/$@/plan.md` using this format:
+Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill format:
 
 ### Required Plan Header
 
 ```markdown
 # [Feature] Implementation Plan
 
-> **For Pi:** Implement this plan task-by-task, following the dependency waves in order.
+> **For Claude:** REQUIRED SUB-SKILL: Use skill({ name: "executing-plans" }) to implement this plan task-by-task.
 
 **Goal:** [Outcome-shaped goal from PRD]
 
@@ -276,7 +323,7 @@ For large work, create child beads for each plan phase:
 
 ```bash
 CHILD=$(br create "[Phase title]" --type task --json | jq -r '.id')
-br dep add $CHILD $@
+br dep add $CHILD $ARGUMENTS
 ```
 
 ## Phase 9: Report
@@ -289,12 +336,12 @@ Output:
 4. **Dependency Waves:** [N] waves for parallel execution
 5. **Task count:** [N] tasks, [M] TDD steps
 6. **Files affected:** [List]
-7. **Plan location:** `.beads/artifacts/$@/plan.md`
+7. **Plan location:** `.beads/artifacts/$ARGUMENTS/plan.md`
 8. **Child bead hierarchy:** (if created)
-9. **Next step:** `/ship $@`
+9. **Next step:** `/ship $ARGUMENTS`
 
 ```bash
-br comments add $@ "Created plan.md: Level [N] discovery, [X] waves, [Y] tasks, [Z] TDD steps"
+br comments add $ARGUMENTS "Created plan.md: Level [N] discovery, [X] waves, [Y] tasks, [Z] TDD steps"
 ```
 
 ## Related Commands

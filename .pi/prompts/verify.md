@@ -1,10 +1,18 @@
 ---
 description: Verify implementation completeness, correctness, and coherence
+argument-hint: "<bead-id> [--quick] [--fix]"
 ---
 
-# Verify: $@
+# Verify: $ARGUMENTS
 
 Check implementation against PRD before shipping.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "verification-before-completion" });
+```
 
 ## Parse Arguments
 
@@ -32,8 +40,8 @@ Check implementation against PRD before shipping.
 ## Phase 1: Gather Context
 
 ```bash
-br show $@
-ls .beads/artifacts/$@/
+br show $ARGUMENTS
+ls .beads/artifacts/$ARGUMENTS/
 ```
 
 Read the PRD and any other artifacts (plan.md, research.md, design.md).
@@ -82,7 +90,7 @@ Flag contradictions with specific file references.
 ## Phase 5: Report
 
 ```bash
-br comments add $@ "Verification: [PASS|PARTIAL|FAIL] - [summary]"
+br comments add $ARGUMENTS "Verification: [PASS|PARTIAL|FAIL] - [summary]"
 ```
 
 Output:
@@ -92,9 +100,9 @@ Output:
 3. **Correctness**: gate results
 4. **Coherence**: contradictions found (if not --quick)
 5. **Blocking issues** to fix before shipping
-6. **Next step**: `/ship $@` if ready, or list fixes needed
+6. **Next step**: `/ship $ARGUMENTS` if ready, or list fixes needed
 
-Note any significant findings for future reference.
+Record significant findings with `observation()`.
 
 ## Related Commands
 

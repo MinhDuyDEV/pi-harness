@@ -1,8 +1,16 @@
 ---
 description: Create and submit pull request with bead traceability
+argument-hint: "[bead-id] [--draft]"
 ---
 
 # Pull Request
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "verification-before-completion" });
+```
 
 ## Parse Arguments
 
@@ -43,8 +51,8 @@ git diff main...HEAD --stat
 If bead ID provided:
 
 ```bash
-br show $@
-ls .beads/artifacts/$@/
+br show $ARGUMENTS
+ls .beads/artifacts/$ARGUMENTS/
 ```
 
 Read the PRD to extract goal and success criteria for the PR description.
@@ -53,19 +61,24 @@ Read the PRD to extract goal and success criteria for the PR description.
 
 This is the last gate before code hits GitHub. Run it every time.
 
-Review the diff carefully across these dimensions before pushing:
+Load the review skill:
 
-- **Security/correctness** — no vulnerabilities, logic errors, or unsafe operations
-- **Performance/architecture** — no regressions, appropriate data structures, clean design
-- **Type safety/tests** — types correct, tests cover the new behavior
-- **Conventions/patterns** — follows existing code style and project conventions
-- **Simplicity/completeness** — no dead code, no missing edge cases, no over-engineering
+```typescript
+skill({ name: "requesting-code-review" });
+```
+
+Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
 
 ```bash
 BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git merge-base HEAD origin/main)
 HEAD_SHA=$(git rev-parse HEAD)
-git diff $BASE_SHA..$HEAD_SHA
 ```
+
+Fill placeholders:
+
+- `{WHAT_WAS_IMPLEMENTED}`: what this PR delivers (from git log summary)
+- `{PLAN_OR_REQUIREMENTS}`: PRD path or brief requirements
+- `{BASE_SHA}` / `{HEAD_SHA}`: from above
 
 **Gate rule:** All Critical issues must be resolved before pushing. No exceptions.
 Important issues: fix or document as known limitation in PR body.
@@ -74,7 +87,23 @@ After fixing issues, re-run verification gates from Phase 1 if code was changed.
 
 ## Phase 3: Push and Confirm
 
-Show the user what will be pushed (branch name, commit count, files changed) and ask for confirmation before proceeding. Do not push without explicit confirmation.
+Show what will be pushed and ask the user:
+
+```typescript
+question({
+  questions: [
+    {
+      header: "Push",
+      question: "Ready to push and create PR. Proceed?",
+      options: [
+        { label: "Push & create PR (Recommended)", description: "Push branch and create PR" },
+        { label: "Push & draft PR", description: "Create as draft for review" },
+        { label: "Show diff first", description: "Review changes before pushing" },
+      ],
+    },
+  ],
+});
+```
 
 If confirmed:
 
@@ -112,7 +141,7 @@ EOF
 
 If `--draft`, add `--draft` flag.
 
-If bead ID provided, add artifacts section linking to `.beads/artifacts/$@/prd.md`.
+If bead ID provided, add artifacts section linking to `.beads/artifacts/$ARGUMENTS/prd.md`.
 
 ## Output
 

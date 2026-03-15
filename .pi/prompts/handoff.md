@@ -1,12 +1,13 @@
 ---
 description: Save progress and context for next session
+argument-hint: "<bead-id> [instructions]"
 ---
 
-# Handoff: $@
+# Handoff: $ARGUMENTS
 
 Save state so the next session can pick up cleanly.
 
-> **Workflow:** Run this when pausing work. Resume with `/resume $@`.
+> **Workflow:** Run this when pausing work. Resume with `/resume $ARGUMENTS`.
 
 ## Parse Arguments
 
@@ -15,48 +16,63 @@ Save state so the next session can pick up cleanly.
 | `<bead-id>`      | required | The bead to hand off               |
 | `[instructions]` | none     | Extra context for the next session |
 
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "memory-system" });
+```
+
 ---
 
-## Phase 1: Gather State
+## Phase 1: Gather State (Parallel)
 
 ```bash
-br show $@
+br show $ARGUMENTS
 git status --porcelain
 git branch --show-current
 git rev-parse --short HEAD
-ls .beads/artifacts/$@/ 2>/dev/null
+ls .beads/artifacts/$ARGUMENTS/ 2>/dev/null
 ```
 
 ---
 
 ## Phase 2: Handle Uncommitted Changes
 
-If `git status` shows uncommitted changes, decide what to do:
+If `git status` shows uncommitted changes, ask the user:
 
-- **Commit as WIP (recommended):** commit all changes now so the next session starts from a clean state
-- **Leave uncommitted:** skip the commit and just write the handoff notes
+```typescript
+question({
+  questions: [
+    {
+      header: "Uncommitted work",
+      question: "You have uncommitted changes. What should we do?",
+      options: [
+        { label: "Commit as WIP (Recommended)", description: "git commit -m 'WIP: $ARGUMENTS'" },
+        { label: "Leave uncommitted", description: "Skip commit, just write handoff" },
+      ],
+    },
+  ],
+});
+```
 
-If committing:
+If user chooses commit:
 
 ```bash
 git add -A
-git commit -m "WIP: $@ - [brief description of where you stopped]"
+git commit -m "WIP: $ARGUMENTS - [brief description of where you stopped]"
 ```
 
 ---
 
 ## Phase 3: Write Handoff
 
-Create the directory if needed and write the handoff file:
+Write the handoff to the memory system:
 
-```bash
-mkdir -p .beads/artifacts/$@/handoffs
-```
-
-Write the following content to `.beads/artifacts/$@/handoffs/$(date +%Y-%m-%dT%H-%M-%S).md`:
-
-```
-# Handoff: $@
+```typescript
+memory_update({
+  file: "handoffs/$ARGUMENTS",
+  content: `# Handoff: $ARGUMENTS
 
 **Date:** [timestamp]
 **Branch:** [from git branch]
@@ -72,7 +88,7 @@ Write the following content to `.beads/artifacts/$@/handoffs/$(date +%Y-%m-%dT%H
 - [next steps]
 
 ## Files Touched
-- `path/to/file.ts` — [what changed]
+- \`path/to/file.ts\` — [what changed]
 
 ## Decisions
 - [decision]: [why]
@@ -84,19 +100,26 @@ Write the following content to `.beads/artifacts/$@/handoffs/$(date +%Y-%m-%dT%H
 1. [first thing to do]
 2. [second thing to do]
 
-Resume with: `/resume $@`
+Resume with: \`/resume $ARGUMENTS\`
+`,
+  mode: "replace",
+});
 ```
 
 ---
 
 ## Phase 4: Record Learnings (If Any)
 
-If you discovered patterns or gotchas worth remembering, add a "Learnings" section to the handoff file:
+If you discovered patterns or gotchas worth remembering:
 
-```
-## Learnings
-- [concise, searchable title]: [what you learned — specific and actionable]
-  Keywords: [relevant concepts]
+```typescript
+observation({
+  type: "learning",
+  title: "[concise, searchable title]",
+  narrative: "[what you learned — specific and actionable]",
+  bead_id: "$ARGUMENTS",
+  concepts: "[keywords for search]",
+});
 ```
 
 ---
@@ -112,12 +135,12 @@ br sync --flush-only
 ## Output
 
 ```
-Handoff: $@
+Handoff: $ARGUMENTS
 ━━━━━━━━━━━━━━━━━━━
 
 Branch: [branch]
 Commit: [hash]
-Saved:  .beads/artifacts/$@/handoffs/[timestamp].md
+Saved:  handoffs/$ARGUMENTS (memory system)
 
-Next session: /resume $@
+Next session: /resume $ARGUMENTS
 ```

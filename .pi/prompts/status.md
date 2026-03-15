@@ -1,8 +1,9 @@
 ---
 description: Show project status - tasks, git state, recent sessions
+argument-hint: "[--git] [--sessions]"
 ---
 
-# Status: $@
+# Status: $ARGUMENTS
 
 Quick project status dashboard. Runs read-only commands and reports state.
 
@@ -14,6 +15,12 @@ Quick project status dashboard. Runs read-only commands and reports state.
 | ------------ | ------- | ----------------------- |
 | `--git`      | false   | Focus on git state only |
 | `--sessions` | false   | Focus on sessions only  |
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+```
 
 ## Determine Input Type
 
@@ -30,9 +37,17 @@ Quick project status dashboard. Runs read-only commands and reports state.
 - **No modifications**: Don't create beads or modify state from status
 - **Single recommendation**: Only suggest ONE next action
 
-## Phase 1: Gather State
+## Available Tools
 
-Run all checks:
+| Tool            | Use When              |
+| --------------- | --------------------- |
+| `br`            | Task status and stats |
+| `git`           | Git state and history |
+| `find_sessions` | Recent sessions       |
+
+## Phase 1: Gather State (Parallel)
+
+Run all checks simultaneously:
 
 ```bash
 br stats
@@ -46,10 +61,8 @@ git branch --show-current
 git log --oneline -5
 ```
 
-Check the bead comments and recent handoff files for any session context:
-
-```bash
-ls .beads/artifacts/*/handoffs/ 2>/dev/null | sort | tail -5
+```typescript
+find_sessions({ query: "today", limit: 5 });
 ```
 
 ---
@@ -72,8 +85,8 @@ GIT
   Changes: [from git status, or "clean"]
   Recent:  [from git log]
 
-RECENT HANDOFFS
-  [from handoff files, or "None found"]
+SESSIONS TODAY
+  [from find_sessions]
 ```
 
 ---

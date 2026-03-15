@@ -1,12 +1,21 @@
 ---
 description: Review UI/UX design for quality, aesthetics, and best practices
+argument-hint: "<image-or-component-path> [--responsive] [--dark-mode]"
 ---
 
-# UI Review: $@
+# UI Review: $ARGUMENTS
+
+## Load Skills
+
+```typescript
+skill({ name: "visual-analysis" }); // Analysis framework
+skill({ name: "accessibility-audit" }); // WCAG checklists
+skill({ name: "frontend-design" }); // Anti-patterns, design quality
+```
 
 ## Input
 
-Parse `$@`:
+Parse `$ARGUMENTS`:
 
 - **Path** (required): Image, screenshot, or component file
 - **`--responsive`**: Include responsive breakpoint review
@@ -16,7 +25,7 @@ Parse `$@`:
 
 ### 1. Analyze the Input
 
-Perform deep analysis of the provided input:
+Use the `visual-analysis` skill to perform deep analysis:
 
 - Content inventory (elements, text, icons)
 - Visual properties (colors, typography, spacing, layout)
@@ -26,14 +35,14 @@ Perform deep analysis of the provided input:
 
 Rate each 1-10 with brief justification:
 
-| Category               | What to Evaluate                                                      |
-| ---------------------- | --------------------------------------------------------------------- |
-| **Typography**         | Hierarchy, readability, weight contrast, intentional choices          |
-| **Color**              | Palette cohesion, contrast, semantic usage, no AI slop                |
-| **Layout & Spacing**   | Visual hierarchy, consistency, alignment, white space                 |
-| **Interactive States** | Hover, focus, active, disabled, loading coverage                      |
-| **Accessibility**      | WCAG AA compliance (contrast ratios, keyboard navigation, ARIA roles) |
-| **Visual Polish**      | Consistency, attention to detail, motion, shadows, icons              |
+| Category               | What to Evaluate                                               |
+| ---------------------- | -------------------------------------------------------------- |
+| **Typography**         | Hierarchy, readability, weight contrast, intentional choices   |
+| **Color**              | Palette cohesion, contrast, semantic usage, no AI slop         |
+| **Layout & Spacing**   | Visual hierarchy, consistency, alignment, white space          |
+| **Interactive States** | Hover, focus, active, disabled, loading coverage               |
+| **Accessibility**      | WCAG AA compliance (use `accessibility-audit` skill checklist) |
+| **Visual Polish**      | Consistency, attention to detail, motion, shadows, icons       |
 
 ### 3. Conditional Reviews
 
@@ -59,6 +68,18 @@ Deliver:
 2. Overall assessment (1-2 sentences)
 3. Findings grouped by severity with actionable fixes
 4. Code fixes for critical issues (if reviewing component code)
+
+## Record Findings
+
+```typescript
+observation({
+  type: "warning",
+  title: "UI: [Component] [issue type]",
+  narrative: "Found [issue] in [location]. Impact: [description]...",
+  concepts: "ui, accessibility, [category]",
+  confidence: "high",
+});
+```
 
 ## Related Commands
 

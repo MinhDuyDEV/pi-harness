@@ -1,58 +1,95 @@
 ---
-description: Initialize GSD-style project planning context
+description: Initialize GSD-style project planning context with integrated skill usage
+argument-hint: "[--skip-questions] [--brownfield]"
 ---
 
-# Init-Context: $@
+# Init-Context: $ARGUMENTS
 
-Initialize GSD-style project planning context files.
+Initialize GSD-style project planning with integrated skill usage.
+
+## Load Skills
+
+```typescript
+skill({ name: "context-initialization" });
+skill({ name: "brainstorming" });
+skill({ name: "verification-before-completion" });
+```
 
 ## Parse Arguments
 
-Check for these flags in `$@`:
-
-- `--skip-questions`: Skip interactive questions, use template defaults
-- `--brownfield`: Analyze an existing codebase before creating context
+```typescript
+const args = {
+  skipQuestions: $ARGUMENTS.includes("--skip-questions"),
+  brownfield: $ARGUMENTS.includes("--brownfield"),
+  focus: $ARGUMENTS.match(/--focus=(\w+)/)?.[1], // Optional: api, ui, db, etc.
+};
+```
 
 ## Phase 1: Discovery
 
 ### 1.1 Check Existing Context
 
 ```bash
-ls docs/ 2>/dev/null && HAS_CONTEXT=true || HAS_CONTEXT=false
-cat docs/project.md 2>/dev/null | head -20
+ls .opencode/memory/project/ 2>/dev/null && HAS_CONTEXT=true || HAS_CONTEXT=false
+cat .opencode/memory/project/project.md 2>/dev/null | head -20
 ```
 
-**If context exists**, show the user what exists and ask them to choose:
+**If context exists:**
 
-1. Refresh — Delete and recreate
-2. Update — Keep existing, only update state.md
-3. Skip — Use existing context as-is
+```
+Existing planning context found:
+- project.md: [exists/size]
+- roadmap.md: [exists/size]
+- state.md: [exists/size]
+
+Options:
+1. Refresh - Delete and recreate from templates
+2. Update - Keep existing, only update state.md
+3. Skip - Use existing context as-is
+```
 
 Wait for user selection.
 
 ### 1.2 Brownfield Codebase Analysis (if --brownfield)
 
-Analyze the codebase sequentially:
+If `--brownfield` flag is set:
 
-**Step 1: Map tech stack**
-Analyze the technology stack. Write findings to `docs/tech-analysis.md` covering: languages, frameworks, dependencies, build tools.
+```typescript
+// Spawn parallel analysis agents (like GSD map-codebase)
+skill({ name: "swarm-coordination" });
 
-**Step 2: Map architecture**
-Analyze the codebase architecture. Write findings to `docs/arch-analysis.md` covering: patterns, directory structure, entry points.
+// Agent 1: Map tech stack
+Task({
+  subagent_type: "explore",
+  description: "Analyze tech stack",
+  prompt:
+    "Analyze the codebase technology stack. Write findings to .opencode/memory/project/tech-analysis.md covering: languages, frameworks, dependencies, build tools. Return file path and line count only.",
+});
+
+// Agent 2: Map architecture
+Task({
+  subagent_type: "explore",
+  description: "Analyze architecture",
+  prompt:
+    "Analyze the codebase architecture. Write findings to .opencode/memory/project/arch-analysis.md covering: patterns, directory structure, entry points. Return file path and line count only.",
+});
+
+// Wait for agents and collect confirmations
+```
 
 ## Phase 2: Requirements Gathering
 
-### 2.1 Interactive Mode (if not --skip-questions)
+### 2.1 Load Brainstorming Skill (if not --skip-questions)
 
-Ask questions one at a time to understand the project:
+```typescript
+if (!args.skipQuestions) {
+  skill({ name: "brainstorming" });
 
-1. What is the project's core purpose or vision?
-2. What are the key success criteria (3-7 measurable outcomes)?
-3. Who are the target users?
-4. What phases is the project divided into?
-5. Which phase is currently active?
-
-Build understanding incrementally. Each answer informs the next question. Output: Refined vision, success criteria, target users, phases.
+  // Follow brainstorming process for project vision
+  // Ask questions one at a time (as per brainstorming skill)
+  // Output: Refined vision, success criteria, target users
+}
+```
 
 ### 2.2 Quick Mode (if --skip-questions)
 
@@ -66,11 +103,13 @@ Use template defaults with placeholders for:
 
 ## Phase 3: Document Creation
 
-```bash
-mkdir -p docs
-```
-
 ### 3.1 Create project.md
+
+**Load template:**
+
+```bash
+cat .opencode/memory/_templates/project.md
+```
 
 **Fill with gathered data:**
 
@@ -80,11 +119,18 @@ mkdir -p docs
 - Core principles (convention over config, minimal, extensible)
 - Current phase (from user input or template default)
 
-**Write to:** `docs/project.md`
+**Write to:** `.opencode/memory/project/project.md`
 
 ### 3.2 Create roadmap.md
 
-Convert user-provided phases into a structured roadmap table:
+**Parse phases from input:**
+
+```typescript
+// Convert user-provided phases into structured roadmap
+// Example: "Discovery, MVP, Launch, Scale" → table rows
+```
+
+**Structure:**
 
 ```markdown
 | Phase     | Goal   | Status   | Beads |
@@ -92,7 +138,7 @@ Convert user-provided phases into a structured roadmap table:
 | [Phase 1] | [Goal] | [Status] | [#]   |
 ```
 
-**Write to:** `docs/roadmap.md`
+**Write to:** `.opencode/memory/project/roadmap.md`
 
 ### 3.3 Create state.md
 
@@ -108,19 +154,25 @@ Convert user-provided phases into a structured roadmap table:
 - Open Questions: (empty table)
 - Next Actions: (empty list)
 
-**Write to:** `docs/state.md`
+**Write to:** `.opencode/memory/project/state.md`
 
 ### 3.4 Brownfield Analysis Integration (if applicable)
 
-If `--brownfield` analysis was run, append tech/arch findings to the project.md Context Notes section, or reference the separate `docs/tech-analysis.md` and `docs/arch-analysis.md` files.
+If `--brownfield` analysis was run:
 
-## Phase 4: Verification
+```typescript
+// Append tech/arch findings to project.md Context Notes section
+// Or create separate .opencode/memory/project/codebase/ documents
+// (similar to GSD's .planning/codebase/ approach)
+```
+
+## Phase 4: Verification & Security
 
 ### 4.1 Verify Documents Created
 
 ```bash
-ls -la docs/
-wc -l docs/*.md
+ls -la .opencode/memory/project/
+wc -l .opencode/memory/project/*.md
 ```
 
 **Check:**
@@ -130,24 +182,31 @@ wc -l docs/*.md
 - [ ] state.md exists and >20 lines
 - [ ] All files are readable
 
-### 4.2 Secret Scan
+### 4.2 Secret Scan (Critical - from GSD pattern)
 
 ```bash
-grep -E '(sk-[a-zA-Z0-9]{20,}|sk_live_[a-zA-Z0-9]+|AKIA[A-Z0-9]{16}|ghp_[a-zA-Z0-9]{36}|-----BEGIN.*PRIVATE KEY)' docs/*.md 2>/dev/null && echo "SECRETS FOUND - alert user" || echo "No secrets found"
+# Scan for accidentally leaked secrets in generated docs
+grep -E '(sk-[a-zA-Z0-9]{20,}|sk_live_[a-zA-Z0-9]+|AKIA[A-Z0-9]{16}|ghp_[a-zA-Z0-9]{36}|-----BEGIN.*PRIVATE KEY)' .opencode/memory/project/*.md 2>/dev/null && SECRETS_FOUND=true || SECRETS_FOUND=false
 ```
 
 **If secrets found:** Alert user and pause before proceeding.
 
-### 4.3 Final Verification
+### 4.3 Load Verification Skill
 
-Before declaring completion, confirm:
+```typescript
+skill({ name: "verification-before-completion" });
 
-1. All files were created at expected paths
-2. File contents are non-empty and follow template structure
-3. No secrets were leaked
-4. All success criteria are met
+// Run verification checklist:
+// 1. IDENTIFY: Files created, structure valid
+// 2. RUN: Validation commands
+// 3. READ: Check file contents
+// 4. VERIFY: All success criteria met
+// 5. CLAIM: Context initialization complete
+```
 
 ## Phase 5: Beads Integration
+
+### 5.1 Create Initialization Bead (optional)
 
 ```bash
 # If user wants to track context setup as a bead
@@ -157,7 +216,7 @@ br update <bead-id> --status closed --reason="Context files created"
 
 ## Output
 
-Creates in `docs/`:
+Creates in `.opencode/memory/project/`:
 
 | File         | Purpose                                  | Lines (typical) |
 | ------------ | ---------------------------------------- | --------------- |
@@ -166,15 +225,15 @@ Creates in `docs/`:
 | `state.md`   | Current position, blockers, next actions | 60-100          |
 
 **If `--brownfield`:**
-Additional files in `docs/`:
+Additional files in `.opencode/memory/project/codebase/`:
 
 - `tech-analysis.md` - Stack and dependencies
 - `arch-analysis.md` - Architecture patterns
 
 ## Success Criteria
 
-- [ ] All required documents created
-- [ ] Documents follow structured format
+- [ ] All required documents created from templates
+- [ ] Documents follow template structure
 - [ ] No secrets leaked in generated files
 - [ ] Files pass basic validation (readable, non-empty)
 - [ ] User informed of next steps
@@ -186,3 +245,14 @@ After init-context completes:
 1. **For new projects:** Use `/plan` to create first implementation plan
 2. **For brownfield:** Review codebase analysis, then `/plan`
 3. **For existing beads:** Use `/resume` to continue tracked work
+
+---
+
+## Skill Integration Summary
+
+| Skill                            | When Used                         | Purpose                        |
+| -------------------------------- | --------------------------------- | ------------------------------ |
+| `brainstorming`                  | Phase 2 (if not --skip-questions) | Refine vision and requirements |
+| `swarm-coordination`             | Phase 1.2 (if --brownfield)       | Parallel codebase analysis     |
+| `verification-before-completion` | Phase 4                           | Validate created files         |
+| `beads`                          | Phase 5                           | Track as bead if desired       |
