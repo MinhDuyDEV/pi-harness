@@ -333,3 +333,66 @@ export function getToolCalls(sessionId: string): ToolCallRecord[] {
 		)
 		.all(sessionId);
 }
+
+// ---------------------------------------------------------------------------
+// Tool call dedup analysis
+// ---------------------------------------------------------------------------
+
+export interface DedupEntry {
+	tool_name: string;
+	parameters_hash: string;
+	calls: number;
+}
+
+export function getToolCallDedupAnalysis(
+	sessionId?: string,
+): { duplicates: DedupEntry[]; totalCalls: number; uniqueCalls: number } {
+	const db = getDCPDB();
+
+	const whereClause = sessionId ? "WHERE session_id = ?" : "";
+	const params = sessionId ? [sessionId] : [];
+
+	const totalRow = db
+		.prepare(`SELECT COUNT(*) as cnt FROM tool_calls ${whereClause}`)
+		.get(...params);
+	const totalCalls = totalRow?.cnt ?? 0;
+
+	const uniqueRow = db
+		.prepare(
+			`SELECT COUNT(*) as cnt FROM (SELECT DISTINCT tool_name, parameters_hash FROM tool_calls ${whereClause})`,
+		)
+		.get(...params);
+	const uniqueCalls = uniqueRow?.cnt ?? 0;
+
+	const duplicates: DedupEntry[] = db
+		.prepare(
+			`SELECT tool_name, parameters_hash, COUNT(*) as calls
+       FROM tool_calls ${whereClause}
+       GROUP BY tool_name, parameters_hash
+       HAVING calls > 1
+       ORDER BY calls DESC
+       LIMIT 15`,
+		)
+		.all(...params);
+
+	return { duplicates, totalCalls, uniqueCalls };
+}
+
+export function getToolCallFrequency(
+	sessionId?: string,
+): { tool_name: string; calls: number }[] {
+	const db = getDCPDB();
+
+	const whereClause = sessionId ? "WHERE session_id = ?" : "";
+	const params = sessionId ? [sessionId] : [];
+
+	return db
+		.prepare(
+			`SELECT tool_name, COUNT(*) as calls
+       FROM tool_calls ${whereClause}
+       GROUP BY tool_name
+       ORDER BY calls DESC
+       LIMIT 20`,
+		)
+		.all(...params);
+}

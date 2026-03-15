@@ -20,6 +20,8 @@ import {
 	getGlobalStats,
 	getNextBlockId,
 	getSessionStats,
+	getToolCallDedupAnalysis,
+	getToolCallFrequency,
 	storeCompressionBlock,
 	updateSessionStats,
 	deactivateBlock,
@@ -238,6 +240,9 @@ export function registerDCPStatsTool(pi: any, config: DCPConfig): void {
 
 				if (scope === "global") {
 					const stats = getGlobalStats();
+					const dedup = getToolCallDedupAnalysis();
+					const freq = getToolCallFrequency();
+
 					const result = [
 						"## DCP Global Statistics",
 						"",
@@ -245,6 +250,21 @@ export function registerDCPStatsTool(pi: any, config: DCPConfig): void {
 						`Total compressions: ${stats.totalCompressions}`,
 						`Total compressed tokens: ~${stats.totalCompressedTokens}`,
 						`Total pruned tokens: ~${stats.totalPrunedTokens}`,
+						"",
+						`### Tool Call Analysis (${dedup.totalCalls} total, ${dedup.uniqueCalls} unique)`,
+						...(freq.length > 0
+							? freq.map((f) => `  ${f.tool_name}: ${f.calls}`)
+							: ["  (no tool calls tracked)"]),
+						...(dedup.duplicates.length > 0
+							? [
+									"",
+									`### Duplicate Calls (${dedup.duplicates.length} patterns)`,
+									...dedup.duplicates.map(
+										(d) =>
+											`  ${d.tool_name} [${d.parameters_hash}]: ${d.calls}x`,
+									),
+								]
+							: []),
 					].join("\n");
 
 					return {
@@ -279,6 +299,9 @@ export function registerDCPStatsTool(pi: any, config: DCPConfig): void {
 						`  b${b.block_id}: "${b.topic}" (~${b.compressed_tokens} tokens)`,
 				);
 
+				const dedup = getToolCallDedupAnalysis(sessionId);
+				const freq = getToolCallFrequency(sessionId);
+
 				const result = [
 					`## DCP Session Statistics — ${sessionId}`,
 					"",
@@ -293,6 +316,21 @@ export function registerDCPStatsTool(pi: any, config: DCPConfig): void {
 						: ["  (none)"]),
 					"",
 					`### Total Blocks: ${blocks.length} (${blocks.length - activeBlocks.length} deactivated)`,
+					"",
+					`### Tool Calls (${dedup.totalCalls} total, ${dedup.uniqueCalls} unique)`,
+					...(freq.length > 0
+						? freq.map((f) => `  ${f.tool_name}: ${f.calls}`)
+						: ["  (no tool calls tracked)"]),
+					...(dedup.duplicates.length > 0
+						? [
+								"",
+								`### Duplicate Calls (${dedup.duplicates.length} patterns — compress candidates)`,
+								...dedup.duplicates.map(
+									(d) =>
+										`  ${d.tool_name} [${d.parameters_hash}]: ${d.calls}x`,
+								),
+							]
+						: []),
 				].join("\n");
 
 				return {
