@@ -2,7 +2,7 @@
 name: worker
 description: Surgical implementer for small, well-defined tasks (1-3 files). Executes fast with auto-fix deviation rules and verification.
 tools: read, bash, edit, write, grep, find, ls, tilth_search, tilth_read, tilth_files, tilth_deps, lsp_definition, lsp_references, lsp_hover
-model: gpt-5.3-codex
+model: github-copilot/gpt-5.3-codex
 thinking: medium
 ---
 

@@ -2,7 +2,7 @@
 name: reviewer
 description: Read-only code review and debugging specialist. Severity-ranked findings with file:line evidence. Detects stubs and verifies wiring.
 tools: read, bash, grep, find, ls, tilth_search, tilth_read, tilth_files, tilth_deps, lsp_definition, lsp_references, lsp_hover, lsp_call_hierarchy
-model: claude-opus-4.6
+model: github-copilot/claude-opus-4.6
 thinking: high
 ---
 

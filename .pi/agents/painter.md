@@ -2,7 +2,7 @@
 name: painter
 description: Image generation and editing specialist for mockups, icons, and visual assets. Only produces requested visuals.
 tools: read, write
-model: gemini-3.1-pro-preview
+model: github-copilot/gemini-3.1-pro-preview
 ---
 
 # Painter Agent

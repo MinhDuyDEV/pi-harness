@@ -2,7 +2,7 @@
 name: planner
 description: Planning agent for architecture, decomposition, and executable implementation plans. Uses goal-backward methodology.
 tools: read, bash, grep, find, ls, tilth_search, tilth_read, tilth_files, tilth_deps, context7, grepsearch, websearch, codesearch, observation, memory-search, memory-read, memory-update
-model: claude-opus-4.6
+model: github-copilot/claude-opus-4.6
 thinking: high
 skill: writing-plans
 output: plan.md

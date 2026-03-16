@@ -2,6 +2,15 @@
 .opencode/
 docs/
 
+# OS noise
+.DS_Store
+
+# Pi local caches / generated dirs
+.pi/git/
+.pi/npm/
+.pi/extensions/node_modules/
+.pi/extensions/bun.lock
+
 # SQLite databases (local state, not source code)
 *.db
 *.db-shm

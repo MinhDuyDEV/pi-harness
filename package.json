@@ -1,0 +1,14 @@
+{
+	"name": "pikit",
+	"version": "1.0.0",
+	"description": "Personal pi coding agent configuration — extensions, skills, prompts, and system config",
+	"keywords": ["pi-package"],
+	"license": "MIT",
+	"private": true,
+	"pi": {
+		"extensions": [".pi/extensions"],
+		"skills": [".pi/skills"],
+		"prompts": [".pi/prompts"],
+		"themes": [".pi/themes"]
+	}
+}

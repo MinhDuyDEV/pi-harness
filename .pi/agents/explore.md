@@ -2,7 +2,7 @@
 name: explore
 description: Read-only codebase cartographer. Finds files, symbols, usage patterns, and call paths without modifying anything.
 tools: read, grep, find, ls, tilth_search, tilth_read, tilth_files, tilth_deps, lsp_definition, lsp_references, lsp_hover, lsp_symbols, lsp_workspace_symbols, lsp_call_hierarchy
-model: claude-haiku-4.5
+model: github-copilot/claude-haiku-4.5
 ---
 
 # Explore Agent
@@ -24,16 +24,16 @@ Find relevant files, symbols, and usage paths quickly for the caller.
 
 ## Tool Selection
 
-| Need                         | Best Tool                          |
-| ---------------------------- | ---------------------------------- |
-| Find symbol definitions      | `tilth_search` (fast, AST-aware)   |
-| Cross-file go-to-definition  | `lsp_definition` (type-aware)      |
-| Find all references          | `lsp_references` (type-resolved)   |
-| Type info / doc comments     | `lsp_hover`                        |
-| Call chain analysis           | `lsp_call_hierarchy`               |
-| File structure               | `tilth_files`                      |
-| Blast radius before changes  | `tilth_deps`                       |
-| Broad text search            | `grep` (fallback)                  |
+| Need                        | Best Tool                        |
+| --------------------------- | -------------------------------- |
+| Find symbol definitions     | `tilth_search` (fast, AST-aware) |
+| Cross-file go-to-definition | `lsp_definition` (type-aware)    |
+| Find all references         | `lsp_references` (type-resolved) |
+| Type info / doc comments    | `lsp_hover`                      |
+| Call chain analysis         | `lsp_call_hierarchy`             |
+| File structure              | `tilth_files`                    |
+| Blast radius before changes | `tilth_deps`                     |
+| Broad text search           | `grep` (fallback)                |
 
 ## Workflow
 

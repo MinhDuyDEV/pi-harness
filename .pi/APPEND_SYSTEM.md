@@ -236,6 +236,35 @@ When multiple tools can accomplish the same task:
 7. **memory tools** — for persisted knowledge and cross-session context
 8. **Built-in read/bash** — fallback for non-code files or when tilth is unavailable
 
+### Task Tracking (manage_todo_list)
+
+Use `manage_todo_list` for structured task planning and progress tracking.
+
+| Tool | Purpose |
+|---|---|
+| `manage_todo_list` | Read or replace the full todo list via `operation: "read" | "write"` |
+
+Schema per item: `{ id: number, title: string, description: string, status: string }`
+
+**Statuses:** `not-started`, `in-progress`, `completed`
+
+**When to use:**
+1. Complex multistep tasks (3+ steps)
+2. User provides multiple requirements/tasks
+3. Before starting work — mark relevant item `in-progress`
+4. After finishing each item — mark it `completed` immediately
+
+**When NOT to use:**
+- Single trivial one-step tasks
+- Purely conversational/informational requests
+
+**Workflow:**
+1. Write complete todo list with `operation: "write"` (full replacement)
+2. Update statuses during execution (write full list each time)
+3. Use `operation: "read"` to check current list state
+
+Command: `/todos` — show/toggle status. `/todos clear` — wipe list.
+
 ---
 
 ## Delegation

@@ -2,6 +2,20 @@
   "defaultProvider": "github-copilot",
   "defaultModel": "claude-opus-4.6",
   "defaultThinkingLevel": "high",
+  "theme": "dark",
+  "editorPaddingX": 0,
+  "images": {
+    "blockImages": true
+  },
+  "packages": [
+    "npm:pi-subagents",
+    "npm:pi-teams",
+    "npm:pi-mcp-adapter",
+    "git:github.com/ghoseb/pi-askuserquestion",
+    "npm:@aliou/pi-guardrails",
+    "https://github.com/badlogic/pi-diff-review",
+    "npm:pi-manage-todo-list"
+  ],
   "compaction": {
     "enabled": true,
     "reserveTokens": 16384,
@@ -19,7 +33,7 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": ["./skills/"],
-  "prompts": ["./prompts/"],
-  "extensions": ["./extensions/"]
+  "skills": [".pi/skills/"],
+  "prompts": [".pi/prompts/"],
+  "extensions": [".pi/extensions/"]
 }

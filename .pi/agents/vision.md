@@ -2,7 +2,7 @@
 name: vision
 description: Read-only visual analysis specialist for UI/UX review, accessibility audits, and design-system consistency checks.
 tools: read, grep, find, ls, tilth_search, tilth_read
-model: gemini-3.1-pro-preview
+model: github-copilot/gemini-3.1-pro-preview
 skill: visual-analysis, accessibility-audit
 ---
 
