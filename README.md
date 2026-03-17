@@ -5,7 +5,7 @@ Batteries-included configuration kit for [pi](https://github.com/badlogic/pi-mon
 ## Install
 
 ```bash
-pi install github:huynhgiabuu/pikit
+pi install git:github.com/heyhuynhgiabuu/pikit
 ```
 
 Then install the package dependencies declared in `.pi/settings.json`:
