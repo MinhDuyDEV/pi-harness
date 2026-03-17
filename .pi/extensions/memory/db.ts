@@ -5,6 +5,8 @@
  * DEPENDENCY: npm install better-sqlite3 @types/better-sqlite3
  */
 
+import { existsSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 
@@ -170,10 +172,18 @@ END;
 
 let dbInstance: Database.Database | null = null;
 
+function getMemoryDataDir(): string {
+	const dir = path.join(homedir(), ".config", "pi", "memory");
+	if (!existsSync(dir)) {
+		mkdirSync(dir, { recursive: true });
+	}
+	return dir;
+}
+
 export function getMemoryDB(): Database.Database {
 	if (dbInstance) return dbInstance;
 
-	const dbPath = path.join(process.cwd(), ".pi", "memory.db");
+	const dbPath = process.env.PI_MEMORY_DB_PATH?.trim() || path.join(getMemoryDataDir(), "memory.db");
 	dbInstance = new Database(dbPath);
 
 	// Enable WAL mode + foreign keys
