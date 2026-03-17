@@ -16,3 +16,4 @@ docs/
 *.db-shm
 *.db-wal
 *.db-journal
+.pi.zip

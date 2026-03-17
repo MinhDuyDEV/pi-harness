@@ -1,10 +1,13 @@
 {
 	"name": "pikit",
 	"version": "1.0.0",
-	"description": "Personal pi coding agent configuration — extensions, skills, prompts, and system config",
+	"description": "Batteries-included pi coding agent kit — extensions, agents, skills, prompts, and themes",
 	"keywords": ["pi-package"],
 	"license": "MIT",
-	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/huynhgiabuu/pikit"
+	},
 	"pi": {
 		"extensions": [".pi/extensions"],
 		"skills": [".pi/skills"],

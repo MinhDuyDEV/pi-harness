@@ -1,277 +1,165 @@
-# Agent Behavior
+# Delegation — Three-Layer Model
 
-## Tone and Style
+Three integrated systems for delegating work, each optimized for different scales:
 
-- Only use emojis if the user explicitly requests it
-- Responses displayed in a terminal — keep them short, concise, GitHub-flavored markdown
-- Prioritize technical accuracy over validating beliefs
-- Provide direct, objective technical info without unnecessary superlatives or praise
+```
+Layer 1: @tintinweb/pi-subagents  →  Fast in-process agents (seconds to minutes)
+Layer 2: @tintinweb/pi-tasks      →  DAG orchestration + auto-cascade execution
+Layer 3: pi-teams                  →  Multi-process coordination (full context per agent)
+```
 
-## Execution Approach
+## Layer 1: Subagents (`@tintinweb/pi-subagents`)
 
-You are a build-first agent. Ship working code, not promises.
-
-### Ritual Structure
-
-Each task follows a five-phase arc:
-
-| Phase         | Purpose                            | Actions                                                        |
-| ------------- | ---------------------------------- | -------------------------------------------------------------- |
-| **Ground**    | Establish presence in the codebase | Read context, understand constraints                           |
-| **Calibrate** | Verify assumptions and inputs      | Validate files exist, check dependencies, confirm requirements |
-| **Transform** | Execute the core change            | Make minimal, scoped edits, run verification                   |
-| **Release**   | Output results and evidence        | Report changes, show verification output, cite file:line refs  |
-| **Reset**     | Checkpoint and prepare for next    | Plan next iteration                                            |
-
-### Deviation Rules (Auto-Fix Without Permission)
-
-While executing, apply these rules automatically:
-
-**RULE 1: Auto-fix bugs** — Wrong queries, type errors, null pointer exceptions. Fix inline → verify → continue.
-
-**RULE 2: Auto-add missing critical functionality** — Missing input validation, no error handling, missing null checks.
-
-**RULE 3: Auto-fix blocking issues** — Missing dependency, wrong types, broken imports.
-
-**RULE 4: ASK about architectural changes** — New DB tables, switching libraries, breaking API changes. STOP and report to user with: what found, proposed change, impact.
-
-### Commit Protocol
-
-After each task completes (verification passed):
-
-1. **Stage specific files** (never `git add .`)
-2. **Commit with descriptive message** using conventional commits:
-   - `feat`: New feature
-   - `fix`: Bug fix
-   - `test`: Test-only changes
-   - `refactor`: Code cleanup
-   - `chore`: Config/tooling
-
-### TDD Flow
-
-When tests are appropriate, follow RED→GREEN→REFACTOR:
-
-1. **RED**: Write failing test, run → must fail
-2. **GREEN**: Write minimal code to pass, run → must pass
-3. **REFACTOR**: Clean up, run → must still pass
-
-## Planning Mode
-
-When asked to plan (via `/plan` prompt):
-
-- Use **goal-backward methodology**: "What must be TRUE for the goal to be achieved?"
-- Break complex tasks into executable steps with explicit dependencies
-- Include verification steps for each phase
-- Target 2-3 tasks per plan for consistent quality
-- Each plan should consume ~50% context budget
-
-### Discovery Levels
-
-| Level | When                                  | Action                          |
-| ----- | ------------------------------------- | ------------------------------- |
-| 0     | Pure internal work, existing patterns | Skip research                   |
-| 1     | Single known library, confirm syntax  | Quick docs check                |
-| 2     | Choosing between options              | Standard research (15-30 min)   |
-| 3     | Architectural decision, novel problem | Deep dive with multiple sources |
-
-## Review Mode
-
-When asked to review (via `/review-codebase` prompt):
-
-- Output severity-ranked findings: P0 (critical) through P3 (minor)
-- Every finding must cite `file:line` evidence and impact scenario
-- Triage: only report issues that affect correctness/performance/security AND are introduced by the change
-- Three-level verification: Exists → Substantive (not stub) → Wired (connected/used)
-- Detect stub patterns: `return null`, `TODO`, empty handlers, log-only callbacks
-
-## Research Mode
-
-When asked to research (via `/research` prompt):
-
-- Read-only — explore, analyze, document, but don't implement
-- Provide concrete evidence and sources
-- Structure findings for actionable decision-making
-
-## Pressure Handling
-
-| Pressure                     | Response                                         |
-| ---------------------------- | ------------------------------------------------ |
-| Verification failed once     | Adjust approach based on signal                  |
-| Verification failed twice    | Escalate with learnings, not just failure        |
-| Scope too large              | Decompose; plan Phase 1 deeply, outline Phase 2+ |
-| "This might break something" | Verify before proceeding; never guess            |
-
-## Output Format
-
-Report in this order:
-
-1. **Task results** (done/pending/blockers)
-2. **Verification evidence** (command output)
-3. **Review findings** (if applicable)
-4. **Next recommended action**
-
----
-
-## Tool Ecosystem
-
-Extensions register tools beyond the built-in set. Prefer specialized tools over generic ones.
-
-### Code Intelligence (tilth)
-
-Tree-sitter AST-aware code search, smart file reading, and blast-radius analysis. **Always prefer these over built-in equivalents.**
-
-| Tool | Replaces | Purpose |
-|---|---|---|
-| `tilth_search` | grep, rg | Symbol/content/regex/callers search with definitions first |
-| `tilth_read` | cat, Read | Smart outlining: small files → full, large → structural outline |
-| `tilth_files` | find, ls, Glob | Glob pattern matching with token size estimates |
-| `tilth_deps` | manual tracing | Blast-radius check before breaking changes |
-
-Rules:
-- **Search first, read second** — one `tilth_search` replaces multiple grep→read cycles
-- **Don't re-read expanded results** — search output already contains source
-- **Use `tilth_deps` before breaking changes** — renaming exports, changing signatures
-
-### Context Management (DCP)
-
-Dynamic context pruning tools for managing conversation size. Load `dynamic-context-pruning` skill for behavioral patterns.
+Lightweight in-process delegation. Results flow back into conversation. Queue-based concurrency (4 concurrent default).
 
 | Tool | Purpose |
 |---|---|
-| `compress` | Collapse conversation ranges into dense summaries stored in SQLite |
-| `dcp-stats` | View compression stats for current session or globally |
-| `decompress` | Restore a specific compression block by ID |
+| `Agent` | Spawn a specialized agent (foreground or background) |
+| `get_subagent_result` | Fetch output from a background agent (wait or poll) |
+| `steer_subagent` | Send mid-run message to redirect a running agent |
 
-Command: `/dcp` — Show context pruning status and available actions.
+**Key features:**
+- Smart batching: 2+ background agents spawned in same turn → grouped notification
+- Resume support: continue agent from previous conversation via `resume: agentId`
+- Worktree isolation: `isolation: "worktree"` for safe parallel file modifications
+- Custom agent types from `.pi/agents/*.md`
 
-#### Token Budget
+**When to use:** Quick tasks, single-shot delegation, parallel batches under 5 minutes each.
 
-| Phase             | Target  | Action                                        |
-| ----------------- | ------- | --------------------------------------------- |
-| Starting work     | <50k    | Load only essential context + task spec       |
-| Mid-task          | 50-100k | Compress completed research, keep active work |
-| Approaching limit | >100k   | Aggressive compress, prune noise              |
-| Near capacity     | >150k   | Session restart with handoff                  |
+```
+Agent(type: "explore", prompt: "find all API routes", run_in_background: true)
+Agent(type: "worker", prompt: "fix login validation bug")
+```
 
-#### Strategies (apply automatically)
+## Layer 2: Task Orchestration (`@tintinweb/pi-tasks`)
 
-- **Supersede-writes**: When re-reading a file, earlier reads are stale — compress them
-- **Purge-errors**: Failed tool calls with no learnings can be compressed
-- **Deduplication**: Repeated tool outputs add no signal — compress duplicates
-
-### Memory System
-
-Persistent knowledge pipeline backed by SQLite + FTS5. Features time-decay scoring, feedback tracking, and auto-injection.
+DAG-based task management with dependency tracking and auto-cascade execution.
 
 | Tool | Purpose |
 |---|---|
-| `observation` | Create structured observation (decision, bugfix, feature, pattern, discovery, learning, warning) |
-| `memory-search` | FTS5 search across observations, distillations, handoffs (auto-excludes deprecated) |
-| `memory-get` | Retrieve full observation details by ID |
-| `memory-read` | Read a memory file from SQLite storage |
-| `memory-update` | Write or append to a memory file |
-| `memory-timeline` | Chronological context around an observation |
-| `memory-admin` | Status, distill-now, curate-now, archive, vacuum, refresh-scores |
-| `memory-feedback` | Mark observations as helpful/harmful — updates scoring and maturity |
+| `TaskCreate` | Create a task with subject/description (optionally `agentType` for auto-execution) |
+| `TaskList` | List all tasks with status and blockers |
+| `TaskGet` | Read full task details including dependencies |
+| `TaskUpdate` | Update status/owner/metadata/dependencies (`addBlocks`/`addBlockedBy`) |
+| `TaskExecute` | Execute agent-typed tasks as subagents (auto-cascades unblocked dependents) |
+| `TaskOutput` | Retrieve output from running/completed task |
+| `TaskStop` | Stop a running background task |
 
-Command: `/memory` — Show memory system status.
+**Statuses:** `pending` → `in_progress` → `completed` (`deleted` for removal)
 
-Rules:
-- **Record decisions** — use `observation` for architectural choices, discovered gotchas
-- **Search before creating** — check if knowledge already exists via `memory-search`
-- **Persist across sessions** — important findings belong in memory, not just conversation
-- **Give feedback** — after applying an observation, use `memory-feedback` to rate it
-- **Auto-injection active** — relevant observations are injected into system prompt at start
+**Key features:**
+- **DAG dependencies**: `addBlockedBy: ["1"]` — task won't start until blockers complete
+- **Auto-cascade**: `TaskExecute` completes task #1 → auto-spawns unblocked task #2
+- **Agent coupling**: Tasks with `agentType` (e.g. `"explore"`, `"worker"`) are executable via `TaskExecute`
+- **Dual storage**: In-memory (session) or file-backed (`~/.pi/tasks/`) with file locking
 
-### Documentation Lookup (context7)
+**When to use:** Multi-step work with dependencies, pipelines where order matters, tracking progress across complex features.
 
-| Tool | Purpose |
-|---|---|
-| `context7` | Resolve library IDs and query documentation (resolve → query two-step) |
+```
+TaskCreate(subject: "Research auth patterns", agentType: "scout")           → #1
+TaskCreate(subject: "Plan implementation", agentType: "planner")            → #2
+TaskCreate(subject: "Implement auth module", agentType: "worker")           → #3
+TaskUpdate(taskId: "2", addBlockedBy: ["1"])
+TaskUpdate(taskId: "3", addBlockedBy: ["2"])
+TaskExecute(task_ids: ["1"])  → completes → auto-cascades #2 → auto-cascades #3
+```
 
-### Code Search (grepsearch)
+**Manual tracking (no auto-execution):**
+1. `TaskCreate` tasks with clear subject + detailed description (no `agentType`)
+2. `TaskUpdate` status as you work (`pending` → `in_progress` → `completed`)
+3. `TaskList` after each completion to pick next available work
 
-| Tool | Purpose |
-|---|---|
-| `grepsearch` | Search real-world code examples from GitHub via grep.app |
+## Layer 3: Teams (`pi-teams`)
 
-Use for: unfamiliar APIs, production patterns, library integration examples.
-Search for **literal code patterns**, not keywords.
-
-### Web & Code Search (Exa AI)
-
-| Tool | Purpose |
-|---|---|
-| `websearch` | Real-time web search via Exa AI (no API key required) |
-| `codesearch` | Code-specific search for docs, examples, API references |
-
-Use for: current information, documentation not in context7, live web content.
-`codesearch` is optimized for programming queries — better than `websearch` for code.
-
-### LSP Tools (Language Server Protocol)
+Separate Pi processes in tmux panes. Each teammate gets its own **full context window**, task board, and messaging. Requires tmux session.
 
 | Tool | Purpose |
 |---|---|
-| `lsp_definition` | Go to definition — type-aware, works across imports |
-| `lsp_references` | Find all references — only actual usages, not text matches |
-| `lsp_hover` | Type info and documentation at a position |
-| `lsp_symbols` | List all symbols in a file with hierarchy |
-| `lsp_workspace_symbols` | Search symbols across the entire project |
-| `lsp_call_hierarchy` | Show incoming/outgoing calls for a function |
+| `team_create` | Create a new team (sets up coordination directory) |
+| `spawn_teammate` | Launch agent in tmux pane with role prompt |
+| `send_message` | Send message to specific teammate |
+| `broadcast_message` | Send message to all teammates |
+| `read_inbox` | Check messages from teammates |
+| `check_teammate` | Verify agent is alive |
+| `task_create` (team) | Create task on shared team board |
+| `task_submit_plan` | Teammate submits implementation plan |
+| `task_evaluate_plan` | Lead approves/rejects submitted plan |
+| `task_update` (team) | Update team task status/owner |
+| `task_list` (team) | List team tasks |
+| `team_shutdown` | Clean up all panes and coordination files |
 
-Use for: refactoring, understanding type relationships, tracing call chains.
-**More precise than tilth** for cross-file type resolution. Tilth is faster for quick symbol search.
-Available servers: TypeScript (typescript-language-server), Go (gopls).
+**Key features:**
+- Multi-process isolation: each teammate can't crash parent, gets full context budget
+- File-based coordination: `~/.pi/teams/<name>/` (config, tasks, inboxes, PIDs)
+- Plan approval mode: `plan_mode_required: true` → governance before code changes
+- Visual oversight: human can watch agent work in real-time via tmux
 
-### Tool Priority
+**When to use:** Long-running parallel work (15+ min each), multiple specialists needing deep context, human oversight required.
 
-When multiple tools can accomplish the same task:
+```
+team_create("auth-migration")
+spawn_teammate("auth-migration", "researcher", "Research OAuth2 patterns", cwd: ".")
+spawn_teammate("auth-migration", "implementer", "Implement auth after research", cwd: ".")
+send_message("auth-migration", "researcher", "Focus on PKCE flow specifically")
+read_inbox("auth-migration")  → check teammate reports
+team_shutdown("auth-migration")
+```
 
-1. **LSP tools** — for type-aware operations (definition, references, call hierarchy)
-2. **tilth tools** — for all code search, reading, file finding (AST-aware, token-efficient)
-3. **context7** — for library/framework documentation
-4. **codesearch** — for code examples and API references from the web
-5. **grepsearch** — for real-world usage examples from GitHub
-6. **websearch** — for current web information, discussions, blog posts
-7. **memory tools** — for persisted knowledge and cross-session context
-8. **Built-in read/bash** — fallback for non-code files or when tilth is unavailable
+## Decision Flowchart
 
-### Task Tracking (manage_todo_list)
+```
+Is it < 3 independent tasks?
+  YES → Agent (direct or background)
+  NO ↓
 
-Use `manage_todo_list` for structured task planning and progress tracking.
+Do tasks have dependencies (A must finish before B)?
+  YES → TaskCreate + TaskExecute (DAG auto-cascade)
+  NO ↓
 
-| Tool | Purpose |
-|---|---|
-| `manage_todo_list` | Read or replace the full todo list via `operation: "read" | "write"` |
+Do tasks need sustained context (> 15 min each)?
+  YES → pi-teams (separate processes, full context window)
+  NO → Agent with run_in_background (parallel batch)
 
-Schema per item: `{ id: number, title: string, description: string, status: string }`
+Need human approval before code changes?
+  YES → pi-teams with plan_mode_required: true
+```
 
-**Statuses:** `not-started`, `in-progress`, `completed`
+## Combo Patterns
 
-**When to use:**
-1. Complex multistep tasks (3+ steps)
-2. User provides multiple requirements/tasks
-3. Before starting work — mark relevant item `in-progress`
-4. After finishing each item — mark it `completed` immediately
+**Pattern 1: Quick Parallel** — Use `Agent` directly, no tasks needed.
+```
+Agent(type: "explore", prompt: "find all API routes", run_in_background: true)
+Agent(type: "explore", prompt: "find all middleware", run_in_background: true)
+→ grouped notification when all complete
+```
 
-**When NOT to use:**
-- Single trivial one-step tasks
-- Purely conversational/informational requests
+**Pattern 2: Dependency Chain** — Use `pi-tasks` for DAG + auto-cascade.
+```
+TaskCreate(#1: "Research", agentType: "scout")
+TaskCreate(#2: "Plan", agentType: "planner", blockedBy: [#1])
+TaskCreate(#3: "Implement", agentType: "worker", blockedBy: [#2])
+TaskExecute([#1])  → auto-cascades through #2 → #3
+```
 
-**Workflow:**
-1. Write complete todo list with `operation: "write"` (full replacement)
-2. Update statuses during execution (write full list each time)
-3. Use `operation: "read"` to check current list state
+**Pattern 3: Big Feature** — Use `pi-teams` for sustained parallel work.
+```
+team_create("feature-x")
+spawn_teammate("feature-x", "researcher", "Deep research on X")
+spawn_teammate("feature-x", "implementer", "Build X after research")
+spawn_teammate("feature-x", "tester", "Write tests for X")
+→ each has full context window, coordinate via messages
+```
 
-Command: `/todos` — show/toggle status. `/todos clear` — wipe list.
+**Pattern 4: Hybrid** — Tasks for tracking, subagents for execution.
+```
+TaskCreate(#1: "Fix auth bug", agentType: "worker")
+TaskCreate(#2: "Fix payment bug", agentType: "worker")
+TaskCreate(#3: "Run full test suite")  ← manual, no agentType
+TaskUpdate(#3, addBlockedBy: ["1", "2"])
+TaskExecute(["1", "2"])  → parallel workers → when both done, you run #3 manually
+```
 
----
-
-## Delegation
-
-Two systems for delegating work: **subagents** (in-process, fast) and **teams** (separate processes, visual).
-
-### Agent Roster
+## Agent Roster
 
 | Agent | Use For | Key Traits |
 |---|---|---|
@@ -283,54 +171,19 @@ Two systems for delegating work: **subagents** (in-process, fast) and **teams** 
 | `vision` | UI/UX and accessibility analysis | Read-only, WCAG-focused, design-system audit |
 | `painter` | Image generation/editing | Metadata contract, iterative edits |
 
-### Subagents (pi-subagents)
-
-Lightweight in-process delegation. Results flow back into conversation.
-
-**When to use**: Quick tasks, sequential pipelines, parallel batches — anything that finishes in one shot.
-
-```
-/run worker "fix the login validation bug"
-/chain scout "research JWT best practices" -> planner "create auth implementation plan"
-/parallel explore "find all API routes" -> explore "find all middleware" -> explore "find auth utils"
-```
-
-- **3+ independent tasks** → `/parallel`
-- **Sequential pipeline** → `/chain` (output piped via `{previous}`)
-- **Single focused task** → `/run`
-- **Background** → append `--bg`, check with `subagent_status`
-
-### Teams (pi-teams)
-
-Separate pi processes in tmux panes. Each teammate has its own full context window, task board, and messaging. Requires tmux session.
-
-**When to use**: Long-running parallel work, multiple specialists needing sustained context, human oversight of agent coordination.
-
-**Workflow**:
-
-1. `team_create(team_name)` — start a team
-2. `spawn_teammate(team_name, name, prompt, cwd)` — launch agents in tmux panes
-3. `task_create(team_name, subject, description)` — assign work via shared task board
-4. `send_message` / `broadcast_message` — coordinate
-5. `read_inbox` — check reports from teammates
-6. `check_teammate` — verify agents are alive
-7. `team_shutdown` — clean up all panes
-
-**Plan approval mode**: Spawn with `plan_mode_required: true` — teammates must submit plans via `task_submit_plan` before touching code. Review with `task_evaluate_plan`.
-
-### Auto-Delegation Rules (MANDATORY)
+## Auto-Delegation Rules (MANDATORY)
 
 **You MUST delegate to the appropriate subagent when the task matches their specialty.** Do not do the work yourself when a specialist exists. This saves your context window and produces better results.
 
 | User asks... | You MUST delegate to | How |
 |---|---|---|
-| "research X", "look into X", "what is X" | `scout` | `subagent(agent: "scout", task: "...")` |
-| "find X in codebase", "where is X used" | `explore` | `subagent(agent: "explore", task: "...")` |
-| "review this code", "check for bugs" | `reviewer` | `subagent(agent: "reviewer", task: "...")` |
-| "plan how to implement X" | `planner` | `subagent(agent: "planner", task: "...")` |
-| "check this UI/design/screenshot" | `vision` | `subagent(agent: "vision", task: "...")` |
-| "generate an image" | `painter` | `subagent(agent: "painter", task: "...")` |
-| Small implementation (1-3 files) | `worker` | `subagent(agent: "worker", task: "...")` |
+| "research X", "look into X", "what is X" | `scout` | `Agent(type: "scout", prompt: "...")` |
+| "find X in codebase", "where is X used" | `explore` | `Agent(type: "explore", prompt: "...")` |
+| "review this code", "check for bugs" | `reviewer` | `Agent(type: "reviewer", prompt: "...")` |
+| "plan how to implement X" | `planner` | `Agent(type: "planner", prompt: "...")` |
+| "check this UI/design/screenshot" | `vision` | `Agent(type: "vision", prompt: "...")` |
+| "generate an image" | `painter` | `Agent(type: "painter", prompt: "...")` |
+| Small implementation (1-3 files) | `worker` | `Agent(type: "worker", prompt: "...")` |
 
 **Exceptions** (do it yourself):
 - Trivial lookups that take one tool call (e.g., reading a single file)
@@ -338,17 +191,7 @@ Separate pi processes in tmux panes. Each teammate has its own full context wind
 - Tasks that require your accumulated conversation context to answer
 
 **Compound tasks** — break them up:
-- Research then implement → `/chain scout → worker`
-- Research then plan → `/chain scout → planner`
-- Multiple independent searches → `/parallel explore + explore + explore`
-
-### Which System to Use
-
-| Scenario | System |
-|---|---|
-| Quick task (< 5 min) | Subagents — `/run` |
-| Research → Plan → Implement pipeline | Subagents — `/chain` |
-| 3+ independent quick tasks | Subagents — `/parallel` |
-| Multiple specialists, long-running | Teams — full context per agent |
-| Need human oversight of agent work | Teams — visual tmux panes |
-| Need agents to communicate with each other | Teams — inbox messaging |
+- Research then implement → `Agent(scout)` → wait → `Agent(worker)`
+- Research then plan → `Agent(scout)` → wait → `Agent(planner)`
+- Multiple independent searches → 3x `Agent(explore, background: true)`
+- Complex pipeline → `TaskCreate` chain with `agentType` + `TaskExecute`

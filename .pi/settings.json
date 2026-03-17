@@ -8,13 +8,13 @@
     "blockImages": true
   },
   "packages": [
-    "npm:pi-subagents",
+    "npm:@tintinweb/pi-subagents",
     "npm:pi-teams",
     "npm:pi-mcp-adapter",
     "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@aliou/pi-guardrails",
     "https://github.com/badlogic/pi-diff-review",
-    "npm:pi-manage-todo-list"
+    "npm:@tintinweb/pi-tasks"
   ],
   "compaction": {
     "enabled": true,
