@@ -1,0 +1,374 @@
+/**
+ * Undo/Redo Extension (MVP+)
+ *
+ * Session-scoped undo/redo for successful write/edit tool calls.
+ *
+ * Design:
+ * - before_tool_call/tool_call: capture pre-state for write/edit path
+ * - tool_result: on success capture post-state and push operation to undo stack
+ * - separate stacks per sessionId
+ * - successful new operation clears redo stack
+ * - bounded stack size (PI_UNDO_MAX_STACK, default 100)
+ * - path safety: only workspace paths unless explicitly allowlisted via PI_UNDO_ALLOW_ABSOLUTE
+ */
+
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	unlinkSync,
+	writeFileSync,
+} from "node:fs";
+import { dirname, isAbsolute, resolve, sep } from "node:path";
+
+type MaybeContent = string | null;
+
+interface PendingOperation {
+	sessionId: string;
+	path: string;
+	previous: MaybeContent;
+}
+
+interface RecordedOperation {
+	sessionId: string;
+	path: string;
+	previous: MaybeContent;
+	next: MaybeContent;
+	toolName: "write" | "edit";
+}
+
+interface SessionStacks {
+	undo: RecordedOperation[];
+	redo: RecordedOperation[];
+	pendingQueue: PendingOperation[];
+	skippedUnsafePathCount: number;
+}
+
+const pendingByEventKey = new Map<string, PendingOperation>();
+const stacksBySession = new Map<string, SessionStacks>();
+const sessionLastSeenAt = new Map<string, number>();
+
+const WORKSPACE_ROOT = resolve(process.cwd());
+const MAX_STACK_SIZE = (() => {
+	const raw = Number.parseInt(process.env.PI_UNDO_MAX_STACK ?? "100", 10);
+	return Number.isFinite(raw) && raw > 0 ? raw : 100;
+})();
+const ALLOWED_ABSOLUTE_PREFIXES = parseAbsoluteAllowlist(
+	process.env.PI_UNDO_ALLOW_ABSOLUTE ?? "",
+);
+
+function parseAbsoluteAllowlist(raw: string): string[] {
+	if (!raw.trim()) return [];
+	return raw
+		.split(",")
+		.map((x) => x.trim())
+		.filter(Boolean)
+		.map((x) => resolve(x));
+}
+
+function getSessionId(eventOrCtx: any): string {
+	const raw = eventOrCtx?.sessionId;
+	return typeof raw === "string" && raw.trim() ? raw : "default";
+}
+
+function getSessionIdOrNull(eventOrCtx: any): string | null {
+	const raw = eventOrCtx?.sessionId;
+	if (typeof raw !== "string") return null;
+	const id = raw.trim();
+	return id ? id : null;
+}
+
+function markSessionSeen(sessionId: string): void {
+	sessionLastSeenAt.set(sessionId, Date.now());
+}
+
+function resolveCommandSessionId(ctx: any): string {
+	const explicit = getSessionIdOrNull(ctx);
+	if (explicit) return explicit;
+
+	if (sessionLastSeenAt.size === 1) {
+		return Array.from(sessionLastSeenAt.keys())[0];
+	}
+
+	if (sessionLastSeenAt.size > 1) {
+		const latest = Array.from(sessionLastSeenAt.entries()).sort(
+			(a, b) => b[1] - a[1],
+		)[0];
+		return latest[0];
+	}
+
+	return "default";
+}
+
+function getStacks(sessionId: string): SessionStacks {
+	let stacks = stacksBySession.get(sessionId);
+	if (!stacks) {
+		stacks = {
+			undo: [],
+			redo: [],
+			pendingQueue: [],
+			skippedUnsafePathCount: 0,
+		};
+		stacksBySession.set(sessionId, stacks);
+	}
+	return stacks;
+}
+
+function getToolName(event: any): string {
+	return event?.name ?? event?.toolName ?? "";
+}
+
+function getToolPath(event: any): string | null {
+	const rawPath = event?.input?.path ?? event?.params?.path;
+	if (typeof rawPath !== "string" || !rawPath.trim()) return null;
+	return toAbsolutePath(rawPath);
+}
+
+function toAbsolutePath(filePath: string): string {
+	return isAbsolute(filePath) ? filePath : resolve(process.cwd(), filePath);
+}
+
+function pathHasPrefix(filePath: string, prefix: string): boolean {
+	return filePath === prefix || filePath.startsWith(prefix + sep);
+}
+
+function isPathUndoAllowed(filePath: string): boolean {
+	if (pathHasPrefix(filePath, WORKSPACE_ROOT)) return true;
+	for (const prefix of ALLOWED_ABSOLUTE_PREFIXES) {
+		if (pathHasPrefix(filePath, prefix)) return true;
+	}
+	return false;
+}
+
+function readContentOrNull(filePath: string): MaybeContent {
+	try {
+		if (!existsSync(filePath)) return null;
+		return readFileSync(filePath, "utf8");
+	} catch {
+		return null;
+	}
+}
+
+function isToolSuccess(event: any): boolean {
+	if (event?.error) return false;
+	const result = event?.result;
+	if (result && typeof result === "object") {
+		if ((result as any).error) return false;
+		if ((result as any).success === false) return false;
+	}
+	return true;
+}
+
+function eventKey(event: any): string | null {
+	const raw =
+		event?.toolCallId ??
+		event?.tool_call_id ??
+		event?.eventId ??
+		event?.event_id ??
+		event?.id;
+	if (typeof raw !== "string" && typeof raw !== "number") return null;
+	const key = String(raw).trim();
+	return key ? key : null;
+}
+
+function sameContent(a: MaybeContent, b: MaybeContent): boolean {
+	return a === b;
+}
+
+function applyContent(filePath: string, content: MaybeContent): void {
+	if (content === null) {
+		if (existsSync(filePath)) {
+			unlinkSync(filePath);
+		}
+		return;
+	}
+
+	mkdirSync(dirname(filePath), { recursive: true });
+	writeFileSync(filePath, content, "utf8");
+}
+
+function pushBounded(stack: RecordedOperation[], op: RecordedOperation): void {
+	stack.push(op);
+	if (stack.length > MAX_STACK_SIZE) {
+		stack.splice(0, stack.length - MAX_STACK_SIZE);
+	}
+}
+
+function formatDepth(stacks: SessionStacks): string {
+	return `undo:${stacks.undo.length} redo:${stacks.redo.length}`;
+}
+
+function notify(ctx: any, message: string): string {
+	if (ctx?.ui) ctx.ui.notify(message);
+	return message;
+}
+
+export default function undoRedoExtension(pi: any): void {
+	const capturePending = (event: any) => {
+		const toolName = getToolName(event);
+		if (toolName !== "write" && toolName !== "edit") return;
+
+		const filePath = getToolPath(event);
+		if (!filePath) return;
+
+		const sessionId = getSessionId(event);
+		markSessionSeen(sessionId);
+		const stacks = getStacks(sessionId);
+
+		if (!isPathUndoAllowed(filePath)) {
+			stacks.skippedUnsafePathCount += 1;
+			return;
+		}
+
+		const pending: PendingOperation = {
+			sessionId,
+			path: filePath,
+			previous: readContentOrNull(filePath),
+		};
+
+		const key = eventKey(event);
+		if (key && pendingByEventKey.has(key)) {
+			return; // Avoid double-capture if runtime emits multiple pre-call events.
+		}
+
+		stacks.pendingQueue.push(pending);
+
+		if (key) {
+			pendingByEventKey.set(key, pending);
+		}
+	};
+
+	// Some Pi runtimes emit `tool_call` (not before_tool_call) for write/edit.
+	pi.on("before_tool_call", capturePending);
+	pi.on("tool_call", capturePending);
+
+	pi.on("tool_result", (event: any) => {
+		const toolName = getToolName(event);
+		if (toolName !== "write" && toolName !== "edit") return;
+
+		const sessionId = getSessionId(event);
+		markSessionSeen(sessionId);
+		const stacks = getStacks(sessionId);
+
+		const key = eventKey(event);
+		let pending: PendingOperation | undefined;
+		if (key && pendingByEventKey.has(key)) {
+			pending = pendingByEventKey.get(key);
+			pendingByEventKey.delete(key);
+			const idx = stacks.pendingQueue.indexOf(pending!);
+			if (idx >= 0) stacks.pendingQueue.splice(idx, 1);
+		} else {
+			pending = stacks.pendingQueue.pop();
+		}
+
+		if (!pending) return;
+		if (!isToolSuccess(event)) return;
+
+		const next = readContentOrNull(pending.path);
+		if (sameContent(pending.previous, next)) {
+			return;
+		}
+
+		const op: RecordedOperation = {
+			sessionId,
+			path: pending.path,
+			previous: pending.previous,
+			next,
+			toolName,
+		};
+
+		pushBounded(stacks.undo, op);
+		stacks.redo.length = 0;
+	});
+
+	pi.registerCommand("undo", {
+		description: "Undo the most recent successful write/edit in this session",
+		handler(_args: any, ctx: any) {
+			const sessionId = resolveCommandSessionId(ctx);
+			const stacks = getStacks(sessionId);
+			const op = stacks.undo.pop();
+			if (!op) {
+				return notify(ctx, `Nothing to undo (${formatDepth(stacks)})`);
+			}
+
+			applyContent(op.path, op.previous);
+			pushBounded(stacks.redo, op);
+			return notify(
+				ctx,
+				`Undid ${op.toolName} ${op.path} (${formatDepth(stacks)})`,
+			);
+		},
+	});
+
+	pi.registerCommand("redo", {
+		description: "Redo the most recently undone write/edit in this session",
+		handler(_args: any, ctx: any) {
+			const sessionId = resolveCommandSessionId(ctx);
+			const stacks = getStacks(sessionId);
+			const op = stacks.redo.pop();
+			if (!op) {
+				return notify(ctx, `Nothing to redo (${formatDepth(stacks)})`);
+			}
+
+			applyContent(op.path, op.next);
+			pushBounded(stacks.undo, op);
+			return notify(
+				ctx,
+				`Redid ${op.toolName} ${op.path} (${formatDepth(stacks)})`,
+			);
+		},
+	});
+
+	pi.registerCommand("undo-clear", {
+		description: "Clear undo/redo history for current session",
+		handler(_args: any, ctx: any) {
+			const sessionId = resolveCommandSessionId(ctx);
+			const stacks = getStacks(sessionId);
+			stacks.undo.length = 0;
+			stacks.redo.length = 0;
+			stacks.pendingQueue.length = 0;
+
+			for (const [key, pending] of pendingByEventKey.entries()) {
+				if (pending.sessionId === sessionId) {
+					pendingByEventKey.delete(key);
+				}
+			}
+
+			return notify(ctx, `Cleared undo history for session ${sessionId}`);
+		},
+	});
+
+	pi.registerCommand("undo-status", {
+		description: "Show undo/redo stack status for current session",
+		handler(_args: any, ctx: any) {
+			const sessionId = resolveCommandSessionId(ctx);
+			const stacks = getStacks(sessionId);
+			const knownSessions = Array.from(sessionLastSeenAt.keys());
+			const lines = [
+				"## Undo/Redo Status",
+				`session: ${sessionId}`,
+				`undo: ${stacks.undo.length}`,
+				`redo: ${stacks.redo.length}`,
+				`pending: ${stacks.pendingQueue.length}`,
+				`max stack: ${MAX_STACK_SIZE}`,
+				`workspace root: ${WORKSPACE_ROOT}`,
+				`allowlist: ${ALLOWED_ABSOLUTE_PREFIXES.length ? ALLOWED_ABSOLUTE_PREFIXES.join(", ") : "(none)"}`,
+				`skipped unsafe paths: ${stacks.skippedUnsafePathCount}`,
+				`known sessions: ${knownSessions.length ? knownSessions.join(", ") : "(none)"}`,
+			];
+			return notify(ctx, lines.join("\n"));
+		},
+	});
+
+	pi.on("session_shutdown", (event: any) => {
+		const sessionId = getSessionId(event);
+		stacksBySession.delete(sessionId);
+		sessionLastSeenAt.delete(sessionId);
+
+		for (const [key, pending] of pendingByEventKey.entries()) {
+			if (pending.sessionId === sessionId) {
+				pendingByEventKey.delete(key);
+			}
+		}
+	});
+}
