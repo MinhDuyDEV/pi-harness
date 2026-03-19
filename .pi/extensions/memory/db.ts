@@ -9,6 +9,32 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
+import { MEMORY_CONFIG } from "./config.js";
+
+// ---------------------------------------------------------------------------
+// sqlite-vec availability (optional, loaded at runtime)
+// ---------------------------------------------------------------------------
+
+let sqliteVecAvailable = false;
+
+function tryLoadSqliteVec(db: Database.Database): boolean {
+	try {
+		// require() used intentionally — sqlite-vec is CJS-only and this must be synchronous
+		const sqliteVec = require("sqlite-vec");
+		sqliteVec.load(db);
+		sqliteVecAvailable = true;
+		console.log("[memory] sqlite-vec loaded successfully");
+		return true;
+	} catch {
+		sqliteVecAvailable = false;
+		console.log("[memory] sqlite-vec not available — vector search disabled, FTS5-only mode");
+		return false;
+	}
+}
+
+export function isSqliteVecAvailable(): boolean {
+	return sqliteVecAvailable;
+}
 
 // ---------------------------------------------------------------------------
 // Schema SQL
@@ -45,6 +71,8 @@ CREATE TABLE IF NOT EXISTS observations (
   harmful_count INTEGER NOT NULL DEFAULT 0,
   feedback_events TEXT,
   effective_score REAL NOT NULL DEFAULT 0.0,
+  retrieval_count INTEGER NOT NULL DEFAULT 0,
+  last_retrieved INTEGER,
   created_at TEXT NOT NULL,
   created_at_epoch INTEGER NOT NULL,
   updated_at TEXT,
@@ -190,6 +218,9 @@ export function getMemoryDB(): Database.Database {
 	dbInstance.pragma("journal_mode = WAL");
 	dbInstance.pragma("foreign_keys = ON");
 
+	// Try to load sqlite-vec extension (optional)
+	tryLoadSqliteVec(dbInstance);
+
 	initializeSchema(dbInstance);
 	return dbInstance;
 }
@@ -214,30 +245,52 @@ function initializeSchema(db: Database.Database): void {
 			)
 			.get() as { version: number } | undefined;
 
-		if (row && row.version >= 3) return; // Already at v3
+		if (row && row.version >= 4) return; // Already at v4
+
+		if (row && row.version === 3) {
+			migrateV3ToV4(db);
+			return;
+		}
 
 		if (row && row.version === 2) {
 			migrateV2ToV3(db);
+			migrateV3ToV4(db);
 			return;
 		}
 
 		if (row && row.version === 1) {
 			migrateV1ToV2(db);
 			migrateV2ToV3(db);
+			migrateV3ToV4(db);
 			return;
 		}
 	} catch {
 		// schema_versions doesn't exist yet — fresh install
 	}
 
-	// Fresh install: apply full v3 schema
+	// Fresh install: apply full v4 schema
 	db.exec(SCHEMA_SQL);
 	db.exec(FTS_TRIGGERS_SQL);
+
+	// Create vec0 virtual table if sqlite-vec is available
+	if (sqliteVecAvailable) {
+		try {
+			const dims = MEMORY_CONFIG.embedding.dimensions;
+			db.exec(`
+				CREATE VIRTUAL TABLE IF NOT EXISTS vec_observations USING vec0(
+					embedding float[${dims}]
+				);
+			`);
+			console.log("[memory] vec0 virtual table created");
+		} catch (err) {
+			console.warn("[memory] Failed to create vec0 table:", err);
+		}
+	}
 
 	// Record version
 	db.prepare(
 		"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
-	).run(3, new Date().toISOString());
+	).run(4, new Date().toISOString());
 }
 
 function migrateV1ToV2(db: Database.Database): void {
@@ -359,4 +412,78 @@ function migrateV2ToV3(db: Database.Database): void {
 	});
 
 	migration();
+}
+
+function migrateV3ToV4(db: Database.Database): void {
+	const migration = db.transaction(() => {
+		// Add retrieval tracking columns
+		const columns = [
+			["retrieval_count", "INTEGER NOT NULL DEFAULT 0"],
+			["last_retrieved", "INTEGER"],
+		];
+
+		for (const [name, definition] of columns) {
+			try {
+				db.exec(
+					`ALTER TABLE observations ADD COLUMN ${name} ${definition}`,
+				);
+			} catch {
+				// Column may already exist
+			}
+		}
+
+		// Add index for retrieval-based queries
+		db.exec(
+			"CREATE INDEX IF NOT EXISTS idx_observations_retrieval ON observations(retrieval_count DESC)",
+		);
+
+		// Create vec0 virtual table if sqlite-vec is available
+		if (sqliteVecAvailable) {
+			try {
+				const dims = MEMORY_CONFIG.embedding.dimensions;
+				db.exec(`
+					CREATE VIRTUAL TABLE IF NOT EXISTS vec_observations USING vec0(
+						embedding float[${dims}]
+					);
+				`);
+				console.log("[memory] vec0 virtual table created (migration v3→v4)");
+			} catch (err) {
+				console.warn("[memory] Failed to create vec0 table:", err);
+			}
+		}
+
+		// Record version
+		db.prepare(
+			"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
+		).run(4, new Date().toISOString());
+	});
+
+	migration();
+}
+
+// ---------------------------------------------------------------------------
+// One-time embedding backfill for observations that predate vector search
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns observation IDs that have no corresponding vector embedding.
+ * Safe to call even if sqlite-vec is unavailable (returns []).
+ */
+export function getObservationsMissingEmbeddings(): number[] {
+	if (!sqliteVecAvailable) return [];
+
+	try {
+		const db = getMemoryDB();
+		const rows = db
+			.prepare(
+				`SELECT o.id FROM observations o
+				 WHERE o.superseded_by IS NULL AND o.maturity != 'deprecated'
+				   AND o.id NOT IN (SELECT rowid FROM vec_observations)
+				 ORDER BY o.id`,
+			)
+			.all() as { id: number }[];
+		return rows.map((r) => r.id);
+	} catch {
+		return [];
+	}
 }

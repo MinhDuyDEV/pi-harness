@@ -28,7 +28,9 @@ import { MEMORY_CONFIG } from "./memory/config.js";
 import { curateFromDistillations } from "./memory/curator.js";
 import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
 import { distillSession } from "./memory/distill.js";
+import { clearEmbeddings, embed, warmupEmbeddings } from "./memory/embeddings.js";
 import { checkpointWAL, optimizeFTS5 } from "./memory/maintenance.js";
+import { backfillEmbeddings } from "./memory/observations.js";
 import { storeTemporalMessage } from "./memory/pipeline.js";
 import { sanitize } from "./memory/sanitize.js";
 import { refreshAllScores } from "./memory/scoring.js";
@@ -49,6 +51,9 @@ export default function memoryExtension(pi: any): void {
 
 	// 2. Register all memory tools
 	registerMemoryTools(pi);
+
+	// 3. Backfill embeddings for pre-existing observations (async, non-blocking)
+	backfillEmbeddings().catch(() => {});
 
 	// 3. Register event handlers
 
@@ -151,6 +156,9 @@ export default function memoryExtension(pi: any): void {
 			// Periodic maintenance
 			optimizeFTS5();
 			checkpointWAL();
+
+			// Warm up embedding model in background for next search
+			warmupEmbeddings().catch(() => {});
 		} catch {
 			// Pipeline is best-effort
 		}
@@ -188,10 +196,19 @@ export default function memoryExtension(pi: any): void {
 
 			if (taskTerms.length === 0) return; // Nothing to match against
 
-			// Retrieve relevant knowledge (uses FTS5 + BM25 + recency decay)
+			// Retrieve relevant knowledge (uses FTS5 + BM25 + recency decay + vector when available)
+			// Generate query embedding for hybrid search
+			let queryEmbedding: number[] | null = null;
+			try {
+				queryEmbedding = await embed(taskTerms.join(" "));
+			} catch {
+				// Embedding is best-effort
+			}
+
 			const knowledge = getRelevantKnowledge(taskTerms, {
 				tokenBudget: MEMORY_CONFIG.injection.tokenBudget,
 				minScore: MEMORY_CONFIG.injection.minScore,
+				queryEmbedding,
 			});
 
 			if (knowledge.length === 0) return;
@@ -224,6 +241,7 @@ export default function memoryExtension(pi: any): void {
 	// --- Cleanup on shutdown ---
 	pi.on("session_shutdown", () => {
 		try {
+			clearEmbeddings();
 			closeMemoryDB();
 		} catch {
 			// Cleanup is best-effort

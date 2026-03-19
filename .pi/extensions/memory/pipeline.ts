@@ -6,7 +6,8 @@ import {
 	type TemporalMessageInput,
 	type TemporalMessageRow,
 } from "./config.js";
-import { getMemoryDB } from "./db.js";
+import { getMemoryDB, isSqliteVecAvailable } from "./db.js";
+import { markObservationsRetrieved, searchObservationsVector } from "./observations.js";
 
 // ---------------------------------------------------------------------------
 // Temporal Message Operations
@@ -258,6 +259,7 @@ export function getRelevantKnowledge(
 		tokenBudget?: number;
 		minScore?: number;
 		limit?: number;
+		queryEmbedding?: number[] | null;
 	},
 ): Array<{
 	id: number;
@@ -273,6 +275,7 @@ export function getRelevantKnowledge(
 		options?.tokenBudget ?? MEMORY_CONFIG.injection.tokenBudget;
 	const minScore = options?.minScore ?? MEMORY_CONFIG.injection.minScore;
 	const candidateLimit = options?.limit ?? 20;
+	const { weight: vectorWeight, textWeight } = MEMORY_CONFIG.vector;
 
 	const ftsQuery = queryTerms
 		.filter((t) => t.length > 0)
@@ -335,21 +338,53 @@ export function getRelevantKnowledge(
 		// FTS5 unavailable or query error — skip distillations
 	}
 
+	// Build vector similarity map for observations (if available)
+	const vectorSimilarityMap = new Map<number, number>();
+	if (isSqliteVecAvailable() && options?.queryEmbedding) {
+		const vectorResults = searchObservationsVector(options.queryEmbedding, candidateLimit);
+		for (const vr of vectorResults) {
+			vectorSimilarityMap.set(vr.id, Math.max(0, 1 - vr.distance));
+		}
+	}
+
 	const confidenceWeight = (c: string) => {
 		if (c === "high") return 1.0;
 		if (c === "medium") return 0.7;
 		return 0.4;
 	};
 
-	const scoreCandidate = (
-		bm25Score: number,
-		createdAtEpoch: number,
-		confidence: string,
-	): number => {
-		const ageHours = (Date.now() - createdAtEpoch) / 3600000;
+	// Compute raw FTS scores first, then normalize to [0,1] for fair blending with vector
+	const rawFtsScores = new Map<number, number>();
+	for (const obs of obsCandidates) {
+		const ageHours = (Date.now() - obs.created_at_epoch) / 3600000;
 		const recencyFactor =
 			MEMORY_CONFIG.injection.recencyDecay ** (ageHours / 24);
-		return -bm25Score * recencyFactor * confidenceWeight(confidence);
+		const raw = -obs.bm25_score * recencyFactor * confidenceWeight(obs.confidence);
+		rawFtsScores.set(obs.id, raw);
+	}
+
+	// Normalize raw FTS scores to [0,1]
+	const normalizedFtsScores = new Map<number, number>();
+	if (rawFtsScores.size > 0) {
+		const values = [...rawFtsScores.values()];
+		const minFts = Math.min(...values);
+		const maxFts = Math.max(...values);
+		const range = maxFts - minFts;
+		for (const [id, raw] of rawFtsScores) {
+			normalizedFtsScores.set(id, range === 0 ? 1.0 : (raw - minFts) / range);
+		}
+	}
+
+	const scoreCandidate = (obsId: number): number => {
+		const ftsNorm = normalizedFtsScores.get(obsId) ?? 0;
+
+		// Hybrid: blend normalized FTS and vector scores when vector data is available
+		if (vectorSimilarityMap.size > 0) {
+			const vecScore = vectorSimilarityMap.get(obsId) ?? 0;
+			return ftsNorm * textWeight + vecScore * vectorWeight;
+		}
+
+		return ftsNorm;
 	};
 
 	type ScoredResult = {
@@ -370,26 +405,67 @@ export function getRelevantKnowledge(
 			type: obs.type,
 			title: obs.title,
 			content: obs.content,
-			score: scoreCandidate(
-				obs.bm25_score,
-				obs.created_at_epoch,
-				obs.confidence,
-			),
+			score: scoreCandidate(obs.id),
 			source: "observation",
 			created_at: obs.created_at,
 		});
 	}
 
+	// Also include vector-only candidates (not found by FTS)
+	if (vectorSimilarityMap.size > 0) {
+		const ftsIds = new Set(obsCandidates.map((o) => o.id));
+		for (const [obsId, similarity] of vectorSimilarityMap) {
+			if (ftsIds.has(obsId)) continue; // Already in FTS results
+			// Fetch observation details for vector-only hits
+			const row = db
+				.prepare(
+					`SELECT id, type, title, COALESCE(narrative, '') as content,
+                  created_at, created_at_epoch, confidence
+           FROM observations
+           WHERE id = ? AND superseded_by IS NULL AND maturity != 'deprecated'`,
+				)
+				.get(obsId) as ObsCandidate | undefined;
+
+			if (row) {
+				results.push({
+					id: row.id,
+					type: row.type,
+					title: row.title,
+					content: row.content,
+					score: similarity * vectorWeight, // Vector-only score
+					source: "observation",
+					created_at: row.created_at,
+				});
+			}
+		}
+	}
+
+	// Compute and normalize distillation scores
+	const rawDistScores: { dist: typeof distCandidates[0]; raw: number }[] = [];
 	for (const dist of distCandidates) {
-		results.push({
-			id: dist.id,
-			type: "distillation",
-			title: `Distillation ${dist.id}`,
-			content: dist.content,
-			score: scoreCandidate(dist.bm25_score, dist.time_created, "medium"),
-			source: "distillation",
-			created_at: dist.created_at,
-		});
+		const ageHours = (Date.now() - dist.time_created) / 3600000;
+		const recencyFactor =
+			MEMORY_CONFIG.injection.recencyDecay ** (ageHours / 24);
+		rawDistScores.push({ dist, raw: -dist.bm25_score * recencyFactor * confidenceWeight("medium") });
+	}
+
+	if (rawDistScores.length > 0) {
+		const values = rawDistScores.map((d) => d.raw);
+		const minD = Math.min(...values);
+		const maxD = Math.max(...values);
+		const rangeD = maxD - minD;
+
+		for (const { dist, raw } of rawDistScores) {
+			results.push({
+				id: dist.id,
+				type: "distillation",
+				title: `Distillation ${dist.id}`,
+				content: dist.content,
+				score: rangeD === 0 ? 1.0 : (raw - minD) / rangeD,
+				source: "distillation",
+				created_at: dist.created_at,
+			});
+		}
 	}
 
 	// Sort by score descending (higher is better)
@@ -405,6 +481,12 @@ export function getRelevantKnowledge(
 		if (usedTokens + tokens > tokenBudget) continue;
 		packed.push(result);
 		usedTokens += tokens;
+	}
+
+	// Track retrieval for observation results
+	const obsIds = packed.filter((r) => r.source === "observation").map((r) => r.id);
+	if (obsIds.length > 0) {
+		markObservationsRetrieved(obsIds);
 	}
 
 	return packed;

@@ -1,6 +1,8 @@
 {
 	"private": true,
 	"dependencies": {
-		"better-sqlite3": "^11.0.0"
+		"better-sqlite3": "^11.0.0",
+		"sqlite-vec": "^0.1.7",
+		"@huggingface/transformers": "^3.4.0"
 	}
 }

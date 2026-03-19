@@ -37,7 +37,9 @@ import {
 	getObservationStats,
 	getObservationsByIds,
 	getTimelineAroundObservation,
+	markObservationsRetrieved,
 	searchObservationsFTS,
+	searchObservationsHybrid,
 	storeObservation,
 } from "./observations.js";
 import {
@@ -46,6 +48,7 @@ import {
 	searchDistillationsFTS,
 } from "./pipeline.js";
 import { recordFeedback, refreshAllScores } from "./scoring.js";
+import { isSqliteVecAvailable } from "./db.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -282,18 +285,23 @@ export function registerMemoryTools(pi: any): void {
 						? (scope as ObservationType)
 						: undefined;
 
-					const results = searchObservationsFTS(query, {
+					// Use hybrid search (FTS5 + vector) when available
+					const results = await searchObservationsHybrid(query, {
 						type: typeFilter,
 						limit,
 					});
 
 					if (results.length > 0) {
+						// Track retrievals for search results
+						markObservationsRetrieved(results.map((r) => r.id));
+
+						const hasVector = isSqliteVecAvailable();
 						const header = typeFilter
-							? `### Observations [${typeFilter}]`
-							: "### Observations";
+							? `### Observations [${typeFilter}]${hasVector ? " (hybrid)" : ""}`
+							: `### Observations${hasVector ? " (hybrid)" : ""}`;
 						const lines = results.map((r) => {
 							const icon = TYPE_ICONS[r.type] ?? "📌";
-							const score = r.relevance_score.toFixed(3);
+							const score = r.combined_score.toFixed(3);
 							const snippet = r.snippet
 								? ` — ${r.snippet.replace(/\n/g, " ").slice(0, 80)}`
 								: "";
@@ -726,6 +734,7 @@ export function registerMemoryTools(pi: any): void {
 							`  Total   : ${formatBytes(sizes.total)}`,
 							"",
 							`**FTS5 Available:** ${fts5 ? "✅ yes" : "❌ no"}`,
+							`**Vector Search (sqlite-vec):** ${isSqliteVecAvailable() ? "✅ yes (hybrid mode)" : "❌ no (FTS5-only mode)"}`,
 							"",
 							`**Observations** (${obsTotal} active)`,
 							obsLines,
@@ -920,7 +929,7 @@ export function registerMemoryTools(pi: any): void {
 					`${icon} Feedback recorded for observation #${params.id}`,
 					`  Score: ${result.effectiveScore.toFixed(2)} (${result.helpfulCount}👍 / ${result.harmfulCount}👎)`,
 					`  ${maturityIcon} Maturity: ${result.maturity}`,
-					result.reason ? `  Reason: ${result.reason}` : "",
+					params.reason ? `  Reason: ${params.reason}` : "",
 				]
 					.filter(Boolean)
 					.join("\n");

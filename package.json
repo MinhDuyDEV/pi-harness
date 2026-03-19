@@ -9,7 +9,7 @@
 		"url": "https://github.com/huynhgiabuu/pikit"
 	},
 	"scripts": {
-		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3"
+		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec"
 	},
 	"pi": {
 		"extensions": [".pi/extensions"],

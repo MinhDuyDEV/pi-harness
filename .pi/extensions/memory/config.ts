@@ -60,6 +60,8 @@ export interface ObservationRow {
 	harmful_count: number;
 	feedback_events: string | null; // JSON array of FeedbackEvent
 	effective_score: number;
+	retrieval_count: number;
+	last_retrieved: number | null;
 	created_at: string;
 	created_at_epoch: number;
 	updated_at: string | null;
@@ -226,5 +228,21 @@ export const MEMORY_CONFIG = {
 	},
 	fts: {
 		tokenizer: "porter unicode61",
+	},
+	embedding: {
+		/** Embedding dimensions (all-MiniLM-L6-v2 = 384) */
+		dimensions: 384,
+		/** Model name for local embeddings */
+		model: "Xenova/all-MiniLM-L6-v2",
+		/** Max entries in embedding LRU cache */
+		cacheSize: 1000,
+		/** Enable/disable embedding generation */
+		enabled: true,
+	},
+	vector: {
+		/** Weight for vector similarity in hybrid search (0.0-1.0) */
+		weight: 0.4,
+		/** Weight for FTS5 text search in hybrid search (0.0-1.0) */
+		textWeight: 0.6,
 	},
 } as const;
