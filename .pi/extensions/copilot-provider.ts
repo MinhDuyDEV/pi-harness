@@ -58,10 +58,12 @@ const RATE_LIMIT_PATTERN =
   /(too many requests|rate\s*limit|exhausted this model|429)/i;
 
 const MODEL_FALLBACKS: Record<string, string> = {
-  "claude-opus-4.6": "gpt-5.3-codex",
-  "claude-opus-4.5": "gpt-5.3-codex",
+  "claude-opus-4.6": "gpt-5.4",
+  "claude-opus-4.5": "gpt-5.4",
   "claude-sonnet-4.6": "claude-haiku-4.5",
   "claude-sonnet-4.5": "claude-haiku-4.5",
+  "gpt-5.4": "gpt-5.3-codex",
+  "gpt-5.4-mini": "gpt-5-mini",
   "gpt-5.3-codex": "gpt-5.2-codex",
   "gpt-5.2-codex": "gpt-5.1-codex",
   "gpt-5.1-codex": "gpt-5-mini",
@@ -266,6 +268,24 @@ const COPILOT_MODELS: ProviderModelConfig[] = [
   {
     id: "gpt-5.3-codex",
     name: "GPT-5.3-Codex",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: ZERO_COST,
+    contextWindow: 400000,
+    maxTokens: 128000,
+  },
+  {
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: ZERO_COST,
+    contextWindow: 400000,
+    maxTokens: 128000,
+  },
+  {
+    id: "gpt-5.4-mini",
+    name: "GPT-5.4 mini",
     reasoning: true,
     input: ["text", "image"],
     cost: ZERO_COST,
