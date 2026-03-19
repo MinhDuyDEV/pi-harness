@@ -10,6 +10,7 @@ docs/
 .pi/npm/
 .pi/extensions/node_modules/
 .pi/extensions/bun.lock
+.pi/extensions/package-lock.json
 
 # SQLite databases (local state, not source code)
 *.db
