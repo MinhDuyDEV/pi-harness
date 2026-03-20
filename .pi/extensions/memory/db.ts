@@ -23,11 +23,9 @@ function tryLoadSqliteVec(db: Database.Database): boolean {
 		const sqliteVec = require("sqlite-vec");
 		sqliteVec.load(db);
 		sqliteVecAvailable = true;
-		console.log("[memory] sqlite-vec loaded successfully");
 		return true;
 	} catch {
 		sqliteVecAvailable = false;
-		console.log("[memory] sqlite-vec not available — vector search disabled, FTS5-only mode");
 		return false;
 	}
 }
@@ -281,7 +279,6 @@ function initializeSchema(db: Database.Database): void {
 					embedding float[${dims}]
 				);
 			`);
-			console.log("[memory] vec0 virtual table created");
 		} catch (err) {
 			console.warn("[memory] Failed to create vec0 table:", err);
 		}
@@ -446,7 +443,6 @@ function migrateV3ToV4(db: Database.Database): void {
 						embedding float[${dims}]
 					);
 				`);
-				console.log("[memory] vec0 virtual table created (migration v3→v4)");
 			} catch (err) {
 				console.warn("[memory] Failed to create vec0 table:", err);
 			}

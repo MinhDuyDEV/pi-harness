@@ -68,14 +68,10 @@ async function createLocalEmbedder(): Promise<(text: string) => Promise<number[]
 	const { pipeline } = await import("@huggingface/transformers");
 
 	const model = MEMORY_CONFIG.embedding.model;
-	console.log(`[memory] Loading local embedding model: ${model}`);
-
 	const extractor = await pipeline("feature-extraction", model, {
 		// @ts-ignore — quantized option may vary by version
 		dtype: "fp32",
 	});
-
-	console.log(`[memory] Embedding model loaded: ${model}`);
 
 	return async (text: string): Promise<number[]> => {
 		const output = await extractor(text, { pooling: "mean", normalize: true });

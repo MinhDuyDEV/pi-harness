@@ -473,7 +473,6 @@ export async function backfillEmbeddings(): Promise<number> {
 	const missingIds = getObservationsMissingEmbeddings();
 	if (missingIds.length === 0) return 0;
 
-	console.log(`[memory] Backfilling embeddings for ${missingIds.length} observations...`);
 	let success = 0;
 
 	for (const id of missingIds) {
@@ -509,6 +508,5 @@ export async function backfillEmbeddings(): Promise<number> {
 		}
 	}
 
-	console.log(`[memory] Backfill complete: ${success}/${missingIds.length} embeddings stored`);
 	return success;
 }
