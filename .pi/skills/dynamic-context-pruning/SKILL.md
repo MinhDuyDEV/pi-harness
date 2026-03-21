@@ -123,12 +123,12 @@ See `references/compress-philosophy.md` for the full compress philosophy.
 
 ## Context Budget Guidelines
 
-| Phase             | Target  | Action                                            |
-| ----------------- | ------- | ------------------------------------------------- |
-| Starting work     | <50k    | Load only essential context + task spec           |
-| Mid-task          | 50–100k | Compress completed phases, keep active files      |
-| Approaching limit | >100k   | Compress aggressively by phase, distill remaining |
-| Near capacity     | >150k   | Session restart with handoff                      |
+| Phase             | Target   | Action                                            |
+| ----------------- | -------- | ------------------------------------------------- |
+| Starting work     | <50k     | Load only essential context + task spec           |
+| Mid-task          | 50–150k  | Compress completed phases, keep active files      |
+| Approaching limit | >150k    | Compress aggressively by phase, distill remaining |
+| Near capacity     | >200k    | Session restart with handoff                      |
 
 ## Extension Integration
 

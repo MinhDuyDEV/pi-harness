@@ -1,7 +1,7 @@
 ---
 name: context-management
-description: Use when context is growing large, needing to prune/distill tool outputs, or managing conversation size - covers DCP slash commands and context budgets
-version: 1.0.0
+description: Use when context is growing large, needing to compress tool outputs, or managing conversation size - covers DCP tools, strategies, and context budgets
+version: 2.0.0
 tags: [context, workflow]
 dependencies: []
 ---
@@ -10,7 +10,7 @@ dependencies: []
 
 ## When to Use
 
-- Context is growing large and you need to compress/distill/prune tool outputs
+- Context is growing large and you need to compress tool outputs
 - You are finishing a phase and want to preserve signal while freeing tokens
 
 ## When NOT to Use
@@ -18,46 +18,30 @@ dependencies: []
 - You still need active file contents for upcoming edits
 - The output is protected or required for immediate modifications
 
+## Tool Hierarchy (v3.0+ Philosophy)
 
-## Tool Hierarchy (v2.2+ Philosophy)
+Everything flows through the single `compress` tool. Compress > Distill > Prune are
+**behavioral intent tiers**, not separate tools.
 
-DCP beta shifted to a compress-first approach. Follow this order strictly:
+| Intent       | Use When                                               | Implementation        |
+| ------------ | ------------------------------------------------------ | --------------------- |
+| **Compress** | A phase of work is complete — collapse the whole phase | `compress` tool       |
+| **Distill**  | Large raw output with extractable value to preserve    | `compress` (detailed) |
+| **Prune**    | Pure noise: wrong target, irrelevant, zero value       | `compress` (minimal)  |
 
-```
-compress > distill > prune
-```
-
-| Tool       | Use When                                               | Cache Impact |
-| ---------- | ------------------------------------------------------ | ------------ |
-| `compress` | A phase of work is complete — collapse the whole phase | Minimal      |
-| `distill`  | Large raw output with extractable value to preserve    | Low          |
-| `prune`    | Pure noise: wrong target, irrelevant, zero value       | Moderate     |
-
-**Why this matters:** Granular `prune` calls trigger cache invalidation on every provider, especially Anthropic. Compressing whole phases instead of surgically deleting individual outputs is cheaper, faster, and more reliable.
+**Why compress-first:** Granular tool-level pruning triggers cache invalidation on every provider,
+especially Anthropic. Compressing whole phases instead of surgically deleting individual outputs
+is cheaper, faster, and more reliable.
 
 **Never prune because it's convenient. Only prune true noise.**
 
-## DCP Slash Commands (Recommended)
+## Available Tools
 
-| Command                 | Purpose                                  | When to Use                         |
-| ----------------------- | ---------------------------------------- | ----------------------------------- |
-| `/dcp compress [focus]` | Collapse conversation range into summary | Phase complete, research done       |
-| `/dcp distill [focus]`  | Distill key findings before removing     | Large outputs with valuable details |
-| `/dcp sweep [count]`    | Prune all tools since last user message  | Cleanup pure noise only             |
-| `/dcp context`          | Show token breakdown by category         | Check context usage                 |
-| `/dcp stats`            | Show cumulative pruning stats            | Review efficiency                   |
-
-## Tool Calls (Fallback)
-
-Use when slash commands aren't suitable:
-
-| Tool       | Purpose                       | When to Use                           |
-| ---------- | ----------------------------- | ------------------------------------- |
-| `compress` | Collapse conversation range   | Phase complete, research done         |
-| `distill`  | Extract key info, then remove | Large outputs with valuable details   |
-| `prune`    | Remove tool outputs (no save) | Noise only — irrelevant, never-needed |
-
-**Note:** Prefer `/dcp compress` slash command over the `compress` tool — better boundary matching.
+| Tool         | Purpose                                 | When to Use                         |
+| ------------ | --------------------------------------- | ----------------------------------- |
+| `compress`   | Collapse conversation range into summary| Phase complete, research done       |
+| `dcp-stats`  | Show compression statistics             | Check context usage and efficiency  |
+| `decompress` | Review stored compression blocks        | Recover compressed content          |
 
 ## Phase-Boundary Compress Triggers
 
@@ -99,7 +83,7 @@ DCP runs these automatically at zero LLM cost — don't manually manage these:
 
 ## Protected Content
 
-Auto-protected from pruning (v2.1.7+):
+Auto-protected from pruning:
 
 - `write` and `edit` tool outputs
 - `.env*` files
@@ -110,55 +94,41 @@ Auto-protected from pruning (v2.1.7+):
 
 Don't manually protect what's already protected.
 
-## Distill — Preserve + Remove
+## Self-Monitoring Nudges
 
-Extract high-fidelity knowledge from tool outputs, then remove the raw output. Distillation must be a **complete technical substitute** — capture signatures, types, logic, constraints, everything essential.
-
-```typescript
-distill({
-  targets: [
-    {
-      id: "10",
-      distillation:
-        "auth.ts: validateToken(token: string) -> User|null, uses bcrypt 12 rounds, throws on expired tokens",
-    },
-    {
-      id: "11",
-      distillation:
-        "user.ts: interface User { id: string, email: string, permissions: Permission[], status: 'active'|'suspended' }",
-    },
-  ],
-});
-```
+| Context Level      | Action                                                                     |
+| ------------------ | -------------------------------------------------------------------------- |
+| Below 50k tokens   | No compression pressure — work freely                                      |
+| 50k–150k tokens    | Light reminders at turn boundaries — check for compressible ranges         |
+| Above 150k tokens  | **Critical** — compress now, prioritize one large closed range first       |
+| 15+ iterations     | After 15 messages without user input, check for closed compressible ranges |
 
 ## Context Budget Guidelines
 
-| Phase             | Target  | Action                                            |
-| ----------------- | ------- | ------------------------------------------------- |
-| Starting work     | <50k    | Load only essential AGENTS.md + task spec         |
-| Mid-task          | 50-100k | Compress completed phases, keep active files      |
-| Approaching limit | >100k   | Compress aggressively by phase, distill remaining |
-| Near capacity     | >150k   | Session restart with handoff                      |
+| Phase             | Target   | Action                                            |
+| ----------------- | -------- | ------------------------------------------------- |
+| Starting work     | <50k     | Load only essential AGENTS.md + task spec         |
+| Mid-task          | 50–150k  | Compress completed phases, keep active files      |
+| Approaching limit | >150k    | Compress aggressively by phase                    |
+| Near capacity     | >200k    | Session restart with handoff                      |
 
-At >100k: prefer compressing full phases over distilling individual outputs. The cache cost is lower.
+At >150k: prefer compressing full phases over individual outputs. The cache cost is lower.
+
+## XML Tag Suppression
+
+DCP uses internal XML metadata tags for prompt injection. **Never output these tags in
+user-visible responses.** Act on them but do not echo them.
 
 ## Quick Reference
 
 ```
-HIERARCHY: compress > distill > prune
+HIERARCHY: compress > distill > prune (behavioral tiers via single compress tool)
 TIMING: manage at turn START, not turn END
 PHASE ENDS = compress trigger
+XML TAGS: never echo DCP-internal XML tags in output
 
-DCP SLASH COMMANDS (preferred):
-/dcp compress [focus]  → Collapse completed phase
-/dcp distill [focus]   → Distill key findings
-/dcp sweep [count]     → Prune pure noise only
-/dcp context           → Show token breakdown
+TOOLS: compress (crystallize), dcp-stats (monitor), decompress (review)
+EXTENSION: .pi/extensions/dcp.ts → SQLite at ~/.config/pi/dcp/dcp.db
 
-TOOL CALLS (fallback):
-compress({ topic, content: { startId, endId, summary } })
-distill({ targets: [{ id, distillation }] })
-prune({ ids: [...] })  ← last resort only
-
-BUDGET: <50k start → 50-100k compress phases → >100k aggressive → >150k restart
+BUDGET: <50k start → 50-150k compress phases → >150k critical → >200k restart
 ```
