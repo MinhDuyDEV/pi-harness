@@ -43,9 +43,9 @@ context pruning behavior. In a pi skill context, use these as behavioral paramet
     // Show compression content in notification
     "showCompression": false,
     // Soft upper threshold for strong compression nudges
-    "maxContextLimit": 100000,
+    "maxContextLimit": 150000,
     // Soft lower threshold — below this, nudges are off
-    "minContextLimit": 30000,
+    "minContextLimit": 50000,
     // How often the context-limit nudge fires (1 = every turn, 5 = every 5th)
     "nudgeFrequency": 5,
     // Start iteration nudges after this many messages without user input
@@ -117,8 +117,8 @@ Pattern syntax:
 
 | Setting           | Type              | Default  | Description                              |
 | ----------------- | ----------------- | -------- | ---------------------------------------- |
-| `maxContextLimit` | number or "N%"    | 100000   | Above this, critical nudges fire         |
-| `minContextLimit` | number or "N%"    | 30000    | Below this, turn/iteration nudges are off|
+| `maxContextLimit` | number or "N%"    | 150000   | Above this, critical nudges fire         |
+| `minContextLimit` | number or "N%"    | 50000    | Below this, turn/iteration nudges are off|
 
 When using percentage values (e.g., `"80%"`), the limit is calculated as a percentage of the
 model's total context window.
@@ -129,7 +129,7 @@ Different models can have different thresholds:
 
 ```jsonc
 "compress": {
-  "maxContextLimit": 100000,
+  "maxContextLimit": 150000,
   "modelMaxLimits": {
     "anthropic/claude-sonnet-4": "80%",
     "openai/gpt-4o": 120000
@@ -153,3 +153,21 @@ Approximate impact: ~85% cache hit rate with DCP vs ~90% without.
 
 **No impact** for request-based billing (e.g., GitHub Copilot) or uniform token pricing
 (e.g., Cerebras).
+
+## New in v3.0.0+ Configuration Keys
+
+These upstream config keys are documented for reference. Not all are implemented in pikit's
+behavioral port, but they inform the correct mental model.
+
+| Key | Type | Default | Since | Description |
+|-----|------|---------|-------|-------------|
+| `manualMode.enabled` | bool | `false` | v3.0.0 | Disables autonomous compression; commands only |
+| `manualMode.automaticStrategies` | bool | `true` | v3.0.0 | Zero-cost strategies still run in manual mode |
+| `turnProtection.enabled` | bool | `false` | v3.0.0 | Protect content for N turns after tool invocation |
+| `turnProtection.turns` | int | `4` | v3.0.0 | Number of turns to protect |
+| `compress.protectUserMessages` | bool | `false` | v3.0.0 | Prevents user messages from being compressed |
+| `compress.flatSchema` | bool | `false` | v3.0.0 | Simplified tool schema (reduces model confusion) |
+| `compress.nudgeForce` | `"soft"\|"strong"` | `"soft"` | v3.0.0 | Compression aggressiveness after user messages |
+| `compress.iterationNudgeThreshold` | int | `15` | v3.0.0 | Messages before iteration nudge fires |
+| `experimental.customPrompts` | bool | `false` | v3.0.0 | User-defined prompt override files |
+| `experimental.allowSubAgents` | bool | `false` | v3.0.0 | Enable compression in sub-agent contexts |

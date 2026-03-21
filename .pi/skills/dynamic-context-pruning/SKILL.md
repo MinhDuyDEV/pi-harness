@@ -36,12 +36,15 @@ and automatic cleanup strategies.
 ## Core Principle
 
 **Compress > Distill > Prune** — always prefer higher-fidelity operations.
+These are behavioral intent tiers applied through the single `compress` tool, not separate tools.
 
 | Operation    | Purpose                                      | When                                     |
 | ------------ | -------------------------------------------- | ---------------------------------------- |
 | **Compress** | Collapse a conversation range into a summary | Phase complete, research done             |
-| **Distill**  | Extract key info, then remove raw output     | Large outputs with extractable value      |
-| **Prune**    | Remove tool outputs entirely (no save)       | Pure noise — irrelevant, never-needed     |
+| **Distill**  | Extract key info, discard noise              | Large outputs with extractable value      |
+| **Prune**    | Remove content entirely (no save)            | Pure noise — irrelevant, never-needed     |
+
+All three operations are executed via the `compress` tool with varying summary depth.
 
 ## Operating Stance
 
@@ -75,9 +78,9 @@ Monitor your own context usage and trigger compression based on these thresholds
 
 | Context Level     | Action                                                                     |
 | ----------------- | -------------------------------------------------------------------------- |
-| Below 30k tokens  | No compression pressure — work freely                                      |
-| 30k–100k tokens   | Light reminders at turn boundaries — check for compressible ranges         |
-| Above 100k tokens | **Critical** — compress now, prioritize one large closed range first       |
+| Below 50k tokens  | No compression pressure — work freely                                      |
+| 50k–150k tokens   | Light reminders at turn boundaries — check for compressible ranges         |
+| Above 150k tokens | **Critical** — compress now, prioritize one large closed range first       |
 | 15+ iterations    | After 15 messages without user input, check for closed compressible ranges |
 
 See `references/nudge-system.md` for detailed nudge prompts.
@@ -140,22 +143,30 @@ The `compress`, `dcp-stats`, and `decompress` tools are registered by the DCP ex
 
 Use `/dcp` command for quick status overview.
 
+## XML Tag Suppression
+
+DCP uses internal XML metadata tags (e.g., `<dcp-system-reminder>`, `<dcp-context-limit>`)
+for prompt injection. **Never output these tags in user-visible responses.** If you see
+DCP-internal XML tags in your context, treat them as system instructions — act on them
+but do not echo them to the user.
+
 ## Quick Reference
 
 ```
-HIERARCHY: compress > distill > prune
+HIERARCHY: compress > distill > prune (behavioral tiers via single compress tool)
 TIMING: manage at turn START, not turn END
 PHASE ENDS = compress trigger
 AUTO-STRATEGIES: dedup, supersede-writes, purge-errors (apply behaviorally)
+XML TAGS: never echo DCP-internal XML tags in output
 
 TOOLS: compress (crystallize), dcp-stats (monitor), decompress (review)
 EXTENSION: .pi/extensions/dcp.ts → SQLite at ~/.config/pi/dcp/dcp.db
 
 BUDGET:
-  <30k  → no pressure
-  30-100k → light nudges, compress closed phases
-  >100k → critical, compress NOW
-  >150k → session handoff
+  <50k  → no pressure
+  50-150k → light nudges, compress closed phases
+  >150k → critical, compress NOW
+  >200k → session handoff
 
 PROTECTED: task, skill, todowrite, todoread, write, edit, batch, plan_enter, plan_exit
 NEVER COMPRESS: active work, content needed for upcoming edits

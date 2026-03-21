@@ -7,13 +7,13 @@ at appropriate moments. Ported from DCP's prompt injection system.
 
 | Nudge Type           | Trigger Condition                        | Priority | Frequency        |
 | -------------------- | ---------------------------------------- | -------- | ---------------- |
-| Context Limit Nudge  | Context above `maxContextLimit` (100k)   | Critical | Every 5th fetch  |
+| Context Limit Nudge  | Context above `maxContextLimit` (150k)   | Critical | Every 5th fetch  |
 | Turn Nudge           | Context between min/max at user turn     | Medium   | At turn boundary |
 | Iteration Nudge      | 15+ messages since last user message     | Medium   | Once per trigger |
 
 ## Context Limit Nudge (Critical)
 
-**Trigger**: Context is at or beyond the configured max context threshold (default: 100k tokens).
+**Trigger**: Context is at or beyond the configured max context threshold (default: 150k tokens).
 
 **Response**: This is an emergency context-recovery moment. You **MUST** compress now.
 
@@ -43,7 +43,7 @@ at appropriate moments. Ported from DCP's prompt injection system.
 
 ## Turn Nudge (Medium)
 
-**Trigger**: Context is between `minContextLimit` (30k) and `maxContextLimit` (100k) tokens,
+**Trigger**: Context is between `minContextLimit` (50k) and `maxContextLimit` (150k) tokens,
 and a new user message has arrived.
 
 **Response**: Evaluate the conversation for compressible ranges.
@@ -83,8 +83,8 @@ autonomously for a while).
 
 | Setting                    | Default | Description                                         |
 | -------------------------- | ------- | --------------------------------------------------- |
-| `maxContextLimit`          | 100000  | Tokens above which critical nudges fire              |
-| `minContextLimit`          | 30000   | Tokens below which turn/iteration nudges are off     |
+| `maxContextLimit`          | 150000  | Tokens above which critical nudges fire              |
+| `minContextLimit`          | 50000   | Tokens below which turn/iteration nudges are off     |
 | `nudgeFrequency`           | 5       | How often context-limit nudge fires (every Nth turn) |
 | `iterationNudgeThreshold`  | 15      | Messages since last user message before nudge fires  |
 | `nudgeForce`               | "soft"  | How likely compression is after user messages        |
@@ -103,9 +103,9 @@ Since these nudges are behavioral (not injected by code), follow this self-monit
 ### At Every Turn Start
 
 1. Estimate current context usage (rough token count)
-2. If above 100k → apply Context Limit Nudge behavior
-3. If between 30k–100k → apply Turn Nudge behavior
-4. If below 30k → no action needed
+2. If above 150k → apply Context Limit Nudge behavior
+3. If between 50k–150k → apply Turn Nudge behavior
+4. If below 50k → no action needed
 
 ### During Autonomous Iteration
 

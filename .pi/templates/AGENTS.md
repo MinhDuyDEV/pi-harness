@@ -254,7 +254,8 @@ Command: `/dcp` — Show context pruning status and available actions.
 | Starting work     | <50k    | Load only essential context + task spec       |
 | Mid-task          | 50-100k | Compress completed research, keep active work |
 | Approaching limit | >100k   | Aggressive compress, prune noise              |
-| Near capacity     | >150k   | Session restart with handoff                  |
+| Near capacity     | >150k   | Compress critical, prepare session handoff    |
+| Over capacity     | >200k   | Session restart with handoff                  |
 
 #### Strategies (apply automatically)
 
