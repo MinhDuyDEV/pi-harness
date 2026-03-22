@@ -6,7 +6,7 @@
 # Example: ./launch.sh node -e "console.log(1)"
 #
 # Sandbox mode: workspace-write
-# Generated: 2026-03-22T04:02:05.390Z
+# Generated: 2026-03-22T04:04:41.057Z
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

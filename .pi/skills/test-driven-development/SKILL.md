@@ -296,6 +296,7 @@ Tests-first force edge case discovery before implementing. Tests-after verify yo
 - Test passes immediately
 - Can't explain why test failed
 - Tests added "later"
+- **Writing all tests first, then all implementations (horizontal slicing)**
 - Rationalizing "just this once"
 - "I already manually tested it"
 - "Tests after achieve the same purpose"
@@ -306,6 +307,35 @@ Tests-first force edge case discovery before implementing. Tests-after verify yo
 - "This is different because..."
 
 **All of these mean: Delete code. Start over with TDD.**
+
+## Anti-Pattern: Horizontal Test Slicing
+
+```
+WRONG — horizontal (what AI does naturally without guidance):
+  Write test1, test2, test3, test4, test5     ← all RED at once
+  Write impl1, impl2, impl3, impl4, impl5     ← all GREEN at once
+  
+  Why this fails:
+  - Tests written in bulk test IMAGINED behavior, not actual behavior
+  - You outrun your headlights — committing to test structure before
+    understanding the implementation
+  - Later tests influence earlier tests (contamination)
+  - You end up testing the shape of things, not user-facing behavior
+
+RIGHT — vertical (one behavior at a time):
+  RED test1 → GREEN impl1 → verify
+  RED test2 → GREEN impl2 → verify
+  RED test3 → GREEN impl3 → verify
+  
+  Why this works:
+  - Each test is informed by what you learned implementing the previous one
+  - Each implementation is minimal — just enough to pass ONE test
+  - You discover edge cases AS you go, not all upfront
+  - Tests verify ACTUAL behavior, not predicted behavior
+```
+
+**If you catch yourself writing more than one failing test before making
+any pass — STOP. You are horizontal slicing. Go back to one RED → one GREEN.**
 
 ## Example: Bug Fix
 
