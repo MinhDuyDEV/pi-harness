@@ -5,6 +5,9 @@ docs/
 # OS noise
 .DS_Store
 
+# Pi auto-generated sandbox profiles
+.pi/sandbox/
+
 # Pi local caches / generated dirs
 .pi/git/
 .pi/npm/
