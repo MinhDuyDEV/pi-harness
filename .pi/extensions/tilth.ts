@@ -201,12 +201,14 @@ function registerTilthTool(
 	label: string,
 	description: string,
 	parameters: any,
+	promptSnippet?: string,
 ): void {
 	pi.registerTool({
 		name,
 		label,
 		description,
 		parameters,
+		...(promptSnippet && { promptSnippet }),
 		async execute(
 			_toolCallId: string,
 			params: Record<string, unknown>,
@@ -279,6 +281,7 @@ export default function tilthExtension(pi: any): void {
 				Type.Number({ description: "Max tokens in response." }),
 			),
 		}),
+		"Search for symbols, text, or regex in code. AST-aware definitions-first results.",
 	);
 
 	// --- tilth_read ---
@@ -315,6 +318,7 @@ export default function tilthExtension(pi: any): void {
 				Type.Number({ description: "Max tokens in response." }),
 			),
 		}),
+		"Read files with smart outlining — full content for small files, structural outline for large.",
 	);
 
 	// --- tilth_files ---
@@ -339,6 +343,7 @@ export default function tilthExtension(pi: any): void {
 				Type.Number({ description: "Max tokens in response." }),
 			),
 		}),
+		"Find files by glob pattern with token size estimates. Respects .gitignore.",
 	);
 
 	// --- tilth_deps ---
@@ -365,6 +370,7 @@ export default function tilthExtension(pi: any): void {
 				}),
 			),
 		}),
+		"Blast-radius check — shows what imports a file and calls its exports.",
 	);
 
 	// --- Cleanup ---

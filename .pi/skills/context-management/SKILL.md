@@ -40,8 +40,8 @@ is cheaper, faster, and more reliable.
 | Tool         | Purpose                                 | When to Use                         |
 | ------------ | --------------------------------------- | ----------------------------------- |
 | `compress`   | Collapse conversation range into summary| Phase complete, research done       |
-| `dcp-stats`  | Show compression statistics             | Check context usage and efficiency  |
-| `decompress` | Review stored compression blocks        | Recover compressed content          |
+
+Use `/dcp` command for stats and to review active compression blocks.
 
 ## Phase-Boundary Compress Triggers
 
@@ -98,21 +98,23 @@ Don't manually protect what's already protected.
 
 | Context Level      | Action                                                                     |
 | ------------------ | -------------------------------------------------------------------------- |
-| Below 50k tokens   | No compression pressure — work freely                                      |
-| 50k–150k tokens    | Light reminders at turn boundaries — check for compressible ranges         |
-| Above 150k tokens  | **Critical** — compress now, prioritize one large closed range first       |
+| Below 100k tokens  | No compression pressure — work freely                                      |
+| 100k–300k tokens   | Light reminders at turn boundaries — check for compressible ranges         |
+| 300k–500k tokens   | **Moderate** — compress completed phases proactively                       |
+| Above 500k tokens  | **Critical** — compress now, prioritize one large closed range first       |
 | 15+ iterations     | After 15 messages without user input, check for closed compressible ranges |
 
 ## Context Budget Guidelines
 
-| Phase             | Target   | Action                                            |
-| ----------------- | -------- | ------------------------------------------------- |
-| Starting work     | <50k     | Load only essential AGENTS.md + task spec         |
-| Mid-task          | 50–150k  | Compress completed phases, keep active files      |
-| Approaching limit | >150k    | Compress aggressively by phase                    |
-| Near capacity     | >200k    | Session restart with handoff                      |
+| Phase             | Target    | Action                                            |
+| ----------------- | --------- | ------------------------------------------------- |
+| Starting work     | <100k     | Load only essential AGENTS.md + task spec         |
+| Mid-task          | 100–300k  | Compress completed phases, keep active files      |
+| Steady work       | 300–500k  | Compress aggressively by phase                    |
+| Approaching limit | 500k–800k | Critical — compress all closed ranges, minimize   |
+| Near capacity     | >800k     | Session restart with handoff                      |
 
-At >150k: prefer compressing full phases over individual outputs. The cache cost is lower.
+At >500k: prefer compressing full phases over individual outputs. The cache cost is lower.
 
 ## XML Tag Suppression
 
@@ -127,8 +129,8 @@ TIMING: manage at turn START, not turn END
 PHASE ENDS = compress trigger
 XML TAGS: never echo DCP-internal XML tags in output
 
-TOOLS: compress (crystallize), dcp-stats (monitor), decompress (review)
+TOOLS: compress (crystallize)
 EXTENSION: .pi/extensions/dcp.ts → SQLite at ~/.config/pi/dcp/dcp.db
 
-BUDGET: <50k start → 50-150k compress phases → >150k critical → >200k restart
+BUDGET (1M): <100k start → 100-300k compress phases → 300-500k moderate → >500k critical → >800k restart
 ```

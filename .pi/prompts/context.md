@@ -9,8 +9,7 @@ Quick, read-only context dashboard for this session.
 
 Combines:
 - `/usage` (token + cost stats)
-- `/dcp` (compression status)
-- `dcp-stats` tool (detailed compression stats)
+- `/dcp` (compression status and stats)
 
 ## Parse Arguments
 
@@ -34,17 +33,13 @@ Run these first (required):
 /dcp
 ```
 
-Then run detailed DCP stats:
+Then check DCP status:
 
-```typescript
-dcp-stats({ scope: "session" })
+```text
+/dcp
 ```
 
-If `--all` is provided, also run:
-
-```typescript
-dcp-stats({ scope: "global" })
-```
+If `--all` is provided, also check global stats via `/dcp`.
 
 Get current DCP budget settings from:
 - `.pi/extensions/dcp/config.ts` (`DEFAULT_CONFIG.compress`)
@@ -72,7 +67,7 @@ Render as terminal-friendly tables.
 | Thinking tokens | ... | ... | from usage data |
 | Estimated cost | ... | ... | USD |
 | Model / Provider | ... | ... | current session model |
-| Active DCP blocks | ... | ... | from `/dcp` + `dcp-stats` |
+| Active DCP blocks | ... | ... | from `/dcp` |
 | Tokens compressed | ... | ... | from DCP stats |
 | Tokens pruned/saved | ... | ... | from DCP stats |
 

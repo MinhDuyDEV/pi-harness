@@ -43,7 +43,7 @@ skill({ name: "beads" });
 | --------------- | --------------------- |
 | `br`            | Task status and stats |
 | `git`           | Git state and history |
-| `find_sessions` | Recent sessions       |
+| `memory-search` | Recent session context |
 
 ## Phase 1: Gather State (Parallel)
 
@@ -62,7 +62,7 @@ git log --oneline -5
 ```
 
 ```typescript
-find_sessions({ query: "today", limit: 5 });
+memory-search({ query: "recent work", type: "handoffs" })
 ```
 
 ---
@@ -85,8 +85,8 @@ GIT
   Changes: [from git status, or "clean"]
   Recent:  [from git log]
 
-SESSIONS TODAY
-  [from find_sessions]
+RECENT CONTEXT
+  [from memory-search]
 ```
 
 ---

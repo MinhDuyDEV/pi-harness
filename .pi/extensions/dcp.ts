@@ -6,8 +6,6 @@
  *
  * WHAT THIS EXTENSION DOES:
  *   - Registers `compress` tool for crystallizing conversation ranges into summaries
- *   - Registers `dcp-stats` tool for monitoring context savings
- *   - Registers `decompress` tool for reviewing stored compressions
  *   - Tracks tool calls for automatic strategy suggestions
  *   - Persists compression state in SQLite (~/.config/pi/dcp/dcp.db)
  *   - Registers /dcp command for quick status
@@ -29,8 +27,6 @@ import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
 import { closeDCPDB, getDCPDB, recordToolCall } from "./dcp/db.js";
 import {
 	registerCompressTool,
-	registerDCPStatsTool,
-	registerDecompressTool,
 } from "./dcp/tools.js";
 
 // ---------------------------------------------------------------------------
@@ -72,8 +68,6 @@ export default function dcpExtension(pi: any): void {
 
 	// 2. Register tools
 	registerCompressTool(pi, config);
-	registerDCPStatsTool(pi, config);
-	registerDecompressTool(pi, config);
 
 	// 3. Track tool calls for dedup strategy
 	let currentTurn = 0;
@@ -149,8 +143,6 @@ export default function dcpExtension(pi: any): void {
 					),
 					"",
 					"Use `compress` tool to crystallize completed conversation ranges.",
-					"Use `dcp-stats` tool for detailed statistics.",
-					"Use `decompress` tool to review stored compressions.",
 				];
 
 				if (ctx?.ui) {

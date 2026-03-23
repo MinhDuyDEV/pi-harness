@@ -42,6 +42,8 @@ Operations:
 Example:
 context7({ operation: "resolve", libraryName: "react" })
 context7({ operation: "query", libraryId: "/reactjs/react.dev", topic: "hooks" })`,
+		promptSnippet:
+			"Library documentation lookup — resolve library IDs and query docs.",
 
 		parameters: Type.Object({
 			operation: Type.Optional(

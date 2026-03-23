@@ -48,7 +48,7 @@ If a handoff exists, read the latest one. It tells you:
 Also search previous sessions:
 
 ```typescript
-find_sessions({ query: "$ARGUMENTS" });
+memory-search({ query: "$ARGUMENTS", type: "handoffs" })
 ```
 
 ## Phase 4: Load Artifacts

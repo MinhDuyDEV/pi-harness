@@ -78,9 +78,10 @@ Monitor your own context usage and trigger compression based on these thresholds
 
 | Context Level     | Action                                                                     |
 | ----------------- | -------------------------------------------------------------------------- |
-| Below 50k tokens  | No compression pressure — work freely                                      |
-| 50k–150k tokens   | Light reminders at turn boundaries — check for compressible ranges         |
-| Above 150k tokens | **Critical** — compress now, prioritize one large closed range first       |
+| Below 100k tokens | No compression pressure — work freely                                      |
+| 100k–300k tokens  | Light reminders at turn boundaries — check for compressible ranges         |
+| 300k–500k tokens  | **Moderate** — compress completed phases proactively                       |
+| Above 500k tokens | **Critical** — compress now, prioritize one large closed range first       |
 | 15+ iterations    | After 15 messages without user input, check for closed compressible ranges |
 
 See `references/nudge-system.md` for detailed nudge prompts.
@@ -123,25 +124,24 @@ See `references/compress-philosophy.md` for the full compress philosophy.
 
 ## Context Budget Guidelines
 
-| Phase             | Target   | Action                                            |
-| ----------------- | -------- | ------------------------------------------------- |
-| Starting work     | <50k     | Load only essential context + task spec           |
-| Mid-task          | 50–150k  | Compress completed phases, keep active files      |
-| Approaching limit | >150k    | Compress aggressively by phase, distill remaining |
-| Near capacity     | >200k    | Session restart with handoff                      |
+| Phase             | Target    | Action                                            |
+| ----------------- | --------- | ------------------------------------------------- |
+| Starting work     | <100k     | Load only essential context + task spec           |
+| Mid-task          | 100–300k  | Compress completed phases, keep active files      |
+| Steady work       | 300–500k  | Compress aggressively by phase, distill remaining |
+| Approaching limit | 500k–800k | Critical — compress all closed ranges, minimize   |
+| Near capacity     | >800k     | Session restart with handoff                      |
 
 ## Extension Integration
 
-The `compress`, `dcp-stats`, and `decompress` tools are registered by the DCP extension
-(`.pi/extensions/dcp.ts`). Compression summaries persist in SQLite (`~/.config/pi/dcp/dcp.db`).
+The `compress` tool is registered by the DCP extension (`.pi/extensions/dcp.ts`).
+Compression summaries persist in SQLite (`~/.config/pi/dcp/dcp.db`).
 
 | Tool           | Purpose                                           |
 | -------------- | ------------------------------------------------- |
 | `compress`     | Crystallize a conversation range into a summary   |
-| `dcp-stats`    | Show compression statistics (session or global)   |
-| `decompress`   | Review stored compression blocks                  |
 
-Use `/dcp` command for quick status overview.
+Use `/dcp` command for quick status overview (shows stats and active blocks).
 
 ## XML Tag Suppression
 
@@ -159,14 +159,15 @@ PHASE ENDS = compress trigger
 AUTO-STRATEGIES: dedup, supersede-writes, purge-errors (apply behaviorally)
 XML TAGS: never echo DCP-internal XML tags in output
 
-TOOLS: compress (crystallize), dcp-stats (monitor), decompress (review)
+TOOLS: compress (crystallize)
 EXTENSION: .pi/extensions/dcp.ts → SQLite at ~/.config/pi/dcp/dcp.db
 
-BUDGET:
-  <50k  → no pressure
-  50-150k → light nudges, compress closed phases
-  >150k → critical, compress NOW
-  >200k → session handoff
+BUDGET (1M context):
+  <100k   → no pressure
+  100-300k → light nudges, compress closed phases
+  300-500k → moderate, proactive compression
+  >500k   → critical, compress NOW
+  >800k   → session handoff
 
 PROTECTED: task, skill, todowrite, todoread, write, edit, batch, plan_enter, plan_exit
 NEVER COMPRESS: active work, content needed for upcoming edits

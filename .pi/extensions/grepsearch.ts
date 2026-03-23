@@ -42,6 +42,8 @@ Examples:
   grepsearch({ query: "getServerSession", language: "TypeScript" })
   grepsearch({ query: "CORS(", language: "Python", repo: "flask" })
   grepsearch({ query: "export async function POST", path: "route.ts" })`,
+		promptSnippet:
+			"Search real-world code examples from GitHub repos via grep.app.",
 
 		parameters: Type.Object({
 			query: Type.String({

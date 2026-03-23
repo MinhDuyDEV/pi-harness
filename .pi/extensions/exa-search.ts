@@ -121,6 +121,8 @@ export default function exaSearchExtension(pi: any): void {
 		label: "Web Search",
 		description:
 			"Search the web using Exa AI. Returns relevant results with content snippets. Use for current information, documentation, blog posts, discussions. No API key required.",
+		promptSnippet:
+			"Search the web via Exa AI for current information, docs, and discussions.",
 		parameters: Type.Object({
 			query: Type.String({
 				description: "Search query (be specific for better results)",
@@ -141,6 +143,8 @@ export default function exaSearchExtension(pi: any): void {
 			_toolCallId: string,
 			params: { query: string; numResults?: number; type?: string },
 			signal: AbortSignal,
+			_onUpdate: (text: string) => void,
+			_ctx: any,
 		) {
 			try {
 				const result = await callExaMCP(
@@ -182,6 +186,8 @@ export default function exaSearchExtension(pi: any): void {
 		label: "Code Search",
 		description:
 			"Search for programming documentation, code examples, and API references using Exa AI's code-specific index. Better than web search for technical queries. No API key required.",
+		promptSnippet:
+			"Search code-specific docs and API references via Exa AI.",
 		parameters: Type.Object({
 			query: Type.String({
 				description:
@@ -197,6 +203,8 @@ export default function exaSearchExtension(pi: any): void {
 			_toolCallId: string,
 			params: { query: string; numResults?: number },
 			signal: AbortSignal,
+			_onUpdate: (text: string) => void,
+			_ctx: any,
 		) {
 			try {
 				const result = await callExaMCP(

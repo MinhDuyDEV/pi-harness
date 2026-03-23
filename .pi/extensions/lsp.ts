@@ -571,6 +571,8 @@ export default function lspExtension(pi: any): void {
 		label: "Go to Definition",
 		description:
 			"Jump to the definition of a symbol at a given position. Uses the language server for type-aware resolution — works across files and through imports.",
+		promptSnippet:
+			"Jump to symbol definition — type-aware, works across files and imports.",
 		parameters: FileLineParams,
 		async execute(
 			_id: string,
@@ -611,6 +613,8 @@ export default function lspExtension(pi: any): void {
 		label: "Find References",
 		description:
 			"Find all references to a symbol at a given position. Type-aware — only finds actual usages of the same symbol, not just text matches.",
+		promptSnippet:
+			"Find all references to a symbol — type-aware, not just text matches.",
 		parameters: FileLineParams,
 		async execute(
 			_id: string,
@@ -651,6 +655,8 @@ export default function lspExtension(pi: any): void {
 		label: "Hover Info",
 		description:
 			"Get type information and documentation for a symbol at a given position. Shows type signatures, JSDoc comments, and inferred types.",
+		promptSnippet:
+			"Get type information and documentation for a symbol at a position.",
 		parameters: FileLineParams,
 		async execute(
 			_id: string,
@@ -691,6 +697,7 @@ export default function lspExtension(pi: any): void {
 		label: "Document Symbols",
 		description:
 			"List all symbols (functions, classes, variables, types) in a file. Provides a structural overview with hierarchy.",
+		promptSnippet: "List all symbols in a file with structural hierarchy.",
 		parameters: Type.Object({
 			filePath: Type.String({
 				description: "Absolute path to the file",
@@ -732,6 +739,7 @@ export default function lspExtension(pi: any): void {
 		label: "Workspace Symbols",
 		description:
 			"Search for symbols across the entire project. Type-aware — finds functions, classes, interfaces, types by name.",
+		promptSnippet: "Search symbols across the entire project by name.",
 		parameters: Type.Object({
 			query: Type.String({
 				description:
@@ -831,6 +839,7 @@ export default function lspExtension(pi: any): void {
 		label: "Call Hierarchy",
 		description:
 			'Show who calls a function (incoming) or what a function calls (outgoing). Set direction to "incoming" or "outgoing".',
+		promptSnippet: "Show incoming callers or outgoing calls for a function.",
 		parameters: Type.Object({
 			filePath: Type.String({
 				description: "Absolute path to the file",

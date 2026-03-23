@@ -59,23 +59,23 @@ Read previous session: ses_abc123 (focus: "auth") (filter to relevant messages)
 ## When to Start New Session
 
 - Completing distinct task from `br ready`
-- Token usage approaching 150k
+- Token usage approaching 500k (or 150k for 200k context models)
 - Switching phases (implementation → review → testing)
 - After handoff (`/handoff <bead-id>`)
 
 ## Session Workflow Pattern
 
 ```
-Session 1: Implement feature X (80k tokens)
+Session 1: Implement feature X (200k tokens)
   ↓ close, update memory
-Session 2: Search previous sessions for "feature X" → read session → Refactor (60k tokens)
+Session 2: Search previous sessions for "feature X" → read session → Refactor (150k tokens)
   ↓
-Session 3: Search previous sessions for "feature X" → Add tests (90k tokens)
+Session 3: Search previous sessions for "feature X" → Add tests (200k tokens)
   ↓
-Session 4: Read previous session → Final review (100k tokens)
+Session 4: Read previous session → Final review (250k tokens)
 ```
 
-**Result**: 4 fresh contexts vs 1 degraded 330k context. Better performance, lower cost.
+**Result**: 4 fresh contexts vs 1 degraded 800k context. Better performance, lower cost.
 
 ## Context Transfer
 
