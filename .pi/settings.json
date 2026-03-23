@@ -2,10 +2,10 @@
   "defaultProvider": "github-copilot",
   "defaultModel": "claude-opus-4.6",
   "defaultThinkingLevel": "high",
-  "theme": "dark",
+  "theme": "catppuccin",
   "editorPaddingX": 0,
   "images": {
-    "blockImages": true
+    "blockImages": false
   },
   "packages": [
     "npm:@tintinweb/pi-subagents",
@@ -16,7 +16,8 @@
     "https://github.com/badlogic/pi-diff-review",
     "npm:@tintinweb/pi-tasks",
     "npm:pi-rewind",
-    "npm:pi-notify"
+    "npm:pi-notify",
+    "npm:@ifi/oh-pi-themes"
   ],
   "compaction": {
     "enabled": true,
