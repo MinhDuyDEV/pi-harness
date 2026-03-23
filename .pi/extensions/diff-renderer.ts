@@ -63,8 +63,8 @@ const SPLIT_MAX_WRAP_RATIO = 0.20;      // if >20% lines wrap in split, fall bac
 const SPLIT_MAX_WRAP_LINES = 8;         // absolute cap before unified fallback
 
 // --- Terminal bounds ---
-const MAX_TERM_WIDTH = 400;             // support up to 2560px+ displays (~360 cols at typical font)
-const DEFAULT_TERM_WIDTH = 200;         // modern terminals are wider; safer default than 120
+const MAX_TERM_WIDTH = 210;             // max for 1728px wide display (~205 cols at typical font)
+const DEFAULT_TERM_WIDTH = 200;         // safe default for 1728x1117 resolution
 
 // --- Rendering limits ---
 const MAX_PREVIEW_LINES = 60;           // was 50 — show slightly more context in edit preview
