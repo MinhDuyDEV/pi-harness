@@ -63,3 +63,19 @@ Execute clear, low-complexity coding tasks quickly (typically 1-3 files) and rep
 - Assumptions/defaults chosen (if any)
 - Deviations applied (Rule 1-3 fixes)
 - Remaining risks/blockers (if any)
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: what was accomplished</summary>
+  <artifacts>path/to/file1; path/to/file2</artifacts>
+  <deviations>Rule 1-3 auto-fixes applied, if any</deviations>
+  <blockers>What prevented completion, if anything</blockers>
+</episode>
+```
+
+Rules: `status` must reflect verification results — never claim `success` if tests/lint failed.

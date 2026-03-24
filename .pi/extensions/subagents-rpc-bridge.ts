@@ -12,6 +12,19 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 
 type SubagentStatus = "queued" | "running" | "completed" | "error" | "stopped" | "aborted" | "steered";
 
+type Episode = {
+	status: "success" | "failure" | "blocked" | "partial";
+	summary?: string;
+	findings?: string[];
+	artifacts?: string[];
+	sources?: string[];
+	deviations?: string[];
+	blockers?: string[];
+	verdict?: string;
+	confidence?: number;
+	files?: string[];
+};
+
 type SubagentRecord = {
 	id: string;
 	type?: string;
@@ -66,6 +79,45 @@ function isDebugEnabled(): boolean {
 	return raw ? /^(1|true|yes|on)$/i.test(raw.trim()) : false;
 }
 
+/** Parse the last <episode>...</episode> block from agent output. */
+function parseEpisode(text: string | undefined): Episode | undefined {
+	if (!text) return undefined;
+	// Last match wins — agents reading docs may have the template in output;
+	// the agent-generated episode always appears at the end.
+	const matches = [...text.matchAll(/<episode>([\s\S]*?)<\/episode>/g)];
+	if (matches.length === 0) return undefined;
+	const block = matches[matches.length - 1][1];
+
+	const tag = (name: string): string | undefined => {
+		const m = block.match(new RegExp(`<${name}>([\\s\\S]*?)<\\/${name}>`));
+		return m ? m[1].trim() : undefined;
+	};
+
+	const splitList = (raw: string | undefined): string[] | undefined => {
+		if (!raw) return undefined;
+		return raw.split(/;\s*/).map(s => s.trim()).filter(Boolean);
+	};
+
+	const status = tag("status") as Episode["status"];
+	if (!status || !["success", "failure", "blocked", "partial"].includes(status)) return undefined;
+
+	const rawConfidence = tag("confidence");
+	const rawFiles = tag("files");
+
+	return {
+		status,
+		summary: tag("summary"),
+		findings: splitList(tag("findings")),
+		artifacts: splitList(tag("artifacts")),
+		sources: splitList(tag("sources")),
+		deviations: splitList(tag("deviations")),
+		blockers: splitList(tag("blockers")),
+		verdict: tag("verdict"),
+		confidence: rawConfidence ? parseFloat(rawConfidence) : undefined,
+		files: splitList(rawFiles),
+	};
+}
+
 export default function (pi: ExtensionAPI) {
 	let latestCtx: ExtensionContext | undefined;
 	let readyAnnounced = false;
@@ -87,12 +139,14 @@ export default function (pi: ExtensionAPI) {
 		finalized.add(id);
 		watching.delete(id);
 
+		const episode = parseEpisode(record.result);
+
 		if (isFailure(record.status)) {
-			pi.events.emit("subagents:failed", { id, error: record.error ?? record.status, status: record.status });
-			debugNotify(`emit failed id=${id} status=${record.status}`, "warning");
+			pi.events.emit("subagents:failed", { id, error: record.error ?? record.status, status: record.status, episode });
+			debugNotify(`emit failed id=${id} status=${record.status}${episode ? ` episode=${episode.status}` : ""}`, "warning");
 		} else {
-			pi.events.emit("subagents:completed", { id, result: record.result, status: record.status });
-			debugNotify(`emit completed id=${id} status=${record.status}`);
+			pi.events.emit("subagents:completed", { id, result: record.result, status: record.status, episode });
+			debugNotify(`emit completed id=${id} status=${record.status}${episode ? ` episode=${episode.status}` : ""}`);
 		}
 	};
 

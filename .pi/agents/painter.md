@@ -46,3 +46,16 @@ Always include:
 - Resolution and aspect ratio
 - Output file path
 - `thoughtSignature` for follow-up edits (when applicable)
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: what was generated or edited</summary>
+  <artifacts>path/to/output1; path/to/output2</artifacts>
+  <blockers>What prevented generation, if anything</blockers>
+</episode>
+```

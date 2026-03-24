@@ -54,3 +54,17 @@ Assess visual quality, accessibility, and design consistency, then return concre
 
 - If visual input is unclear/low-res, state limitations and request clearer assets
 - If intent is ambiguous, list assumptions and top interpretations
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: what was assessed</summary>
+  <findings>Finding 1 (severity); Finding 2 (severity); ...</findings>
+  <confidence>0.0-1.0</confidence>
+  <blockers>What prevented full assessment, if anything</blockers>
+</episode>
+```

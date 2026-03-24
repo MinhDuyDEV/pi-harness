@@ -81,3 +81,20 @@ Overall:
 
 - `patch is correct` or `patch is incorrect`
 - 1-3 sentence explanation
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: review verdict</summary>
+  <verdict>correct|incorrect</verdict>
+  <findings>P0: description; P1: description; ...</findings>
+  <files>path/to/file1; path/to/file2</files>
+  <blockers>What prevented full review, if anything</blockers>
+</episode>
+```
+
+Rules: `status` is about the review process, not the code quality. A completed review of bad code is `status=success` with `verdict=incorrect`.

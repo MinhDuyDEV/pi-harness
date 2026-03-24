@@ -110,3 +110,17 @@ How to confirm the entire plan succeeded.
 
 What to do next.
 ```
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: what was planned</summary>
+  <findings>Phase 1: description; Phase 2: description; ...</findings>
+  <artifacts>path/to/plan1; path/to/plan2</artifacts>
+  <blockers>Ambiguities or missing info that prevented full planning</blockers>
+</episode>
+```

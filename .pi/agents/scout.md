@@ -58,3 +58,17 @@ Higher-ranked sources win on conflicts.
 - Recommended approach
 - Sources (with URLs or file:line refs)
 - Risks/tradeoffs
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: what was researched and concluded</summary>
+  <findings>Key finding 1; Key finding 2; ...</findings>
+  <sources>URL or ref 1; URL or ref 2; ...</sources>
+  <blockers>What prevented full research, if anything</blockers>
+</episode>
+```

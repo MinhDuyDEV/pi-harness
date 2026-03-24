@@ -62,3 +62,17 @@ Find relevant files, symbols, and usage paths quickly for the caller.
 
 - If results are ambiguous, list assumptions and best candidate paths
 - Never guess — mark uncertainty explicitly
+
+## Episode Contract
+
+After your detailed output, **always** emit this structured block as the last thing in your response:
+
+```xml
+<episode>
+  <status>success|failure|blocked|partial</status>
+  <summary>One sentence: what was found</summary>
+  <findings>Key finding 1; Key finding 2; ...</findings>
+  <files>absolute/path1; absolute/path2</files>
+  <blockers>What prevented full exploration, if anything</blockers>
+</episode>
+```
