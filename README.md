@@ -14,17 +14,16 @@ Then install the package dependencies declared in `.pi/settings.json`:
 pi install
 ```
 
-This pulls in the delegation stack (`@tintinweb/pi-subagents`, `@tintinweb/pi-tasks`, `pi-teams`) and other packages automatically.
+This pulls in the delegation stack (`@tintinweb/pi-subagents`, `@tintinweb/pi-tasks`, `pi-teams`) and other packages automatically. `TaskExecute` is expected to work directly against `@tintinweb/pi-subagents` without a custom bridge.
 
 ## What's Included
 
-### Extensions (12)
+### Extensions (11)
 
 Custom tools that register into pi's tool system:
 
 | Extension | Purpose |
 |-----------|---------|
-| `subagents-rpc-bridge` | Bridges `@tintinweb/pi-tasks` ↔ `@tintinweb/pi-subagents` so `TaskExecute` works |
 | `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive) |
 | `copilot-provider` | GitHub Copilot provider with rate-limit fallback |
 | `usage-tracker` | Token usage tracking via `/usage` command |
