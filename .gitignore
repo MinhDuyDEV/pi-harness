@@ -8,6 +8,19 @@ docs/
 # Pi auto-generated sandbox profiles
 .pi/sandbox/
 
+# Node / package manager noise
+node_modules/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tgz
+.env
+.env.*
+!.env.example
+
 # Pi local caches / generated dirs
 .pi/git/
 .pi/npm/
