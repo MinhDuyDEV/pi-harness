@@ -4,8 +4,8 @@
  * Thin bridge between Pi lifecycle events and user-configurable shell scripts.
  *
  * Hook search order:
- *   1) ~/.pi/agent/hooks (global)
- *   2) ./.pi/hooks (project)
+ *   1) ~/.pi/agent/shell-hooks (global)
+ *   2) ./.pi/shell-hooks (project)
  *
  * Project hooks run after global hooks.
  */
@@ -95,8 +95,8 @@ function discoverHooks(rootDir: string): ActiveHook[] {
 	const discovered: ActiveHook[] = [];
 
 	const hookRoots: Array<{ scope: HookScope; dir: string }> = [
-		{ scope: "global", dir: join(homedir(), ".pi", "agent", "hooks") },
-		{ scope: "project", dir: join(rootDir, ".pi", "hooks") },
+		{ scope: "global", dir: join(homedir(), ".pi", "agent", "shell-hooks") },
+		{ scope: "project", dir: join(rootDir, ".pi", "shell-hooks") },
 	];
 
 	for (const root of hookRoots) {
