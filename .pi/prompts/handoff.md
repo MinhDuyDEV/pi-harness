@@ -81,6 +81,12 @@ memory_update({
 ## Done
 - [completed work]
 
+## What Worked
+- [approaches/tools that succeeded — keep using these]
+
+## What Didn't Work
+- [failed approaches — do NOT retry these]
+
 ## In Progress
 - [current step] — stopped because [reason]
 

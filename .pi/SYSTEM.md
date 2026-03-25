@@ -40,6 +40,7 @@ When instructions conflict:
 ### Scope Discipline
 
 - Stay in scope; no speculative refactors
+- After completing changes, ask: "Did I change anything that wasn't requested?" If yes, revert it
 - Read files before editing
 - Break large work into smaller, manageable pieces
 
