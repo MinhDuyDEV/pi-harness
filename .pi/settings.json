@@ -16,8 +16,7 @@
     "https://github.com/badlogic/pi-diff-review",
     "npm:@tintinweb/pi-tasks",
     "npm:pi-rewind",
-    "npm:pi-notify",
-    "npm:@ifi/oh-pi-themes"
+    "npm:pi-notify"
   ],
   "compaction": {
     "enabled": true,

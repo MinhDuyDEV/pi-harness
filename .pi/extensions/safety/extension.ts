@@ -56,6 +56,13 @@ export default function safetyExtension(pi: any): void {
 
 		const sessionId = event?.sessionId ?? "default";
 		tracker.recordEvidence(sessionId, normalized);
+
+		// Parse structured verification output
+		const output = String(event?.output ?? event?.result ?? "");
+		const exitCode = event?.exitCode ?? event?.exit_code;
+		if (output) {
+			tracker.recordResult(sessionId, normalized, output, typeof exitCode === "number" ? exitCode : undefined);
+		}
 	});
 
 	// 4. Single before_tool_call hook — replaces 3 separate hooks

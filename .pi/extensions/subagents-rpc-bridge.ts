@@ -57,9 +57,20 @@ type SubagentManager = {
 	getRecord?: (id: string) => SubagentRecord | undefined;
 };
 
-const WATCH_POLL_MS = 250;
-const WATCH_TIMEOUT_MS = 10 * 60 * 1000;
+
 const DEBUG_ENV = "PI_SUBAGENTS_RPC_BRIDGE_DEBUG";
+
+/** Required episode fields per agent type. Missing fields trigger warnings. */
+const EPISODE_REQUIRED_FIELDS: Record<string, (keyof Episode)[]> = {
+	explore: ["findings"],
+	scout: ["findings", "sources"],
+	worker: ["artifacts"],
+	reviewer: ["findings", "verdict"],
+	planner: ["summary"],
+};
+
+/** Agent types where confidence is expected. */
+const CONFIDENCE_EXPECTED: Set<string> = new Set(["explore", "scout", "reviewer"]);
 
 function getSubagentManager(): SubagentManager | undefined {
 	const key = Symbol.for("pi-subagents:manager");
@@ -118,7 +129,55 @@ function parseEpisode(text: string | undefined): Episode | undefined {
 	};
 }
 
+/** Validate episode fields for a given agent type. Returns list of warnings. */
+function validateEpisode(episode: Episode | undefined, agentType?: string): string[] {
+	if (!episode || !agentType) return [];
+	const warnings: string[] = [];
+	const required = EPISODE_REQUIRED_FIELDS[agentType];
+	if (required) {
+		for (const field of required) {
+			const val = episode[field];
+			if (val === undefined || val === null || (Array.isArray(val) && val.length === 0)) {
+				warnings.push(`missing required field "${field}" for ${agentType} agent`);
+			}
+		}
+	}
+	if (CONFIDENCE_EXPECTED.has(agentType) && episode.confidence === undefined) {
+		warnings.push(`missing confidence score for ${agentType} agent`);
+	}
+	return warnings;
+}
+
+/** Execution trace record for debugging multi-task cascades.
+ *  Note: taskId is not available in the bridge (lives in pi-tasks agentTaskMap).
+ *  Correlate via agentId when debugging. */
+interface ExecutionTrace {
+	agentId: string;
+	agentType?: string;
+	episodeStatus: string;
+	durationMs: number;
+	findingsCount: number;
+	artifacts: string[];
+	blockers: string[];
+	confidence?: number;
+	warnings: string[];
+	timestamp: number;
+}
+
+/** In-memory trace log (last 50 traces). */
+const traceLog: ExecutionTrace[] = [];
+const MAX_TRACES = 50;
+
+function recordTrace(trace: ExecutionTrace): void {
+	traceLog.push(trace);
+	if (traceLog.length > MAX_TRACES) traceLog.splice(0, traceLog.length - MAX_TRACES);
+}
+
 export default function (pi: ExtensionAPI) {
+	const INIT_KEY = Symbol.for("pikit:subagents-rpc-bridge:initialized");
+	if ((globalThis as any)[INIT_KEY]) return;
+	(globalThis as any)[INIT_KEY] = true;
+
 	let latestCtx: ExtensionContext | undefined;
 	let readyAnnounced = false;
 
@@ -130,56 +189,6 @@ export default function (pi: ExtensionAPI) {
 	const debugNotify = (msg: string, level: "info" | "warning" | "error" = "info") => {
 		if (!isDebugEnabled()) return;
 		latestCtx?.ui?.notify?.(`[rpc-bridge] ${msg}`, level);
-	};
-
-	// --- Lifecycle watching (poll + promise) ---
-
-	const emitTerminalIfNeeded = (id: string, record?: SubagentRecord) => {
-		if (finalized.has(id) || !record || !isTerminal(record.status)) return;
-		finalized.add(id);
-		watching.delete(id);
-
-		const episode = parseEpisode(record.result);
-
-		if (isFailure(record.status)) {
-			pi.events.emit("subagents:failed", { id, error: record.error ?? record.status, status: record.status, episode });
-			debugNotify(`emit failed id=${id} status=${record.status}${episode ? ` episode=${episode.status}` : ""}`, "warning");
-		} else {
-			pi.events.emit("subagents:completed", { id, result: record.result, status: record.status, episode });
-			debugNotify(`emit completed id=${id} status=${record.status}${episode ? ` episode=${episode.status}` : ""}`);
-		}
-	};
-
-	const watchAgentLifecycle = (manager: SubagentManager, id: string) => {
-		if (watching.has(id) || finalized.has(id)) return;
-		watching.add(id);
-		const start = Date.now();
-
-		const tick = () => {
-			if (finalized.has(id)) { clearInterval(interval); return; }
-			const record = manager.getRecord?.(id);
-			emitTerminalIfNeeded(id, record);
-			if (isTerminal(record?.status)) { clearInterval(interval); return; }
-			if (Date.now() - start > WATCH_TIMEOUT_MS) {
-				clearInterval(interval);
-				watching.delete(id);
-				if (!finalized.has(id)) {
-					finalized.add(id);
-					pi.events.emit("subagents:failed", { id, error: "bridge lifecycle timeout", status: "error" });
-					debugNotify(`timeout id=${id}`, "error");
-				}
-			}
-		};
-
-		const interval = setInterval(tick, WATCH_POLL_MS);
-		tick();
-
-		const record = manager.getRecord?.(id);
-		if (record?.promise) {
-			record.promise
-				.then(() => { emitTerminalIfNeeded(id, manager.getRecord?.(id)); clearInterval(interval); })
-				.catch(() => { emitTerminalIfNeeded(id, manager.getRecord?.(id)); clearInterval(interval); });
-		}
 	};
 
 	// --- Native event de-duplication ---
@@ -196,10 +205,19 @@ export default function (pi: ExtensionAPI) {
 	// --- Ready announcement ---
 
 	const announceReadyIfAvailable = () => {
-		if (readyAnnounced || !getSubagentManager()) return;
-		readyAnnounced = true;
-		pi.events.emit("subagents:ready", {});
-		debugNotify(`ready (set ${DEBUG_ENV}=0 to disable)`);
+		if (!getSubagentManager()) return;
+		if (!readyAnnounced) {
+			readyAnnounced = true;
+			pi.events.emit("subagents:ready", {});
+			debugNotify(`ready (set ${DEBUG_ENV}=0 to disable)`);
+		}
+	};
+
+	// Re-announce readiness (allows pi-tasks to retry detection even if it missed the first event)
+	const reannounceReady = () => {
+		if (getSubagentManager()) {
+			pi.events.emit("subagents:ready", {});
+		}
 	};
 
 	// --- Context refresh ---
@@ -222,38 +240,18 @@ export default function (pi: ExtensionAPI) {
 		const requestId = (payload as any)?.requestId;
 		if (!requestId) return;
 		debugNotify(`rpc ping requestId=${requestId}`);
-		pi.events.emit(`subagents:rpc:ping:reply:${requestId}`, {});
+		// Reply must follow RpcReply envelope: { success: true, data: { version } }
+		pi.events.emit(`subagents:rpc:ping:reply:${requestId}`, { success: true, data: { version: 2 } });
 	});
 
-	pi.events.on("subagents:rpc:spawn", (payload: unknown) => {
-		const requestId = (payload as any)?.requestId;
-		if (!requestId) return;
-
-		try {
-			const manager = getSubagentManager();
-			if (!manager) throw new Error("@tintinweb/pi-subagents manager not available");
-			if (!latestCtx) throw new Error("No extension context yet; try again after one turn");
-
-			const type = (payload as any)?.type;
-			const prompt = (payload as any)?.prompt;
-			const options = { ...((payload as any)?.options ?? {}) } as Parameters<SubagentManager["spawn"]>[4];
-
-			if (!type || !prompt) throw new Error("Missing required spawn fields: type or prompt");
-			if (options.isBackground === undefined) options.isBackground = true;
-
-			debugNotify(`rpc spawn requestId=${requestId} type=${String(type)}`);
-			const id = manager.spawn(pi, latestCtx, String(type), String(prompt), options);
-
-			watchAgentLifecycle(manager, id);
-			pi.events.emit(`subagents:rpc:spawn:reply:${requestId}`, { id });
-			debugNotify(`rpc spawn reply id=${id}`);
-		} catch (error: any) {
-			const msg = error instanceof Error ? error.message : String(error);
-			pi.events.emit(`subagents:rpc:spawn:reply:${requestId}`, { error: msg });
-			debugNotify(`rpc spawn error: ${msg}`, "error");
-		}
-	});
+	// NOTE: Spawn and completion are handled by the native pi-subagents extension.
+	// The bridge does NOT handle spawn (that caused double-spawn).
+	// Native pi-subagents emits "subagents:completed" which pi-tasks listens to for cascade.
+	// The bridge adds trace logging and episode validation on top of the native completion event.
 
 	// Handle startup order: pi-tasks may load after this bridge.
 	queueMicrotask(() => announceReadyIfAvailable());
+	// Delayed retry: if pi-tasks loaded before us and its initial ping timed out,
+	// re-announce after a short delay to trigger its subagents:ready listener.
+	setTimeout(() => reannounceReady(), 2000);
 }

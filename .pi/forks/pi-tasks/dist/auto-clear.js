@@ -1,0 +1,87 @@
+/**
+ * auto-clear.ts — Turn-based auto-clearing of completed tasks.
+ *
+ * Two modes:
+ * - "on_task_complete": each completed task gets its own REMINDER_INTERVAL countdown, deleted individually
+ * - "on_list_complete": countdown starts when ALL tasks are completed, cleared as a batch
+ *
+ * Both use the same turn delay (REMINDER_INTERVAL) for consistency.
+ */
+export class AutoClearManager {
+    getStore;
+    getMode;
+    clearDelayTurns;
+    /** Per-task: turn when task was marked completed ("on_task_complete" mode). */
+    completedAtTurn = new Map();
+    /** Turn when ALL tasks became completed ("on_list_complete" mode). */
+    allCompletedAtTurn = null;
+    constructor(getStore, getMode, 
+    /** How many turns completed tasks linger before auto-clearing. */
+    clearDelayTurns = 4) {
+        this.getStore = getStore;
+        this.getMode = getMode;
+        this.clearDelayTurns = clearDelayTurns;
+    }
+    /** Record a task completion. Call AFTER cascade logic. */
+    trackCompletion(taskId, currentTurn) {
+        const mode = this.getMode();
+        if (mode === "never")
+            return;
+        if (mode === "on_task_complete") {
+            this.completedAtTurn.set(taskId, currentTurn);
+        }
+        else if (mode === "on_list_complete") {
+            this.checkAllCompleted(currentTurn);
+        }
+    }
+    /** Check if all tasks are completed and start/reset the batch countdown. */
+    checkAllCompleted(currentTurn) {
+        const tasks = this.getStore().list();
+        if (tasks.length > 0 && tasks.every(t => t.status === "completed")) {
+            if (this.allCompletedAtTurn === null)
+                this.allCompletedAtTurn = currentTurn;
+        }
+        else {
+            this.allCompletedAtTurn = null;
+        }
+    }
+    /** Reset batch countdown (e.g., when a new task is created or task goes non-completed). */
+    resetBatchCountdown() {
+        this.allCompletedAtTurn = null;
+    }
+    /** Reset all tracking state (e.g., on new session). */
+    reset() {
+        this.completedAtTurn.clear();
+        this.allCompletedAtTurn = null;
+    }
+    /**
+     * Called on each turn start. Deletes tasks whose linger period has expired.
+     * Returns true if any tasks were cleared.
+     */
+    onTurnStart(currentTurn) {
+        const mode = this.getMode();
+        let cleared = false;
+        if (mode === "on_task_complete") {
+            for (const [taskId, turn] of this.completedAtTurn) {
+                const task = this.getStore().get(taskId);
+                if (!task || task.status !== "completed") {
+                    // Task was deleted or reverted — drop stale tracking entry
+                    this.completedAtTurn.delete(taskId);
+                }
+                else if (currentTurn - turn >= this.clearDelayTurns) {
+                    this.getStore().delete(taskId);
+                    this.completedAtTurn.delete(taskId);
+                    cleared = true;
+                }
+            }
+        }
+        else if (mode === "on_list_complete" && this.allCompletedAtTurn !== null) {
+            if (currentTurn - this.allCompletedAtTurn >= this.clearDelayTurns) {
+                this.getStore().clearCompleted();
+                this.allCompletedAtTurn = null;
+                cleared = true;
+            }
+        }
+        return cleared;
+    }
+}
