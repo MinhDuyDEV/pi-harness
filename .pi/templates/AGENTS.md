@@ -49,6 +49,13 @@ When instructions conflict:
 - **No wrapper files** — don't create files that only re-export from other files; import directly from the source
 - **One home per concept** — if a function/class already exists somewhere, use it; don't duplicate in a new location
 
+### Multi-Agent Coordination Hygiene
+
+- Before `send_message`: verify recipient matches a known teammate from team config
+- Before `spawn_teammate`: use role names (`researcher`, `implementer`), never tool/model names
+- When delegating to multiple agents: include explicit file ownership — which files each agent may edit
+- When reporting completion: include `file:line` evidence, not just "done"
+
 ### Verification Before Completion
 
 - No success claims without fresh evidence

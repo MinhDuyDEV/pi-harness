@@ -123,12 +123,42 @@ Lead: build agent
 3. **Avoid file conflicts** - Never assign the same file to multiple teammates
 4. **Include verification** - Each task should include its own verification step
 
+### File Ownership Protocol (MANDATORY for implementation teams)
+
+The #1 multi-agent failure mode is two agents editing the same file. Prevent it with explicit ownership.
+
+**Before dispatching, the lead MUST:**
+
+1. **List all files each teammate will touch** — be specific, use paths
+2. **Cross-check for overlaps** — if two teammates need the same file, restructure: one teammate owns it, the other waits or works on different files
+3. **Include ownership in the teammate's prompt** — make it a hard constraint
+
+**Template for teammate prompts:**
+
+```
+You own these files (ONLY edit these):
+- src/auth/login.ts
+- src/auth/session.ts
+- tests/auth/login.test.ts
+
+Do NOT edit files outside this list. If you need changes to other files,
+message the lead with what you need changed and why.
+```
+
+**If ownership can't be cleanly split** (e.g., two features touching the same file), use sequential dispatch instead of parallel — first teammate finishes and reports, then second teammate starts with the updated file.
+
 ### Coordination
 
 1. **Lead synthesizes** - Don't let teammates make final decisions; lead integrates
 2. **Regular check-ins** - Lead should review intermediate results, not just final
 3. **Fail fast** - If a teammate hits a blocker, escalate to lead immediately
 4. **Shared conventions** - Establish naming, formatting, and style before dispatching
+5. **Capture to memory on shutdown** - After `team_shutdown`, create a memory observation:
+   ```
+   observation(type: "decision", title: "Team <name> results",
+     narrative: "Team objective: ... Key decisions: ... Files changed: ... Unresolved: ...")
+   ```
+   This preserves team knowledge for future sessions. Don't skip it.
 
 ### Communication
 
@@ -247,7 +277,13 @@ Before dispatching a team:
 
 - [ ] Identified 3+ independent tasks (otherwise use single agent)
 - [ ] Each task has clear file ownership (no overlaps)
+- [ ] File ownership declared explicitly in each teammate's prompt
+- [ ] Cross-checked all file lists for conflicts — zero overlap
 - [ ] Each task has self-contained context (files, patterns, constraints)
 - [ ] Each task has acceptance criteria (verification commands)
 - [ ] Lead has a synthesis plan (how to integrate results)
 - [ ] Tasks are sized appropriately (5-6 per teammate max)
+
+After shutting down a team:
+
+- [ ] Created memory observation capturing team decisions and outcomes
