@@ -248,26 +248,35 @@ Dynamic context pruning tools for managing conversation size. Load `dynamic-cont
 
 | Tool | Purpose |
 |---|---|
-| `compress` | Collapse conversation ranges into dense summaries stored in SQLite |
-| `dcp-stats` | View compression stats for current session or globally |
-| `decompress` | Restore a specific compression block by ID |
+| `compress` | Collapse conversation ranges or individual messages into dense summaries stored in SQLite |
 
-Command: `/dcp` — Show context pruning status and available actions.
+Command: `/dcp` — Show context pruning status, active blocks, and summary buffer usage.
 
-#### Token Budget
+#### Compress Modes
+
+| Mode | When | Behavior |
+|---|---|---|
+| `"range"` (default) | Clear phase boundaries | Select start/end range → replace with summary |
+| `"message"` (experimental) | Dense sessions, no clear phases | Compress individual messages by size priority |
+
+**Never run multiple compress calls in parallel.** Always serialize — concurrent calls corrupt state.
+
+#### Dual-Band Token Budget (50k / 150k)
 
 | Phase             | Target  | Action                                        |
 | ----------------- | ------- | --------------------------------------------- |
-| Starting work     | <50k     | Load only essential context + task spec       |
-| Mid-task          | 50-150k  | Compress completed research, keep active work |
-| Approaching limit | >150k    | Aggressive compress, prune noise              |
-| Near capacity     | >200k    | Compress critical, prepare session handoff    |
+| Starting work     | <50k    | No pressure — work freely, nudges off         |
+| Mid-task          | 50–150k | Turn nudges — compress completed phases       |
+| Approaching limit | >150k   | **Critical** — compress now, one large range  |
+| Near capacity     | >200k   | Session restart with handoff                  |
 
-#### Strategies (apply automatically)
+Iteration nudge: after 15+ messages without user input → check for compressible ranges.
 
-- **Supersede-writes**: When re-reading a file, earlier reads are stale — compress them
-- **Purge-errors**: Failed tool calls with no learnings can be compressed
-- **Deduplication**: Repeated tool outputs add no signal — compress duplicates
+#### Strategies (apply automatically — zero LLM cost)
+
+- **Deduplication**: Same tool + same args called twice → keep only the latest output
+- **Supersede-writes**: File written then later read → write content is redundant
+- **Purge-errors**: After 4+ turns, errored tool inputs can be stripped (error message preserved)
 
 ### Memory System
 

@@ -55,7 +55,13 @@ context pruning behavior. In a pi skill context, use these as behavioral paramet
     // Tools whose outputs are always appended to compression summaries
     "protectedTools": ["task", "skill", "todowrite", "todoread"],
     // Preserve user messages verbatim during compression
-    "protectUserMessages": false
+    "protectUserMessages": false,
+    // Compression mode: "range" (default) or "message" (experimental)
+    "mode": "range",
+    // Token budget for accumulated summaries (prevents nudge cascade)
+    "summaryBuffer": 20000,
+    // Simplified tool schema injection
+    "flatSchema": false
   },
 
   // Automatic pruning strategies
@@ -72,6 +78,14 @@ context pruning behavior. In a pi skill context, use these as behavioral paramet
       "turns": 4,
       "protectedTools": []
     }
+  },
+
+  // Experimental features
+  "experimental": {
+    // User-defined prompt override files
+    "customPrompts": false,
+    // Enable compression in sub-agent contexts
+    "allowSubAgents": false
   }
 }
 ```
@@ -156,18 +170,44 @@ Approximate impact: ~85% cache hit rate with DCP vs ~90% without.
 
 ## New in v3.0.0+ Configuration Keys
 
-These upstream config keys are documented for reference. Not all are implemented in pikit's
-behavioral port, but they inform the correct mental model.
+These upstream config keys are documented for reference. All have typed defaults in pikit's
+extension (`config.ts`). Keys marked with ★ are wired to runtime behavior; others are
+declared for forward-compatibility but have no runtime consumer yet.
+
+| Key | Type | Default | Since | Wired | Description |
+|-----|------|---------|-------|-------|-------------|
+| `manualMode.enabled` | bool | `false` | v3.0.0 | ★ | Disables autonomous compression; commands only |
+| `manualMode.automaticStrategies` | bool | `true` | v3.0.0 | | Zero-cost strategies still run in manual mode |
+| `turnProtection.enabled` | bool | `false` | v3.0.0 | | Protect content for N turns after tool invocation |
+| `turnProtection.turns` | int | `4` | v3.0.0 | | Number of turns to protect |
+| `compress.protectUserMessages` | bool | `false` | v3.0.0 | ★ | Prevents user messages from being compressed |
+| `compress.flatSchema` | bool | `false` | v3.0.0 | | Simplified tool schema (reduces model confusion) |
+| `compress.nudgeForce` | `"soft"\|"strong"` | `"soft"` | v3.0.0 | ★ | Compression aggressiveness after user messages |
+| `compress.iterationNudgeThreshold` | int | `15` | v3.0.0 | ★ | Messages before iteration nudge fires |
+| `experimental.customPrompts` | bool | `false` | v3.0.0 | | User-defined prompt override files |
+| `experimental.allowSubAgents` | bool | `false` | v3.0.0 | ★ | Enable compression in sub-agent contexts |
+
+## New in v3.1.0 Configuration Keys
 
 | Key | Type | Default | Since | Description |
 |-----|------|---------|-------|-------------|
-| `manualMode.enabled` | bool | `false` | v3.0.0 | Disables autonomous compression; commands only |
-| `manualMode.automaticStrategies` | bool | `true` | v3.0.0 | Zero-cost strategies still run in manual mode |
-| `turnProtection.enabled` | bool | `false` | v3.0.0 | Protect content for N turns after tool invocation |
-| `turnProtection.turns` | int | `4` | v3.0.0 | Number of turns to protect |
-| `compress.protectUserMessages` | bool | `false` | v3.0.0 | Prevents user messages from being compressed |
-| `compress.flatSchema` | bool | `false` | v3.0.0 | Simplified tool schema (reduces model confusion) |
-| `compress.nudgeForce` | `"soft"\|"strong"` | `"soft"` | v3.0.0 | Compression aggressiveness after user messages |
-| `compress.iterationNudgeThreshold` | int | `15` | v3.0.0 | Messages before iteration nudge fires |
-| `experimental.customPrompts` | bool | `false` | v3.0.0 | User-defined prompt override files |
-| `experimental.allowSubAgents` | bool | `false` | v3.0.0 | Enable compression in sub-agent contexts |
+| `compress.mode` | `"range"\|"message"` | `"range"` | v3.1.0 | Compression targeting mode. `"range"` collapses conversation ranges; `"message"` (experimental) compresses individual messages by size priority |
+| `compress.summaryBuffer` | int | `20000` | v3.1.0 | Token budget for accumulated summaries. Prevents nudge cascade when summaries consume tokens. Nudges factor this in before firing |
+
+### compress.mode Details
+
+**"range" mode** (default): Select a conversation range by start/end boundaries. Best for clear
+phase transitions (research done → implementation starting).
+
+**"message" mode** (experimental): Compresses individual messages targeting the largest ones first
+for maximum token recovery. Best for dense sessions without clear phase boundaries. Preserves
+protected refs and completed compress calls. Uses stable IDs across multipart content.
+
+### summaryBuffer Details
+
+As compressions accumulate, the summaries themselves consume tokens. Without `summaryBuffer`,
+the nudge system would keep firing even though the session *is* being managed — creating a
+nudge cascade. The buffer tracks accumulated summary tokens and factors them into nudge decisions.
+
+Default: 20,000 tokens. When summary tokens exceed this buffer, the system accounts for it
+in the next nudge evaluation rather than treating all summary tokens as "recoverable" context.

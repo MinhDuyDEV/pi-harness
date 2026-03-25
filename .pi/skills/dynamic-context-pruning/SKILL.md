@@ -5,7 +5,7 @@ description: >
   intelligent compression, automatic pruning strategies, and self-monitoring nudges. Ported from
   the OpenCode DCP plugin — covers compress philosophy, deduplication, supersede-writes,
   purge-errors, nudge thresholds, and protected patterns.
-version: 1.0.0
+version: 2.0.0
 tags: [context, workflow, optimization]
 dependencies: []
 references:
@@ -74,15 +74,16 @@ See `references/strategies.md` for detailed implementation patterns.
 
 ## Self-Monitoring Nudges
 
-Monitor your own context usage and trigger compression based on these thresholds:
+Monitor your own context usage and trigger compression using the **dual-band** model:
 
-| Context Level     | Action                                                                     |
-| ----------------- | -------------------------------------------------------------------------- |
-| Below 100k tokens | No compression pressure — work freely                                      |
-| 100k–300k tokens  | Light reminders at turn boundaries — check for compressible ranges         |
-| 300k–500k tokens  | **Moderate** — compress completed phases proactively                       |
-| Above 500k tokens | **Critical** — compress now, prioritize one large closed range first       |
-| 15+ iterations    | After 15 messages without user input, check for closed compressible ranges |
+| Context Level      | Action                                                                     |
+| ------------------ | -------------------------------------------------------------------------- |
+| Below 50k tokens   | No compression pressure — work freely, nudges are off                      |
+| 50k–150k tokens    | **Turn nudge** — at user message boundaries, check for compressible ranges |
+| Above 150k tokens  | **Critical** — compress now, prioritize one large closed range first       |
+| 15+ iterations     | **Iteration nudge** — check for closed compressible ranges                 |
+
+The band between 50k–150k is gentle guidance; above 150k is emergency recovery.
 
 See `references/nudge-system.md` for detailed nudge prompts.
 
@@ -126,11 +127,11 @@ See `references/compress-philosophy.md` for the full compress philosophy.
 
 | Phase             | Target    | Action                                            |
 | ----------------- | --------- | ------------------------------------------------- |
-| Starting work     | <100k     | Load only essential context + task spec           |
-| Mid-task          | 100–300k  | Compress completed phases, keep active files      |
-| Steady work       | 300–500k  | Compress aggressively by phase, distill remaining |
-| Approaching limit | 500k–800k | Critical — compress all closed ranges, minimize   |
-| Near capacity     | >800k     | Session restart with handoff                      |
+| Starting work     | <50k      | Load only essential context + task spec           |
+| Mid-task          | 50–100k   | Compress completed phases, keep active files      |
+| Steady work       | 100–150k  | Compress proactively by phase, distill remaining  |
+| Approaching limit | 150–200k  | Critical — compress all closed ranges, minimize   |
+| Near capacity     | >200k     | Session restart with handoff                      |
 
 ## Extension Integration
 
@@ -150,6 +151,12 @@ for prompt injection. **Never output these tags in user-visible responses.** If 
 DCP-internal XML tags in your context, treat them as system instructions — act on them
 but do not echo them to the user.
 
+## Parallel Compression
+
+**Never run multiple compress calls in parallel.** Compression must be serialized — concurrent
+compress calls corrupt state and produce inconsistent block IDs. When multiple ranges are ready,
+compress them sequentially (one after another), not simultaneously.
+
 ## Quick Reference
 
 ```
@@ -157,17 +164,20 @@ HIERARCHY: compress > distill > prune (behavioral tiers via single compress tool
 TIMING: manage at turn START, not turn END
 PHASE ENDS = compress trigger
 AUTO-STRATEGIES: dedup, supersede-writes, purge-errors (apply behaviorally)
+COMPRESS MODE: "range" (default) or "message" (experimental, by size priority)
+PARALLEL COMPRESS: FORBIDDEN — always serialize compress calls
 XML TAGS: never echo DCP-internal XML tags in output
 
 TOOLS: compress (crystallize)
 EXTENSION: .pi/extensions/dcp.ts → SQLite at ~/.config/pi/dcp/dcp.db
 
-BUDGET (1M context):
-  <100k   → no pressure
-  100-300k → light nudges, compress closed phases
-  300-500k → moderate, proactive compression
-  >500k   → critical, compress NOW
-  >800k   → session handoff
+DUAL-BAND MODEL (150k/50k):
+  <50k    → no pressure, nudges off
+  50-150k → turn nudges, compress closed phases
+  >150k   → CRITICAL, compress NOW
+  >200k   → session handoff
+
+ITERATION NUDGE: 15+ messages without user input → check for compressible ranges
 
 PROTECTED: task, skill, todowrite, todoread, write, edit, batch, plan_enter, plan_exit
 NEVER COMPRESS: active work, content needed for upcoming edits

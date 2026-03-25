@@ -44,6 +44,7 @@ export interface SessionStats {
 	total_compressions: number;
 	total_compressed_tokens: number;
 	total_pruned_tokens: number;
+	total_summary_tokens: number;
 	current_turn: number;
 	updated_at: number;
 }
@@ -127,6 +128,7 @@ function initSchema(db: any): void {
       total_compressions      INTEGER NOT NULL DEFAULT 0,
       total_compressed_tokens INTEGER NOT NULL DEFAULT 0,
       total_pruned_tokens     INTEGER NOT NULL DEFAULT 0,
+      total_summary_tokens    INTEGER NOT NULL DEFAULT 0,
       current_turn            INTEGER NOT NULL DEFAULT 0,
       updated_at              INTEGER NOT NULL
     );
@@ -135,6 +137,21 @@ function initSchema(db: any): void {
     CREATE INDEX IF NOT EXISTS idx_blocks_active ON compression_blocks(session_id, active);
     CREATE INDEX IF NOT EXISTS idx_tools_session ON tool_calls(session_id);
   `);
+
+	// v3.1.0 migration: add total_summary_tokens column if missing
+	try {
+		const cols = db
+			.prepare("PRAGMA table_info(session_stats)")
+			.all()
+			.map((c: any) => c.name);
+		if (!cols.includes("total_summary_tokens")) {
+			db.exec(
+				"ALTER TABLE session_stats ADD COLUMN total_summary_tokens INTEGER NOT NULL DEFAULT 0",
+			);
+		}
+	} catch {
+		// best-effort migration
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -241,6 +258,7 @@ export function updateSessionStats(
 			| "total_compressions"
 			| "total_compressed_tokens"
 			| "total_pruned_tokens"
+			| "total_summary_tokens"
 			| "current_turn"
 		>
 	>,
@@ -251,13 +269,14 @@ export function updateSessionStats(
 
 	if (!existing) {
 		db.prepare(
-			`INSERT INTO session_stats (session_id, total_compressions, total_compressed_tokens, total_pruned_tokens, current_turn, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO session_stats (session_id, total_compressions, total_compressed_tokens, total_pruned_tokens, total_summary_tokens, current_turn, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		).run(
 			sessionId,
 			updates.total_compressions ?? 0,
 			updates.total_compressed_tokens ?? 0,
 			updates.total_pruned_tokens ?? 0,
+			updates.total_summary_tokens ?? 0,
 			updates.current_turn ?? 0,
 			now,
 		);
@@ -267,6 +286,7 @@ export function updateSessionStats(
         total_compressions = ?,
         total_compressed_tokens = ?,
         total_pruned_tokens = ?,
+        total_summary_tokens = ?,
         current_turn = ?,
         updated_at = ?
        WHERE session_id = ?`,
@@ -274,6 +294,7 @@ export function updateSessionStats(
 			updates.total_compressions ?? existing.total_compressions,
 			updates.total_compressed_tokens ?? existing.total_compressed_tokens,
 			updates.total_pruned_tokens ?? existing.total_pruned_tokens,
+			updates.total_summary_tokens ?? existing.total_summary_tokens,
 			updates.current_turn ?? existing.current_turn,
 			now,
 			sessionId,
@@ -286,6 +307,7 @@ export function getGlobalStats(): {
 	totalCompressions: number;
 	totalCompressedTokens: number;
 	totalPrunedTokens: number;
+	totalSummaryTokens: number;
 } {
 	const db = getDCPDB();
 	const row = db
@@ -294,7 +316,8 @@ export function getGlobalStats(): {
         COUNT(*) as totalSessions,
         COALESCE(SUM(total_compressions), 0) as totalCompressions,
         COALESCE(SUM(total_compressed_tokens), 0) as totalCompressedTokens,
-        COALESCE(SUM(total_pruned_tokens), 0) as totalPrunedTokens
+        COALESCE(SUM(total_pruned_tokens), 0) as totalPrunedTokens,
+        COALESCE(SUM(total_summary_tokens), 0) as totalSummaryTokens
        FROM session_stats`,
 		)
 		.get();
@@ -395,4 +418,50 @@ export function getToolCallFrequency(
        LIMIT 20`,
 		)
 		.all(...params);
+}
+
+// ---------------------------------------------------------------------------
+// Post-compact state reset
+// ---------------------------------------------------------------------------
+
+/**
+ * Reset session state after a native /compact event.
+ * Clears stale tool call cache and resets summary token counter,
+ * since compacted messages no longer exist in the conversation.
+ */
+export function resetSessionState(sessionId: string): void {
+	const db = getDCPDB();
+
+	// Clear tool call cache — compacted messages invalidate dedup signatures
+	db.prepare("DELETE FROM tool_calls WHERE session_id = ?").run(sessionId);
+
+	// Deactivate all compression blocks — their ranges no longer exist
+	db.prepare(
+		"UPDATE compression_blocks SET active = 0, deactivated_at = ? WHERE session_id = ? AND active = 1",
+	).run(Date.now(), sessionId);
+
+	// Reset session stats (keep compressions count for historical tracking)
+	const existing = getSessionStats(sessionId);
+	if (existing) {
+		db.prepare(
+			`UPDATE session_stats SET
+        total_pruned_tokens = 0,
+        total_summary_tokens = 0,
+        current_turn = 0,
+        updated_at = ?
+       WHERE session_id = ?`,
+		).run(Date.now(), sessionId);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Summary token helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Get total summary tokens for a session (for summaryBuffer checks).
+ */
+export function getSummaryTokens(sessionId: string): number {
+	const stats = getSessionStats(sessionId);
+	return stats?.total_summary_tokens ?? 0;
 }

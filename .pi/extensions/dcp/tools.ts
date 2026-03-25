@@ -37,6 +37,11 @@ function estimateTokens(text: string): number {
 
 const COMPRESS_DESCRIPTION = `Collapse a range in the conversation into a detailed summary.
 
+COMPRESSION MODES
+- "range" (default): Select a conversation range by start/end boundaries → replace with summary.
+- "message" (experimental): Compress individual messages by size priority. Use when sessions are dense
+  with no clear phase boundaries. Targets the largest messages first for maximum token recovery.
+
 THE PHILOSOPHY OF COMPRESS
 compress transforms verbose conversation sequences into dense, high-fidelity summaries. This is not cleanup — it is crystallization. Your summary becomes the authoritative record of what transpired.
 
@@ -57,6 +62,8 @@ WHEN TO USE
 WHEN NOT TO USE
 - You may need exact code, error messages, or file contents in the immediate next steps
 - Work in that area is still active or likely to resume immediately
+
+IMPORTANT: Never run multiple compress calls in parallel. Always serialize compression calls.
 
 Before compressing, ask: "Is this range closed enough to become summary-only right now?"`;
 
@@ -92,6 +99,12 @@ export function registerCompressTool(pi: any, config: DCPConfig): void {
 				description:
 					"Complete technical summary replacing all content in range. Must be exhaustive.",
 			}),
+			mode: Type.Optional(
+				Type.Union([Type.Literal("range"), Type.Literal("message")], {
+					description:
+						'Compression mode: "range" (default) collapses a conversation range; "message" (experimental) compresses individual messages by size priority.',
+				}),
+			),
 		}),
 		async execute(
 			toolCallId: string,
@@ -100,12 +113,14 @@ export function registerCompressTool(pi: any, config: DCPConfig): void {
 				startId: string;
 				endId: string;
 				summary: string;
+				mode?: "range" | "message";
 			},
 			_signal: AbortSignal,
 			_onUpdate: (text: string) => void,
 			ctx: any,
 		) {
 			try {
+				const compressMode = params.mode ?? config.compress.mode;
 				// Validate args
 				if (!params.topic?.trim()) {
 					return {
@@ -154,24 +169,35 @@ export function registerCompressTool(pi: any, config: DCPConfig): void {
 
 				// Update session stats
 				const existing = getSessionStats(sessionId);
+				const newSummaryTokens =
+					(existing?.total_summary_tokens ?? 0) + summaryTokens;
 				updateSessionStats(sessionId, {
 					total_compressions:
 						(existing?.total_compressions ?? 0) + 1,
 					total_compressed_tokens:
 						(existing?.total_compressed_tokens ?? 0) +
 						summaryTokens,
+					total_summary_tokens: newSummaryTokens,
 				});
 
 				// Build response
 				const activeBlocks = getActiveBlocks(sessionId);
 				const totalActive = activeBlocks.length;
 
+				// Check summaryBuffer status
+				const summaryBufferLimit = config.compress.summaryBuffer;
+				const summaryBufferUsed = Math.round(
+					(newSummaryTokens / summaryBufferLimit) * 100,
+				);
+
 				const result = [
 					`[Compressed conversation section b${blockId}]`,
 					`Topic: ${params.topic}`,
+					`Mode: ${compressMode}`,
 					`Range: ${params.startId} → ${params.endId}`,
 					`Summary tokens: ~${summaryTokens}`,
 					`Active compressions: ${totalActive}`,
+					`Summary buffer: ~${newSummaryTokens}/${summaryBufferLimit} tokens (${summaryBufferUsed}%)`,
 					"",
 					"The following is the authoritative summary of the compressed range:",
 					"",
@@ -183,8 +209,10 @@ export function registerCompressTool(pi: any, config: DCPConfig): void {
 					details: {
 						blockId,
 						topic: params.topic,
+						mode: compressMode,
 						summaryTokens,
 						totalActive,
+						summaryBufferUsed: `${summaryBufferUsed}%`,
 					},
 				};
 			} catch (err) {

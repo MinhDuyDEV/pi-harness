@@ -2,7 +2,7 @@
  * DCP Extension — Entry Point
  *
  * Dynamic Context Pruning extension for Pi coding agents.
- * Ported from @tarquinen/opencode-dcp v3.0.4.
+ * Ported from @tarquinen/opencode-dcp v3.1.0.
  *
  * WHAT THIS EXTENSION DOES:
  *   - Registers `compress` tool for crystallizing conversation ranges into summaries
@@ -24,7 +24,7 @@
  */
 
 import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
-import { closeDCPDB, getDCPDB, recordToolCall } from "./dcp/db.js";
+import { closeDCPDB, getDCPDB, recordToolCall, resetSessionState } from "./dcp/db.js";
 import {
 	registerCompressTool,
 } from "./dcp/tools.js";
@@ -52,6 +52,32 @@ function hashParams(params: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
+// Improved token estimation (counts both args and result)
+// ---------------------------------------------------------------------------
+
+function estimateToolTokens(event: any): number {
+	let total = 0;
+
+	// Count tool argument tokens (new in v3.1.0 — args were previously ignored)
+	const input = event?.input ?? event?.params;
+	if (input) {
+		const inputStr =
+			typeof input === "string" ? input : JSON.stringify(input);
+		total += Math.ceil(inputStr.length / 4);
+	}
+
+	// Count result tokens
+	const result = event?.result;
+	if (result) {
+		const resultStr =
+			typeof result === "string" ? result : JSON.stringify(result);
+		total += Math.ceil(resultStr.length / 4);
+	}
+
+	return total;
+}
+
+// ---------------------------------------------------------------------------
 // Extension factory
 // ---------------------------------------------------------------------------
 
@@ -66,8 +92,10 @@ export default function dcpExtension(pi: any): void {
 		return;
 	}
 
-	// 2. Register tools
-	registerCompressTool(pi, config);
+	// 2. Register tools (skip in manual mode unless allowSubAgents is enabled)
+	if (!config.manualMode.enabled || config.experimental.allowSubAgents) {
+		registerCompressTool(pi, config);
+	}
 
 	// 3. Track tool calls for dedup strategy
 	let currentTurn = 0;
@@ -92,13 +120,7 @@ export default function dcpExtension(pi: any): void {
 			if (config.compress.protectedTools.includes(toolName)) return;
 
 			const paramsHash = hashParams(params);
-			const tokenEstimate = event?.result
-				? Math.ceil(
-						(typeof event.result === "string"
-							? event.result.length
-							: JSON.stringify(event.result).length) / 4,
-					)
-				: 0;
+			const tokenEstimate = estimateToolTokens(event);
 
 			recordToolCall(
 				sessionId,
@@ -114,7 +136,18 @@ export default function dcpExtension(pi: any): void {
 		}
 	});
 
-	// 4. Register /dcp command
+	// 4. Handle native /compact events — reset stale state
+	pi.on("compact", (event: any) => {
+		try {
+			const sessionId = event?.sessionId ?? "default";
+			resetSessionState(sessionId);
+			currentTurn = 0;
+		} catch {
+			// best-effort reset
+		}
+	});
+
+	// 5. Register /dcp command
 	pi.registerCommand("dcp", {
 		description: "Show DCP context pruning status and statistics",
 		async handler(ctx: any) {
@@ -122,11 +155,16 @@ export default function dcpExtension(pi: any): void {
 				const {
 					getGlobalStats,
 					getActiveBlocks,
+					getSummaryTokens,
 				} = await import("./dcp/db.js");
 
 				const stats = getGlobalStats();
 				const sessionId = ctx?.sessionId ?? "default";
 				const activeBlocks = getActiveBlocks(sessionId);
+				const summaryTokens = getSummaryTokens(sessionId);
+				const summaryBufferPct = Math.round(
+					(summaryTokens / config.compress.summaryBuffer) * 100,
+				);
 
 				const lines = [
 					"## DCP Status",
@@ -135,6 +173,8 @@ export default function dcpExtension(pi: any): void {
 					`**Total compressions**: ${stats.totalCompressions}`,
 					`**Tokens compressed**: ~${stats.totalCompressedTokens}`,
 					`**Tokens pruned**: ~${stats.totalPrunedTokens}`,
+					`**Summary buffer**: ~${summaryTokens}/${config.compress.summaryBuffer} (${summaryBufferPct}%)`,
+					`**Mode**: ${config.compress.mode}`,
 					"",
 					`**Active blocks (current session)**: ${activeBlocks.length}`,
 					...activeBlocks.map(
@@ -156,7 +196,7 @@ export default function dcpExtension(pi: any): void {
 		},
 	});
 
-	// 5. Cleanup on shutdown
+	// 6. Cleanup on shutdown
 	pi.on("session_shutdown", () => {
 		closeDCPDB();
 	});

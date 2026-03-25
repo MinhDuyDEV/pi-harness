@@ -12,6 +12,7 @@
 export type Permission = "ask" | "allow" | "deny";
 export type NudgeForce = "strong" | "soft";
 export type NotificationLevel = "off" | "minimal" | "detailed";
+export type CompressMode = "range" | "message";
 
 export interface CompressConfig {
 	permission: Permission;
@@ -22,6 +23,24 @@ export interface CompressConfig {
 	nudgeForce: NudgeForce;
 	protectedTools: string[];
 	protectUserMessages: boolean;
+	mode: CompressMode;
+	summaryBuffer: number;
+	flatSchema: boolean;
+}
+
+export interface ManualModeConfig {
+	enabled: boolean;
+	automaticStrategies: boolean;
+}
+
+export interface TurnProtectionConfig {
+	enabled: boolean;
+	turns: number;
+}
+
+export interface ExperimentalConfig {
+	customPrompts: boolean;
+	allowSubAgents: boolean;
 }
 
 export interface DeduplicationConfig {
@@ -52,6 +71,9 @@ export interface DCPConfig {
 	protectedFilePatterns: string[];
 	compress: CompressConfig;
 	strategies: StrategiesConfig;
+	manualMode: ManualModeConfig;
+	turnProtection: TurnProtectionConfig;
+	experimental: ExperimentalConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +129,9 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		nudgeForce: "soft",
 		protectedTools: [...COMPRESS_PROTECTED_TOOLS],
 		protectUserMessages: false,
+		mode: "range",
+		summaryBuffer: 20_000,
+		flatSchema: false,
 	},
 	strategies: {
 		deduplication: {
@@ -121,5 +146,17 @@ export const DEFAULT_CONFIG: DCPConfig = {
 			turns: 4,
 			protectedTools: [],
 		},
+	},
+	manualMode: {
+		enabled: false,
+		automaticStrategies: true,
+	},
+	turnProtection: {
+		enabled: false,
+		turns: 4,
+	},
+	experimental: {
+		customPrompts: false,
+		allowSubAgents: false,
 	},
 };

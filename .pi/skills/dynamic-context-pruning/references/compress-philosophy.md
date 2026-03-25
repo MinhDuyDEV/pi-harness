@@ -78,12 +78,14 @@ Compression is irreversible. The summary replaces everything in the range.
 
 ## Parallel Compression
 
-When multiple independent ranges are ready and their boundaries do not overlap, compress
-multiple ranges in the same pass. This is the **preferred pattern** over a single large-range
-compression when the work can be safely split.
+**NEVER run multiple compress calls in parallel.** Concurrent compression calls corrupt state —
+block IDs become inconsistent and summary token tracking breaks.
 
-Run compression sequentially only when ranges overlap or when a later range depends on the
-result of an earlier compression.
+When multiple independent ranges are ready, compress them **sequentially** (one after another).
+This is a hard constraint from upstream (documented in `feat/flashblocks` branch).
+
+The only optimization: identify all compressible ranges first, then compress them in order
+from oldest to newest.
 
 ## Summary Template
 
