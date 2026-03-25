@@ -56,6 +56,7 @@ When instructions conflict:
 - **Verify external APIs before using** — check local type definitions, source code, or official docs; never guess library method signatures or options
 - Run relevant commands (typecheck/lint/test/build) after meaningful changes
 - If verification fails twice on the same approach, stop and escalate with blocker details
+- **After any context compaction** — STOP. Re-read: (1) AGENTS.md, (2) current task details, (3) any active state. Only then continue
 - **Auto-detect project toolchain** — look for `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `Makefile`, etc. and run the appropriate verification commands
 - **Common verification patterns:**
 
