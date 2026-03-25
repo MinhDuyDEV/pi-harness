@@ -146,10 +146,11 @@ Use `/dcp` command for quick status overview (shows stats and active blocks).
 
 ## XML Tag Suppression
 
-DCP uses internal XML metadata tags (e.g., `<dcp-system-reminder>`, `<dcp-context-limit>`)
-for prompt injection. **Never output these tags in user-visible responses.** If you see
-DCP-internal XML tags in your context, treat them as system instructions — act on them
-but do not echo them to the user.
+DCP uses internal XML metadata tags with a `dcp` prefix (e.g., `<dcp-system-reminder>`,
+`<dcp-context-limit>`, `<dcp-message-id>`). **Never output any `<dcp*>` prefixed tags in
+user-visible responses.** If you see any XML tag starting with `dcp` in your context,
+treat it as a system instruction — act on it but do not echo it to the user. This includes
+variant forms the model may hallucinate (`<dcp-message-id-extra>`, `<dcp:message_id>`, etc.).
 
 ## Parallel Compression
 

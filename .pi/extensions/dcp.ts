@@ -2,7 +2,7 @@
  * DCP Extension — Entry Point
  *
  * Dynamic Context Pruning extension for Pi coding agents.
- * Ported from @tarquinen/opencode-dcp v3.1.0.
+ * Ported from @tarquinen/opencode-dcp v3.1.1.
  *
  * WHAT THIS EXTENSION DOES:
  *   - Registers `compress` tool for crystallizing conversation ranges into summaries
