@@ -148,9 +148,16 @@ Use `/dcp` command for quick status overview (shows stats and active blocks).
 
 DCP uses internal XML metadata tags with a `dcp` prefix (e.g., `<dcp-system-reminder>`,
 `<dcp-context-limit>`, `<dcp-message-id>`). **Never output any `<dcp*>` prefixed tags in
-user-visible responses.** If you see any XML tag starting with `dcp` in your context,
-treat it as a system instruction — act on it but do not echo it to the user. This includes
-variant forms the model may hallucinate (`<dcp-message-id-extra>`, `<dcp:message_id>`, etc.).
+user-visible responses** — this includes:
+
+- **Paired tags**: `<dcp-message-id>m0045</dcp-message-id>`
+- **Orphan opening tags**: `<dcp:function_calls>` (no closing tag)
+- **Orphan closing tags**: `</dcp-message-id>` (no opening tag)
+- **Variant forms**: `<dcp:message_id>`, `<dcp-function_calls>`, `<dcp:invoke name="edit">`
+
+If you see any XML tag starting with `dcp` (paired or orphan) in your context, treat it as
+a system instruction artifact — act on it but strip it from your output. Do not echo, quote,
+or reproduce any `<dcp*>` tag to the user.
 
 ## Parallel Compression
 
