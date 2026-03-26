@@ -6,5 +6,9 @@
 		"@huggingface/transformers": "^3.4.0",
 		"diff": "^7.0.0",
 		"@shikijs/cli": "^4.0.2"
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*",
+		"@sinclair/typebox": "*"
 	}
 }

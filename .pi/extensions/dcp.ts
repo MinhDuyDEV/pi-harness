@@ -11,23 +11,30 @@
  *   - Registers /dcp command for quick status
  *
  * WHAT IT DOES NOT DO (Pi architectural limits):
- *   - No message transform hooks (Pi doesn't intercept LLM messages)
- *   - No automatic message pruning (agent must follow behavioral patterns)
- *   - No system prompt injection (use SKILL.md for agent instructions)
+ *   - No message transform hooks — agent must follow behavioral patterns
+ *   - No automatic message pruning — use dynamic-context-pruning skill
+ *   - No system prompt injection — use SKILL.md for agent instructions
  *
  * DEPENDENCIES:
- *   better-sqlite3 (shared with memory extension)
- *   @sinclair/typebox (for tool parameter schemas)
+ *   better-sqlite3 (via .pi/extensions/package.json)
+ *   @sinclair/typebox (bundled by Pi runtime)
+ *   @mariozechner/pi-coding-agent (bundled by Pi runtime — types only)
  *
  * The agent should use the dynamic-context-pruning skill (.pi/skills/)
  * for behavioral patterns: when to compress, auto-strategies, nudge thresholds.
  */
 
+import type {
+	ExtensionAPI,
+	ExtensionContext,
+	ExtensionCommandContext,
+	ToolResultEvent,
+	SessionCompactEvent,
+} from "@mariozechner/pi-coding-agent";
+
 import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
 import { closeDCPDB, getDCPDB, recordToolCall, resetSessionState } from "./dcp/db.js";
-import {
-	registerCompressTool,
-} from "./dcp/tools.js";
+import { registerCompressTool } from "./dcp/tools.js";
 
 // ---------------------------------------------------------------------------
 // Simple hash for tool parameter dedup tracking
@@ -55,33 +62,48 @@ function hashParams(params: unknown): string {
 // Improved token estimation (counts both args and result)
 // ---------------------------------------------------------------------------
 
-function estimateToolTokens(event: any): number {
+function estimateToolTokens(event: ToolResultEvent): number {
 	let total = 0;
 
-	// Count tool argument tokens (new in v3.1.0 — args were previously ignored)
-	const input = event?.input ?? event?.params;
+	// Count tool argument tokens
+	const input = event.input;
 	if (input) {
-		const inputStr =
-			typeof input === "string" ? input : JSON.stringify(input);
+		const inputStr = JSON.stringify(input);
 		total += Math.ceil(inputStr.length / 4);
 	}
 
-	// Count result tokens
-	const result = event?.result;
-	if (result) {
-		const resultStr =
-			typeof result === "string" ? result : JSON.stringify(result);
-		total += Math.ceil(resultStr.length / 4);
+	// Count result content tokens
+	for (const part of event.content) {
+		if (part.type === "text") {
+			total += Math.ceil(part.text.length / 4);
+		}
 	}
 
 	return total;
 }
 
 // ---------------------------------------------------------------------------
+// Session ID helper — Pi doesn't expose sessionId on events, derive from ctx
+// ---------------------------------------------------------------------------
+
+function getSessionId(ctx?: ExtensionContext): string {
+	try {
+		// Use session file path as a stable session identifier
+		const mgr = ctx?.sessionManager;
+		if (mgr && typeof (mgr as any).getSessionFile === "function") {
+			return (mgr as any).getSessionFile() ?? "default";
+		}
+	} catch {
+		// best-effort
+	}
+	return "default";
+}
+
+// ---------------------------------------------------------------------------
 // Extension factory
 // ---------------------------------------------------------------------------
 
-export default function dcpExtension(pi: any): void {
+export default function dcpExtension(pi: ExtensionAPI): void {
 	const config: DCPConfig = { ...DEFAULT_CONFIG };
 
 	// 1. Initialize database
@@ -104,27 +126,27 @@ export default function dcpExtension(pi: any): void {
 		currentTurn++;
 	});
 
-	pi.on("tool_result", (event: any) => {
+	// tool_result fires after each tool execution with result content
+	// See: ToolResultEvent { toolCallId, toolName, input, content, isError }
+	pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
 		if (!config.strategies.deduplication.enabled) return;
 
 		try {
-			const toolName = event?.name ?? event?.toolName;
-			const callId = event?.toolCallId ?? event?.id;
-			const params = event?.input ?? event?.params;
-			const status = event?.error ? "error" : "completed";
-			const sessionId = event?.sessionId ?? "default";
+			const { toolName, toolCallId, input, isError } = event;
+			const sessionId = getSessionId(ctx);
 
-			if (!toolName || !callId) return;
+			if (!toolName || !toolCallId) return;
 
 			// Skip protected tools
 			if (config.compress.protectedTools.includes(toolName)) return;
 
-			const paramsHash = hashParams(params);
+			const paramsHash = hashParams(input);
+			const status = isError ? "error" : "completed";
 			const tokenEstimate = estimateToolTokens(event);
 
 			recordToolCall(
 				sessionId,
-				callId,
+				toolCallId,
 				toolName,
 				paramsHash,
 				status,
@@ -137,9 +159,10 @@ export default function dcpExtension(pi: any): void {
 	});
 
 	// 4. Handle native /compact events — reset stale state
-	pi.on("compact", (event: any) => {
+	// Event name is "session_compact" in the Pi SDK
+	pi.on("session_compact", (_event: SessionCompactEvent, ctx: ExtensionContext) => {
 		try {
-			const sessionId = event?.sessionId ?? "default";
+			const sessionId = getSessionId(ctx);
 			resetSessionState(sessionId);
 			currentTurn = 0;
 		} catch {
@@ -148,9 +171,10 @@ export default function dcpExtension(pi: any): void {
 	});
 
 	// 5. Register /dcp command
+	// Pi command handler signature: (args: string, ctx: ExtensionCommandContext)
 	pi.registerCommand("dcp", {
 		description: "Show DCP context pruning status and statistics",
-		async handler(ctx: any) {
+		async handler(_args: string, ctx: ExtensionCommandContext) {
 			try {
 				const {
 					getGlobalStats,
@@ -159,7 +183,7 @@ export default function dcpExtension(pi: any): void {
 				} = await import("./dcp/db.js");
 
 				const stats = getGlobalStats();
-				const sessionId = ctx?.sessionId ?? "default";
+				const sessionId = getSessionId(ctx);
 				const activeBlocks = getActiveBlocks(sessionId);
 				const summaryTokens = getSummaryTokens(sessionId);
 				const summaryBufferPct = Math.round(
@@ -185,12 +209,12 @@ export default function dcpExtension(pi: any): void {
 					"Use `compress` tool to crystallize completed conversation ranges.",
 				];
 
-				if (ctx?.ui) {
-					ctx.ui.notify(lines.join("\n"));
+				if (ctx.hasUI) {
+					ctx.ui.notify(lines.join("\n"), "info");
 				}
 			} catch (err) {
-				if (ctx?.ui) {
-					ctx.ui.notify(`DCP status error: ${err}`);
+				if (ctx.hasUI) {
+					ctx.ui.notify(`DCP status error: ${err}`, "error");
 				}
 			}
 		},

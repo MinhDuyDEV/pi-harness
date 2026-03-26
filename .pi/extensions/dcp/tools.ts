@@ -11,6 +11,7 @@
  * and returns the summary to the agent for reference.
  */
 
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 import { COMPRESS_PROTECTED_TOOLS, type DCPConfig } from "./config.js";
@@ -29,6 +30,22 @@ import {
 function estimateTokens(text: string): number {
 	// ~4 chars per token (rough estimate, matches Anthropic's rule of thumb)
 	return Math.ceil(text.length / 4);
+}
+
+// ---------------------------------------------------------------------------
+// Session ID helper
+// ---------------------------------------------------------------------------
+
+function getSessionId(ctx?: ExtensionContext): string {
+	try {
+		const mgr = ctx?.sessionManager;
+		if (mgr && typeof (mgr as any).getSessionFile === "function") {
+			return (mgr as any).getSessionFile() ?? "default";
+		}
+	} catch {
+		// best-effort
+	}
+	return "default";
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +88,7 @@ Before compressing, ask: "Is this range closed enough to become summary-only rig
 // Tool registration
 // ---------------------------------------------------------------------------
 
-export function registerCompressTool(pi: any, config: DCPConfig): void {
+export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void {
 	if (config.compress.permission === "deny") {
 		return;
 	}
@@ -115,9 +132,9 @@ export function registerCompressTool(pi: any, config: DCPConfig): void {
 				summary: string;
 				mode?: "range" | "message";
 			},
-			_signal: AbortSignal,
-			_onUpdate: (text: string) => void,
-			ctx: any,
+			_signal: AbortSignal | undefined,
+			_onUpdate: unknown,
+			ctx: ExtensionContext,
 		) {
 			try {
 				const compressMode = params.mode ?? config.compress.mode;
@@ -146,9 +163,8 @@ export function registerCompressTool(pi: any, config: DCPConfig): void {
 					};
 				}
 
-				// Use a session ID (from context or fallback)
-				const sessionId =
-					ctx?.sessionId ?? "default";
+				// Use a session ID (derive from context)
+				const sessionId = getSessionId(ctx);
 
 				// Allocate block ID
 				const blockId = getNextBlockId(sessionId);
