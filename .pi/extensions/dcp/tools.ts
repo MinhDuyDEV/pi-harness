@@ -11,10 +11,15 @@
  * and returns the summary to the agent for reference.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type {
+	AgentToolUpdateCallback,
+	ExtensionAPI,
+	ExtensionContext,
+} from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
-import { COMPRESS_PROTECTED_TOOLS, type DCPConfig } from "./config.js";
+import { type DCPConfig } from "./config.js";
+import { getSessionId } from "./context.js";
 import {
 	getActiveBlocks,
 	getNextBlockId,
@@ -33,22 +38,6 @@ function estimateTokens(text: string): number {
 }
 
 // ---------------------------------------------------------------------------
-// Session ID helper
-// ---------------------------------------------------------------------------
-
-function getSessionId(ctx?: ExtensionContext): string {
-	try {
-		const mgr = ctx?.sessionManager;
-		if (mgr && typeof (mgr as any).getSessionFile === "function") {
-			return (mgr as any).getSessionFile() ?? "default";
-		}
-	} catch {
-		// best-effort
-	}
-	return "default";
-}
-
-// ---------------------------------------------------------------------------
 // Compress tool description (from DCP's compress prompt)
 // ---------------------------------------------------------------------------
 
@@ -56,8 +45,9 @@ const COMPRESS_DESCRIPTION = `Collapse a range in the conversation into a detail
 
 COMPRESSION MODES
 - "range" (default): Select a conversation range by start/end boundaries → replace with summary.
-- "message" (experimental): Compress individual messages by size priority. Use when sessions are dense
-  with no clear phase boundaries. Targets the largest messages first for maximum token recovery.
+- "message" (experimental, advisory in the Pi port): Use when sessions are dense with no clear
+  phase boundaries. The agent should choose message-sized slices by priority, but this tool still
+  stores a normal compression block with the provided boundaries and summary.
 
 THE PHILOSOPHY OF COMPRESS
 compress transforms verbose conversation sequences into dense, high-fidelity summaries. This is not cleanup — it is crystallization. Your summary becomes the authoritative record of what transpired.
@@ -119,7 +109,7 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
 			mode: Type.Optional(
 				Type.Union([Type.Literal("range"), Type.Literal("message")], {
 					description:
-						'Compression mode: "range" (default) collapses a conversation range; "message" (experimental) compresses individual messages by size priority.',
+						'Compression mode: "range" (default) collapses a conversation range; "message" is advisory in the Pi port and records that the agent selected message-sized slices by priority before summarizing.',
 				}),
 			),
 		}),
@@ -133,117 +123,114 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
 				mode?: "range" | "message";
 			},
 			_signal: AbortSignal | undefined,
-			_onUpdate: unknown,
+			_onUpdate: AgentToolUpdateCallback<{
+				blockId: number;
+				topic: string;
+				mode: "range" | "message";
+				summaryTokens: number;
+				totalActive: number;
+				summaryBufferUsed: string;
+			}> | undefined,
 			ctx: ExtensionContext,
 		) {
-			try {
-				const compressMode = params.mode ?? config.compress.mode;
-				// Validate args
-				if (!params.topic?.trim()) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Error: topic is required and must be a non-empty string",
-							},
-						],
-						details: {},
-					};
-				}
+			const compressMode = params.mode ?? config.compress.mode;
+			const modeLabel =
+				compressMode === "message"
+					? 'message (advisory in Pi port)'
+					: compressMode;
 
-				if (!params.summary?.trim()) {
-					return {
-						content: [
-							{
-								type: "text",
-								text: "Error: summary is required and must be a non-empty string",
-							},
-						],
-						details: {},
-					};
-				}
-
-				// Use a session ID (derive from context)
-				const sessionId = getSessionId(ctx);
-
-				// Allocate block ID
-				const blockId = getNextBlockId(sessionId);
-
-				// Estimate tokens in summary
-				const summaryTokens = estimateTokens(params.summary);
-
-				// Store the compression block
-				storeCompressionBlock(
-					sessionId,
-					blockId,
-					params.topic.trim(),
-					params.startId.trim(),
-					params.endId.trim(),
-					params.summary.trim(),
-					summaryTokens,
-				);
-
-				// Update session stats
-				const existing = getSessionStats(sessionId);
-				const newSummaryTokens =
-					(existing?.total_summary_tokens ?? 0) + summaryTokens;
-				updateSessionStats(sessionId, {
-					total_compressions:
-						(existing?.total_compressions ?? 0) + 1,
-					total_compressed_tokens:
-						(existing?.total_compressed_tokens ?? 0) +
-						summaryTokens,
-					total_summary_tokens: newSummaryTokens,
-				});
-
-				// Build response
-				const activeBlocks = getActiveBlocks(sessionId);
-				const totalActive = activeBlocks.length;
-
-				// Check summaryBuffer status
-				const summaryBufferLimit = config.compress.summaryBuffer;
-				const summaryBufferUsed = Math.round(
-					(newSummaryTokens / summaryBufferLimit) * 100,
-				);
-
-				const result = [
-					`[Compressed conversation section b${blockId}]`,
-					`Topic: ${params.topic}`,
-					`Mode: ${compressMode}`,
-					`Range: ${params.startId} → ${params.endId}`,
-					`Summary tokens: ~${summaryTokens}`,
-					`Active compressions: ${totalActive}`,
-					`Summary buffer: ~${newSummaryTokens}/${summaryBufferLimit} tokens (${summaryBufferUsed}%)`,
-					"",
-					"The following is the authoritative summary of the compressed range:",
-					"",
-					params.summary,
-				].join("\n");
-
-				return {
-					content: [{ type: "text", text: result }],
-					details: {
-						blockId,
-						topic: params.topic,
-						mode: compressMode,
-						summaryTokens,
-						totalActive,
-						summaryBufferUsed: `${summaryBufferUsed}%`,
-					},
-				};
-			} catch (err) {
-				const errMsg =
-					err instanceof Error ? err.message : String(err);
-				return {
-					content: [
-						{
-							type: "text",
-							text: `Error during compression: ${errMsg}`,
-						},
-					],
-					details: {},
-				};
+			if (!params.topic?.trim()) {
+				throw new Error("topic is required and must be a non-empty string");
 			}
+
+			if (!params.summary?.trim()) {
+				throw new Error("summary is required and must be a non-empty string");
+			}
+
+			if (config.compress.permission === "ask") {
+				if (!ctx.hasUI) {
+					throw new Error(
+						"Compression requires user confirmation, but no UI is available to ask.",
+					);
+				}
+
+				const approved = await ctx.ui.confirm(
+					"Compress context?",
+					`Topic: ${params.topic}\nMode: ${modeLabel}\nRange: ${params.startId} → ${params.endId}`,
+				);
+				if (!approved) {
+					throw new Error("Compression cancelled by user.");
+				}
+			}
+
+			// Use a session ID (derive from context)
+			const sessionId = getSessionId(ctx);
+
+			// Allocate block ID
+			const blockId = getNextBlockId(sessionId);
+
+			// Estimate tokens in summary
+			const summaryTokens = estimateTokens(params.summary);
+
+			// Store the compression block
+			storeCompressionBlock(
+				sessionId,
+				blockId,
+				params.topic.trim(),
+				params.startId.trim(),
+				params.endId.trim(),
+				params.summary.trim(),
+				summaryTokens,
+			);
+
+			// Update session stats
+			const existing = getSessionStats(sessionId);
+			const newSummaryTokens =
+				(existing?.total_summary_tokens ?? 0) + summaryTokens;
+			updateSessionStats(sessionId, {
+				total_compressions:
+					(existing?.total_compressions ?? 0) + 1,
+				total_compressed_tokens:
+					(existing?.total_compressed_tokens ?? 0) +
+					summaryTokens,
+				total_summary_tokens: newSummaryTokens,
+			});
+
+			// Build response
+			const activeBlocks = getActiveBlocks(sessionId);
+			const totalActive = activeBlocks.length;
+
+			// Check summaryBuffer status
+			const summaryBufferLimit = config.compress.summaryBuffer;
+			const summaryBufferUsed = Math.round(
+				(newSummaryTokens / summaryBufferLimit) * 100,
+			);
+
+			const result = [
+				`[Compressed conversation section b${blockId}]`,
+				`Topic: ${params.topic}`,
+				`Mode: ${modeLabel}`,
+				`Range: ${params.startId} → ${params.endId}`,
+				`Summary tokens: ~${summaryTokens}`,
+				`Active compressions: ${totalActive}`,
+				`Summary buffer: ~${newSummaryTokens}/${summaryBufferLimit} tokens (${summaryBufferUsed}%)`,
+				"",
+				"The following is the authoritative summary of the compressed range:",
+				"",
+				params.summary,
+			].join("\n");
+
+			return {
+				content: [{ type: "text", text: result }],
+				details: {
+					blockId,
+					topic: params.topic,
+					mode: compressMode,
+					summaryTokens,
+					totalActive,
+					summaryBufferUsed: `${summaryBufferUsed}%`,
+				},
+			};
 		},
 	});
 }

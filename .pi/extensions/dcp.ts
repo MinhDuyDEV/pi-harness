@@ -33,6 +33,7 @@ import type {
 } from "@mariozechner/pi-coding-agent";
 
 import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
+import { getSessionId } from "./dcp/context.js";
 import { closeDCPDB, getDCPDB, recordToolCall, resetSessionState } from "./dcp/db.js";
 import { registerCompressTool } from "./dcp/tools.js";
 
@@ -83,28 +84,15 @@ function estimateToolTokens(event: ToolResultEvent): number {
 }
 
 // ---------------------------------------------------------------------------
-// Session ID helper — Pi doesn't expose sessionId on events, derive from ctx
-// ---------------------------------------------------------------------------
-
-function getSessionId(ctx?: ExtensionContext): string {
-	try {
-		// Use session file path as a stable session identifier
-		const mgr = ctx?.sessionManager;
-		if (mgr && typeof (mgr as any).getSessionFile === "function") {
-			return (mgr as any).getSessionFile() ?? "default";
-		}
-	} catch {
-		// best-effort
-	}
-	return "default";
-}
-
-// ---------------------------------------------------------------------------
 // Extension factory
 // ---------------------------------------------------------------------------
 
 export default function dcpExtension(pi: ExtensionAPI): void {
 	const config: DCPConfig = { ...DEFAULT_CONFIG };
+
+	if (!config.enabled) {
+		return;
+	}
 
 	// 1. Initialize database
 	try {
@@ -114,10 +102,10 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		return;
 	}
 
-	// 2. Register tools (skip in manual mode unless allowSubAgents is enabled)
-	if (!config.manualMode.enabled || config.experimental.allowSubAgents) {
-		registerCompressTool(pi, config);
-	}
+	// 2. Register tools
+	// In the Pi behavioral port, `manualMode` does not disable the tool itself.
+	// It only affects agent behavior documented in the skill.
+	registerCompressTool(pi, config);
 
 	// 3. Track tool calls for dedup strategy
 	let currentTurn = 0;
@@ -137,8 +125,11 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
 			if (!toolName || !toolCallId) return;
 
-			// Skip protected tools
-			if (config.compress.protectedTools.includes(toolName)) return;
+			const dedupProtectedTools = new Set([
+				...config.compress.protectedTools,
+				...config.strategies.deduplication.protectedTools,
+			]);
+			if (dedupProtectedTools.has(toolName)) return;
 
 			const paramsHash = hashParams(input);
 			const status = isError ? "error" : "completed";
@@ -202,7 +193,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					"",
 					`**Active blocks (current session)**: ${activeBlocks.length}`,
 					...activeBlocks.map(
-						(b: any) =>
+						(b) =>
 							`  b${b.block_id}: "${b.topic}" (~${b.compressed_tokens} tokens)`,
 					),
 					"",

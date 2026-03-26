@@ -7,60 +7,45 @@ context pruning behavior. In a pi skill context, use these as behavioral paramet
 
 ```jsonc
 {
-  // Enable or disable context pruning behavior
+  // Enable or disable the DCP extension
   "enabled": true,
 
-  // Notification level: "off", "minimal", or "detailed"
+  // Notification verbosity for extension-owned status output
   "pruneNotification": "detailed",
 
-  // Slash commands
-  "commands": {
-    "enabled": true,
-    // Additional tools protected from command-based pruning
-    "protectedTools": []
-  },
-
-  // Manual mode: disables autonomous context management
-  "manualMode": {
-    "enabled": false,
-    // When true, auto-strategies still run even in manual mode
-    "automaticStrategies": true
-  },
-
-  // Protect from pruning for N message turns past tool invocation
-  "turnProtection": {
-    "enabled": false,
-    "turns": 4
-  },
-
   // File operations protected from pruning via glob patterns
-  "protectedFilePatterns": [],
+  "protectedFilePatterns": [
+    ".env*",
+    "AGENTS.md",
+    ".pi/**",
+    ".beads/**",
+    "package.json",
+    "tsconfig.json"
+  ],
 
   // Compress tool behavior settings
   "compress": {
-    // Permission: "allow" (no prompt), "ask" (prompt), "deny" (disabled)
+    // Permission: "allow" (no prompt), "ask" (confirm in UI), "deny" (disabled)
     "permission": "allow",
-    // Show compression content in notification
-    "showCompression": false,
-    // Soft upper threshold for strong compression nudges
+    // Soft upper threshold for strong compression nudges (behavioral in Pi port)
     "maxContextLimit": 150000,
-    // Soft lower threshold — below this, nudges are off
+    // Soft lower threshold — below this, nudges are off (behavioral in Pi port)
     "minContextLimit": 50000,
-    // How often the context-limit nudge fires (1 = every turn, 5 = every 5th)
+    // How often the context-limit nudge fires (behavioral in Pi port)
     "nudgeFrequency": 5,
     // Start iteration nudges after this many messages without user input
     "iterationNudgeThreshold": 15,
     // "strong" = more likely to compress, "soft" = less likely
     "nudgeForce": "soft",
-    // Tools whose outputs are always appended to compression summaries
-    "protectedTools": ["task", "skill", "todowrite", "todoread"],
-    // Preserve user messages verbatim during compression
+    // Tools whose outputs are always protected from pruning/compression
+    "protectedTools": ["task", "skill", "todowrite", "todoread", "observation"],
+    // Preserve user messages verbatim during compression (behavioral in Pi port)
     "protectUserMessages": false,
-    // Compression mode: "range" (default) or "message" (experimental)
+    // Compression mode: "range" (default) or "message" (advisory in Pi port)
     "mode": "range",
-    // Token budget for accumulated summaries (prevents nudge cascade)
+    // Token budget for accumulated summaries
     "summaryBuffer": 20000,
-    // Simplified tool schema injection
+    // Simplified tool schema injection (declared for compatibility only)
     "flatSchema": false
   },
 
@@ -68,6 +53,7 @@ context pruning behavior. In a pi skill context, use these as behavioral paramet
   "strategies": {
     "deduplication": {
       "enabled": true,
+      // Runtime-wired: merged with compress.protectedTools before tracking duplicates
       "protectedTools": []
     },
     "supersedeWrites": {
@@ -76,19 +62,49 @@ context pruning behavior. In a pi skill context, use these as behavioral paramet
     "purgeErrors": {
       "enabled": true,
       "turns": 4,
+      // Behavioral only in the Pi port
       "protectedTools": []
     }
   },
 
-  // Experimental features
+  // Manual mode / turn protection / experimental flags are kept for
+  // compatibility with upstream mental models. In the Pi port they are
+  // behavioral guidance unless explicitly marked runtime-wired below.
+  "manualMode": {
+    "enabled": false,
+    "automaticStrategies": true
+  },
+  "turnProtection": {
+    "enabled": false,
+    "turns": 4
+  },
   "experimental": {
-    // User-defined prompt override files
     "customPrompts": false,
-    // Enable compression in sub-agent contexts
     "allowSubAgents": false
   }
 }
 ```
+
+## Compression Permission
+
+| Value | Runtime behavior |
+| ----- | ---------------- |
+| `"allow"` | Register the `compress` tool and run immediately |
+| `"ask"` | Register the `compress` tool and prompt for confirmation when UI is available |
+| `"deny"` | Do not register the `compress` tool |
+
+If `permission` is `"ask"` and no UI is available, the tool returns an error instead of compressing silently.
+
+## Strategy Runtime Support
+
+| Setting | Runtime | Notes |
+| ------- | ------- | ----- |
+| `strategies.deduplication.enabled` | extension | Enables tool-call tracking for duplicate detection |
+| `strategies.deduplication.protectedTools` | extension | Merged with `compress.protectedTools` before dedup tracking |
+| `strategies.supersedeWrites.enabled` | skill | Behavioral guidance only |
+| `strategies.purgeErrors.enabled` | skill | Behavioral guidance only |
+| `strategies.purgeErrors.turns` | skill | Behavioral guidance only |
+| `strategies.purgeErrors.protectedTools` | skill | Behavioral guidance only |
 
 ## Protected Tools (Always Protected)
 
@@ -129,30 +145,14 @@ Pattern syntax:
 
 ## Context Limit Configuration
 
-| Setting           | Type              | Default  | Description                              |
-| ----------------- | ----------------- | -------- | ---------------------------------------- |
-| `maxContextLimit` | number or "N%"    | 150000   | Above this, critical nudges fire         |
-| `minContextLimit` | number or "N%"    | 50000    | Below this, turn/iteration nudges are off|
+| Setting           | Type   | Default | Runtime | Description |
+| ----------------- | ------ | ------- | ------- | ----------- |
+| `maxContextLimit` | number | 150000  | skill   | Above this, critical nudges fire |
+| `minContextLimit` | number | 50000   | skill   | Below this, turn/iteration nudges are off |
+| `nudgeFrequency`  | number | 5       | skill   | How often context-limit nudges fire |
 
-When using percentage values (e.g., `"80%"`), the limit is calculated as a percentage of the
-model's total context window.
-
-## Per-Model Overrides
-
-Different models can have different thresholds:
-
-```jsonc
-"compress": {
-  "maxContextLimit": 150000,
-  "modelMaxLimits": {
-    "anthropic/claude-sonnet-4": "80%",
-    "openai/gpt-4o": 120000
-  },
-  "modelMinLimits": {
-    "anthropic/claude-sonnet-4": "25%"
-  }
-}
-```
+In the Pi port, these thresholds are **behavioral guidance for the agent skill**, not hard runtime
+limits enforced by the extension code.
 
 ## Impact on Prompt Caching
 
@@ -170,44 +170,45 @@ Approximate impact: ~85% cache hit rate with DCP vs ~90% without.
 
 ## New in v3.0.0+ Configuration Keys
 
-These upstream config keys are documented for reference. All have typed defaults in pikit's
-extension (`config.ts`). Keys marked with ★ are wired to runtime behavior; others are
-declared for forward-compatibility but have no runtime consumer yet.
+These upstream config keys are documented for reference. In the Pi port, some are consumed by the
+extension runtime, while others are kept only to preserve the upstream mental model used by the
+skill.
 
-| Key | Type | Default | Since | Wired | Description |
-|-----|------|---------|-------|-------|-------------|
-| `manualMode.enabled` | bool | `false` | v3.0.0 | ★ | Disables autonomous compression; commands only |
-| `manualMode.automaticStrategies` | bool | `true` | v3.0.0 | | Zero-cost strategies still run in manual mode |
-| `turnProtection.enabled` | bool | `false` | v3.0.0 | | Protect content for N turns after tool invocation |
-| `turnProtection.turns` | int | `4` | v3.0.0 | | Number of turns to protect |
-| `compress.protectUserMessages` | bool | `false` | v3.0.0 | ★ | Prevents user messages from being compressed |
-| `compress.flatSchema` | bool | `false` | v3.0.0 | | Simplified tool schema (reduces model confusion) |
-| `compress.nudgeForce` | `"soft"\|"strong"` | `"soft"` | v3.0.0 | ★ | Compression aggressiveness after user messages |
-| `compress.iterationNudgeThreshold` | int | `15` | v3.0.0 | ★ | Messages before iteration nudge fires |
-| `experimental.customPrompts` | bool | `false` | v3.0.0 | | User-defined prompt override files |
-| `experimental.allowSubAgents` | bool | `false` | v3.0.0 | ★ | Enable compression in sub-agent contexts |
+| Key | Type | Default | Since | Runtime | Description |
+|-----|------|---------|-------|---------|-------------|
+| `manualMode.enabled` | bool | `false` | v3.0.0 | skill | Disables autonomous compression behavior in the skill; does **not** unregister the `compress` tool |
+| `manualMode.automaticStrategies` | bool | `true` | v3.0.0 | skill | Zero-cost strategies still run in manual mode |
+| `turnProtection.enabled` | bool | `false` | v3.0.0 | declared | Protect content for N turns after tool invocation |
+| `turnProtection.turns` | int | `4` | v3.0.0 | declared | Number of turns to protect |
+| `compress.protectUserMessages` | bool | `false` | v3.0.0 | skill | Preserve user messages verbatim during compression summaries |
+| `compress.flatSchema` | bool | `false` | v3.0.0 | declared | Simplified tool schema (reduces model confusion) |
+| `compress.nudgeForce` | `"soft"\|"strong"` | `"soft"` | v3.0.0 | skill | Compression aggressiveness after user messages |
+| `compress.iterationNudgeThreshold` | int | `15` | v3.0.0 | skill | Messages before iteration nudge fires |
+| `experimental.customPrompts` | bool | `false` | v3.0.0 | declared | User-defined prompt override files |
+| `experimental.allowSubAgents` | bool | `false` | v3.0.0 | declared | Reserved for future subagent-specific behavior |
 
 ## New in v3.1.0 Configuration Keys
 
-| Key | Type | Default | Since | Description |
-|-----|------|---------|-------|-------------|
-| `compress.mode` | `"range"\|"message"` | `"range"` | v3.1.0 | Compression targeting mode. `"range"` collapses conversation ranges; `"message"` (experimental) compresses individual messages by size priority |
-| `compress.summaryBuffer` | int | `20000` | v3.1.0 | Token budget for accumulated summaries. Prevents nudge cascade when summaries consume tokens. Nudges factor this in before firing |
+| Key | Type | Default | Since | Runtime | Description |
+|-----|------|---------|-------|---------|-------------|
+| `compress.mode` | `"range"\|"message"` | `"range"` | v3.1.0 | extension + skill | Compression targeting mode. `"range"` collapses conversation ranges; `"message"` is **advisory in the Pi port** and records that the agent selected message-sized slices before summarizing |
+| `compress.summaryBuffer` | int | `20000` | v3.1.0 | extension | Token budget for accumulated summaries. Prevents nudge cascade when summaries consume tokens |
 
 ### compress.mode Details
 
 **"range" mode** (default): Select a conversation range by start/end boundaries. Best for clear
 phase transitions (research done → implementation starting).
 
-**"message" mode** (experimental): Compresses individual messages targeting the largest ones first
-for maximum token recovery. Best for dense sessions without clear phase boundaries. Preserves
-protected refs and completed compress calls. Uses stable IDs across multipart content.
+**"message" mode** (experimental, advisory in the Pi port): The agent should choose message-sized
+slices by priority when planning the summary. The current Pi extension still stores a normal
+compression block using the provided `startId`, `endId`, and `summary`; it does not auto-select
+messages for you.
 
 ### summaryBuffer Details
 
 As compressions accumulate, the summaries themselves consume tokens. Without `summaryBuffer`,
-the nudge system would keep firing even though the session *is* being managed — creating a
-nudge cascade. The buffer tracks accumulated summary tokens and factors them into nudge decisions.
+status and planning logic can treat all accumulated summary tokens as free savings, which creates
+misleading pressure to keep compressing. The buffer tracks accumulated summary tokens explicitly.
 
-Default: 20,000 tokens. When summary tokens exceed this buffer, the system accounts for it
-in the next nudge evaluation rather than treating all summary tokens as "recoverable" context.
+Default: 20,000 tokens. In the Pi port this value is surfaced in the tool response and `/dcp`
+status output so the agent can reason about summary overhead during future compression decisions.

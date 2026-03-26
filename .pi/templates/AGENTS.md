@@ -248,7 +248,7 @@ Dynamic context pruning tools for managing conversation size. Load `dynamic-cont
 
 | Tool | Purpose |
 |---|---|
-| `compress` | Collapse conversation ranges or individual messages into dense summaries stored in SQLite |
+| `compress` | Collapse conversation ranges into dense summaries stored in SQLite; record advisory `message` mode when used |
 
 Command: `/dcp` — Show context pruning status, active blocks, and summary buffer usage.
 
@@ -257,7 +257,7 @@ Command: `/dcp` — Show context pruning status, active blocks, and summary buff
 | Mode | When | Behavior |
 |---|---|---|
 | `"range"` (default) | Clear phase boundaries | Select start/end range → replace with summary |
-| `"message"` (experimental) | Dense sessions, no clear phases | Compress individual messages by size priority |
+| `"message"` (experimental) | Dense sessions, no clear phases | Advisory-only in Pi port — the agent chooses message-sized slices, then stores a normal compression block |
 
 **Never run multiple compress calls in parallel.** Always serialize — concurrent calls corrupt state.
 

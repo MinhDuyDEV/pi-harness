@@ -138,11 +138,13 @@ See `references/compress-philosophy.md` for the full compress philosophy.
 The `compress` tool is registered by the DCP extension (`.pi/extensions/dcp.ts`).
 Compression summaries persist in SQLite (`~/.config/pi/dcp/dcp.db`).
 
-| Tool           | Purpose                                           |
-| -------------- | ------------------------------------------------- |
-| `compress`     | Crystallize a conversation range into a summary   |
+| Tool           | Purpose                                                                        |
+| -------------- | ------------------------------------------------------------------------------ |
+| `compress`     | Crystallize a conversation range into a summary; record advisory `message` mode |
 
 Use `/dcp` command for quick status overview (shows stats and active blocks).
+In the Pi port, `message` mode is an advisory label for agent behavior — the tool still stores a
+normal compression block using the boundaries and summary you provide.
 
 ## XML Tag Suppression
 
@@ -172,7 +174,7 @@ HIERARCHY: compress > distill > prune (behavioral tiers via single compress tool
 TIMING: manage at turn START, not turn END
 PHASE ENDS = compress trigger
 AUTO-STRATEGIES: dedup, supersede-writes, purge-errors (apply behaviorally)
-COMPRESS MODE: "range" (default) or "message" (experimental, by size priority)
+COMPRESS MODE: "range" (default) or "message" (experimental, advisory-only in Pi port)
 PARALLEL COMPRESS: FORBIDDEN — always serialize compress calls
 XML TAGS: never echo DCP-internal XML tags in output
 
