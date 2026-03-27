@@ -97,22 +97,24 @@ export default function memoryExtension(pi: any): void {
 		if (!MEMORY_CONFIG.capture.enabled) return;
 
 		try {
-			const result = event?.result;
-			if (!result) return;
-
-			// Extract text from tool result content
-			let text = "";
-			if (typeof result === "string") {
-				text = result;
-			} else if (Array.isArray(result?.content)) {
-				text = result.content
-					.filter((c: any) => c.type === "text")
+			const textParts = Array.isArray(event?.content)
+				? event.content
+					.filter((c: any) => c?.type === "text" && typeof c.text === "string")
 					.map((c: any) => c.text)
-					.join("\n");
-			} else if (result?.content && typeof result.content === "string") {
-				text = result.content;
-			}
-
+				: [];
+			const legacyResult = event?.result;
+			const legacyText =
+				typeof legacyResult === "string"
+					? legacyResult
+					: Array.isArray(legacyResult?.content)
+						? legacyResult.content
+								.filter((c: any) => c?.type === "text" && typeof c.text === "string")
+								.map((c: any) => c.text)
+								.join("\n")
+						: typeof legacyResult?.content === "string"
+							? legacyResult.content
+							: "";
+			const text = textParts.join("\n") || legacyText;
 			if (!text) return;
 
 			let content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);

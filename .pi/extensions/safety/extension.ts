@@ -57,11 +57,38 @@ export default function safetyExtension(pi: any): void {
 		const sessionId = event?.sessionId ?? "default";
 		tracker.recordEvidence(sessionId, normalized);
 
-		// Parse structured verification output
-		const output = String(event?.output ?? event?.result ?? "");
-		const exitCode = event?.exitCode ?? event?.exit_code;
+		// Prefer current structured tool_result content, fall back to older event shapes.
+		const contentText = Array.isArray(event?.content)
+			? event.content
+					.filter((part: any) => part?.type === "text" && typeof part.text === "string")
+					.map((part: any) => part.text)
+					.join("\n")
+			: "";
+		const legacyResult = event?.result;
+		const legacyText =
+			typeof legacyResult === "string"
+				? legacyResult
+				: Array.isArray(legacyResult?.content)
+					? legacyResult.content
+							.filter((part: any) => part?.type === "text" && typeof part.text === "string")
+							.map((part: any) => part.text)
+							.join("\n")
+					: typeof legacyResult?.content === "string"
+						? legacyResult.content
+						: String(event?.output ?? "");
+		const output = contentText || legacyText;
+		const exitCode =
+			typeof event?.details?.exitCode === "number"
+				? event.details.exitCode
+				: typeof event?.details?.exit_code === "number"
+					? event.details.exit_code
+					: typeof event?.exitCode === "number"
+						? event.exitCode
+						: typeof event?.exit_code === "number"
+							? event.exit_code
+							: undefined;
 		if (output) {
-			tracker.recordResult(sessionId, normalized, output, typeof exitCode === "number" ? exitCode : undefined);
+			tracker.recordResult(sessionId, normalized, output, exitCode);
 		}
 	});
 
