@@ -1,8 +1,9 @@
 /**
- * DCP Extension — Configuration
+ * DCP Extension — Configuration (v2)
  *
  * Default configuration and types for the Dynamic Context Pruning extension.
- * Ported from @tarquinen/opencode-dcp.
+ * v2 adds runtime-enforced strategies, cache-aware drops, tagging, fact extraction,
+ * smart compaction, and a real nudge system — all built on Pi's native extension API.
  */
 
 // ---------------------------------------------------------------------------
@@ -54,6 +55,7 @@ export interface SupersedeWritesConfig {
 
 export interface PurgeErrorsConfig {
 	enabled: boolean;
+	/** Number of turns to wait before purging errored tool inputs */
 	turns: number;
 	protectedTools: string[];
 }
@@ -63,6 +65,97 @@ export interface StrategiesConfig {
 	supersedeWrites: SupersedeWritesConfig;
 	purgeErrors: PurgeErrorsConfig;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2: Cache-aware drop queue config
+// ---------------------------------------------------------------------------
+
+export interface CacheTTLConfig {
+	/** Default cache TTL in milliseconds (default: 5 minutes) */
+	defaultMs: number;
+	/** Per-model overrides: model name/pattern → TTL in ms */
+	perModel: Record<string, number>;
+}
+
+export interface DropQueueConfig {
+	enabled: boolean;
+	/** Cache TTL settings — drops are deferred until TTL expires */
+	cacheTTL: CacheTTLConfig;
+	/** Context usage % that forces queue execution regardless of TTL */
+	executeThresholdPercent: number;
+	/** Last N tags immune from immediate drop */
+	protectedTags: number;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Tagging config
+// ---------------------------------------------------------------------------
+
+export interface TaggingConfig {
+	enabled: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Fact extraction config
+// ---------------------------------------------------------------------------
+
+export type FactCategory =
+	| "ARCHITECTURE_DECISIONS"
+	| "CONSTRAINTS"
+	| "NAMING_CONVENTIONS"
+	| "KNOWN_ISSUES"
+	| "WORKFLOW_RULES"
+	| "DEPENDENCIES"
+	| "FILE_PATTERNS"
+	| "API_CONTRACTS";
+
+export interface FactExtractionConfig {
+	enabled: boolean;
+	/** Categories to extract */
+	categories: FactCategory[];
+	/** Retrieval count threshold for promotion to permanent memory */
+	promotionThreshold: number;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: Expand (reversible compression) config
+// ---------------------------------------------------------------------------
+
+export interface ExpandConfig {
+	enabled: boolean;
+	/** Max tokens to return when expanding a compressed range */
+	maxExpandTokens: number;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3: Background historian config
+// ---------------------------------------------------------------------------
+
+export interface HistorianConfig {
+	enabled: boolean;
+	/** Model to use for background summarization (e.g. "haiku") */
+	model: string;
+	/** Timeout per historian call in ms */
+	timeoutMs: number;
+	/** Token budget for historian input chunk */
+	chunkTokenBudget: number;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1: Auto-compact config
+// ---------------------------------------------------------------------------
+
+export interface AutoCompactConfig {
+	enabled: boolean;
+	/** Context usage % threshold to trigger auto ctx.compact() */
+	thresholdPercent: number;
+	/** Custom instructions for auto-compaction */
+	customInstructions: string;
+}
+
+// ---------------------------------------------------------------------------
+// Main config type
+// ---------------------------------------------------------------------------
 
 export interface DCPConfig {
 	enabled: boolean;
@@ -74,6 +167,14 @@ export interface DCPConfig {
 	manualMode: ManualModeConfig;
 	turnProtection: TurnProtectionConfig;
 	experimental: ExperimentalConfig;
+
+	// v2 additions
+	dropQueue: DropQueueConfig;
+	tagging: TaggingConfig;
+	factExtraction: FactExtractionConfig;
+	expand: ExpandConfig;
+	historian: HistorianConfig;
+	autoCompact: AutoCompactConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -158,5 +259,62 @@ export const DEFAULT_CONFIG: DCPConfig = {
 	experimental: {
 		customPrompts: false,
 		allowSubAgents: false,
+	},
+
+	// v2: Cache-aware deferred drop queue
+	dropQueue: {
+		enabled: true,
+		cacheTTL: {
+			defaultMs: 5 * 60 * 1000, // 5 minutes
+			perModel: {
+				// Claude Max has longer cache windows
+				"claude-sonnet-4-0": 10 * 60 * 1000,
+				"claude-opus-4-0": 10 * 60 * 1000,
+			},
+		},
+		executeThresholdPercent: 65,
+		protectedTags: 20,
+	},
+
+	// v2: Monotonic message tagging
+	tagging: {
+		enabled: true,
+	},
+
+	// v2: Fact extraction from compaction
+	factExtraction: {
+		enabled: true,
+		categories: [
+			"ARCHITECTURE_DECISIONS",
+			"CONSTRAINTS",
+			"NAMING_CONVENTIONS",
+			"KNOWN_ISSUES",
+			"WORKFLOW_RULES",
+			"DEPENDENCIES",
+			"FILE_PATTERNS",
+			"API_CONTRACTS",
+		],
+		promotionThreshold: 3,
+	},
+
+	// v2: Reversible compression (ctx_expand)
+	expand: {
+		enabled: true,
+		maxExpandTokens: 15_000,
+	},
+
+	// v3: Background historian
+	historian: {
+		enabled: false, // Off by default — opt-in
+		model: "haiku",
+		timeoutMs: 300_000, // 5 minutes
+		chunkTokenBudget: 20_000,
+	},
+
+	// v2: Auto-compact via ctx.compact()
+	autoCompact: {
+		enabled: true,
+		thresholdPercent: 80,
+		customInstructions: "Focus on preserving: key decisions, file paths modified, current task state, and next steps. Be thorough but concise.",
 	},
 };

@@ -6,9 +6,9 @@
  *
  * Ported from @tarquinen/opencode-dcp compress tool.
  *
- * Pi limitation: Cannot modify messages in-flight (no message transform hooks).
- * Instead, stores compression summaries in SQLite for cross-session persistence
- * and returns the summary to the agent for reference.
+ * In DCP v2, the compress tool stores the summary in SQLite AND the
+ * context event handler strips the compressed range from messages on
+ * every subsequent LLM call. The summary replaces the original messages.
  */
 
 import type {

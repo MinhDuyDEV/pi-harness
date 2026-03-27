@@ -1,121 +1,59 @@
-# Compress Philosophy
+# Compress Philosophy (v2)
 
-Ported from the OpenCode DCP plugin's compress tool description. This is the detailed philosophy
-that guides how compression should be performed.
+> Compress transforms verbose conversation into dense, high-fidelity summaries.
+> This is not cleanup — it is crystallization.
 
-## What Compress Is
+## The Summary Contract
 
-`compress` transforms verbose conversation sequences into dense, high-fidelity summaries. This is
-not cleanup — it is **crystallization**. Your summary becomes the authoritative record of what
-transpired.
-
-Think of compression as phase transitions: raw exploration becomes refined understanding. The
-original context served its purpose; your summary now carries that understanding forward.
-
-## The Summary
-
-Your summary must be **EXHAUSTIVE**. Capture:
-
+Your summary must be **EXHAUSTIVE**:
 - File paths and function signatures
-- Decisions made and why
+- Decisions made and their rationale
 - Constraints discovered
-- Key findings and patterns
-- Types, interfaces, and data structures
-- Error patterns and their resolutions
+- Key findings and evidence
+- User intent (quote short user messages directly)
 
-This is not a brief note — it is an authoritative record so faithful that the original conversation
-adds zero value.
+Yet be **LEAN**:
+- Strip failed attempts
+- Strip verbose tool outputs
+- Strip redundant back-and-forth exploration
 
-Yet be **LEAN**. Strip away:
-
-- Failed attempts that led nowhere
-- Verbose tool outputs already captured in summary
-- Back-and-forth exploration noise
-- Redundant confirmations
-
-What remains should be pure signal — golden nuggets of detail that preserve full understanding
-with zero ambiguity.
-
-## User Intent Fidelity
-
-When the compressed range includes user messages, preserve the user's intent with extra care:
-
-- Do not change scope, constraints, priorities, acceptance criteria, or requested outcomes
-- Directly quote user messages when they are short enough to include safely
-- Direct quotes are preferred when they best preserve exact meaning
+**Test**: If someone reads only the summary, they should be able to continue the work without missing anything.
 
 ## When to Compress
-
-Compress when a range is genuinely closed and the raw conversation has served its purpose:
 
 - Research concluded and findings are clear
 - Implementation finished and verified
 - Exploration exhausted and patterns understood
 - Debugging complete and fix applied
-
-Compress smaller ranges when:
-
-- You need to discard dead-end noise without waiting for a whole chapter to close
-- You need to preserve key findings from a narrow slice while freeing context quickly
+- A phase naturally closed
 
 ## When NOT to Compress
 
 - You may need exact code, error messages, or file contents in the immediate next steps
 - Work in that area is still active or likely to resume immediately
-- You cannot identify reliable boundaries yet
+- Cannot identify reliable boundaries
 
-**Before compressing, ask**: _"Is this range closed enough to become summary-only right now?"_
-Compression is irreversible. The summary replaces everything in the range.
+## v2: Cache-Aware Deferred Drops
 
-## Operating Stance
+In v2, compression benefits from the deferred drop queue:
+- When you compress, the original content is queued for removal (not immediately stripped)
+- The queue waits for the provider's KV cache to expire (default 5 minutes)
+- This means your next LLM call still benefits from cached context
+- Drops execute automatically when the cache expires or context gets full
 
-- Prefer short, closed, summary-safe ranges
-- When multiple independent stale ranges exist, prefer several short compressions over one
-  large-range compression
-- Use compress as steady housekeeping while you work
-- Prioritize closedness and independence over raw range size
-- Prefer smaller, regular compressions over infrequent massive compressions for better quality
+## v2: Reversible Compression
 
-## Parallel Compression
+Before compaction, raw transcripts are stored in SQLite.
+If you later need details the summary doesn't cover:
 
-**NEVER run multiple compress calls in parallel.** Concurrent compression calls corrupt state —
-block IDs become inconsistent and summary token tracking breaks.
-
-When multiple independent ranges are ready, compress them **sequentially** (one after another).
-This is a hard constraint from upstream (documented in `feat/flashblocks` branch).
-
-The only optimization: identify all compressible ranges first, then compress them in order
-from oldest to newest.
-
-## Summary Template
-
-```markdown
-## [Phase/Topic] Summary
-
-### Context
-[What was being done and why]
-
-### Key Findings
-- [Finding 1 with file paths and specifics]
-- [Finding 2 with exact signatures/types]
-
-### Decisions Made
-- [Decision with rationale]
-
-### Artifacts
-- [Files created/modified: path → description]
-
-### Remaining
-- [What's left undone, if anything]
+```
+ctx_expand({ blockId: 3 })  // Decompresses block b3
 ```
 
-## Quality Checklist
+This is an escape hatch — the agent isn't locked into summaries forever.
 
-Before finalizing a compression summary:
+## Serialization Rules
 
-- [ ] All file paths mentioned are exact
-- [ ] Function signatures include parameter types and return types
-- [ ] Decisions include rationale, not just the choice
-- [ ] User intent is preserved faithfully (quoted when short)
-- [ ] No active work content is being compressed
-- [ ] Summary is self-sufficient — original conversation adds no value
+- Never run multiple compress calls in parallel
+- Always ask: "Is this range closed enough to become summary-only right now?"
+- Include enough context for a fresh agent to understand the work

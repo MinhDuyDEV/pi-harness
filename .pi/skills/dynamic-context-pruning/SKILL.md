@@ -1,194 +1,83 @@
----
-name: dynamic-context-pruning
-description: >
-  Use when context is growing large and you need to actively manage conversation size through
-  intelligent compression, automatic pruning strategies, and self-monitoring nudges. Ported from
-  the OpenCode DCP plugin — covers compress philosophy, deduplication, supersede-writes,
-  purge-errors, nudge thresholds, and protected patterns.
-version: 2.0.0
-tags: [context, workflow, optimization]
-dependencies: []
-references:
-  - references/compress-philosophy.md
-  - references/strategies.md
-  - references/nudge-system.md
-  - references/configuration.md
----
+# Dynamic Context Pruning (DCP v2)
 
-# Dynamic Context Pruning (DCP)
+> Runtime-enforced context management for Pi coding agents. Prune + compress conversation to stay in budget.
 
-Automatically reduces token usage by managing conversation context through intelligent compression
-and automatic cleanup strategies.
+## Overview
 
-## When to Use
+DCP v2 operates at **two levels**:
 
-- Context is growing large and you need to compress/distill completed work
-- Multiple tool outputs have accumulated and some are now stale or duplicated
-- A phase of work is complete and raw conversation can be crystallized
-- You're iterating for many turns without user input and context is building up
+1. **Runtime enforcement** — The extension hooks into Pi's `context`, `turn_end`, `session_before_compact`, and `before_agent_start` events to automatically prune, nudge, and compact.
+2. **Agent behavior** — The `compress` tool remains available for manual crystallization of completed phases.
 
-## When NOT to Use
+**Key change from v1**: Strategies (dedup, supersede-writes, purge-errors) now execute automatically via the `context` event before every LLM call. They are no longer just behavioral guidance.
 
-- Raw content is still needed for upcoming edits or precise references
-- Work in the target range is still actively in progress
-- Short sessions with low context usage
+## What Happens Automatically (No Agent Action Needed)
 
-## Core Principle
+| Feature | Hook | What It Does |
+|---|---|---|
+| **Deduplication** | `context` | Same tool + same args called twice → older result content stripped |
+| **Supersede-writes** | `context` | File written then later read → write input stripped |
+| **Purge-errors** | `context` | Errored tool inputs stripped after 4+ turns |
+| **Nudge injection** | `before_agent_start` | Context usage warnings injected as messages |
+| **Auto-compact** | `turn_end` | `ctx.compact()` triggered at 80% context usage |
+| **Status display** | `turn_end` | Footer shows current context usage |
+| **Fact extraction** | `session_compact` | Durable facts extracted from compaction summaries |
 
-**Compress > Distill > Prune** — always prefer higher-fidelity operations.
-These are behavioral intent tiers applied through the single `compress` tool, not separate tools.
+## What the Agent Should Still Do
 
-| Operation    | Purpose                                      | When                                     |
-| ------------ | -------------------------------------------- | ---------------------------------------- |
-| **Compress** | Collapse a conversation range into a summary | Phase complete, research done             |
-| **Distill**  | Extract key info, discard noise              | Large outputs with extractable value      |
-| **Prune**    | Remove content entirely (no save)            | Pure noise — irrelevant, never-needed     |
+### Use `compress` for Phase Boundaries
 
-All three operations are executed via the `compress` tool with varying summary depth.
-
-## Operating Stance
-
-- Prefer short, closed, summary-safe ranges
-- When multiple independent stale ranges exist, prefer several short compressions over one large one
-- Use compression as **steady housekeeping** while you work, not as emergency cleanup
-- No fixed threshold mandates compression — prioritize closedness and independence over raw size
-- Evaluate conversation signal-to-noise **regularly**
-
-## Do NOT Compress If
-
-- Raw context is still relevant and needed for edits or precise references
-- The task in the target range is still actively in progress
-- You cannot identify reliable boundaries yet
-
-## Automatic Strategies (Zero LLM Cost)
-
-Apply these behavioral patterns automatically:
-
-| Strategy             | Rule                                                                        |
-| -------------------- | --------------------------------------------------------------------------- |
-| **Deduplication**    | When same tool runs with same args, only the most recent output matters     |
-| **Supersede Writes** | When a file is written then later read, the write content is redundant      |
-| **Purge Errors**     | After 4+ turns, errored tool inputs can be stripped (keep error message)    |
-
-See `references/strategies.md` for detailed implementation patterns.
-
-## Self-Monitoring Nudges
-
-Monitor your own context usage and trigger compression using the **dual-band** model:
-
-| Context Level      | Action                                                                     |
-| ------------------ | -------------------------------------------------------------------------- |
-| Below 50k tokens   | No compression pressure — work freely, nudges are off                      |
-| 50k–150k tokens    | **Turn nudge** — at user message boundaries, check for compressible ranges |
-| Above 150k tokens  | **Critical** — compress now, prioritize one large closed range first       |
-| 15+ iterations     | **Iteration nudge** — check for closed compressible ranges                 |
-
-The band between 50k–150k is gentle guidance; above 150k is emergency recovery.
-
-See `references/nudge-system.md` for detailed nudge prompts.
-
-## Protected Content
-
-Never prune or compress these:
-
-- **Protected tools**: `task`, `skill`, `todowrite`, `todoread`, `batch`, `plan_enter`, `plan_exit`
-- **Write/edit outputs**: `write` and `edit` tool results
-- **Config files**: `.env*`, `AGENTS.md`, `.pi/**`, `.beads/**`, `package.json`, `tsconfig.json`
-- **User messages** (optionally): preserve verbatim when `protectUserMessages` is enabled
-
-See `references/configuration.md` for protected patterns configuration.
-
-## Phase-Boundary Compress Triggers
-
-The most effective compress timing is at natural phase endings:
-
-| Phase Ends           | What to Compress                       | What to Keep                      |
-| -------------------- | -------------------------------------- | --------------------------------- |
-| Research done        | Exploration turns, search outputs      | Key findings, decisions           |
-| Implementation done  | Implementation turns, file reads       | Commit refs, verification results |
-| Review complete      | Raw reviewer outputs                   | Synthesized findings              |
-| Debugging done       | Debug exploration, failed attempts     | Root cause, fix applied           |
-| Session → handoff    | Everything since last compress         | Handoff document summary          |
-
-**Rule**: Every completed phase is a compress candidate. Don't wait until context is full.
-
-## Compress Summary Requirements
-
-When compressing, the summary must be **exhaustive**:
-
-- Capture file paths, function signatures, decisions made, constraints discovered
-- Preserve user intent with extra care — directly quote short user messages
-- Strip noise: failed attempts, verbose tool outputs, redundant exploration
-- The summary must be a **complete technical substitute** for the original
-
-See `references/compress-philosophy.md` for the full compress philosophy.
-
-## Context Budget Guidelines
-
-| Phase             | Target    | Action                                            |
-| ----------------- | --------- | ------------------------------------------------- |
-| Starting work     | <50k      | Load only essential context + task spec           |
-| Mid-task          | 50–100k   | Compress completed phases, keep active files      |
-| Steady work       | 100–150k  | Compress proactively by phase, distill remaining  |
-| Approaching limit | 150–200k  | Critical — compress all closed ranges, minimize   |
-| Near capacity     | >200k     | Session restart with handoff                      |
-
-## Extension Integration
-
-The `compress` tool is registered by the DCP extension (`.pi/extensions/dcp.ts`).
-Compression summaries persist in SQLite (`~/.config/pi/dcp/dcp.db`).
-
-| Tool           | Purpose                                                                        |
-| -------------- | ------------------------------------------------------------------------------ |
-| `compress`     | Crystallize a conversation range into a summary; record advisory `message` mode |
-
-Use `/dcp` command for quick status overview (shows stats and active blocks).
-In the Pi port, `message` mode is an advisory label for agent behavior — the tool still stores a
-normal compression block using the boundaries and summary you provide.
-
-## XML Tag Suppression
-
-DCP uses internal XML metadata tags with a `dcp` prefix (e.g., `<dcp-system-reminder>`,
-`<dcp-context-limit>`, `<dcp-message-id>`). **Never output any `<dcp*>` prefixed tags in
-user-visible responses** — this includes:
-
-- **Paired tags**: `<dcp-message-id>m0045</dcp-message-id>`
-- **Orphan opening tags**: `<dcp:function_calls>` (no closing tag)
-- **Orphan closing tags**: `</dcp-message-id>` (no opening tag)
-- **Variant forms**: `<dcp:message_id>`, `<dcp-function_calls>`, `<dcp:invoke name="edit">`
-
-If you see any XML tag starting with `dcp` (paired or orphan) in your context, treat it as
-a system instruction artifact — act on it but strip it from your output. Do not echo, quote,
-or reproduce any `<dcp*>` tag to the user.
-
-## Parallel Compression
-
-**Never run multiple compress calls in parallel.** Compression must be serialized — concurrent
-compress calls corrupt state and produce inconsistent block IDs. When multiple ranges are ready,
-compress them sequentially (one after another), not simultaneously.
-
-## Quick Reference
+When a phase of work is complete (research, implementation, debugging), use `compress`:
 
 ```
-HIERARCHY: compress > distill > prune (behavioral tiers via single compress tool)
-TIMING: manage at turn START, not turn END
-PHASE ENDS = compress trigger
-AUTO-STRATEGIES: dedup, supersede-writes, purge-errors (apply behaviorally)
-COMPRESS MODE: "range" (default) or "message" (experimental, advisory-only in Pi port)
-PARALLEL COMPRESS: FORBIDDEN — always serialize compress calls
-XML TAGS: never echo DCP-internal XML tags in output
-
-TOOLS: compress (crystallize)
-EXTENSION: .pi/extensions/dcp.ts → SQLite at ~/.config/pi/dcp/dcp.db
-
-DUAL-BAND MODEL (150k/50k):
-  <50k    → no pressure, nudges off
-  50-150k → turn nudges, compress closed phases
-  >150k   → CRITICAL, compress NOW
-  >200k   → session handoff
-
-ITERATION NUDGE: 15+ messages without user input → check for compressible ranges
-
-PROTECTED: task, skill, todowrite, todoread, write, edit, batch, plan_enter, plan_exit
-NEVER COMPRESS: active work, content needed for upcoming edits
+compress({
+  topic: "Auth System Research",
+  startId: "beginning of auth discussion",
+  endId: "auth approach decided",
+  summary: "Exhaustive summary of the phase..."
+})
 ```
+
+**Rules**:
+- Summary must be EXHAUSTIVE — it replaces the original conversation
+- Never run multiple compress calls in parallel
+- Only compress closed phases where you won't need raw context
+
+### Use `ctx_expand` for Reversible Compression
+
+If you need details from a compressed block:
+
+```
+ctx_expand({ blockId: 3 })  // Expands block b3 back to raw transcript
+```
+
+Capped at ~15k tokens per expansion.
+
+## Dual-Band Token Budget
+
+| Phase | Threshold | Behavior |
+|---|---|---|
+| **Free** | < 50k tokens | No pressure, no nudges |
+| **Nudge** | 50k–150k | Gentle reminders to compress completed phases |
+| **Critical** | > 150k | Strong nudges, prepare for compaction |
+| **Auto-compact** | > 80% of context | `ctx.compact()` triggered automatically |
+
+## Deferred Drop Queue
+
+Inspired by Magic Context's cache-aware design:
+- When strategies identify droppable content, drops are **queued** (not applied immediately)
+- Drops execute when provider cache TTL expires (default 5min) or context hits 65%
+- This avoids paying twice for the same tokens due to KV cache invalidation
+
+## Fact Extraction
+
+After compaction, DCP extracts durable facts into categories:
+- ARCHITECTURE_DECISIONS, CONSTRAINTS, NAMING_CONVENTIONS
+- KNOWN_ISSUES, WORKFLOW_RULES, DEPENDENCIES
+- FILE_PATTERNS, API_CONTRACTS
+
+Facts with retrieval_count ≥ 3 are candidates for promotion to permanent memory.
+
+## Commands
+
+- `/dcp` — Full status: context usage, auto-prune stats, tags, queue, facts, blocks

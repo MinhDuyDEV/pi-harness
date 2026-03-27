@@ -1,27 +1,42 @@
 /**
- * DCP Extension — Entry Point
+ * DCP Extension v2 — Entry Point
  *
  * Dynamic Context Pruning extension for Pi coding agents.
- * Ported from @tarquinen/opencode-dcp v3.1.2.
+ * Built on Pi's native extension API for maximum integration.
  *
  * WHAT THIS EXTENSION DOES:
- *   - Registers `compress` tool for crystallizing conversation ranges into summaries
- *   - Tracks tool calls for automatic strategy suggestions
- *   - Persists compression state in SQLite (~/.config/pi/dcp/dcp.db)
- *   - Registers /dcp command for quick status
+ *   Phase 1 — Runtime-enforced context management:
+ *     - `context` event: Auto-prunes duplicates, superseded writes, and old errors
+ *     - `turn_end` event: Real nudge system with ctx.getContextUsage()
+ *     - `session_before_compact`: Enriched compaction with DCP block summaries
+ *     - `before_agent_start`: Injects nudge messages and facts summary
+ *     - Pi's native auto-compaction handles threshold-based compaction (we don't duplicate it)
  *
- * WHAT IT DOES NOT DO (Pi architectural limits):
- *   - No message transform hooks — agent must follow behavioral patterns
- *   - No automatic message pruning — use dynamic-context-pruning skill
- *   - No system prompt injection — use SKILL.md for agent instructions
+ *   Phase 2 — Magic Context-inspired features:
+ *     - Monotonic message tagging for precise references
+ *     - Deferred drop queue with cache TTL awareness
+ *     - Fact extraction from compaction summaries
+ *     - Raw transcript storage for reversible compression (ctx_expand)
+ *     - ctx_expand tool for decompressing historical ranges
+ *
+ *   Phase 3 — Background capabilities:
+ *     - Historian model config (opt-in, future)
+ *
+ *   Preserved from v1:
+ *     - `compress` tool for manual crystallization
+ *     - `/dcp` command for status overview
+ *     - SQLite persistence (~/.config/pi/dcp/dcp.db)
+ *     - Tool call tracking for dedup analysis
+ *
+ * IMPORTANT: DCP does NOT call ctx.compact() — Pi's native auto-compaction
+ * already handles threshold-based compaction via _checkCompaction().
+ * Calling compact() from event handlers races with the agent loop and crashes.
+ * DCP only provides nudge messages to guide the agent to compress proactively.
  *
  * DEPENDENCIES:
  *   better-sqlite3 (via .pi/extensions/package.json)
  *   @sinclair/typebox (bundled by Pi runtime)
  *   @mariozechner/pi-coding-agent (bundled by Pi runtime — types only)
- *
- * The agent should use the dynamic-context-pruning skill (.pi/skills/)
- * for behavioral patterns: when to compress, auto-strategies, nudge thresholds.
  */
 
 import type {
@@ -30,56 +45,73 @@ import type {
 	ExtensionCommandContext,
 	ToolResultEvent,
 	SessionCompactEvent,
+	TurnEndEvent,
+	BeforeAgentStartEvent,
+	SessionBeforeCompactEvent,
+	ContextEvent,
 } from "@mariozechner/pi-coding-agent";
+
+// These result types are defined in pi-coding-agent's internal extensions/types.d.ts
+// but not re-exported from the main package index. Define structurally here.
+interface BeforeAgentStartEventResult {
+	message?: {
+		customType: string;
+		content: string;
+		display: boolean;
+		details?: unknown;
+	};
+	systemPrompt?: string;
+}
+
+interface SessionBeforeCompactResult {
+	cancel?: boolean;
+	compaction?: unknown;
+}
 
 import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
 import { getSessionId } from "./dcp/context.js";
-import { closeDCPDB, getDCPDB, recordToolCall, resetSessionState } from "./dcp/db.js";
+import {
+	closeDCPDB,
+	getDCPDB,
+	recordToolCall,
+	resetSessionState,
+	getGlobalStats,
+	getActiveBlocks,
+	getSummaryTokens,
+	getSessionStats,
+	updateSessionStats,
+	getNextTranscriptBlockId,
+} from "./dcp/db.js";
 import { registerCompressTool } from "./dcp/tools.js";
+import { applyStrategies, applyDeferredDrops, type StrategyResult } from "./dcp/strategies.js";
+import { TagManager } from "./dcp/tags.js";
+import { DropQueue } from "./dcp/queue.js";
+import { NudgeManager } from "./dcp/nudge.js";
+import {
+	storePreCompactionTranscript,
+	extractFacts,
+	getFactsSummary,
+	expandCompressedBlock,
+} from "./dcp/compaction.js";
+import { hashParams } from "./dcp/utils.js";
+import { Type } from "@sinclair/typebox";
 
 // ---------------------------------------------------------------------------
-// Simple hash for tool parameter dedup tracking
-// ---------------------------------------------------------------------------
-
-function hashParams(params: unknown): string {
-	try {
-		if (!params || typeof params !== "object") return "";
-		const sorted = JSON.stringify(
-			params,
-			Object.keys(params as Record<string, unknown>).sort(),
-		);
-		// Simple djb2 hash — good enough for dedup signatures
-		let hash = 5381;
-		for (let i = 0; i < sorted.length; i++) {
-			hash = (hash * 33) ^ sorted.charCodeAt(i);
-		}
-		return (hash >>> 0).toString(36);
-	} catch {
-		return "";
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Improved token estimation (counts both args and result)
+// Token estimation
 // ---------------------------------------------------------------------------
 
 function estimateToolTokens(event: ToolResultEvent): number {
 	let total = 0;
-
-	// Count tool argument tokens
 	const input = event.input;
 	if (input) {
 		const inputStr = JSON.stringify(input);
 		total += Math.ceil(inputStr.length / 4);
 	}
-
-	// Count result content tokens
 	for (const part of event.content) {
 		if (part.type === "text") {
 			total += Math.ceil(part.text.length / 4);
 		}
 	}
-
 	return total;
 }
 
@@ -102,117 +134,480 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		return;
 	}
 
-	// 2. Register tools
-	// In the Pi behavioral port, `manualMode` does not disable the tool itself.
-	// It only affects agent behavior documented in the skill.
-	registerCompressTool(pi, config);
-
-	// 3. Track tool calls for dedup strategy
+	// 2. Per-session state (lazily initialized on first event with ctx)
+	let tagManager: TagManager | null = null;
+	let dropQueue: DropQueue | null = null;
+	let nudgeManager: NudgeManager = new NudgeManager(config);
 	let currentTurn = 0;
+	let lastStrategyResult: StrategyResult | null = null;
+	let initialized = false;
+
+	// Cache protected tools set (P3 fix: avoid rebuilding per event)
+	const protectedToolCache = new Set([
+		...config.compress.protectedTools,
+		...config.strategies.deduplication.protectedTools,
+	]);
+
+	function ensureInitialized(ctx: ExtensionContext): void {
+		if (initialized) return;
+		const sessionId = getSessionId(ctx);
+		tagManager = new TagManager(sessionId, config);
+		dropQueue = new DropQueue(sessionId, config);
+		initialized = true;
+	}
+
+	// 3. Register tools (compress + ctx_expand)
+	registerCompressTool(pi, config);
+	registerExpandTool(pi, config);
+
+	// -----------------------------------------------------------------------
+	// EVENT: input — Track turn count + reset nudge consecutive counter
+	// -----------------------------------------------------------------------
 
 	pi.on("input", () => {
 		currentTurn++;
+		nudgeManager.recordUserInput();
 	});
 
-	// tool_result fires after each tool execution with result content
-	// See: ToolResultEvent { toolCallId, toolName, input, content, isError }
-	pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
-		if (!config.strategies.deduplication.enabled) return;
+	// -----------------------------------------------------------------------
+	// EVENT: tool_result — Record tool calls for dedup + assign tags
+	// -----------------------------------------------------------------------
 
+	pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
 		try {
+			ensureInitialized(ctx);
 			const { toolName, toolCallId, input, isError } = event;
 			const sessionId = getSessionId(ctx);
 
 			if (!toolName || !toolCallId) return;
 
-			const dedupProtectedTools = new Set([
-				...config.compress.protectedTools,
-				...config.strategies.deduplication.protectedTools,
-			]);
-			if (dedupProtectedTools.has(toolName)) return;
+			// Check if compress was called — inform nudge manager
+			if (toolName === "compress") {
+				nudgeManager.recordCompressCall(currentTurn);
+			}
+
+			if (protectedToolCache.has(toolName)) return;
 
 			const paramsHash = hashParams(input);
 			const status = isError ? "error" : "completed";
 			const tokenEstimate = estimateToolTokens(event);
 
-			recordToolCall(
-				sessionId,
-				toolCallId,
-				toolName,
-				paramsHash,
-				status,
-				currentTurn,
-				tokenEstimate,
-			);
+			// Record for dedup analysis
+			recordToolCall(sessionId, toolCallId, toolName, paramsHash, status, currentTurn, tokenEstimate);
+
+			// Assign a monotonic tag
+			if (tagManager) {
+				tagManager.assign(currentTurn, toolName, paramsHash);
+			}
 		} catch {
 			// Best-effort tracking
 		}
 	});
 
-	// 4. Handle native /compact events — reset stale state
-	// Event name is "session_compact" in the Pi SDK
-	pi.on("session_compact", (_event: SessionCompactEvent, ctx: ExtensionContext) => {
+	// -----------------------------------------------------------------------
+	// EVENT: context — Runtime auto-pruning before EVERY LLM call
+	//
+	// This is THE key hook. Pi passes a deep-cloned message array.
+	// We apply all DCP strategies and return the pruned messages.
+	// -----------------------------------------------------------------------
+
+	pi.on("context", (event: ContextEvent, ctx: ExtensionContext) => {
 		try {
+			ensureInitialized(ctx);
 			const sessionId = getSessionId(ctx);
+
+			// Apply runtime strategies (dedup, supersede-writes, purge-errors)
+			// Note: strategies.ts uses structural AgentMessage types that are
+			// compatible with pi-agent-core's AgentMessage at runtime (jiti skips typechecks)
+			const { messages, totalResult } = applyStrategies(
+				event.messages as any,
+				sessionId,
+				config,
+				currentTurn,
+			);
+
+			lastStrategyResult = totalResult;
+
+			// Update stats if strategies pruned anything
+			if (totalResult.prunedCount > 0) {
+				const stats = getSessionStats(sessionId);
+				if (stats) {
+					updateSessionStats(sessionId, {
+						total_auto_prunes: stats.total_auto_prunes + totalResult.prunedCount,
+						total_pruned_tokens: stats.total_pruned_tokens + totalResult.prunedTokens,
+					});
+				}
+
+				if (config.debug) {
+					console.log(
+						`[dcp] Auto-pruned ${totalResult.prunedCount} items (~${totalResult.prunedTokens} tokens):`,
+						totalResult.actions,
+					);
+				}
+			}
+
+			// Process deferred drop queue — strip content from dropped tags
+			if (dropQueue) {
+				const usage = ctx.getContextUsage();
+				const droppableTagIds = dropQueue.processQueue(usage?.percent ?? null);
+
+				if (droppableTagIds.size > 0) {
+					const dropResult = applyDeferredDrops(messages, sessionId, droppableTagIds);
+					if (dropResult.prunedCount > 0) {
+						totalResult.prunedTokens += dropResult.prunedTokens;
+						totalResult.prunedCount += dropResult.prunedCount;
+						totalResult.actions.push(...dropResult.actions);
+
+						const stats = getSessionStats(sessionId);
+						if (stats) {
+							updateSessionStats(sessionId, {
+								total_deferred_drops: stats.total_deferred_drops + dropResult.prunedCount,
+							});
+						}
+					}
+
+					if (config.debug) {
+						console.log(`[dcp] Deferred drops executed: ${droppableTagIds.size} tags, ${dropResult.prunedCount} items stripped`);
+					}
+				}
+			}
+
+			return { messages } as any; // Cast: our structural AgentMessage[] matches pi-agent-core's
+		} catch (err) {
+			if (config.debug) {
+				console.error("[dcp] Error in context handler:", err);
+			}
+			// On error, return messages unchanged
+			return undefined;
+		}
+	});
+
+	// -----------------------------------------------------------------------
+	// EVENT: turn_end — Nudge system (NO auto-compact — Pi handles that)
+	//
+	// IMPORTANT: We NEVER call ctx.compact() from event handlers.
+	// Pi's native _checkCompaction() already handles auto-compaction at
+	// threshold. Calling compact() from turn_end races with the agent loop
+	// (compact() calls abort() + disconnectFromAgent), causing crashes:
+	//   "Cannot read properties of undefined (reading 'signal')"
+	//
+	// Instead, we set a pending nudge message that gets injected on the
+	// next before_agent_start, guiding the agent to use `compress` manually.
+	// -----------------------------------------------------------------------
+
+	pi.on("turn_end", (event: TurnEndEvent, ctx: ExtensionContext) => {
+		try {
+			ensureInitialized(ctx);
+			const usage = ctx.getContextUsage();
+
+			const nudgeResult = nudgeManager.check(
+				usage?.tokens ?? null,
+				usage?.percent ?? null,
+				currentTurn,
+			);
+
+			// Show status in footer (if UI available)
+			// setStatus(key, text) — key identifies the status slot
+			if (ctx.hasUI && nudgeResult.shouldUpdateStatus) {
+				try {
+					ctx.ui.setStatus("dcp", nudgeResult.statusText);
+				} catch {
+					// setStatus may not be available in all UI modes
+				}
+			}
+
+			// NOTE: nudgeResult.shouldAutoCompact is still tracked internally
+			// but we convert it to a critical nudge instead of calling ctx.compact().
+			// Pi's native compaction.enabled + reserveTokens handles the actual compaction.
+
+			// Set pending nudge for next before_agent_start
+			if (nudgeResult.shouldNudge && nudgeResult.nudgeMessage) {
+				nudgeManager.setPendingNudge(nudgeResult.nudgeMessage);
+			} else if (nudgeResult.shouldAutoCompact) {
+				// Convert auto-compact trigger into a critical nudge instead
+				const tokens = usage?.tokens ?? 0;
+				const percent = usage?.percent ?? 0;
+				nudgeManager.setPendingNudge(
+					`[DCP CRITICAL] Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%). ` +
+					`Pi's auto-compaction will handle this, but you should also compress completed phases NOW ` +
+					`using the \`compress\` tool to preserve important context before auto-compaction runs.`
+				);
+			}
+		} catch {
+			// Best-effort nudging
+		}
+	});
+
+	// -----------------------------------------------------------------------
+	// EVENT: before_agent_start — Inject nudges and facts into context
+	// -----------------------------------------------------------------------
+
+	pi.on("before_agent_start", (event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
+		try {
+			ensureInitialized(ctx);
+			const sessionId = getSessionId(ctx);
+
+			// Check for pending nudge
+			const nudge = nudgeManager.consumePendingNudge();
+
+			// Get facts summary for context enrichment
+			const factsSummary = getFactsSummary(sessionId);
+
+			// Get active DCP block summaries (survives compaction by re-injection)
+			const activeBlocks = getActiveBlocks(sessionId);
+			let blocksSummary: string | null = null;
+			if (activeBlocks.length > 0) {
+				const blockLines = activeBlocks.map(
+					(b) => `[b${b.block_id}: ${b.topic}]\n${b.summary}`,
+				);
+				blocksSummary = `## Active Compression Blocks\n${blockLines.join("\n\n")}`;
+			}
+
+			// Build injected content
+			const parts: string[] = [];
+			if (blocksSummary) {
+				parts.push(blocksSummary);
+			}
+			if (factsSummary) {
+				parts.push(factsSummary);
+			}
+			if (nudge) {
+				parts.push(nudge);
+			}
+
+			if (parts.length > 0) {
+				const result: BeforeAgentStartEventResult = {
+					message: {
+						customType: "dcp-context",
+						content: parts.join("\n\n"),
+						display: false, // Don't show in UI — agent-only context
+					},
+				};
+				return result;
+			}
+		} catch {
+			// Best-effort injection
+		}
+		return undefined;
+	});
+
+	// -----------------------------------------------------------------------
+	// EVENT: session_before_compact — Store raw transcript for ctx_expand
+	//
+	// NOTE: We cannot inject DCP context into Pi's compaction summary
+	// (SessionBeforeCompactResult only supports cancel/compaction).
+	// DCP block summaries are instead re-injected via before_agent_start.
+	// -----------------------------------------------------------------------
+
+	pi.on("session_before_compact", (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
+		try {
+			ensureInitialized(ctx);
+			const sessionId = getSessionId(ctx);
+			const { preparation } = event;
+
+			// Store raw transcript for potential ctx_expand
+			if (config.expand.enabled && preparation?.messagesToSummarize) {
+				const transcriptBlockId = getNextTranscriptBlockId(sessionId);
+				storePreCompactionTranscript(
+					sessionId,
+					transcriptBlockId,
+					preparation.messagesToSummarize,
+				);
+			}
+
+			// NOTE: Pi's SessionBeforeCompactResult only supports cancel/compaction.
+			// There's no way to inject customInstructions or enrich the summary prompt.
+			// DCP block context is instead injected via before_agent_start handler,
+			// ensuring it survives compaction by being re-injected every turn.
+
+			// Don't cancel or replace — let native compaction proceed
+			return undefined;
+		} catch (err) {
+			if (config.debug) {
+				console.error("[dcp] Error in session_before_compact:", err);
+			}
+			return undefined;
+		}
+	});
+
+	// -----------------------------------------------------------------------
+	// EVENT: session_compact — Post-compaction cleanup + fact extraction
+	// -----------------------------------------------------------------------
+
+	pi.on("session_compact", (event: SessionCompactEvent, ctx: ExtensionContext) => {
+		try {
+			ensureInitialized(ctx);
+			const sessionId = getSessionId(ctx);
+
+			// Extract facts from the compaction summary
+			if (event.compactionEntry?.summary && config.factExtraction.enabled) {
+				const factsCount = extractFacts(sessionId, event.compactionEntry.summary, config);
+				if (config.debug && factsCount > 0) {
+					console.log(`[dcp] Extracted ${factsCount} facts from compaction`);
+				}
+			}
+
+			// Reset session state (tool calls, tags, drop queue)
 			resetSessionState(sessionId);
 			currentTurn = 0;
+
+			// Reset managers
+			if (tagManager) tagManager.reset();
+			if (dropQueue) dropQueue.reset();
+			nudgeManager.reset();
+			lastStrategyResult = null;
 		} catch {
 			// best-effort reset
 		}
 	});
 
-	// 5. Register /dcp command
-	// Pi command handler signature: (args: string, ctx: ExtensionCommandContext)
+	// -----------------------------------------------------------------------
+	// COMMAND: /dcp — Enhanced status with v2 stats
+	// -----------------------------------------------------------------------
+
 	pi.registerCommand("dcp", {
-		description: "Show DCP context pruning status and statistics",
+		description: "Show DCP v2 context pruning status and statistics",
 		async handler(_args: string, ctx: ExtensionCommandContext) {
 			try {
-				const {
-					getGlobalStats,
-					getActiveBlocks,
-					getSummaryTokens,
-				} = await import("./dcp/db.js");
-
 				const stats = getGlobalStats();
 				const sessionId = getSessionId(ctx);
 				const activeBlocks = getActiveBlocks(sessionId);
 				const summaryTokens = getSummaryTokens(sessionId);
-				const summaryBufferPct = Math.round(
-					(summaryTokens / config.compress.summaryBuffer) * 100,
-				);
+				const summaryBufferPct = Math.round((summaryTokens / config.compress.summaryBuffer) * 100);
+				const usage = ctx.getContextUsage();
+				const nudgeState = nudgeManager.getState();
+				const pendingDrops = dropQueue?.getPendingCount() ?? 0;
+				const tagCount = tagManager?.getCount() ?? 0;
 
 				const lines = [
-					"## DCP Status",
+					"## DCP v2 Status",
 					"",
+					"### Context",
+					`**Tokens**: ${usage?.tokens != null ? `~${Math.round(usage.tokens / 1000)}k` : "unknown"}`,
+					`**Usage**: ${usage?.percent != null ? `${Math.round(usage.percent)}%` : "unknown"}`,
+					`**Context window**: ${usage?.contextWindow ? `${Math.round(usage.contextWindow / 1000)}k` : "unknown"}`,
+					`**Summary buffer**: ~${summaryTokens}/${config.compress.summaryBuffer} (${summaryBufferPct}%)`,
+					"",
+					"### Runtime Strategies",
+					`**Auto-prunes total**: ${stats.totalAutoPrunes}`,
+					`**Tokens saved by auto-prune**: ~${stats.totalPrunedTokens}`,
+					`**Last pass**: ${lastStrategyResult ? `${lastStrategyResult.prunedCount} items (~${lastStrategyResult.prunedTokens} tokens)` : "none"}`,
+					"",
+					"### Tagging & Queue",
+					`**Tags assigned**: ${tagCount}`,
+					`**Pending drops**: ${pendingDrops}`,
+					`**Deferred drops executed**: ${stats.totalDeferredDrops}`,
+					"",
+					"### Facts",
+					`**Facts extracted**: ${stats.totalFactsExtracted}`,
+					"",
+					"### Nudge System",
+					`**Consecutive turns**: ${nudgeState.consecutiveAssistantTurns}`,
+					`**Last context**: ${nudgeState.lastContextTokens != null ? `~${Math.round(nudgeState.lastContextTokens / 1000)}k (${Math.round(nudgeState.lastContextPercent ?? 0)}%)` : "no data"}`,
+					"",
+					"### Compression History",
 					`**Sessions**: ${stats.totalSessions}`,
 					`**Total compressions**: ${stats.totalCompressions}`,
 					`**Tokens compressed**: ~${stats.totalCompressedTokens}`,
-					`**Tokens pruned**: ~${stats.totalPrunedTokens}`,
-					`**Summary buffer**: ~${summaryTokens}/${config.compress.summaryBuffer} (${summaryBufferPct}%)`,
 					`**Mode**: ${config.compress.mode}`,
 					"",
-					`**Active blocks (current session)**: ${activeBlocks.length}`,
+					`**Active blocks**: ${activeBlocks.length}`,
 					...activeBlocks.map(
-						(b) =>
-							`  b${b.block_id}: "${b.topic}" (~${b.compressed_tokens} tokens)`,
+						(b) => `  b${b.block_id}: "${b.topic}" (~${b.compressed_tokens} tokens)`,
 					),
 					"",
-					"Use `compress` tool to crystallize completed conversation ranges.",
+					"### Config Highlights",
+					`**Drop queue**: ${config.dropQueue.enabled ? `TTL ${config.dropQueue.cacheTTL.defaultMs / 1000}s` : "disabled"}`,
+					`**Fact extraction**: ${config.factExtraction.enabled ? "enabled" : "disabled"}`,
+					`**Expand (reversible)**: ${config.expand.enabled ? "enabled" : "disabled"}`,
+					`**Pi native compaction**: handles auto-compact (DCP provides nudges only)`,
 				];
 
-				if (ctx.hasUI) {
-					ctx.ui.notify(lines.join("\n"), "info");
-				}
+				ctx.ui.notify(lines.join("\n"), "info");
 			} catch (err) {
-				if (ctx.hasUI) {
+				try {
 					ctx.ui.notify(`DCP status error: ${err}`, "error");
+				} catch {
+					// no UI
 				}
 			}
 		},
 	});
 
-	// 6. Cleanup on shutdown
+	// -----------------------------------------------------------------------
+	// Cleanup on shutdown
+	// -----------------------------------------------------------------------
+
 	pi.on("session_shutdown", () => {
 		closeDCPDB();
+	});
+}
+
+// ---------------------------------------------------------------------------
+// ctx_expand tool — Reversible compression
+// ---------------------------------------------------------------------------
+
+function registerExpandTool(pi: ExtensionAPI, config: DCPConfig): void {
+	if (!config.expand.enabled) return;
+
+	pi.registerTool({
+		name: "ctx_expand",
+		label: "Expand Compressed Block",
+		description: [
+			"Decompress a previously compressed conversation block back to its raw transcript.",
+			"Use when you need exact details from a compressed range that the summary doesn't cover.",
+			"The raw transcript is stored before compaction and may be truncated to fit token limits.",
+			"",
+			"Usage: ctx_expand({ blockId: 3 }) — expands block b3",
+		].join("\n"),
+		promptSnippet: "Decompress a DCP block to see raw transcript.",
+		parameters: Type.Object({
+			blockId: Type.Number({
+				description: "Block ID to expand (e.g., 3 for block b3)",
+			}),
+		}),
+		async execute(
+			_toolCallId: string,
+			params: { blockId: number },
+			_signal: AbortSignal | undefined,
+			_onUpdate: unknown,
+			ctx: ExtensionContext,
+		) {
+			const sessionId = getSessionId(ctx);
+			const expanded = expandCompressedBlock(
+				sessionId,
+				params.blockId,
+				config.expand.maxExpandTokens,
+			);
+
+			if (!expanded) {
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: `No raw transcript found for block b${params.blockId}. The block may not exist or was created before expansion tracking was enabled.`,
+						},
+					],
+					details: undefined,
+				};
+			}
+
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: [
+							`[Expanded block b${params.blockId}]`,
+							`Max tokens: ${config.expand.maxExpandTokens}`,
+							"",
+							"--- Raw Transcript ---",
+							"",
+							expanded,
+						].join("\n"),
+					},
+				],
+				details: { blockId: params.blockId },
+			};
+		},
 	});
 }
