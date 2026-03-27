@@ -35,3 +35,6 @@ pnpm-debug.log*
 *.db-wal
 *.db-journal
 .pi.zip
+
+# bv (beads viewer) local config and caches
+.bv/
