@@ -27,15 +27,11 @@ import {
 	storeCompressionBlock,
 	updateSessionStats,
 } from "./db.js";
+import type { PriorityMap } from "./strategies.js";
+import { estimateTokens } from "./utils.js";
 
-// ---------------------------------------------------------------------------
-// Token estimation (lightweight, no external tokenizer dependency)
-// ---------------------------------------------------------------------------
-
-function estimateTokens(text: string): number {
-	// ~4 chars per token (rough estimate, matches Anthropic's rule of thumb)
-	return Math.ceil(text.length / 4);
-}
+// Token estimation imported from shared utils
+// (estimateTokens imported above from ./utils.js)
 
 // ---------------------------------------------------------------------------
 // Compress tool description (from DCP's compress prompt)
@@ -78,7 +74,11 @@ Before compressing, ask: "Is this range closed enough to become summary-only rig
 // Tool registration
 // ---------------------------------------------------------------------------
 
-export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void {
+export function registerCompressTool(
+	pi: ExtensionAPI,
+	config: DCPConfig,
+	getPriorityMap?: () => PriorityMap | null,
+): void {
 	if (config.compress.permission === "deny") {
 		return;
 	}
@@ -206,7 +206,8 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
 				(newSummaryTokens / summaryBufferLimit) * 100,
 			);
 
-			const result = [
+			// Build response
+			const resultLines = [
 				`[Compressed conversation section b${blockId}]`,
 				`Topic: ${params.topic}`,
 				`Mode: ${modeLabel}`,
@@ -218,7 +219,24 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
 				"The following is the authoritative summary of the compressed range:",
 				"",
 				params.summary,
-			].join("\n");
+			];
+
+			// Message-mode: include priority suggestions for next compression targets
+			if (compressMode === "message" && getPriorityMap) {
+				const map = getPriorityMap();
+				if (map && map.topTargets.length > 0) {
+					resultLines.push("");
+					resultLines.push("--- Next compression targets (by token size) ---");
+					for (const target of map.topTargets) {
+						resultLines.push(`  • ${target}`);
+					}
+					if (map.high.length > 0) {
+						resultLines.push(`Tip: ${map.high.length} high-priority tool groups (>5k tokens each). Consider compressing ranges containing these results.`);
+					}
+				}
+			}
+
+			const result = resultLines.join("\n");
 
 			return {
 				content: [{ type: "text", text: result }],

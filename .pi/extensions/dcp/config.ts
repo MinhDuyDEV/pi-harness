@@ -181,6 +181,7 @@ export interface DCPConfig {
 // Protected tools (always protected from pruning)
 // ---------------------------------------------------------------------------
 
+/** @internal Currently unused — available for future features */
 export const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
 	"task",
 	"skill",

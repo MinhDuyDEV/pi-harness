@@ -1,7 +1,29 @@
-# DCP Strategies — Runtime-Enforced (v2)
+# DCP Strategies — Runtime-Enforced (v2.1)
 
 > These strategies run automatically via the `context` event before every LLM call.
 > No agent action required — they execute at the extension level.
+
+## Strategy 0: Compress-Strip (with Nested Block Overlap)
+
+**Rule**: When the agent calls `compress`, the summary is stored but original messages stay in context. This strategy strips the originals and injects the summary.
+
+**How it works**:
+- Finds compress tool_result messages in the context
+- Identifies the message range that was compressed
+- Strips the original messages and the compress call/result
+- Injects a compact `dcp-compressed-summary` custom message with the summary
+
+**Nested block overlap** (v2.1): When a new compress range overlaps an older compressed block, the old block's summary is embedded in the new one to prevent information loss through compression layers:
+
+```
+[Previously compressed content]
+Auth research completed, decided to use OAuth2 with PKCE flow.
+
+[Current compression]
+Implemented OAuth2 auth module with PKCE flow. Created auth.ts and middleware.ts.
+```
+
+This ensures that even if the model didn't fully include older context in its new summary, the information is preserved.
 
 ## Strategy 1: Deduplication
 
@@ -56,6 +78,28 @@ Turn 7: (4 turns later)
 → Turn 3 input replaced with: { _dcp_error_purged: true, _tool: "write" }
    Error message preserved: "file not found"
 ```
+
+## Deferred Drop Strategy
+
+**Rule**: Cache-aware deferred drops strip content from tool calls whose cache TTL has expired.
+
+**How it works**:
+- Tags are assigned to tool calls via the DropQueue
+- When cache TTL expires AND context pressure is sufficient, tags are marked for dropping
+- In the `context` event, matching tool calls/results have their content stripped
+- Placeholder message indicates the drop: "[DCP: deferred drop — cache expired]"
+
+## Compression Priority Map
+
+The `computePriorityMap()` function runs on every `context` event and classifies tool results by token size:
+
+| Level | Tokens | Purpose |
+|---|---|---|
+| **high** | >5000 | Biggest compression targets — named in nudge messages |
+| **medium** | 500-5000 | Secondary targets |
+| **low** | <500 | Not worth individual compression |
+
+The priority map is stored on the NudgeManager and included in nudge messages, so the model knows exactly which tool results to target for compression.
 
 ## Token Savings
 

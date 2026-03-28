@@ -16,7 +16,7 @@
  */
 
 import type { DCPConfig } from "./config.js";
-import { hashParams } from "./utils.js";
+import { hashParams, estimateTokens } from "./utils.js";
 import { getTagsForSession, type MessageTag } from "./db.js";
 
 // ---------------------------------------------------------------------------
@@ -105,13 +105,45 @@ export interface StrategyResult {
 	actions: string[];
 }
 
+/** Raw messages from a compressed range, for ctx_expand storage */
+export interface CompressedRange {
+	/** Compression block ID (from the compress tool result, e.g. b3 → 3) */
+	blockId: number;
+	/** Raw messages in the compressed range (before stripping) */
+	rawMessages: AgentMessage[];
+}
+
+// ---------------------------------------------------------------------------
+// Compression Priority Map
+//
+// Token-classifies tool results by size so nudge messages can point the
+// model at the biggest compression targets first.
+// ---------------------------------------------------------------------------
+
+export interface PriorityEntry {
+	toolName: string;
+	count: number;
+	totalTokens: number;
+}
+
+export interface PriorityMap {
+	/** Tool groups with >5000 total tokens */
+	high: PriorityEntry[];
+	/** Tool groups with 500-5000 total tokens */
+	medium: PriorityEntry[];
+	/** Tool groups with <500 total tokens */
+	low: PriorityEntry[];
+	/** Total tokens across all messages */
+	totalTokens: number;
+	/** Human-readable descriptions of biggest compression targets */
+	topTargets: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function estimateTokens(text: string): number {
-	return Math.ceil(text.length / 4);
-}
+// estimateTokens imported from ./utils.js
 
 function estimateMessageTokens(msg: AgentMessage): number {
 	if (msg.role === "toolResult") {
@@ -253,8 +285,9 @@ function extractToolOps(messages: AgentMessage[]): ToolOp[] {
 function applyCompressStripping(
 	messages: AgentMessage[],
 	config: DCPConfig,
-): { messages: AgentMessage[]; result: StrategyResult } {
+): { messages: AgentMessage[]; result: StrategyResult; rawRanges: CompressedRange[] } {
 	const result: StrategyResult = { prunedTokens: 0, prunedCount: 0, actions: [] };
+	const rawRanges: CompressedRange[] = [];
 
 	// Find compress tool results
 	const compressResults: Array<{
@@ -263,6 +296,7 @@ function applyCompressStripping(
 		callContentIndex: number;
 		summary: string;
 		topic: string;
+		blockId: number;
 	}> = [];
 
 	const ops = extractToolOps(messages);
@@ -275,13 +309,13 @@ function applyCompressStripping(
 			);
 			if (!callOp) continue;
 
-			// Extract summary from the tool result text
+			// Extract full text from the tool result
 			const resultMsg = messages[op.messageIndex] as ToolResultMessage;
-			let summaryText = "";
+			let fullResultText = "";
 			let topic = "";
 			for (const part of resultMsg.content) {
 				if (part.type === "text") {
-					summaryText += (part as TextContent).text;
+					fullResultText += (part as TextContent).text;
 				}
 			}
 
@@ -290,20 +324,40 @@ function applyCompressStripping(
 			const toolCall = callMsg.content[callOp.contentIndex] as ToolCallContent;
 			topic = (toolCall.arguments?.topic as string) ?? "compressed";
 
-			if (!summaryText) continue;
+			if (!fullResultText) continue;
+
+			// Parse block ID from result text: "[Compressed conversation section b3]"
+			const blockIdMatch = fullResultText.match(/section b(\d+)/);
+			const blockId = blockIdMatch ? parseInt(blockIdMatch[1], 10) : -1;
+
+			// Extract just the summary (strip metadata headers and priority suggestions)
+			const summaryMarker = "The following is the authoritative summary of the compressed range:";
+			const markerIdx = fullResultText.indexOf(summaryMarker);
+			let cleanSummary: string;
+			if (markerIdx >= 0) {
+				cleanSummary = fullResultText.substring(markerIdx + summaryMarker.length).trim();
+				// Strip trailing priority suggestions if present
+				const priorityIdx = cleanSummary.indexOf("--- Next compression targets");
+				if (priorityIdx >= 0) {
+					cleanSummary = cleanSummary.substring(0, priorityIdx).trim();
+				}
+			} else {
+				cleanSummary = fullResultText;
+			}
 
 			compressResults.push({
 				resultIndex: op.messageIndex,
 				callIndex: callOp.messageIndex,
 				callContentIndex: callOp.contentIndex,
-				summary: summaryText,
+				summary: cleanSummary,
 				topic,
+				blockId,
 			});
 		}
 	}
 
 	if (compressResults.length === 0) {
-		return { messages, result };
+		return { messages, result, rawRanges };
 	}
 
 	// Sort by callIndex ascending
@@ -333,12 +387,22 @@ function applyCompressStripping(
 		// Range end: just before the compress tool call message
 		const rangeEnd = cr.callIndex;
 
-		// Calculate tokens being stripped
+		// Calculate tokens being stripped + collect nested block summaries
 		let strippedTokens = 0;
+		const nestedSummaries: string[] = [];
 		for (let j = rangeStart; j < rangeEnd; j++) {
 			if (!indicesToRemove.has(j)) {
 				strippedTokens += estimateMessageTokens(messages[j]);
 				indicesToRemove.add(j);
+
+				// Nested block overlap: preserve older compressed summaries
+				const m = messages[j];
+				if (m.role === "custom" && (m as CustomMessage).customType === "dcp-compressed-summary") {
+					const content = (m as CustomMessage).content;
+					if (typeof content === "string" && content.trim()) {
+						nestedSummaries.push(content);
+					}
+				}
 			}
 		}
 
@@ -349,10 +413,28 @@ function applyCompressStripping(
 		indicesToRemove.add(cr.resultIndex);
 		strippedTokens += estimateMessageTokens(messages[cr.resultIndex]);
 
+		// Collect raw messages for ctx_expand (keyed by compression block ID)
+		if (cr.blockId > 0) {
+			const rawMessages: AgentMessage[] = [];
+			for (let j = rangeStart; j < rangeEnd; j++) {
+				rawMessages.push(messages[j]);
+			}
+			rawRanges.push({ blockId: cr.blockId, rawMessages });
+		}
+
 		// Inject the summary as a compact message at the range start position
+		// If nested summaries exist, embed them to prevent info loss through compression layers
+		let finalSummary = cr.summary;
+		if (nestedSummaries.length > 0) {
+			const nestedSection = nestedSummaries
+				.map((s) => `[Previously compressed content]\n${s}`)
+				.join("\n\n");
+			finalSummary = `${nestedSection}\n\n[Current compression]\n${cr.summary}`;
+		}
+
 		summariesToInject.push({
 			atIndex: rangeStart,
-			summary: cr.summary,
+			summary: finalSummary,
 			topic: cr.topic,
 		});
 
@@ -411,7 +493,7 @@ function applyCompressStripping(
 		}
 	}
 
-	return { messages: newMessages, result };
+	return { messages: newMessages, result, rawRanges };
 }
 
 // ---------------------------------------------------------------------------
@@ -614,6 +696,61 @@ function applyPurgeErrors(
 }
 
 // ---------------------------------------------------------------------------
+// Compression Priority Map computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a priority map of message token sizes, grouped by tool name.
+ * Used by NudgeManager to include actionable compression targets in nudge messages.
+ *
+ * Classifies tool result groups as:
+ *   - high: >5000 total tokens (compress these first)
+ *   - medium: 500-5000 tokens
+ *   - low: <500 tokens (not worth compressing)
+ */
+export function computePriorityMap(messages: AgentMessage[]): PriorityMap {
+	const toolTokens = new Map<string, { count: number; totalTokens: number }>();
+	let totalTokens = 0;
+
+	for (const msg of messages) {
+		const tokens = estimateMessageTokens(msg);
+		totalTokens += tokens;
+
+		// Track tool result sizes by tool name
+		if (msg.role === "toolResult") {
+			const tr = msg as ToolResultMessage;
+			const existing = toolTokens.get(tr.toolName) ?? { count: 0, totalTokens: 0 };
+			existing.count++;
+			existing.totalTokens += tokens;
+			toolTokens.set(tr.toolName, existing);
+		}
+	}
+
+	const high: PriorityEntry[] = [];
+	const medium: PriorityEntry[] = [];
+	const low: PriorityEntry[] = [];
+
+	for (const [toolName, data] of toolTokens) {
+		const entry: PriorityEntry = { toolName, count: data.count, totalTokens: data.totalTokens };
+		if (data.totalTokens > 5000) high.push(entry);
+		else if (data.totalTokens >= 500) medium.push(entry);
+		else low.push(entry);
+	}
+
+	// Sort high and medium by totalTokens descending
+	high.sort((a, b) => b.totalTokens - a.totalTokens);
+	medium.sort((a, b) => b.totalTokens - a.totalTokens);
+
+	// Build human-readable top targets (top 5 biggest tool groups)
+	const allSorted = [...high, ...medium].slice(0, 5);
+	const topTargets = allSorted.map(
+		(e) => `${e.toolName} (${e.count}x, ~${Math.round(e.totalTokens / 1000)}k tokens)`,
+	);
+
+	return { high, medium, low, totalTokens, topTargets };
+}
+
+// ---------------------------------------------------------------------------
 // Combined strategy application
 // ---------------------------------------------------------------------------
 
@@ -638,7 +775,7 @@ export function applyStrategies(
 	sessionId: string,
 	config: DCPConfig,
 	currentTurn: number,
-): { messages: AgentMessage[]; totalResult: StrategyResult } {
+): { messages: AgentMessage[]; totalResult: StrategyResult; rawRanges: CompressedRange[] } {
 	const totalResult: StrategyResult = { prunedTokens: 0, prunedCount: 0, actions: [] };
 
 	// Cache protected tool set once (P2 fix: avoid rebuilding per call)
@@ -675,7 +812,7 @@ export function applyStrategies(
 	totalResult.prunedCount += purgeResult.prunedCount;
 	totalResult.actions.push(...purgeResult.actions);
 
-	return { messages, totalResult };
+	return { messages, totalResult, rawRanges: compressResult.rawRanges };
 }
 
 // ---------------------------------------------------------------------------

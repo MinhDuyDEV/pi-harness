@@ -1,4 +1,4 @@
-# DCP Configuration Reference (v2)
+# DCP Configuration Reference (v2.1)
 
 ## Core Settings
 

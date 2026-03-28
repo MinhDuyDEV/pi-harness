@@ -1,12 +1,17 @@
 /**
- * DCP Extension — Real Nudge System (v2)
+ * DCP Extension — Real Nudge System (v2.1)
  *
  * Replaces behavioral-only nudge system with runtime-enforced nudges.
  * Uses Pi's turn_end event + ctx.getContextUsage() for real threshold checks.
- * Can trigger ctx.compact() automatically at critical thresholds.
+ *
+ * v2.1 additions (from v3.1.4 research):
+ *   - summaryBuffer: active summary tokens extend effective maxContextLimit
+ *   - CompressionPriorityMap: nudges include biggest compression targets
+ *   - Hardened nudge format: clear prefixes, structured priority info
  */
 
 import type { DCPConfig } from "./config.js";
+import type { PriorityMap } from "./strategies.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -25,6 +30,10 @@ export interface NudgeState {
 	lastContextPercent: number | null;
 	/** Last known context tokens */
 	lastContextTokens: number | null;
+	/** Current priority map from context event */
+	priorityMap: PriorityMap | null;
+	/** Current summary buffer tokens in use */
+	summaryTokens: number;
 }
 
 export interface NudgeCheckResult {
@@ -57,6 +66,8 @@ export class NudgeManager {
 			autoCompactTriggered: false,
 			lastContextPercent: null,
 			lastContextTokens: null,
+			priorityMap: null,
+			summaryTokens: 0,
 		};
 	}
 
@@ -76,17 +87,31 @@ export class NudgeManager {
 	}
 
 	/**
+	 * Update the priority map from the latest context event.
+	 * Called by dcp.ts after computing the map in the context handler.
+	 */
+	setPriorityMap(map: PriorityMap): void {
+		this.state.priorityMap = map;
+	}
+
+	/**
 	 * Check whether a nudge or auto-compact should fire.
 	 * Called on turn_end with current context usage.
+	 *
+	 * summaryTokens: active summary block tokens. These extend the effective
+	 * maxContextLimit because they represent already-compressed content that
+	 * shouldn't trigger premature nudges. Capped at config.compress.summaryBuffer.
 	 */
 	check(
 		contextTokens: number | null,
 		contextPercent: number | null,
 		currentTurn: number,
+		summaryTokens: number = 0,
 	): NudgeCheckResult {
 		this.state.consecutiveAssistantTurns++;
 		this.state.lastContextPercent = contextPercent;
 		this.state.lastContextTokens = contextTokens;
+		this.state.summaryTokens = summaryTokens;
 
 		const result: NudgeCheckResult = {
 			shouldNudge: false,
@@ -101,8 +126,14 @@ export class NudgeManager {
 			return result;
 		}
 
-		const { minContextLimit, maxContextLimit, iterationNudgeThreshold, nudgeForce } = this.config.compress;
+		const { minContextLimit, maxContextLimit, iterationNudgeThreshold, nudgeForce, summaryBuffer } = this.config.compress;
 		const { autoCompact } = this.config;
+
+		// summaryBuffer: extend effective max by active summary tokens
+		// Summary blocks are already-compressed content — they shouldn't
+		// trigger nudges. Cap the extension at summaryBuffer config value.
+		const summaryExtension = Math.min(summaryTokens, summaryBuffer);
+		const effectiveMax = maxContextLimit + summaryExtension;
 
 		// Phase 1: Below minimum — no pressure
 		if (contextTokens < minContextLimit) {
@@ -116,15 +147,15 @@ export class NudgeManager {
 			return result;
 		}
 
-		// Phase 3: Above max — critical nudge
-		if (contextTokens >= maxContextLimit) {
+		// Phase 3: Above effective max — critical nudge
+		if (contextTokens >= effectiveMax) {
 			result.shouldNudge = true;
 			result.nudgeMessage = this.buildCriticalNudge(contextTokens, contextPercent);
 			this.state.lastNudgeTurn = currentTurn;
 			return result;
 		}
 
-		// Phase 2: Between min and max — gentle nudges
+		// Phase 2: Between min and effective max — gentle nudges
 		// Check if enough turns since last nudge (frequency control)
 		const turnsSinceLastNudge = currentTurn - this.state.lastNudgeTurn;
 		if (turnsSinceLastNudge < this.config.compress.nudgeFrequency) {
@@ -171,6 +202,13 @@ export class NudgeManager {
 	}
 
 	/**
+	 * Get current priority map (for compress tool message-mode suggestions).
+	 */
+	getPriorityMap(): PriorityMap | null {
+		return this.state.priorityMap;
+	}
+
+	/**
 	 * Reset state (e.g. after compaction).
 	 */
 	reset(): void {
@@ -181,54 +219,90 @@ export class NudgeManager {
 			autoCompactTriggered: false,
 			lastContextPercent: null,
 			lastContextTokens: null,
+			priorityMap: null,
+			summaryTokens: 0,
 		};
 	}
 
 	// -----------------------------------------------------------------------
-	// Private nudge message builders
+	// Private nudge message builders (hardened format with priority info)
 	// -----------------------------------------------------------------------
 
 	private buildStatusText(tokens: number | null, percent: number | null): string {
 		if (tokens === null) return "DCP: waiting for context data";
 		const pct = percent !== null ? `${Math.round(percent)}%` : "?%";
 		const tokensK = Math.round(tokens / 1000);
-		return `DCP: ${tokensK}k tokens (${pct})`;
+		const summaryK = Math.round(this.state.summaryTokens / 1000);
+		return summaryK > 0
+			? `DCP: ${tokensK}k tokens (${pct}) [${summaryK}k summary buffer]`
+			: `DCP: ${tokensK}k tokens (${pct})`;
+	}
+
+	/**
+	 * Build a priority map section for inclusion in nudge messages.
+	 * Shows the model which tool results are biggest compression targets.
+	 */
+	private buildPrioritySection(): string {
+		const map = this.state.priorityMap;
+		if (!map || map.topTargets.length === 0) return "";
+
+		const lines: string[] = [];
+
+		if (map.high.length > 0) {
+			const highList = map.high.map((e) => `${e.toolName} (${e.count}x, ~${Math.round(e.totalTokens / 1000)}k)`).join(", ");
+			lines.push(`**High-priority targets**: ${highList}`);
+		}
+
+		if (map.medium.length > 0 && lines.length < 2) {
+			const medList = map.medium.slice(0, 3).map((e) => `${e.toolName} (${e.count}x, ~${Math.round(e.totalTokens / 1000)}k)`).join(", ");
+			lines.push(`**Medium targets**: ${medList}`);
+		}
+
+		return lines.length > 0 ? "\nCompression targets: " + lines.join(". ") : "";
 	}
 
 	private buildGentleNudge(tokens: number, percent: number): string {
 		const tokensK = Math.round(tokens / 1000);
+		const priority = this.buildPrioritySection();
 		return [
 			`[DCP Nudge] Context at ${tokensK}k tokens (${Math.round(percent)}%).`,
 			"Consider using `compress` to crystallize completed conversation ranges.",
 			"Focus on closed phases: finished research, verified implementations, resolved debugging.",
-		].join(" ");
+			priority,
+		].filter(Boolean).join(" ");
 	}
 
 	private buildStrongNudge(tokens: number, percent: number): string {
 		const tokensK = Math.round(tokens / 1000);
+		const priority = this.buildPrioritySection();
 		return [
 			`[DCP Warning] Context at ${tokensK}k tokens (${Math.round(percent)}%).`,
 			"You SHOULD compress completed conversation ranges now.",
 			"Use the `compress` tool on your largest closed phase.",
 			"If no phases are closed, consider which work is least likely to be re-referenced.",
-		].join(" ");
+			priority,
+		].filter(Boolean).join(" ");
 	}
 
 	private buildCriticalNudge(tokens: number, percent: number): string {
 		const tokensK = Math.round(tokens / 1000);
+		const priority = this.buildPrioritySection();
 		return [
 			`[DCP CRITICAL] Context at ${tokensK}k tokens (${Math.round(percent)}%) — approaching limit.`,
 			"IMMEDIATELY compress the largest completed conversation range.",
 			"Auto-compaction will trigger at 80% if no action is taken.",
-		].join(" ");
+			priority,
+		].filter(Boolean).join(" ");
 	}
 
 	private buildIterationNudge(consecutiveTurns: number, tokens: number, percent: number): string {
 		const tokensK = Math.round(tokens / 1000);
+		const priority = this.buildPrioritySection();
 		return [
 			`[DCP Iteration] ${consecutiveTurns} consecutive turns without user input.`,
 			`Context at ${tokensK}k tokens (${Math.round(percent)}%).`,
 			"Check if any phases are complete and can be compressed.",
-		].join(" ");
+			priority,
+		].filter(Boolean).join(" ");
 	}
 }

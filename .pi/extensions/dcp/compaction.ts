@@ -87,6 +87,7 @@ const FACT_PATTERNS: Record<FactCategory, RegExp[]> = {
  * Get a formatted summary of active DCP blocks for injection into context.
  * Used by before_agent_start to re-inject block context after compaction.
  */
+/** @internal Currently unused — available for future features */
 export function getActiveBlocksSummary(sessionId: string, maxTokens: number = 6000): string | null {
 	const blocks = getActiveBlocks(sessionId);
 	if (blocks.length === 0) return null;
@@ -119,6 +120,7 @@ export function getActiveBlocksSummary(sessionId: string, maxTokens: number = 60
  * NOTE: This function is currently unused because Pi's SessionBeforeCompactResult
  * doesn't support injecting customInstructions. Kept for potential future use.
  */
+/** @internal Currently unused — available for future features */
 export function buildEnrichedCompactionContext(
 	sessionId: string,
 	preparation: CompactionPreparation,

@@ -63,9 +63,10 @@ export class DropQueue {
 	 * Returns the set of tag IDs that should be stripped from context.
 	 *
 	 * @param contextPercent - Current context usage percentage (null if unknown)
+	 * @param maxTagId - Current maximum tag ID (for protectedTags filtering)
 	 * @returns Set of tag_ids whose content should be stripped
 	 */
-	processQueue(contextPercent: number | null): Set<number> {
+	processQueue(contextPercent: number | null, maxTagId: number = 0): Set<number> {
 		if (!this.config.dropQueue.enabled) return new Set();
 
 		// Determine if we should force-execute all pending drops
@@ -75,13 +76,20 @@ export class DropQueue {
 		const executable = this.getExecutable(forceAll);
 		const tagIdsToStrip = new Set<number>();
 
+		// protectedTags: last N tags are immune from deferred drops
+		// This protects actively-used cache entries from premature eviction
+		const protectedThreshold = maxTagId > 0
+			? maxTagId - this.config.dropQueue.protectedTags
+			: 0;
+
 		for (const entry of executable) {
 			try {
 				const tags: number[] = JSON.parse(entry.tag_ranges);
 				for (const tagId of tags) {
-					// Respect protected tags — last N tags are immune
-					// (We check this in the caller since we need the current max tag)
-					tagIdsToStrip.add(tagId);
+					// Enforce protectedTags — only drop tags older than the threshold
+					if (tagId <= protectedThreshold) {
+						tagIdsToStrip.add(tagId);
+					}
 				}
 				markDropExecuted(entry.id);
 			} catch {

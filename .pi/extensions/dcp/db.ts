@@ -328,6 +328,7 @@ export function getAllBlocks(sessionId: string): CompressionBlock[] {
 		.all(sessionId);
 }
 
+/** @internal Currently unused — available for future features */
 export function deactivateBlock(sessionId: string, blockId: number): boolean {
 	const db = getDCPDB();
 	const result = db
@@ -457,6 +458,7 @@ export function recordToolCall(
 	).run(sessionId, callId, toolName, parametersHash, status, turn, tokenCount, Date.now());
 }
 
+/** @internal Currently unused — available for future features */
 export function getToolCalls(sessionId: string): ToolCallRecord[] {
 	const db = getDCPDB();
 	return db.prepare("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY created_at").all(sessionId);
@@ -502,6 +504,7 @@ export function getToolCallDedupAnalysis(
 	return { duplicates, totalCalls, uniqueCalls };
 }
 
+/** @internal Currently unused — available for future features */
 export function getToolCallFrequency(sessionId?: string): { tool_name: string; calls: number }[] {
 	const db = getDCPDB();
 	const whereClause = sessionId ? "WHERE session_id = ?" : "";
@@ -556,6 +559,7 @@ export function getTagByToolCall(sessionId: string, toolName: string, paramsHash
  * Get all duplicate tool call tags — tool calls with same name+hash that appear more than once.
  * Returns only the OLDER entries (not the latest) per tool+hash group.
  */
+/** @internal Currently unused — available for future features */
 export function getDuplicateTagsToStripContent(sessionId: string): MessageTag[] {
 	const db = getDCPDB();
 	// Find all tool+hash groups with > 1 tag. Return all but the latest per group.
@@ -733,12 +737,12 @@ export function resetSessionState(sessionId: string): void {
 	// Mark all pending drops as executed — no longer relevant
 	markAllDropsExecuted(sessionId);
 
-	// Reset session stats (keep totals for historical tracking)
+	// Reset session stats — preserve cumulative totals for /dcp display
+	// Only reset turn counter and summary tokens (blocks were just deactivated)
 	const existing = getSessionStats(sessionId);
 	if (existing) {
 		db.prepare(
 			`UPDATE session_stats SET
-        total_pruned_tokens = 0,
         total_summary_tokens = 0,
         current_turn = 0,
         updated_at = ?

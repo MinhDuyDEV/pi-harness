@@ -80,15 +80,14 @@ import {
 	getSummaryTokens,
 	getSessionStats,
 	updateSessionStats,
-	getNextTranscriptBlockId,
+	storeRawTranscript,
 } from "./dcp/db.js";
 import { registerCompressTool } from "./dcp/tools.js";
-import { applyStrategies, applyDeferredDrops, type StrategyResult } from "./dcp/strategies.js";
+import { applyStrategies, applyDeferredDrops, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
 import { TagManager } from "./dcp/tags.js";
 import { DropQueue } from "./dcp/queue.js";
 import { NudgeManager } from "./dcp/nudge.js";
 import {
-	storePreCompactionTranscript,
 	extractFacts,
 	getFactsSummary,
 	expandCompressedBlock,
@@ -141,6 +140,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	let currentTurn = 0;
 	let lastStrategyResult: StrategyResult | null = null;
 	let initialized = false;
+	const storedBlockIds = new Set<number>(); // Track which block raw transcripts we've stored
 
 	// Cache protected tools set (P3 fix: avoid rebuilding per event)
 	const protectedToolCache = new Set([
@@ -157,7 +157,8 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	}
 
 	// 3. Register tools (compress + ctx_expand)
-	registerCompressTool(pi, config);
+	// Pass getPriorityMap callback so compress tool can show priority suggestions in message mode
+	registerCompressTool(pi, config, () => nudgeManager.getPriorityMap());
 	registerExpandTool(pi, config);
 
 	// -----------------------------------------------------------------------
@@ -219,12 +220,25 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			// Apply runtime strategies (dedup, supersede-writes, purge-errors)
 			// Note: strategies.ts uses structural AgentMessage types that are
 			// compatible with pi-agent-core's AgentMessage at runtime (jiti skips typechecks)
-			const { messages, totalResult } = applyStrategies(
+			const { messages, totalResult, rawRanges } = applyStrategies(
 				event.messages as any,
 				sessionId,
 				config,
 				currentTurn,
 			);
+
+			// Store raw ranges for ctx_expand (keyed by compression block ID)
+			if (config.expand.enabled && rawRanges.length > 0) {
+				for (const range of rawRanges) {
+					if (range.blockId > 0 && !storedBlockIds.has(range.blockId)) {
+						try {
+							const serialized = JSON.stringify(range.rawMessages);
+							storeRawTranscript(sessionId, range.blockId, serialized, Math.ceil(serialized.length / 4));
+							storedBlockIds.add(range.blockId);
+						} catch { /* best-effort */ }
+					}
+				}
+			}
 
 			lastStrategyResult = totalResult;
 
@@ -249,7 +263,8 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			// Process deferred drop queue — strip content from dropped tags
 			if (dropQueue) {
 				const usage = ctx.getContextUsage();
-				const droppableTagIds = dropQueue.processQueue(usage?.percent ?? null);
+				const maxTagId = tagManager?.getCount() ?? 0;
+				const droppableTagIds = dropQueue.processQueue(usage?.percent ?? null, maxTagId);
 
 				if (droppableTagIds.size > 0) {
 					const dropResult = applyDeferredDrops(messages, sessionId, droppableTagIds);
@@ -270,6 +285,15 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 						console.log(`[dcp] Deferred drops executed: ${droppableTagIds.size} tags, ${dropResult.prunedCount} items stripped`);
 					}
 				}
+			}
+
+			// Compute compression priority map on POST-PRUNING messages
+			// (P2 fix: event.messages may include already-stripped content)
+			try {
+				const priorityMap = computePriorityMap(messages);
+				nudgeManager.setPriorityMap(priorityMap);
+			} catch {
+				// Best-effort priority map
 			}
 
 			return { messages } as any; // Cast: our structural AgentMessage[] matches pi-agent-core's
@@ -300,10 +324,15 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			ensureInitialized(ctx);
 			const usage = ctx.getContextUsage();
 
+			// Get summary buffer tokens for effective threshold calculation
+			const sessionId = getSessionId(ctx);
+			const summaryTokens = getSummaryTokens(sessionId);
+
 			const nudgeResult = nudgeManager.check(
 				usage?.tokens ?? null,
 				usage?.percent ?? null,
 				currentTurn,
+				summaryTokens,
 			);
 
 			// Show status in footer (if UI available)
@@ -392,42 +421,19 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	});
 
 	// -----------------------------------------------------------------------
-	// EVENT: session_before_compact — Store raw transcript for ctx_expand
+	// EVENT: session_before_compact — Pi's native compaction
 	//
 	// NOTE: We cannot inject DCP context into Pi's compaction summary
 	// (SessionBeforeCompactResult only supports cancel/compaction).
 	// DCP block summaries are instead re-injected via before_agent_start.
+	//
+	// Raw transcripts for ctx_expand are now stored in the context event
+	// (keyed by compression block ID, not compaction transcript ID).
 	// -----------------------------------------------------------------------
 
-	pi.on("session_before_compact", (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
-		try {
-			ensureInitialized(ctx);
-			const sessionId = getSessionId(ctx);
-			const { preparation } = event;
-
-			// Store raw transcript for potential ctx_expand
-			if (config.expand.enabled && preparation?.messagesToSummarize) {
-				const transcriptBlockId = getNextTranscriptBlockId(sessionId);
-				storePreCompactionTranscript(
-					sessionId,
-					transcriptBlockId,
-					preparation.messagesToSummarize,
-				);
-			}
-
-			// NOTE: Pi's SessionBeforeCompactResult only supports cancel/compaction.
-			// There's no way to inject customInstructions or enrich the summary prompt.
-			// DCP block context is instead injected via before_agent_start handler,
-			// ensuring it survives compaction by being re-injected every turn.
-
-			// Don't cancel or replace — let native compaction proceed
-			return undefined;
-		} catch (err) {
-			if (config.debug) {
-				console.error("[dcp] Error in session_before_compact:", err);
-			}
-			return undefined;
-		}
+	pi.on("session_before_compact", (_event: SessionBeforeCompactEvent, _ctx: ExtensionContext) => {
+		// Don't cancel or replace — let native compaction proceed
+		return undefined;
 	});
 
 	// -----------------------------------------------------------------------
@@ -478,6 +484,9 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 				const nudgeState = nudgeManager.getState();
 				const pendingDrops = dropQueue?.getPendingCount() ?? 0;
 				const tagCount = tagManager?.getCount() ?? 0;
+				const priorityMap = nudgeManager.getPriorityMap();
+				const summaryExtension = Math.min(summaryTokens, config.compress.summaryBuffer);
+				const effectiveMax = config.compress.maxContextLimit + summaryExtension;
 
 				const lines = [
 					"## DCP v2 Status",
@@ -487,6 +496,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					`**Usage**: ${usage?.percent != null ? `${Math.round(usage.percent)}%` : "unknown"}`,
 					`**Context window**: ${usage?.contextWindow ? `${Math.round(usage.contextWindow / 1000)}k` : "unknown"}`,
 					`**Summary buffer**: ~${summaryTokens}/${config.compress.summaryBuffer} (${summaryBufferPct}%)`,
+					`**Effective max**: ~${Math.round(effectiveMax / 1000)}k (base ${Math.round(config.compress.maxContextLimit / 1000)}k + ${Math.round(summaryExtension / 1000)}k summary buffer)`,
 					"",
 					"### Runtime Strategies",
 					`**Auto-prunes total**: ${stats.totalAutoPrunes}`,
@@ -504,7 +514,13 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					"### Nudge System",
 					`**Consecutive turns**: ${nudgeState.consecutiveAssistantTurns}`,
 					`**Last context**: ${nudgeState.lastContextTokens != null ? `~${Math.round(nudgeState.lastContextTokens / 1000)}k (${Math.round(nudgeState.lastContextPercent ?? 0)}%)` : "no data"}`,
+					`**Summary buffer used**: ${nudgeState.summaryTokens > 0 ? `~${Math.round(nudgeState.summaryTokens / 1000)}k (extends effective max)` : "0"}`,
 					"",
+					...(nudgeState.priorityMap && nudgeState.priorityMap.topTargets.length > 0 ? [
+						"### Priority Map",
+						...nudgeState.priorityMap.topTargets.map((t: string) => `  • ${t}`),
+						"",
+					] : []),
 					"### Compression History",
 					`**Sessions**: ${stats.totalSessions}`,
 					`**Total compressions**: ${stats.totalCompressions}`,
