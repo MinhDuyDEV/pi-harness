@@ -68,7 +68,7 @@ context7({ operation: "query", libraryId: "/reactjs/react.dev", topic: "hooks" }
 			),
 		}),
 
-		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+		async execute(_toolCallId, params, signal, _onUpdate, _ctx) {
 			const operation = params.operation || "resolve";
 
 			const apiKey = process.env.CONTEXT7_API_KEY;
@@ -102,7 +102,7 @@ context7({ operation: "query", libraryId: "/reactjs/react.dev", topic: "hooks" }
 					url.searchParams.set("libraryName", libraryName);
 					url.searchParams.set("query", "documentation");
 
-					const response = await fetch(url.toString(), { headers });
+					const response = await fetch(url.toString(), { headers, signal });
 
 					if (!response.ok) {
 						if (response.status === 401) {
@@ -187,6 +187,12 @@ context7({ operation: "query", libraryId: "/reactjs/react.dev", topic: "hooks" }
 						},
 					};
 				} catch (error: unknown) {
+					if (error instanceof DOMException && error.name === "AbortError") {
+						return {
+							content: [{ type: "text" as const, text: "Request cancelled." }],
+							details: { operation: "resolve", error: "cancelled" },
+						};
+					}
 					const message =
 						error instanceof Error ? error.message : String(error);
 					return {
@@ -237,6 +243,7 @@ context7({ operation: "query", libraryId: "/reactjs/react.dev", topic: "hooks" }
 					const queryHeaders = { ...headers, Accept: "text/plain" };
 					const response = await fetch(url.toString(), {
 						headers: queryHeaders,
+						signal,
 					});
 
 					if (!response.ok) {
@@ -320,6 +327,12 @@ context7({ operation: "query", libraryId: "/reactjs/react.dev", topic: "hooks" }
 						},
 					};
 				} catch (error: unknown) {
+					if (error instanceof DOMException && error.name === "AbortError") {
+						return {
+							content: [{ type: "text" as const, text: "Request cancelled." }],
+							details: { operation: "query", error: "cancelled" },
+						};
+					}
 					const message =
 						error instanceof Error ? error.message : String(error);
 					return {

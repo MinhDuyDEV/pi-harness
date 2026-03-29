@@ -20,13 +20,11 @@ export default function exaSearchExtension(pi: any): void {
 	async function callExaMCP(
 		toolName: string,
 		args: Record<string, unknown>,
-		signal?: AbortSignal,
+		signal: AbortSignal,
 		timeoutMs = 30_000,
 	): Promise<string> {
 		const controller = new AbortController();
-		const combinedSignal = signal
-			? AbortSignal.any([signal, controller.signal])
-			: controller.signal;
+		const combinedSignal = AbortSignal.any([signal, controller.signal]);
 
 		const timer = setTimeout(() => controller.abort(), timeoutMs);
 

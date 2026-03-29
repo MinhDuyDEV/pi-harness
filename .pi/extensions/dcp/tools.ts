@@ -89,6 +89,11 @@ export function registerCompressTool(
 		description: COMPRESS_DESCRIPTION,
 		promptSnippet:
 			"Collapse a conversation range into a dense, exhaustive summary.",
+		promptGuidelines: [
+			"Compress completed research or implementation phases to free context space — don't let context fill up silently.",
+			"Before compressing, verify the range is truly closed — never compress work you may need exact details from in the immediate next steps.",
+			"Write exhaustive summaries that capture file paths, function signatures, decisions, and constraints — the summary replaces the original conversation.",
+		],
 		parameters: Type.Object({
 			topic: Type.String({
 				description:

@@ -76,6 +76,11 @@ export function registerMemoryTools(pi: any): void {
 		label: "Create Observation",
 		description:
 			"Create a structured observation for future reference. Captures decisions, bugs, features, patterns, discoveries, learnings, or warnings with optional metadata.",
+		promptGuidelines: [
+			"Search memory (memory-search) before making decisions that may repeat past patterns or contradict earlier decisions.",
+			"Record important decisions, discoveries, and patterns as observations so they persist across sessions.",
+			"When you learn something surprising or make a non-obvious choice, create an observation to capture it.",
+		],
 		parameters: Type.Object({
 			type: Type.String({
 				description:
