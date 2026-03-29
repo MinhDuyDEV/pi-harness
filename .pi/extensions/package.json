@@ -3,7 +3,9 @@
 	"dependencies": {
 		"@google/stitch-sdk": "^0.0.3",
 		"@huggingface/transformers": "^3.4.0",
+		"@shikijs/cli": "^4.0.2",
 		"better-sqlite3": "^11.0.0",
+		"diff": "^7.0.0",
 		"sqlite-vec": "^0.1.7"
 	},
 	"peerDependencies": {
