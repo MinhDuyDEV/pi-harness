@@ -1,0 +1,30 @@
+{
+  "id": "",
+  "title": "",
+  "created": "",
+  "branch": "",
+  "baseBranch": "main",
+  "beadId": null,
+  "currentPhase": "think",
+  "phases": {
+    "think":   { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null },
+    "plan":    { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null },
+    "build":   { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null },
+    "review":  { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null },
+    "qa":      { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null },
+    "ship":    { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null },
+    "reflect": { "status": "pending", "artifacts": [], "startedAt": null, "completedAt": null, "skipped": false, "skipReason": null }
+  },
+  "gates": {
+    "think-approved": false,
+    "plan-approved": false,
+    "review-passed": false,
+    "qa-passed": false
+  },
+  "decisions": [],
+  "metrics": {
+    "totalTimeMinutes": null,
+    "phaseTransitions": [],
+    "completedAt": null
+  }
+}

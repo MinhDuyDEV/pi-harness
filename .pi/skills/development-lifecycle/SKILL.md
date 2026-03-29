@@ -19,6 +19,7 @@ dependencies: [brainstorming, prd, writing-plans, executing-plans, verification-
 
 - You are already mid-phase and only need a specific sub-skill
 - The change is trivial and can skip the full lifecycle
+- You need enforced quality gates, state persistence across sessions, and artifact traceability — use `/skill:sprint` instead (adds Think forcing questions, multi-perspective plan review, scope drift detection, QA phase, adversarial review, retro with sprint grading)
 
 ## Overview
 
