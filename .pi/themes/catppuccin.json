@@ -47,7 +47,7 @@
     "customMessageText": "",
     "customMessageLabel": "mauve",
     "toolPendingBg": "base",
-    "toolSuccessBg": "#283228",
+    "toolSuccessBg": "#000000",
     "toolErrorBg": "#3c2828",
     "toolTitle": "mauve",
     "toolOutput": "overlay0",

@@ -421,18 +421,48 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	});
 
 	// -----------------------------------------------------------------------
-	// EVENT: session_before_compact — Pi's native compaction
+	// EVENT: session_before_compact — Cancel Pi's native compaction when DCP manages context
 	//
-	// NOTE: We cannot inject DCP context into Pi's compaction summary
-	// (SessionBeforeCompactResult only supports cancel/compaction).
-	// DCP block summaries are instead re-injected via before_agent_start.
+	// Pi's _checkCompaction() runs after every assistant message and triggers
+	// compaction when contextTokens > contextWindow - reserveTokens.
+	// But DCP's compress tool stores blocks that are stripped on the NEXT
+	// context event — Pi sees stale sizes and compacts prematurely.
 	//
-	// Raw transcripts for ctx_expand are now stored in the context event
-	// (keyed by compression block ID, not compaction transcript ID).
+	// When cancelNativeCompaction is set, we return { cancel: true } to
+	// prevent Pi's native compaction from clobbering manually managed context.
+	// Pi's overflow recovery (reason: "overflow") is still allowed through.
 	// -----------------------------------------------------------------------
 
-	pi.on("session_before_compact", (_event: SessionBeforeCompactEvent, _ctx: ExtensionContext) => {
-		// Don't cancel or replace — let native compaction proceed
+	pi.on("session_before_compact", (_event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
+		const cancelPolicy = config.autoCompact.cancelNativeCompaction;
+
+		if (cancelPolicy === "never") {
+			return undefined;
+		}
+
+		if (cancelPolicy === "always") {
+			if (config.debug) {
+				console.log("[dcp] Cancelling Pi native compaction (policy: always)");
+			}
+			return { cancel: true } as SessionBeforeCompactResult;
+		}
+
+		if (cancelPolicy === "when-managed") {
+			// Only cancel if DCP has active compression blocks
+			try {
+				const sessionId = getSessionId(ctx);
+				const activeBlocks = getActiveBlocks(sessionId);
+				if (activeBlocks.length > 0) {
+					if (config.debug) {
+						console.log(`[dcp] Cancelling Pi native compaction (policy: when-managed, ${activeBlocks.length} active blocks)`);
+					}
+					return { cancel: true } as SessionBeforeCompactResult;
+				}
+			} catch {
+				// On error, let native compaction proceed
+			}
+		}
+
 		return undefined;
 	});
 
@@ -536,7 +566,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					`**Drop queue**: ${config.dropQueue.enabled ? `TTL ${config.dropQueue.cacheTTL.defaultMs / 1000}s` : "disabled"}`,
 					`**Fact extraction**: ${config.factExtraction.enabled ? "enabled" : "disabled"}`,
 					`**Expand (reversible)**: ${config.expand.enabled ? "enabled" : "disabled"}`,
-					`**Pi native compaction**: handles auto-compact (DCP provides nudges only)`,
+					`**Pi native compaction**: ${config.autoCompact.cancelNativeCompaction === "always" ? "BLOCKED by DCP (manual compress only)" : config.autoCompact.cancelNativeCompaction === "when-managed" ? "blocked when DCP has active blocks" : "handles auto-compact (DCP provides nudges only)"}`,
 				];
 
 				ctx.ui.notify(lines.join("\n"), "info");

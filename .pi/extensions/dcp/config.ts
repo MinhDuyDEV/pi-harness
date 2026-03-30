@@ -151,6 +151,18 @@ export interface AutoCompactConfig {
 	thresholdPercent: number;
 	/** Custom instructions for auto-compaction */
 	customInstructions: string;
+	/**
+	 * Cancel Pi's native auto-compaction via session_before_compact.
+	 * When true, DCP returns { cancel: true } to prevent Pi from running
+	 * its own compaction, giving the user full manual control via the
+	 * compress tool. Pi's overflow recovery is still allowed.
+	 *
+	 * Options:
+	 *   - "always": Always cancel native compaction (full manual control)
+	 *   - "when-managed": Cancel only when DCP has active compression blocks
+	 *   - "never": Never cancel (current default behavior)
+	 */
+	cancelNativeCompaction: "always" | "when-managed" | "never";
 }
 
 // ---------------------------------------------------------------------------
@@ -181,29 +193,36 @@ export interface DCPConfig {
 // Protected tools (always protected from pruning)
 // ---------------------------------------------------------------------------
 
-/** @internal Currently unused — available for future features */
+/** @internal Full list of tools that should never be pruned (for reference) */
 export const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
-	"task",
-	"skill",
-	"todowrite",
-	"todoread",
-	"compress",
-	"batch",
-	"plan_enter",
-	"plan_exit",
+	// File mutations
 	"write",
 	"edit",
+	// Context management
+	"compress",
+	// Memory persistence
 	"observation",
 	"memory-update",
 	"memory-read",
+	// Task management (Pi tool names)
+	"TaskCreate",
+	"TaskUpdate",
 ];
 
+/**
+ * Tools whose results are auto-preserved in compression summaries.
+ * Keep this list to tools with SMALL, HIGH-VALUE outputs.
+ * Tools with large outputs (write/edit diffs) go in deduplication.protectedTools instead.
+ */
 export const COMPRESS_PROTECTED_TOOLS: readonly string[] = [
-	"task",
-	"skill",
-	"todowrite",
-	"todoread",
+	// Context management
+	"compress",
+	// Memory persistence
 	"observation",
+	"memory-update",
+	// Task management (Pi tool names)
+	"TaskCreate",
+	"TaskUpdate",
 ];
 
 // ---------------------------------------------------------------------------
@@ -238,7 +257,9 @@ export const DEFAULT_CONFIG: DCPConfig = {
 	strategies: {
 		deduplication: {
 			enabled: true,
-			protectedTools: [],
+			// write/edit protected from dedup (file mutations are unique operations)
+			// but NOT in compress.protectedTools (their diff outputs are too large for auto-preserve)
+			protectedTools: ["write", "edit"],
 		},
 		supersedeWrites: {
 			enabled: true,
@@ -317,5 +338,6 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		enabled: true,
 		thresholdPercent: 80,
 		customInstructions: "Focus on preserving: key decisions, file paths modified, current task state, and next steps. Be thorough but concise.",
+		cancelNativeCompaction: "always",
 	},
 };

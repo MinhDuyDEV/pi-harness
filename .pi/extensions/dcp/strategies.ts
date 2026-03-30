@@ -367,6 +367,9 @@ function applyCompressStripping(
 	const indicesToRemove = new Set<number>();
 	const summariesToInject: Array<{ atIndex: number; summary: string; topic: string }> = [];
 
+	// Build protected tool set once for all ranges
+	const protectedToolSet = new Set(config.compress.protectedTools);
+
 	for (let i = 0; i < compressResults.length; i++) {
 		const cr = compressResults[i];
 
@@ -387,20 +390,53 @@ function applyCompressStripping(
 		// Range end: just before the compress tool call message
 		const rangeEnd = cr.callIndex;
 
-		// Calculate tokens being stripped + collect nested block summaries
+		// Calculate tokens being stripped + collect nested block summaries + protected content
 		let strippedTokens = 0;
 		const nestedSummaries: string[] = [];
+		const protectedContent: string[] = [];
 		for (let j = rangeStart; j < rangeEnd; j++) {
 			if (!indicesToRemove.has(j)) {
 				strippedTokens += estimateMessageTokens(messages[j]);
 				indicesToRemove.add(j);
 
-				// Nested block overlap: preserve older compressed summaries
 				const m = messages[j];
+
+				// Nested block overlap: preserve older compressed summaries
 				if (m.role === "custom" && (m as CustomMessage).customType === "dcp-compressed-summary") {
 					const content = (m as CustomMessage).content;
 					if (typeof content === "string" && content.trim()) {
 						nestedSummaries.push(content);
+					}
+				}
+
+				// Protected tool outputs: auto-preserve results from protected tools
+				// (mirrors OpenCode DCP range.ts — prevents info loss for observation, todowrite, etc.)
+				if (m.role === "toolResult" && protectedToolSet.size > 0) {
+					const tm = m as ToolResultMessage;
+					if (protectedToolSet.has(tm.toolName) && !tm.isError) {
+						let text = "";
+						for (const part of tm.content) {
+							if (part.type === "text") text += (part as TextContent).text;
+						}
+						if (text.trim()) {
+							protectedContent.push(`[${tm.toolName}] ${text.trim()}`);
+						}
+					}
+				}
+
+				// Protected user messages: auto-preserve user intent
+				if (config.compress.protectUserMessages && m.role === "user") {
+					const um = m as UserMessage;
+					let text = "";
+					if (typeof um.content === "string") {
+						text = um.content;
+					} else if (Array.isArray(um.content)) {
+						for (const part of um.content) {
+							if (part.type === "text") text += (part as TextContent).text;
+						}
+					}
+					if (text.trim()) {
+						protectedContent.push(`[user] ${text.trim()}`);
 					}
 				}
 			}
@@ -430,6 +466,12 @@ function applyCompressStripping(
 				.map((s) => `[Previously compressed content]\n${s}`)
 				.join("\n\n");
 			finalSummary = `${nestedSection}\n\n[Current compression]\n${cr.summary}`;
+		}
+
+		// Auto-append protected content that the agent's summary may have missed
+		// (mirrors OpenCode DCP range.ts: protected tool outputs + user messages)
+		if (protectedContent.length > 0) {
+			finalSummary += `\n\n## Auto-preserved content\n${protectedContent.join("\n")}`;
 		}
 
 		summariesToInject.push({
