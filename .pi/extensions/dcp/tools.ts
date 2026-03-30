@@ -152,6 +152,65 @@ export function registerCompressTool(
 				throw new Error("summary is required and must be a non-empty string");
 			}
 
+			// ---------------------------------------------------------------
+			// Turn protection: prevent compressing recent working context
+			//
+			// The compress strategy (strategies.ts) strips ALL messages before
+			// the compress tool call. So if an agent calls compress, everything
+			// in the conversation prior to this call gets replaced by the summary.
+			// We protect against nuking recent work by counting user turns
+			// (which accurately represent interaction rounds regardless of how
+			// many tool calls each round generates).
+			// ---------------------------------------------------------------
+			if (config.turnProtection.enabled && config.turnProtection.turns > 0) {
+				try {
+					// getBranch() returns root → leaf order, no Map needed
+					const branch = ctx.sessionManager.getBranch();
+					const protectedTurns = config.turnProtection.turns;
+
+					// Walk the branch and count user turns since the last
+					// compaction boundary (or start of conversation).
+					// A compaction entry means prior history was already
+					// summarized — sufficient context exists beyond it.
+					let userTurnsSinceBoundary = 0;
+					let hasCompactionBoundary = false;
+
+					for (const entry of branch) {
+						if (entry.type === "compaction") {
+							// Reset: compaction summarizes prior context
+							userTurnsSinceBoundary = 0;
+							hasCompactionBoundary = true;
+						} else if (entry.type === "message") {
+							const msg = entry as { message?: { role?: string } };
+							if (msg.message?.role === "user") {
+								userTurnsSinceBoundary++;
+							}
+						}
+					}
+
+					// If there's a compaction boundary, the conversation has
+					// sufficient prior history — only check turns since boundary.
+					// Without compaction, check total user turns from start.
+					if (userTurnsSinceBoundary <= protectedTurns) {
+						const context = hasCompactionBoundary
+							? "since the last compaction"
+							: "in this session";
+						throw new Error(
+							`Cannot compress: only ${userTurnsSinceBoundary} user turn(s) ${context}. ` +
+							`At least ${protectedTurns + 1} user turns are required before compression ` +
+							`to preserve recent working context. Continue working and compress later ` +
+							`when there are more completed phases to crystallize.`
+						);
+					}
+				} catch (err) {
+					// Re-throw our own validation errors, swallow infrastructure errors
+					if (err instanceof Error && err.message.startsWith("Cannot compress:")) {
+						throw err;
+					}
+					// Best-effort: if session access fails, allow compression
+				}
+			}
+
 			if (config.compress.permission === "ask") {
 				if (!ctx.hasUI) {
 					throw new Error(

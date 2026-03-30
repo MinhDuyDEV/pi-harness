@@ -66,8 +66,10 @@ const HOOK_DEFINITIONS: HookDefinition[] = [
 	},
 ];
 
+const DEBUG = process.env.PI_HOOKS_DEBUG === "1";
+
 function debug(message: string): void {
-	console.debug(`[hooks] ${message}`);
+	if (DEBUG) console.debug(`[hooks] ${message}`);
 }
 
 function toSafeString(value: unknown): string {

@@ -1,3 +1,15 @@
+---
+name: dynamic-context-pruning
+description: >
+  Runtime-enforced context management for Pi coding agents. Covers DCP's automatic
+  pruning strategies (dedup, supersede-writes, purge-errors), the compress tool for
+  manual phase crystallization, nudge system, summary buffer, priority maps, deferred
+  drop queue, fact extraction, and ctx_expand for reversible compression.
+version: 2.1.0
+tags: [context, dcp, compression, pruning]
+dependencies: []
+---
+
 # Dynamic Context Pruning (DCP v2.1)
 
 > Runtime-enforced context management for Pi coding agents. Prune + compress conversation to stay in budget.

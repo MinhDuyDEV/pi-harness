@@ -36,6 +36,7 @@ export interface ManualModeConfig {
 
 export interface TurnProtectionConfig {
 	enabled: boolean;
+	/** Minimum number of recent assistant+user message turns to keep raw (uncompressed) */
 	turns: number;
 }
 
@@ -275,8 +276,8 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		automaticStrategies: true,
 	},
 	turnProtection: {
-		enabled: false,
-		turns: 4,
+		enabled: true,
+		turns: 3,
 	},
 	experimental: {
 		customPrompts: false,
