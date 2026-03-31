@@ -1,0 +1,6 @@
+{
+	"figma-go": {
+		"command": "npx",
+		"args": ["-y", "@vkhanhqui/figma-mcp-go@latest"]
+	}
+}
