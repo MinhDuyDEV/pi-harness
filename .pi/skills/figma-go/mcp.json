@@ -1,6 +1,40 @@
 {
 	"figma-go": {
 		"command": "npx",
-		"args": ["-y", "@vkhanhqui/figma-mcp-go@latest"]
+		"args": ["-y", "@vkhanhqui/figma-mcp-go@latest"],
+		"includeTools": [
+			"get_document",
+			"get_metadata",
+			"get_pages",
+			"get_selection",
+			"get_node",
+			"get_nodes_info",
+			"get_design_context",
+			"get_viewport",
+			"search_nodes",
+			"scan_text_nodes",
+			"scan_nodes_by_types",
+			"get_styles",
+			"get_variable_defs",
+			"get_local_components",
+			"get_fonts",
+			"get_annotations",
+			"get_reactions",
+			"get_screenshot",
+			"save_screenshots",
+			"create_frame",
+			"create_rectangle",
+			"create_ellipse",
+			"create_text",
+			"import_image",
+			"set_text",
+			"set_fills",
+			"set_strokes",
+			"move_nodes",
+			"resize_nodes",
+			"rename_node",
+			"clone_node",
+			"delete_nodes"
+		]
 	}
 }
