@@ -1,6 +1,6 @@
 ---
 description: Create detailed implementation plan with TDD steps for a bead
-argument-hint: "<bead-id> [--create-beads]"
+argument-hint: "<bead-id> [--create-beads] [--consensus] [--premortem]"
 ---
 
 # Plan: $ARGUMENTS
@@ -22,10 +22,12 @@ skill({ name: "writing-plans" }); // TDD plan format
 
 ## Parse Arguments
 
-| Argument         | Default  | Description                       |
-| ---------------- | -------- | --------------------------------- |
-| `<bead-id>`      | required | The bead to plan                  |
-| `--create-beads` | false    | Create child beads for each phase |
+| Argument         | Default  | Description                                                        |
+| ---------------- | -------- | ------------------------------------------------------------------ |
+| `<bead-id>`      | required | The bead to plan                                                   |
+| `--create-beads` | false    | Create child beads for each phase                                  |
+| `--consensus`    | false    | Force explicit options analysis + ADR before locking the plan       |
+| `--premortem`    | false    | Force a pre-mortem section with likely failure modes and mitigations |
 
 ## Before You Plan
 
@@ -34,6 +36,8 @@ skill({ name: "writing-plans" }); // TDD plan format
 - **Budget context**: Target ~50% context per execution
 - **Split signals**: Create child beads for complex work
 - **Vertical slices**: Each task should cover one feature end-to-end
+- **Clarify before planning**: If 2+ material ambiguities remain around scope, constraints, non-goals, or success criteria, stop and run `/clarify` before writing the final plan
+- **Consensus is for branching/risky work**: Use `--consensus` for decisions with real trade-offs (auth, migrations, destructive ops, public API changes, architecture forks)
 
 ## Phase 0: Institutional Research (Mandatory)
 
@@ -120,6 +124,8 @@ Before research, determine discovery level based on PRD:
 
 - Level 2+: New library not in package.json, external API, "choose/select/evaluate"
 - Level 3: "architecture/design/system", data modeling, auth design
+- Force `--consensus` when there are 2+ viable technical approaches with materially different risk/cost profiles
+- Force `--premortem` for migrations, destructive changes, security-sensitive work, or user-visible outage risk
 
 **Decision:** Ask user to confirm or adjust:
 
@@ -200,6 +206,23 @@ For each truth: "What must EXIST for this to be true?"
 | API       | Database  | `prisma.query`      | Query returns static, not DB result |
 | Component | Real data | `useEffect` fetch   | Shows placeholder, not messages     |
 
+### Phase 4B: Decision Framing (Consensus / High-Risk Mode)
+
+When `--consensus` is set or the task has real architectural branching:
+
+1. List **2-3 viable options** only — not fake alternatives
+2. Compare each option on implementation cost, blast radius, testability, rollback path, and long-term maintenance
+3. Recommend one option explicitly
+4. Explain **why the other options were not chosen**
+5. Write a short ADR block before task decomposition:
+   - **Decision**
+   - **Drivers**
+   - **Alternatives considered**
+   - **Consequences / follow-ups**
+6. If the choice materially changes scope or future work, get user confirmation before finalizing the plan
+
+When `--premortem` is set or the work is high-risk, add a **Pre-mortem** section with at least 3 failure modes and one mitigation per failure.
+
 ## Phase 5: Decompose with Context Budget
 
 **Quality Degradation Rule:** Target ~50% context per execution. More plans, smaller scope = consistent quality.
@@ -255,6 +278,11 @@ Wave 3: C (depends on B)
 
 Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill format:
 
+**Section inclusion rules:**
+- Include `Options Considered` and `ADR` only when `--consensus` is set or the work has real branching trade-offs
+- Include `Pre-mortem` only when `--premortem` is set or the work is high-risk
+- Omit those sections entirely for straightforward plans
+
 ### Required Plan Header
 
 ```markdown
@@ -291,6 +319,29 @@ Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill 
 | From        | To    | Via     | Risk           |
 | ----------- | ----- | ------- | -------------- |
 | [Component] | [API] | `fetch` | [Failure mode] |
+
+## Options Considered (required for `--consensus` or branching work)
+
+| Option | Pros | Cons | Why chosen / rejected |
+| ------ | ---- | ---- | --------------------- |
+| A      |      |      |                       |
+| B      |      |      |                       |
+
+## ADR (required for `--consensus` or branching work)
+
+- **Decision:** [chosen path]
+- **Drivers:** [top reasons]
+- **Alternatives considered:** [options reviewed]
+- **Consequences:** [trade-offs, follow-ups, rollback notes]
+
+## Pre-mortem (required for `--premortem` or high-risk work)
+
+1. **Failure mode:** [what breaks]
+   - Mitigation: [how to prevent / detect]
+2. **Failure mode:** [what breaks]
+   - Mitigation: [how to prevent / detect]
+3. **Failure mode:** [what breaks]
+   - Mitigation: [how to prevent / detect]
 
 ## Dependency Graph
 ```
@@ -336,9 +387,10 @@ Output:
 4. **Dependency Waves:** [N] waves for parallel execution
 5. **Task count:** [N] tasks, [M] TDD steps
 6. **Files affected:** [List]
-7. **Plan location:** `.beads/artifacts/$ARGUMENTS/plan.md`
-8. **Child bead hierarchy:** (if created)
-9. **Next step:** `/ship $ARGUMENTS`
+7. **Decision record:** options table + ADR included only when branching/risky
+8. **Plan location:** `.beads/artifacts/$ARGUMENTS/plan.md`
+9. **Child bead hierarchy:** (if created)
+10. **Next step:** `/ship $ARGUMENTS` or `/clarify $ARGUMENTS` if ambiguity remains
 
 ```bash
 br comments add $ARGUMENTS "Created plan.md: Level [N] discovery, [X] waves, [Y] tasks, [Z] TDD steps"
@@ -346,9 +398,10 @@ br comments add $ARGUMENTS "Created plan.md: Level [N] discovery, [X] waves, [Y]
 
 ## Related Commands
 
-| Need           | Command       |
-| -------------- | ------------- |
-| Create spec    | `/create`     |
-| Start working  | `/start <id>` |
-| Execute plan   | `/ship <id>`  |
-| Research first | `/research`   |
+| Need              | Command         |
+| ----------------- | --------------- |
+| Create spec       | `/create`       |
+| Clarify scope     | `/clarify <id>` |
+| Start working     | `/start <id>`   |
+| Execute plan      | `/ship <id>`    |
+| Research first    | `/research`     |

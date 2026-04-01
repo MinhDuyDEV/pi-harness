@@ -16,6 +16,7 @@ Execute PRD tasks, verify each passes, run review, close the bead.
 ```typescript
 skill({ name: "beads" });
 skill({ name: "verification-before-completion" });
+skill({ name: "code-cleanup" }); // optional post-verification cleanup pass
 ```
 
 ## Determine Input Type
@@ -34,6 +35,7 @@ skill({ name: "verification-before-completion" });
 - **Verify goals**: Tasks completing ≠ goals achieved (use goal-backward verification)
 - **Commit before close**: Per-task commits required, don't ship without git history
 - **Ask before closing**: Never close bead without user confirmation
+- **Clean up before review when needed**: If the implementation works but the diff is noisy or obviously overbuilt, run `code-cleanup` on changed files and rerun the same gates before review
 
 ## Available Tools
 
@@ -241,6 +243,16 @@ Check `package.json` scripts, `Makefile`, or `justfile` for project-specific com
 Also run PRD `Verify:` commands.
 
 If any gate fails, fix before proceeding.
+
+## Phase 5B: Optional Cleanup Pass
+
+If verification passes but the changed code is still noisy:
+
+1. Follow the `code-cleanup` skill
+2. Limit cleanup to changed files or directly adjacent support files
+3. Apply the skill's simplification rules without expanding scope
+4. Re-run the same verification gates from Phase 5
+5. Only continue to review if the cleanup pass is still green
 
 ## Phase 6: Review
 

@@ -11,6 +11,7 @@ Improve code quality without changing external behavior.
 
 ```typescript
 skill({ name: "verification-before-completion" });
+skill({ name: "code-cleanup" });
 ```
 
 ## Process
@@ -29,6 +30,11 @@ Present the refactoring plan before executing:
 | Category | What | Why | Risk |
 |----------|------|-----|------|
 | ... | ... | ... | ... |
+
+If this is mostly a post-implementation simplification pass, follow the `code-cleanup` skill pattern:
+- lock behavior first
+- simplify only the changed files
+- rerun the same verification after each cleanup pass
 
 Wait for user approval on the plan.
 
@@ -58,3 +64,4 @@ Follow the scope level:
 - Run tests after each change, not just at the end
 - If a test fails, revert the last change and investigate
 - Ask before architectural changes (new files, moved exports, changed interfaces)
+- When using `code-cleanup`, follow that skill's simplification rules rather than inventing a larger refactor
