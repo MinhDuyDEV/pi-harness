@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example: if a bash command failed, replace the displayed text with a short hook note.
+# IMPORTANT: structured hooks should print ONLY JSON to stdout.
+
+payload="$(cat)"
+
+if [[ "${PI_TOOL_NAME:-}" == "bash" && "${PI_TOOL_IS_ERROR:-0}" == "1" ]]; then
+  printf '{"content":"[hook] Bash tool failed. Review stderr/details above.","details":{"hook":"post-tool-use"},"isError":true}\n'
+fi

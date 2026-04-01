@@ -1,7 +1,7 @@
 ---
 name: scout
 description: External research specialist. Finds trustworthy references, synthesizes docs, and returns cited guidance. Memory-first.
-tools: read, bash, grep, find, ls, tilth_search, tilth_read, context7, grepsearch, websearch, codesearch, memory-search, mcp
+tools: read, bash, grep, find, ls, tilth_search, tilth_read, context7, grepsearch, websearch, codesearch, memory-search, webclaw_scrape, webclaw_batch, mcp
 model: github-copilot/claude-sonnet-4.6
 skill: source-code-research, lightpanda
 ---
@@ -37,20 +37,23 @@ Higher-ranked sources win on conflicts.
 1. **Memory first**: `memory-search` for prior research before going external
 2. **Choose tools by need**:
 
-   | Need                 | Tool                                 |
-   | -------------------- | ------------------------------------ |
-   | Library docs/API     | `context7` (resolve → query)         |
-   | Production examples  | `grepsearch` (literal code patterns) |
-   | Current web info     | `websearch` (Exa AI, real-time)      |
-   | Code docs & examples | `codesearch` (Exa AI, code-specific) |
-   | Read a specific URL  | `lightpanda_markdown` (full page)    |
-   | Extract page links   | `lightpanda_links` (all URLs)        |
-   | Page metadata/SEO    | `lightpanda_structuredData`          |
-   | Package source code  | `source-code-research` skill         |
-   | Codebase patterns    | `tilth_search`                       |
+   | Need                              | Tool                                                     |
+   | --------------------------------- | -------------------------------------------------------- |
+   | Library docs/API                  | `context7` (resolve → query)                             |
+   | Production examples               | `grepsearch` (literal code patterns)                     |
+   | Current web info                  | `websearch` (Exa AI, real-time)                          |
+   | Code docs & examples              | `codesearch` (Exa AI, code-specific)                     |
+   | Read a specific static/protected URL | `webclaw_scrape` (fast, token-efficient, bot-bypass) |
+   | Compare several known URLs        | `webclaw_batch`                                          |
+   | Read a JS-heavy or interactive URL| `lightpanda_markdown` (rendered page)                    |
+   | Extract page links                | `lightpanda_links` (all URLs)                            |
+   | Page metadata/SEO                 | `lightpanda_structuredData`                              |
+   | Package source code               | `source-code-research` skill                             |
+   | Codebase patterns                 | `tilth_search`                                           |
 
-3. Run independent calls in parallel
-4. Return concise recommendations with sources
+3. Prefer `webclaw_scrape` over browser tools for direct URL reads unless the page clearly needs JavaScript rendering or interaction
+4. Run independent calls in parallel
+5. Return concise recommendations with sources
 
 ## Output
 

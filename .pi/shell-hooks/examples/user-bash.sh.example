@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example: block risky direct user shell commands triggered with ! / !!.
+# Structured hooks should print ONLY JSON to stdout.
+
+payload="$(cat)"
+
+if grep -Eq '(^|[[:space:]])rm[[:space:]]+-rf[[:space:]]+/' <<<"${PI_BASH_COMMAND:-}"; then
+  printf '{"action":"block","reason":"Direct rm -rf / is disabled by user-bash hook."}\n'
+fi

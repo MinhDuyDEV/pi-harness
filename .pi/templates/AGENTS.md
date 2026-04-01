@@ -302,6 +302,21 @@ Rules:
 - **Give feedback** — after applying an observation, use `memory-feedback` to rate it
 - **Auto-injection active** — relevant observations are injected into system prompt at start
 
+### Web Retrieval (webclaw + lightpanda)
+
+| Tool | Purpose |
+|---|---|
+| `webclaw_scrape` | Fetch a specific URL with token-efficient extraction and bot-bypass-friendly transport |
+| `webclaw_batch` | Fetch multiple known URLs in parallel |
+| `lightpanda_markdown` | Read a rendered page when JavaScript execution matters |
+| `lightpanda_links` | Extract links from a rendered page |
+| `lightpanda_structuredData` | Get page metadata / structured data from a rendered page |
+
+Rules:
+- **Prefer `webclaw_scrape` first** for direct URL reads, static/server-rendered pages, and sites that may block normal fetches
+- **Prefer `webclaw_batch`** when comparing a fixed set of URLs
+- **Escalate to lightpanda** when the page needs JavaScript execution, interaction, or rendered DOM state
+
 ### Documentation Lookup (context7)
 
 | Tool | Purpose |
@@ -349,11 +364,12 @@ When multiple tools can accomplish the same task:
 1. **LSP tools** — for type-aware operations (definition, references, call hierarchy)
 2. **tilth tools** — for all code search, reading, file finding (AST-aware, token-efficient)
 3. **context7** — for library/framework documentation
-4. **codesearch** — for code examples and API references from the web
-5. **grepsearch** — for real-world usage examples from GitHub
-6. **websearch** — for current web information, discussions, blog posts
-7. **memory tools** — for persisted knowledge and cross-session context
-8. **Built-in read/bash** — fallback for non-code files or when tilth is unavailable
+4. **webclaw tools** — for direct URL retrieval, static/server-rendered pages, and bot-protected sites
+5. **codesearch** — for code examples and API references from the web
+6. **grepsearch** — for real-world usage examples from GitHub
+7. **websearch** — for current web information, discussions, blog posts
+8. **memory tools** — for persisted knowledge and cross-session context
+9. **Built-in read/bash** — fallback for non-code files or when tilth is unavailable
 
 ---
 

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example: record when a session shuts down.
+# Full event payload is available on stdin for richer scripts.
+
+payload="$(cat)"
+printf '[hooks] session stopped: id=%s file=%s cwd=%s\n' \
+  "${PI_SESSION_ID:-unknown}" \
+  "${PI_SESSION_FILE:-}" \
+  "${PI_CWD:-unknown}" >&2

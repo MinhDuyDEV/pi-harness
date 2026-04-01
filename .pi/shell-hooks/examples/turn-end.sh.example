@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example: append lightweight turn telemetry to a local log.
+# Turn-end hooks are passive; stdout is ignored, so log to a file or stderr.
+
+log_file=".pi/shell-hooks/turn-end.log"
+mkdir -p "$(dirname "$log_file")"
+printf '%s session=%s turn=%s tool_results=%s\n' \
+  "$(date -Is)" \
+  "${PI_SESSION_ID:-unknown}" \
+  "${PI_TURN_INDEX:-0}" \
+  "${PI_TOOL_RESULTS_COUNT:-0}" >> "$log_file"

@@ -104,6 +104,17 @@ For major tracked work (requires `beads_rust` CLI):
 
 ---
 
+## Web Retrieval Priority
+
+When reading external URLs:
+
+- **Prefer `webclaw_scrape` first** for direct URL reads, static/server-rendered pages, and sites that may block normal fetches
+- **Prefer `webclaw_batch`** when comparing a fixed list of URLs
+- **Escalate to lightpanda/browser tools** only when the page needs JavaScript execution, interaction, or rendered DOM state
+- For library/framework docs, still prefer `context7` over ad-hoc web scraping when official docs are available
+
+---
+
 ## Skills Policy
 
 - **Prompts** define user workflows (`.pi/prompts/`)

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example: append deterministic instructions before the agent loop starts.
+# Structured hooks should print ONLY JSON to stdout.
+
+payload="$(cat)"
+
+printf '{"systemMessage":"Before making changes, summarize the plan and mention any verification you will run."}\n'

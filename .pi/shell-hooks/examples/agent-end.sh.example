@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Example: append a lightweight agent-run summary to a local log.
+# agent-end hooks are passive; stdout is ignored, so log to a file or stderr.
+
+payload="$(cat)"
+log_file=".pi/shell-hooks/agent-end.log"
+mkdir -p "$(dirname "$log_file")"
+printf '%s session=%s messages=%s\n' \
+  "$(date -Is)" \
+  "${PI_SESSION_ID:-unknown}" \
+  "${PI_MESSAGE_COUNT:-0}" >> "$log_file"
