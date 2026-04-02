@@ -1,0 +1,20 @@
+{
+	"pencil": {
+		"command": "/Applications/Pencil.app/Contents/Resources/app.asar.unpacked/out/mcp-server-darwin-arm64",
+		"args": ["--app", "desktop"],
+		"includeTools": [
+			"batch_design",
+			"batch_get",
+			"get_variables",
+			"set_variables",
+			"get_editor_state",
+			"snapshot_layout",
+			"find_empty_space_on_canvas",
+			"search_all_unique_properties",
+			"replace_all_matching_properties",
+			"get_screenshot",
+			"export_nodes",
+			"get_guidelines"
+		]
+	}
+}
