@@ -429,7 +429,6 @@ export default function remoteQuestionsExtension(pi: any): void {
 	};
 
 	pi.on("session_start", refreshAskToolState);
-	pi.on("session_switch", refreshAskToolState);
 	pi.on("turn_start", refreshAskToolState);
 	refreshAskToolState();
 
