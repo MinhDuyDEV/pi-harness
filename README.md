@@ -8,6 +8,8 @@ Batteries-included configuration kit for [pi](https://github.com/badlogic/pi-mon
 pi install git:github.com/heyhuynhgiabuu/pikit
 ```
 
+**Compatibility:** requires `@mariozechner/pi-coding-agent` `0.65.0+` and is verified against the 0.65.x line, including 0.65.2.
+
 Then install the package dependencies declared in `.pi/settings.json`:
 
 ```bash
