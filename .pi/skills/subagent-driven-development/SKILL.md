@@ -8,6 +8,8 @@ dependencies: [executing-plans]
 
 # Subagent-Driven Development
 
+> **Replaces** monolithic single-agent implementation sessions that grow stale — dispatches fresh subagents per task with code review gates between them
+
 ## When to Use
 
 - Executing a plan with mostly independent tasks in the same session
@@ -17,8 +19,6 @@ dependencies: [executing-plans]
 
 - The plan requires review or revisions first (use executing-plans)
 - Tasks are tightly coupled and need manual sequencing
-
-
 
 ## Overview
 
@@ -33,7 +33,9 @@ dependencies: [executing-plans]
 
 ### 1. Load Plan
 
-Read plan file, track all tasks (mark in_progress → completed as you go).
+Read plan file, create TodoWrite with all tasks.
+
+**Context file pattern:** If the plan exceeds ~500 tokens, write it to `.beads/artifacts/<id>/plan-context.md` and reference by path in subagent prompts instead of inlining. This saves tokens when dispatching multiple subagents from the same plan.
 
 ### 2. Execute Task with Subagent
 
@@ -56,10 +58,15 @@ Task tool (general-purpose):
 
     Work from: [directory]
 
-    Report: What you implemented, what you tested, test results, files changed, any issues
+    [Include Structured Termination Contract from AGENTS.md]
 ```
 
-**Subagent reports back** with summary of work.
+**After subagent reports back** — follow the **Worker Distrust Protocol** from AGENTS.md:
+
+1. Read changed files directly (don't trust the report)
+2. Run verification on modified files (typecheck + lint minimum)
+3. Check acceptance criteria against original task spec
+4. Only then mark the task as complete
 
 ### 3. Review Subagent's Work
 
@@ -95,7 +102,7 @@ DESCRIPTION: [task summary]
 
 ### 5. Mark Complete, Next Task
 
-- Mark task as completed
+- Mark task as completed in TodoWrite
 - Move to next task
 - Repeat steps 2-5
 
@@ -112,7 +119,7 @@ After all tasks complete, dispatch final review:
 After final review passes:
 
 - Announce: "I'm using finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use /skill:finishing-a-development-branch
+- **REQUIRED SUB-SKILL:** Use skill({ name: "finishing-a-development-branch" })
 - Follow that skill to verify tests, present options, execute choice
 
 ## Example Workflow
@@ -121,7 +128,7 @@ After final review passes:
 
 You: I'm using Subagent-Driven Development to execute this plan.
 
-[Load plan, note all tasks to track]
+[Load plan, create TodoWrite]
 
 Task 1: Hook installation script
 
@@ -189,6 +196,21 @@ Done!
 - Dispatch fix subagent with specific instructions
 - Don't try to fix manually (context pollution)
 
+## Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Dispatching subagents for tasks with shared state/files | Creates edit conflicts, race conditions, and unclear ownership | Keep shared-state work sequential under one subagent at a time |
+| Skipping code review between subagent tasks | Lets defects accumulate and compounds later fixes | Run a review gate after each task before moving on |
+| Giving subagents vague prompts without file paths or acceptance criteria | Produces off-target changes and repeated back-and-forth | Provide exact file paths, task scope, and acceptance criteria |
+| Not verifying subagent output before moving to next task | Carries regressions forward into later tasks | Validate output immediately before starting the next task |
+
+## Verification
+
+- After each subagent completes: review its changes, run typecheck + lint on modified files
+- After all tasks: run full test suite to catch integration issues
+- Check: no conflicting edits between subagent outputs
+
 ## Integration
 
 **Required workflow skills:**
@@ -207,3 +229,9 @@ Done!
 
 See review template: requesting-code-review/review.md
 ```
+
+## See Also
+
+- **dispatching-parallel-agents** — for parallel investigation
+- **executing-plans** — for batch execution with checkpoints
+- **requesting-code-review** — for review between subagent tasks

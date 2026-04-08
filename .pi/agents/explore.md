@@ -21,6 +21,8 @@ Find relevant files, symbols, and usage paths quickly for the caller.
 - Prefer `tilth_search` (AST-aware) for quick symbol lookup
 - Use `lsp_*` tools for type-aware queries (cross-file definitions, references, call hierarchy)
 - Stop when you can answer with concrete evidence — don't over-explore
+- Target ≤3 tool calls per symbol: search → read section → done
+- Bash is enabled **only** for read-only operations — do not use bash to modify files
 
 ## Tool Selection
 

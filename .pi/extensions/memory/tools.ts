@@ -49,6 +49,10 @@ import {
 } from "./pipeline.js";
 import { recordFeedback, refreshAllScores } from "./scoring.js";
 import { isSqliteVecAvailable } from "./db.js";
+import { lintMemory } from "./lint.js";
+import { compileObservations } from "./compile.js";
+import { generateMemoryIndex } from "./index-generator.js";
+import { getLogContent } from "./operation-log.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -664,12 +668,12 @@ export function registerMemoryTools(pi: any): void {
 		name: "memory-admin",
 		label: "Memory Admin",
 		description:
-			'Memory system administration. Operations: "status", "full", "archive", "checkpoint", "vacuum", "capture-stats", "distill-now", "curate-now".',
+			'Memory system administration. Operations: "status", "full", "archive", "checkpoint", "vacuum", "capture-stats", "distill-now", "curate-now", "lint", "compile", "index", "log".',
 		parameters: Type.Object({
 			operation: Type.Optional(
 				Type.String({
 					description:
-						'Operation to run (default "status"): "status", "full", "archive", "checkpoint", "vacuum", "capture-stats", "distill-now", "curate-now", "refresh-scores"',
+						'Operation to run (default "status"): "status", "full", "archive", "checkpoint", "vacuum", "capture-stats", "distill-now", "curate-now", "refresh-scores", "lint", "compile", "index", "log"',
 				}),
 			),
 			older_than_days: Type.Optional(
@@ -840,6 +844,64 @@ export function registerMemoryTools(pi: any): void {
 						return { content: [{ type: "text", text: result }], details: {} };
 					}
 
+					case "lint": {
+						const lintResult = lintMemory({ staleDays: olderThanDays });
+						const lines: string[] = [
+							"## Memory Lint Report",
+							"",
+							`Total observations: ${lintResult.stats.total_observations}`,
+							`Duplicates: ${lintResult.stats.duplicates}`,
+							`Contradictions: ${lintResult.stats.contradictions}`,
+							`Stale: ${lintResult.stats.stale}`,
+							`Orphans: ${lintResult.stats.orphans}`,
+							`Missing narrative: ${lintResult.stats.missing_narrative}`,
+							"",
+						];
+						if (lintResult.issues.length === 0) {
+							lines.push("✅ No issues found.");
+						} else {
+							for (const issue of lintResult.issues) {
+								const sev = issue.severity === "high" ? "🔴" : issue.severity === "medium" ? "🟡" : "⚪";
+								lines.push(`${sev} **[${issue.type}]** ${issue.title}`);
+								lines.push(`  ${issue.detail}`);
+								lines.push(`  💡 ${issue.suggestion}`);
+								lines.push("");
+							}
+						}
+						const result = lines.join("\n");
+						return { content: [{ type: "text", text: result }], details: {} };
+					}
+
+					case "compile": {
+						const compileResult = compileObservations();
+						const result = [
+							`📚 Compilation complete.`,
+							`  Articles generated   : ${compileResult.articles.length}`,
+							`  Observations compiled : ${compileResult.totalObservations}`,
+							`  Clusters skipped     : ${compileResult.skippedClusters}`,
+							"",
+							...compileResult.articles.map((a) => `  - ${a.concept} (${a.observationCount} obs, ${a.relatedConcepts.length} related)`),
+						].join("\n");
+						return { content: [{ type: "text", text: result }], details: {} };
+					}
+
+					case "index": {
+						const indexResult = generateMemoryIndex();
+						const result = [
+							`📇 Memory index generated.`,
+							`  Entries  : ${indexResult.entryCount}`,
+							`  Concepts : ${indexResult.conceptCount}`,
+							"",
+							"Use \`memory-read({ file: \"index\" })\` to view the full index.",
+						].join("\n");
+						return { content: [{ type: "text", text: result }], details: {} };
+					}
+
+					case "log": {
+						const logContent = getLogContent();
+						return { content: [{ type: "text", text: logContent }], details: {} };
+					}
+
 					default: {
 						const validOps = [
 							"status",
@@ -851,6 +913,10 @@ export function registerMemoryTools(pi: any): void {
 							"distill-now",
 							"curate-now",
 							"refresh-scores",
+							"lint",
+							"compile",
+							"index",
+							"log",
 						];
 						const result = `❌ Unknown operation "${op}". Must be one of: ${validOps.join(", ")}`;
 						return { content: [{ type: "text", text: result }], details: {} };

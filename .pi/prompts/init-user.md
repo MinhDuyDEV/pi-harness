@@ -10,12 +10,6 @@ Create personalized user profile. Optional but recommended for better AI respons
 > **Prerequisite:** Run `/init` first for core setup
 > **Related:** `/init-context` for project planning setup
 
-## Load Skills
-
-```typescript
-skill({ name: "memory-system" });
-```
-
 ## Options
 
 | Argument           | Default | Description                         |
@@ -36,13 +30,7 @@ If skipped, infer from `git config user.name` and `git config user.email`.
 
 ## Phase 2: Create user.md
 
-From template `.opencode/memory/_templates/user.md`:
-
-```bash
-cp .opencode/memory/_templates/user.md .opencode/memory/project/user.md
-```
-
-Fill in gathered answers:
+Write to memory system:
 
 ```markdown
 ---
@@ -54,49 +42,48 @@ updated: [today]
 
 ## Identity
 
-- **Name:** [from answers]
-- **Git:** [user.name] <[user.email]>
+- Name: [from answers]
+- Git email: [user.email]
 
 ## Communication Preferences
 
-- **Style:** [Terse/Detailed]
-- **Tone:** [Professional/Casual]
+- Style: [Terse/Detailed]
+- Tone: [Professional/Casual]
 
 ## Workflow Preferences
 
-- **Commits:** [Auto/Ask-first]
-- **Beads updates:** [Auto/Ask-first]
+- Git commits: [Auto/Ask-first]
+- Beads updates: [Auto/Ask-first]
 
 ## Technical Preferences
 
-- **Languages:** [Preferred languages]
-- **Frameworks:** [Preferred frameworks]
+- Languages/frameworks: [Preferred languages/frameworks]
 
-## Rules to Always Follow
+## Things to Remember
 
 - [Rule 1]
 - [Rule 2]
 - [Rule 3]
 ```
 
-## Phase 3: Update opencode.json
+### Persist to Memory System
 
-Ensure user.md is loaded in instructions:
+Store key preferences as a memory observation for cross-session retrieval:
 
-```json
-{
-  "instructions": [
-    "file://.opencode/AGENTS.md",
-    "file://.opencode/memory/project/tech-stack.md",
-    "file://.opencode/memory/project/user.md"
-  ]
-}
+```
+observation(
+  type: "decision",
+  title: "User profile: [name]",
+  narrative: "User preferences captured: [style], [workflow prefs], [technical prefs].",
+  concepts: "user-profile, preferences",
+  confidence: "high"
+)
 ```
 
-## Phase 4: Report
+## Phase 3: Report
 
 Output:
 
-1. user.md created at `.opencode/memory/project/user.md`
+1. user.md created
 2. Preferences captured
-3. Next step: `/init-context` for GSD planning workflow
+3. Next step: `/init-context` for project planning setup

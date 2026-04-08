@@ -1,65 +1,46 @@
 ---
-description: Create a bead with specification from a description
-argument-hint: "<description> [--type epic|feature|task|bug]"
+description: Create a bead with specification, claim it, and prepare workspace
+argument-hint: "<description> [--type epic|feature|task|bug] [--spec-only]"
 ---
 
 # Create: $ARGUMENTS
 
-Create a bead and its specification (PRD) from a description.
+Create a bead, write its specification (PRD), claim it, set up the workspace, and convert to executable tasks — ready for `/ship`.
 
-> **Workflow:** **`/create`** → `/start <id>` → `/ship <id>`
+> **Workflow:** **`/create`** → `/ship <id>`
 >
-> ⛔ This command creates the specification ONLY. Do NOT write any implementation code.
-
-## Load Skills
-
-```typescript
-skill({ name: "beads" });
-skill({ name: "prd" }); // PRD template guidance
-```
+> Use `--spec-only` to create the specification without claiming or setting up workspace.
 
 ## Parse Arguments
 
-| Argument        | Default       | Description                        |
-| --------------- | ------------- | ---------------------------------- |
-| `<description>` | required      | What to build/fix (quoted string)  |
-| `--type`        | auto-detected | Override: epic, feature, task, bug |
-
-## Determine Input Type
-
-| Input Type  | Detection            | Action                        |
-| ----------- | -------------------- | ----------------------------- |
-| Quoted text | `"description here"` | Create PRD from description   |
-| Short form  | Simple string        | Ask for more detail if needed |
-| `--type`    | Flag provided        | Use provided type             |
+| Argument        | Default       | Description                               |
+| --------------- | ------------- | ----------------------------------------- |
+| `<description>` | required      | What to build/fix (quoted string)         |
+| `--type`        | auto-detected | Override: epic, feature, task, bug        |
+| `--spec-only`   | false         | Create spec without claiming or workspace |
 
 ## Before You Create
 
 - **Be certain**: Only create beads you're confident have clear scope
 - **Don't over-spec**: If the description is vague, ask clarifying questions first
 - **Check duplicates**: Always run Phase 1 duplicate check
-- **No implementation**: This command creates specs only, don't write code
+- **No implementation**: This command creates specs and workspace — don't write implementation code
 - **Verify PRD**: Before saving, verify all sections are filled (no placeholders)
-
-## Available Tools
-
-| Tool      | Use When                                     |
-| --------- | -------------------------------------------- |
-| `explore` | Finding patterns in codebase, affected files |
-| `scout`   | External research, best practices            |
-| `br`      | Creating and managing beads                  |
+- **Flag uncertainty**: Use `[NEEDS CLARIFICATION]` markers for unknowns — never guess silently
 
 ## Phase 1: Duplicate Check
+
+Search memory for prior work on this topic, then check open beads:
 
 ```bash
 br list --status=open --status=in_progress
 ```
 
-If a matching bead exists, stop and tell the user to use `/start <id>` instead.
+If a matching bead exists, stop and tell the user to use `/ship <id>` instead.
 
 ## Phase 2: Classify Type
 
-If `--type` was provided, use it directly. Otherwise, suggest a type based on the description and ask the user to confirm:
+If `--type` was provided, use it directly. Otherwise, suggest a type:
 
 - **epic**: Multi-session, cross-domain (redesign, migrate, overhaul)
 - **feature**: New capability, scoped (add, implement, build, integrate)
@@ -70,131 +51,146 @@ If `--type` was provided, use it directly. Otherwise, suggest a type based on th
 
 Ask user before spawning agents:
 
-```typescript
-question({
-  questions: [
-    {
-      header: "Research Depth",
-      question: "How much codebase research do you need?",
-      options: [
-        {
-          label: "Deep (Recommended for complex work)",
-          description: "3-5 agents: patterns, tests, deps, best practices (~2 min)",
-        },
-        {
-          label: "Standard",
-          description: "2 agents: patterns + tests (~1 min)",
-        },
-        {
-          label: "Minimal",
-          description: "1 agent: quick file scan (~30 sec)",
-        },
-        {
-          label: "Skip",
-          description: "I know the codebase, use existing knowledge",
-        },
-      ],
-    },
-  ],
-});
-```
+| Depth    | Agents                                             | Time     |
+| -------- | -------------------------------------------------- | -------- |
+| Deep     | 3-5 agents: patterns, tests, deps, best practices | ~2 min   |
+| Standard | 2 agents: patterns + tests                        | ~1 min   |
+| Minimal  | 1 agent: quick file scan                          | ~30 sec  |
+| Skip     | No agents, use existing knowledge                 | Instant  |
 
 ## Phase 4: Gather Context
 
 Based on research depth choice, spawn agents:
 
-**If Deep:**
+**Deep:** 3x `explore` (patterns, tests, deps) + 1x `scout` (feature/epic) + 1x `reviewer` (epic)
+**Standard:** 2x `explore` (patterns, tests) + 1x `scout` (feature/epic only)
+**Minimal:** 1x `explore` (patterns)
+**Skip:** No agents
 
-- 3x `explore` (patterns, tests, deps)
-- 1x `scout` (feature/epic)
-- 1x `review` (epic)
-
-**If Standard:**
-
-- 2x `explore` (patterns, tests)
-- 1x `scout` (feature/epic only)
-
-**If Minimal:**
-
-- 1x `explore` (patterns)
-
-**If Skip:**
-
-- No agents, use existing AGENTS.md context
-
-**While agents run**, ask clarifying questions if the description lacks scope or expected outcome. For bugs, also ask for reproduction steps and expected vs actual behavior.
+**While agents run**, ask clarifying questions if scope or expected outcome is unclear.
 
 ## Phase 5: Create Bead
 
+Extract title and description from `$ARGUMENTS`:
+- Single line → use for both title and description
+- Multiple lines → first line as title, full text as description
+
 ```bash
-BEAD_ID=$(br create "$DESCRIPTION" --type $BEAD_TYPE --json | jq -r '.id')
+BEAD_ID=$(br create --title "$TITLE" --description "$DESCRIPTION" --type $BEAD_TYPE --json | jq -r '.id')
 mkdir -p ".beads/artifacts/$BEAD_ID"
 ```
 
-## Phase 6: Write PRD
+## Phase 6: Determine PRD Rigor
 
-Copy and fill the PRD template using context from Phase 3:
+Not every change needs a full spec. Assess complexity:
 
-```bash
-cp .opencode/memory/_templates/prd.md ".beads/artifacts/$BEAD_ID/prd.md"
+| Signal         | Lite PRD                  | Full PRD                        |
+| -------------- | ------------------------- | ------------------------------- |
+| Type           | `bug`, `task`             | `feature`, `epic`               |
+| Files affected | 1-3                       | 4+                              |
+| Scope          | Clear, single-concern     | Cross-cutting, multi-system     |
+| Research depth | Skip or Minimal           | Standard or Deep                |
+
+**Auto-detect:** If type is `bug`/`task` AND research was Skip/Minimal AND simple description → Lite.
+
+### Lite PRD Format
+
+```markdown
+# [Title]
+
+## Problem
+[1-2 sentences]
+
+## Solution
+[1-2 sentences]
+
+## Affected Files
+- `src/path/to/file.ts`
+
+## Tasks
+- [ ] [Task description] → Verify: `[command]`
+
+## Success Criteria
+- Verify: `npm run typecheck && npm run lint`
 ```
 
-### Required Sections
+### Full PRD Format
 
-| Section           | Source                                                     | Required          |
-| ----------------- | ---------------------------------------------------------- | ----------------- |
-| Problem Statement | User description + clarifying questions                    | Always            |
-| Scope (In/Out)    | User input + codebase exploration                          | Always            |
-| Proposed Solution | Codebase patterns + user intent                            | Always            |
-| Success Criteria  | User verification + test commands (must include `Verify:`) | Always            |
-| Technical Context | Explore agent findings                                     | Always            |
-| Affected Files    | Explore agent findings (real paths from Phase 3)           | Always            |
-| Tasks             | Derived from scope + solution                              | Always            |
-| Risks             | Codebase exploration                                       | Feature/epic only |
-| Open Questions    | Unresolved items from Phase 3                              | If any exist      |
+Use the full PRD template with all sections:
+Problem Statement, Scope, Proposed Solution, Success Criteria, Technical Context, Affected Files, Tasks, Risks, Open Questions.
+
+## Phase 7: Write PRD
+
+Fill the chosen format using context from Phase 4.
+
+| Section           | Source                                   | Required          |
+| ----------------- | ---------------------------------------- | ----------------- |
+| Problem Statement | User description + clarifying questions  | Always            |
+| Scope (In/Out)    | User input + codebase exploration        | Always            |
+| Proposed Solution | Codebase patterns + user intent          | Always            |
+| Success Criteria  | Must include `Verify:` commands          | Always            |
+| Affected Files    | Real paths from exploration              | Always            |
+| Tasks             | Derived from scope + solution            | Always            |
+| Risks             | Codebase exploration                     | Feature/epic only |
 
 ### Task Format
 
-Tasks must follow the `prd-task` skill format:
-
 - Title with `[category]` tag
 - One-sentence **end state** description (not step-by-step)
-- Metadata block: `depends_on`, `parallel`, `conflicts_with`, `files`
+- Metadata: `depends_on`, `parallel`, `conflicts_with`, `files`
 - At least one verification command per task
 
-## Phase 7: Validate PRD
+## Phase 8: Validate PRD
 
-Before saving, verify:
+Before saving:
 
-- [ ] No placeholder text remains (e.g., "[Clear description", "[List what's allowed]")
+- [ ] No placeholder text remains
 - [ ] Success criteria include `Verify:` commands
-- [ ] Technical context references actual `src/` paths from exploration
+- [ ] Technical context references actual paths from exploration
 - [ ] Affected files list real paths
-- [ ] Tasks have `[category]` headings
-- [ ] Each task has verification
+- [ ] Tasks have `[category]` headings and verification
 - [ ] No implementation code in the PRD
+- [ ] No unresolved `[NEEDS CLARIFICATION]` markers remain
 
 If any check fails, fix it — don't ask the user.
 
-## Phase 8: Report
+## Phase 9: Claim and Prepare Workspace
+
+**If `--spec-only` was passed, skip to Phase 10 (Report).**
+
+```bash
+git status --porcelain
+git branch --show-current
+br list --status=in_progress
+```
+
+- If uncommitted changes: ask user to stash, commit, or continue
+- If other tasks in progress: warn before claiming another
+
+```bash
+br update $BEAD_ID --status in_progress
+```
+
+Create branch and optionally offer worktree setup.
+
+## Phase 10: Report
 
 Output:
 
 1. Bead ID and type
 2. PRD location (`.beads/artifacts/$BEAD_ID/prd.md`)
 3. Summary: task count, success criteria count, affected files count
-4. Next steps: `/start $BEAD_ID` or `/plan $BEAD_ID`
+4. Branch name and workspace (if claimed)
+5. Next step: `/ship $BEAD_ID` (or `/plan $BEAD_ID` for complex work)
 
 ```bash
 br comments add $BEAD_ID "Created prd.md with [N] tasks, [M] success criteria"
 ```
 
----
-
 ## Related Commands
 
-| Need            | Command       |
-| --------------- | ------------- |
-| Research first  | `/research`   |
-| Plan after spec | `/plan <id>`  |
-| Start working   | `/start <id>` |
+| Need               | Command      |
+| ------------------ | ------------ |
+| Research first     | `/research`  |
+| Plan after spec    | `/plan <id>` |
+| Implement and ship | `/ship <id>` |

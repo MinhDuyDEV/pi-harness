@@ -126,8 +126,8 @@ For each example, identify:
 ### Step 3: Create the Skill
 
 ```bash
-mkdir -p .pi/skills/my-skill
-touch .pi/skills/my-skill/SKILL.md
+mkdir -p .opencode/skill/my-skill
+touch .opencode/skill/my-skill/SKILL.md
 ```
 
 ### Step 4: Edit SKILL.md
@@ -154,3 +154,28 @@ Answer these questions:
 - [ ] **No XML-style tags**
 - [ ] **SKILL.md under 200 lines**
 - [ ] **All referenced files exist**
+
+## Recommended Sections for SKILL.md
+
+Beyond the required structure, include these sections when applicable:
+
+### `## Gotchas`
+
+Every skill should accumulate a Gotchas section over time. This is **failure-driven documentation** — each entry should trace to a specific failure encountered during real use.
+
+```markdown
+## Gotchas
+
+- **[Short description of what went wrong]** — [What the agent did wrong, why, and the fix]. Discovered [date or session reference].
+- **[Another failure]** — [Details]. Discovered [date].
+```
+
+**Rules for Gotchas:**
+
+1. Every entry must trace to an actual failure, not a hypothetical risk
+2. Include what the agent did, why it failed, and how to avoid it
+3. New entries are added when a skill causes a failure — the fix PR should include a gotcha entry
+4. Keep entries concise (1-3 sentences each)
+5. This section grows over time and is never cleared — it's the skill's scar tissue
+
+**Why this matters:** Skills without gotchas are untested skills. A skill with 5 gotchas has been battle-tested through 5 real failures and is structurally better than a pristine skill with zero. When a skill causes a failure, always ask: "Should this become a gotcha entry?"

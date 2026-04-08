@@ -95,6 +95,52 @@ Skip any step = lying, not verifying
 | "Partial check is enough"               | Partial proves nothing |
 | "Different words so rule doesn't apply" | Spirit over letter     |
 
+## Diagnostic Failure Phrases
+
+These phrases are **automatic re-verification triggers**. If you catch yourself writing any of these (or semantic equivalents), STOP and run the actual verification command before continuing.
+
+### Completion Claims Without Evidence
+
+- "This should fix it"
+- "That should resolve the issue"
+- "The problem should be gone now"
+- "This will work"
+- "It's fixed"
+- "Everything looks good"
+- "We're all set"
+
+### Confidence Substitution
+
+- "I'm fairly certain this is correct"
+- "Based on my understanding, this works"
+- "This is straightforward enough"
+- "The logic is sound"
+- "This follows the pattern so it should be fine"
+
+### Deflection / Minimization
+
+- "It's just a minor change"
+- "Nothing else should be affected"
+- "The rest of the code is unchanged"
+- "This is a safe change"
+- "No side effects expected"
+
+### Post-Hoc Rationalization
+
+- "The error was probably just [X]"
+- "That failure was likely a fluke"
+- "It probably works in production"
+- "The test environment might be the issue"
+
+### False Completion
+
+- "All done!" / "Done!" / "Complete!"
+- "That takes care of everything"
+- "Ready for review" (without verification output)
+- "Committing now" (without verification output)
+
+**Rule:** If any of these phrases appear in your draft response, delete them and replace with actual verification command output. The phrase IS the signal that you're about to lie.
+
 ## Key Patterns
 
 **Tests:**
@@ -131,6 +177,148 @@ Skip any step = lying, not verifying
 ✅ Agent reports success → Check VCS diff → Verify changes → Report actual state
 ❌ Trust agent report
 ```
+
+## Smart Verification
+
+The Iron Law demands evidence, but evidence should be gathered efficiently.
+
+### Incremental by Default
+
+Unless shipping or `--full` is passed, verify only what changed:
+
+- **Lint**: `oxlint <changed-files>` instead of linting the entire codebase
+- **Test**: `vitest run --changed` instead of running all tests
+- **Typecheck**: always full (type errors propagate across files)
+
+See the [Verification Protocol](./references/VERIFICATION_PROTOCOL.md) for exact commands.
+
+### Parallel Execution
+
+Run independent gates simultaneously to reduce wall-clock time:
+
+```
+Parallel: typecheck + lint → both must pass
+Sequential: test → build (ship only)
+```
+
+Total time = max(typecheck, lint) + test, not typecheck + lint + test.
+
+### Verification Cache
+
+If you just verified and nothing changed, don't re-verify:
+
+1. After gates pass, record a stamp in `.beads/verify.log`
+2. Before running gates, compare current state to last stamp
+3. If match → report cached PASS, skip redundant work
+4. Cache is always bypassed for `--full` and ship/release
+
+This matters when other commands need verification (e.g., closing beads, `/ship`). If you verified 30 seconds ago and made no changes, the cache lets you skip.
+
+## Enforcement Gates
+
+Prompt-level rules get ignored under pressure. These gates are **hard blocks** — they must be checked at the tool/action level, not just remembered.
+
+### Gate 1: Completion Claims Require verify.log
+
+Before ANY completion claim (bead close, PR creation, `/ship`, task completion):
+
+1. Check `.beads/verify.log` exists and contains a recent `PASS` stamp
+2. If verify.log is missing or stale (older than last file change) → **BLOCK** — run verification first
+3. If verify.log shows `FAIL` → **BLOCK** — do not proceed
+
+```
+✅ verify.log exists, PASS within last edit window → proceed
+❌ verify.log missing → STOP: "Run verification first"
+❌ verify.log shows FAIL → STOP: "Verification failed, fix before claiming complete"
+❌ verify.log stale (files changed since last PASS) → STOP: "Re-run verification"
+```
+
+### Gate 2: Agent Delegation Requires Post-Verification
+
+After ANY `task()` subagent returns with "success", follow the **Worker Distrust Protocol** from AGENTS.md — read changed files, run verification, check acceptance criteria. Do not trust agent self-reports.
+
+### Enforcement Principle
+
+> **Prompt rules fail under pressure. Gates fail safe.**
+>
+> When a constraint matters enough to be an iron law, enforce it at the action level:
+> check a file, verify a condition, reject if unmet. Don't rely on the agent
+> "remembering" to follow the rule.
+
+## Phantom Completion Detection
+
+Tasks can "pass" verification while containing stub implementations. This gate catches completions that are technically correct but substantively empty.
+
+### When to Run
+
+- After all PRD tasks are marked complete (during `/ship` Phase 4-5)
+- Before closing any bead
+- When `--full` verification is requested
+
+### Stub Patterns to Detect
+
+Scan all files modified in the current task/bead for these phantom indicators:
+
+```bash
+# Run against modified code files only (exclude .md, .json, .yml to avoid false positives)
+git diff --name-only origin/main | grep -E '\.(ts|tsx|js|jsx|py|rs|go|swift|kt|java)$' | xargs grep -nE \
+  'return null|return undefined|return \{\}|return \[\]|onClick=\{?\(\) => \{\}\}?|TODO|FIXME|placeholder|stub|not.?implemented|throw new Error\(.Not implemented' \
+  2>/dev/null
+```
+
+| Pattern                                                  | What It Indicates         | Severity |
+| -------------------------------------------------------- | ------------------------- | -------- |
+| `return null` / `return undefined`                       | Empty implementation      | HIGH     |
+| `return {}` / `return []`                                | Hollow data               | HIGH     |
+| `onClick={() => {}}`                                     | No-op handler             | HIGH     |
+| `<div>Component</div>` / `<div>{/* TODO */}</div>`       | Placeholder UI            | HIGH     |
+| `TODO` / `FIXME` / `HACK`                                | Acknowledged incomplete   | MEDIUM   |
+| `placeholder` / `stub` / `not implemented`               | Self-documenting stubs    | HIGH     |
+| `throw new Error("Not implemented")`                     | Explicit stub             | HIGH     |
+| `fetch('/api/...')` without `await` or error handling    | Disconnected call         | MEDIUM   |
+| `Response.json({ok: true})` or static hardcoded response | Fake API response         | HIGH     |
+| `console.log` as only function body                      | Debug-only implementation | MEDIUM   |
+
+### Three-Level Artifact Verification
+
+For each file listed in PRD `Affected Files`:
+
+| Level              | Check                  | How                                                                                          |
+| ------------------ | ---------------------- | -------------------------------------------------------------------------------------------- |
+| **1: Exists**      | File is present        | `ls path/to/file.ts`                                                                         |
+| **2: Substantive** | Not a stub/placeholder | `grep -v "TODO\|FIXME\|return null\|placeholder" path/to/file.ts` — verify real logic exists |
+| **3: Wired**       | Connected and used     | `grep -r "import.*ExportName" src/` — verify other files import/use it                       |
+
+### Key Link Verification
+
+Check that components are actually connected (not just existing side-by-side):
+
+| Connection Type | Check Command                                                  |
+| --------------- | -------------------------------------------------------------- |
+| Component → API | `grep -E "fetch.*api/\|axios\|useSWR\|useQuery" Component.tsx` |
+| API → Database  | `grep -E "prisma\.\|db\.\|sql\|query" route.ts`                |
+| Form → Handler  | `grep "onSubmit\|handleSubmit" Component.tsx`                  |
+| State → Render  | `grep "{stateVar}" Component.tsx`                              |
+| Route → Page    | Check router config references the page component              |
+
+### Phantom Score
+
+After running all checks, report a phantom score:
+
+```
+Phantom Completion Check:
+- Files scanned: [N]
+- Stubs found: [N] (HIGH: [n], MEDIUM: [n])
+- Artifact levels: [N] exist, [M] substantive, [K] wired
+- Key links verified: [N]/[M]
+- Score: [CLEAN | SUSPECT | PHANTOM]
+```
+
+| Score       | Criteria                                       | Action                            |
+| ----------- | ---------------------------------------------- | --------------------------------- |
+| **CLEAN**   | 0 HIGH stubs, all artifacts Level 3            | Proceed                           |
+| **SUSPECT** | 1-2 MEDIUM stubs OR 1 artifact not Level 3     | Report, ask user                  |
+| **PHANTOM** | Any HIGH stubs OR >2 artifacts not substantive | **BLOCK** — fix before completion |
 
 ## Why This Matters
 

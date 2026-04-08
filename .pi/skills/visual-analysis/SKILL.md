@@ -8,6 +8,8 @@ dependencies: []
 
 # Visual Analysis Skill
 
+> **Replaces** guessing at visual properties from code alone — direct inspection of rendered output for colors, layout, spacing, and typography
+
 ## When to Use
 
 - Analyzing UI mockups or screenshots
@@ -19,6 +21,12 @@ dependencies: []
 
 - Pure text/code review without any visual assets.
 
+## Workflow
+
+1. **Capture** — Get the image (screenshot, mockup, or user-provided)
+2. **Analyze** — Use vision agent to extract specific properties (colors as hex, font sizes, spacing in px/rem)
+3. **Compare** — Cross-reference extracted values against design tokens and existing CSS
+4. **Report** — List discrepancies with specific values and file locations
 
 ## Quick Mode
 
@@ -129,13 +137,18 @@ Output CSS/Tailwind structure.
 
 ## Storage
 
-Save findings to `docs/design/analysis/`
+Save findings to `.opencode/memory/design/analysis/`
 
-## Related Skills
+## Anti-Patterns
 
-| Need                        | Skill                 |
-| --------------------------- | --------------------- |
-| Found accessibility issues  | `accessibility-audit` |
-| Need to implement design    | `mockup-to-code`      |
-| Want design tokens          | `design-system-audit` |
-| Need aesthetic improvements | `frontend-design`     |
+| Anti-Pattern                                                                   | Why It Fails                                                                 | Instead                                                                     |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Describing layout vaguely ("looks good") instead of extracting specific values | Feedback is non-actionable and hard to validate                              | Report measurable values (hex, px/rem, font size/weight) with locations     |
+| Not comparing against existing design tokens                                   | Findings drift from system standards and create inconsistent recommendations | Map extracted values to tokens first, then flag true mismatches             |
+| Analyzing low-resolution screenshots (artifacts mislead analysis)              | Compression/noise causes false readings for spacing and color                | Request higher-resolution captures or zoomed crops before final conclusions |
+
+## See Also
+
+- `mockup-to-code`
+- `design-system-audit`
+- `accessibility-audit`

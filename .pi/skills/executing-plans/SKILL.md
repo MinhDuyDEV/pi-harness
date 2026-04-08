@@ -1,28 +1,31 @@
 ---
 name: executing-plans
-description: Use when partner provides a complete implementation plan to execute in controlled batches with review checkpoints - loads plan, reviews critically, executes tasks in batches, reports for review between batches
-version: 1.0.0
-tags: [workflow, planning]
+description: Use when a complete implementation plan exists — parses dependency waves, executes independent tasks in parallel via subagents, runs review checkpoints between waves
+version: 2.0.0
+tags: [workflow, planning, parallel]
 dependencies: [writing-plans]
 ---
 
 # Executing Plans
 
+> **Replaces** sequential task-by-task implementation — detects parallelizable waves and dispatches subagents concurrently within each wave
+
 ## When to Use
 
-- A complete implementation plan exists and you need to execute it in batches with checkpoints
-- You must follow a plan precisely and report between waves for feedback
+- A complete implementation plan exists (`.beads/artifacts/<id>/plan.md` or provided directly)
+- The plan has a dependency graph with wave assignments from `/plan`
 
 ## When NOT to Use
 
-- There is no plan yet or requirements are still unclear
-- You need to create the plan or tasks first (use writing-plans or prd)
+- No plan yet (use `writing-plans` or `prd` first)
+- All tasks are tightly sequential with no parallelism opportunity
+- Fewer than 3 tasks (just execute directly, overhead not worth it)
 
 ## Overview
 
-Load plan, review critically, execute tasks in batches, report for review between batches.
+Load plan → parse dependency waves → execute each wave (parallel within, sequential between) → review after each wave → next wave.
 
-**Core principle:** Batch execution with checkpoints for architect review.
+**Core principle:** Parallel within waves, sequential between waves, review at wave boundaries.
 
 **Announce at start:** "I'm using the executing-plans skill to implement this plan."
 
@@ -34,91 +37,153 @@ Load plan, review critically, execute tasks in batches, report for review betwee
 
 - [ ] Read the plan file end-to-end
 - [ ] Identify goal, deliverables, risks, and missing pieces
-- [ ] If concerns, ask the user and wait for decision
-- [ ] If no concerns, track all tasks and proceed
+- [ ] If concerns, ask via `question()` and wait for decision
+- [ ] If no concerns, proceed to wave parsing
 
 1. Read plan file
-2. Review critically - identify any questions or concerns about the plan
-3. If concerns: Ask the user:
+2. Review critically — identify any questions or concerns
+3. If concerns: raise them with `question()` tool
+4. If no concerns: proceed
 
-   "Plan review complete. Any concerns before proceeding?
-   - No concerns (Recommended) — Plan looks good, execute batches
-   - Has concerns — Need clarification before starting"
+### Step 2: Parse Dependency Graph
 
-4. Read plan and identify:
-   - What is the goal?
-   - What are the deliverables?
-   - What are the risks?
-   - Does the approach make sense?
-   - Are there missing pieces?
+Look for the dependency graph section in the plan. The `/plan` command generates this format:
 
-If no concerns: Track all tasks and proceed
-If concerns: Wait for human to decide and resubmit
+```
+## Dependency Graph
 
-### Step 2: Execute Batch
+Task A: needs nothing, creates src/models/X.ts
+Task B: needs Task A, creates src/api/X.ts
+Task C: needs nothing, creates src/utils/Y.ts
+Task D: needs Task B + Task C, creates src/routes/Z.ts
 
-**Default: First 3 tasks**
-
-**Before starting a batch**: create a wave-start git tag for safe rollback:
-
-```bash
-# Tag the safe point before this batch/wave
-git tag wave-${BATCH_NUMBER}-start
+Wave 1: A, C  (independent)
+Wave 2: B     (depends on A)
+Wave 3: D     (depends on B, C)
 ```
 
-#### Batch Execution Checklist
+**Extract:**
+- Which tasks belong to each wave
+- Which files each task modifies (for conflict detection)
+- Dependencies between tasks
 
-- [ ] Create wave start tag: `git tag wave-${BATCH_NUMBER}-start`
-- [ ] Mark each task in_progress
-- [ ] Follow each step exactly as written
-- [ ] Run all specified verifications
-- [ ] Mark tasks completed
-- [ ] Create wave complete tag: `git tag wave-${BATCH_NUMBER}-complete`
+**If no dependency graph found:** Fall back to sequential execution (batch of 3 tasks).
 
-For each task:
+**File conflict check:** Tasks in the same wave MUST NOT modify the same files. If they do, move one to the next wave.
 
-1. Mark as in_progress
-2. Follow each step exactly (plan has bite-sized steps)
-3. Run verifications as specified
-4. Mark as completed
+### Step 3: Create TodoWrite
 
-**After batch passes all gates**: create a wave-complete tag:
+Create todos for all tasks, grouped by wave:
 
-```bash
-# Seal the completed wave - confirms all gates passed
-git tag wave-${BATCH_NUMBER}-complete
+```typescript
+todowrite({
+  todos: [
+    { content: "Wave 1: Task A — [description]", status: "pending", priority: "high" },
+    { content: "Wave 1: Task C — [description]", status: "pending", priority: "high" },
+    { content: "Wave 1 review checkpoint", status: "pending", priority: "high" },
+    { content: "Wave 2: Task B — [description]", status: "pending", priority: "high" },
+    { content: "Wave 2 review checkpoint", status: "pending", priority: "high" },
+    // ...
+  ]
+});
 ```
 
-### Step 3: Report
+### Step 4: Execute Wave
 
-#### Batch Report Checklist
+**Before starting a wave:** create a git tag for safe rollback:
 
-- [ ] Summarize what was implemented
-- [ ] Include verification output
-- [ ] Confirm wave tag created (e.g., `wave-1-complete`)
-- [ ] Ask for feedback before continuing
+```bash
+git tag wave-${WAVE_NUMBER}-start
+```
 
-When batch complete:
+#### Single-task wave (no parallelism needed)
 
-- Show what was implemented
-- Show verification output
-- Show wave tag created (e.g., `wave-1-complete`)
-- Say: "Ready for feedback."
+Execute directly in the current agent context. No subagent overhead.
 
-### Step 4: Continue
+#### Multi-task wave (2+ independent tasks)
+
+Dispatch parallel subagents — one per task:
+
+```typescript
+// Dispatch all tasks in this wave simultaneously
+task({
+  subagent_type: "general",
+  description: `Wave ${N}: Task A — ${taskTitle}`,
+  prompt: `You are implementing Task A from the plan.
+
+## Task
+${taskDescription}
+
+## Files to modify
+${taskFiles.join('\n')}
+
+## Constraints
+- ONLY modify files listed above
+- Follow each step exactly as written in the task
+- Run verification commands specified in the task
+- Commit your changes: git add <specific-files> && git commit -m "feat: ${taskTitle}"
+
+## Report back
+- What you implemented
+- Files changed
+- Verification results (pass/fail)
+- Commit hash
+- Any issues or blockers`
+});
+// ...dispatch other tasks in this wave simultaneously
+```
+
+**Critical rules for parallel dispatch:**
+
+| Rule | Why |
+| --- | --- |
+| Non-overlapping files | Subagents editing same file = merge conflicts |
+| Exact file list per subagent | Prevents scope creep into other tasks |
+| Each subagent commits independently | Clean git history per task |
+| Never `git add .` | Only stage files from this task |
+
+#### Wave Execution Checklist
+
+- [ ] Create wave start tag: `git tag wave-${WAVE_NUMBER}-start`
+- [ ] Dispatch subagents for all tasks in this wave (parallel)
+- [ ] Collect results from all subagents
+- [ ] Check for failures — if any task failed, stop and report
+- [ ] Run verification gates (typecheck + lint in parallel, then tests)
+- [ ] Create wave complete tag: `git tag wave-${WAVE_NUMBER}-complete`
+- [ ] Mark wave tasks as completed in TodoWrite
+
+### Step 5: Review Wave
+
+After each wave completes:
+
+1. **Synthesize results** from all subagents
+2. **Run verification gates** on the combined changes:
+   ```bash
+   # Parallel: typecheck + lint
+   npm run typecheck & npm run lint & wait
+   # Sequential: tests
+   npm test
+   ```
+3. **Report to user:**
+   - Tasks completed in this wave
+   - Verification results
+   - Wave tag created
+   - Any issues found
+4. **Wait for feedback** before proceeding to next wave
+
+### Step 6: Next Wave
 
 Based on feedback:
+- Apply corrections if needed
+- Execute next wave (repeat Steps 4-5)
+- Continue until all waves complete
 
-- Apply changes if needed
-- Execute next batch
-- Repeat until complete
+### Step 7: Complete Development
 
-### Step 5: Complete Development
-
-After all tasks complete and verified:
+After all waves complete and verified:
 
 - Announce: "I'm using finishing-a-development-branch skill to complete this work."
-- **REQUIRED SUB-SKILL:** Use /skill:finishing-a-development-branch
+- **REQUIRED SUB-SKILL:** Use skill({ name: "finishing-a-development-branch" })
 - Follow that skill to verify tests, present options, execute choice
 
 ## Wave-Level Rollback with Git Tags
@@ -129,78 +194,54 @@ Git tags act as checkpoints between waves. If a wave fails irrecoverably, roll b
 
 | When                         | Command                         | Purpose                   |
 | ---------------------------- | ------------------------------- | ------------------------- |
-| Before starting any batch    | `git tag wave-N-start`          | Mark rollback point       |
-| After batch passes all gates | `git tag wave-N-complete`       | Seal confirmed-good state |
+| Before starting any wave     | `git tag wave-N-start`          | Mark rollback point       |
+| After wave passes all gates  | `git tag wave-N-complete`       | Seal confirmed-good state |
 | On irrecoverable failure     | `git reset --hard wave-N-start` | Restore to pre-wave state |
 | Listing all wave checkpoints | `git tag --list "wave-*"`       | Audit trail of execution  |
 
 ### When to Rollback
 
 Roll back (with user confirmation) when:
-
-- Build gates fail twice consecutively in the same wave
-- Unexpected destructive changes were made
-- Drift check detects unrecoverable scope creep
+- Verification gates fail twice consecutively in the same wave
+- Subagent made destructive changes outside its file scope
 - Tests were broken and the cause is unclear
 
-**Always ask the user before running `git reset --hard`** - it discards uncommitted changes irreversibly.
+**Always ask the user before running `git reset --hard`** — it discards uncommitted changes irreversibly.
 
-### Rollback Steps
+## Sequential Fallback
 
-```bash
-# 1. Identify safe point
-git tag --list "wave-*"
-# e.g.: wave-1-complete  wave-2-start  wave-2-complete  wave-3-start
+If the plan has no dependency graph or waves:
 
-# 2. Confirm with user: rollback to which tag?
-# e.g.: git reset --hard wave-2-complete (last known good)
+1. Group tasks into batches of 3
+2. Execute each batch sequentially (no parallel subagents)
+3. Review between batches
+4. Same wave-tag protocol applies
 
-# 3. Execute rollback (ONLY after user confirms)
-git reset --hard wave-2-complete
-
-# 4. Verify state is clean
-npm run typecheck && npm run lint
-
-# 5. Re-plan the failed batch with new approach
-```
-
-### Tag Naming Convention
-
-```
-wave-1-start      # Before batch 1 starts
-wave-1-complete   # After batch 1 passes all gates
-wave-2-start      # Before batch 2 starts
-wave-2-complete   # After batch 2 passes all gates
-...
-```
-
-Use numeric batch numbers, not task names, for predictable reference.
+This preserves backward compatibility with plans that don't have wave assignments.
 
 ## When to Stop and Ask for Help
 
 **STOP executing immediately when:**
-
-- Hit a blocker mid-batch (missing dependency, test fails, instruction unclear)
+- Subagent reports a blocker or failure
+- File conflict detected between parallel tasks
+- Verification fails twice in the same wave
 - Plan has critical gaps preventing starting
-- You don't understand an instruction
-- Verification fails repeatedly
 
 **Ask for clarification rather than guessing.**
 
-## When to Revisit Earlier Steps
+## Anti-Patterns
 
-**Return to Review (Step 1) when:**
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Dispatching parallel subagents for tasks that share files | Edit conflicts, lost changes, merge chaos | Move conflicting tasks to separate waves |
+| Skipping verification between waves | Broken code compounds across waves | Run all gates after each wave before proceeding |
+| Giving subagents the full plan instead of their task | Context pollution, scope creep | Extract only the specific task + file list |
+| Running all tasks in one wave regardless of dependencies | Later tasks fail because prerequisites aren't ready | Respect the dependency graph strictly |
+| Not committing per-task | Can't rollback individual tasks, messy git history | Each subagent commits its own changes |
 
-- Partner updates the plan based on your feedback
-- Fundamental approach needs rethinking
+## See Also
 
-**Don't force through blockers** - stop and ask.
-
-## Remember
-
-- Review plan critically first
-- Follow plan steps exactly
-- Don't skip verifications
-- Reference skills when plan says to
-- Between batches: just report and wait
-- Stop when blocked, don't guess
+- `writing-plans` — Create detailed, zero-ambiguity implementation plans before execution
+- `swarm-coordination` — For 10+ task scenarios with full PARL orchestration
+- `subagent-driven-development` — For sequential per-task execution with review between each
+- `verification-before-completion` — Run final verification gates before claiming completion

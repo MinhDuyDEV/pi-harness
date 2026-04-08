@@ -19,9 +19,9 @@ so future Plan and Ship cycles start with institutional knowledge instead of bla
 ## Phase 1: Gather Evidence
 
 ```bash
-# Get what changed
-git diff origin/main..HEAD --stat
-git log origin/main..HEAD --oneline
+# Get what changed (falls back gracefully if no remote)
+git diff origin/main..HEAD --stat 2>/dev/null || git diff HEAD~5..HEAD --stat
+git log origin/main..HEAD --oneline 2>/dev/null || git log --oneline -10
 
 # Get review comments if any
 br comments list $ARGUMENTS 2>/dev/null || echo "No bead"
@@ -46,7 +46,7 @@ For each finding, assign a type:
 | `pattern`   | A reusable approach confirmed to work in this codebase     | "Always use X pattern for Y type of component"  |
 | `bugfix`    | A non-obvious bug and its root cause                       | "Bun doesn't support X, use Y instead"          |
 | `decision`  | An architectural or design choice with rationale           | "Chose JWT over sessions because..."            |
-| `gotcha`    | A footgun, constraint, or thing that looks wrong but isn't | "Don't modify dist/ directly, build overwrites" |
+| `warning`   | A footgun, constraint, or thing that looks wrong but isn't | "Don't modify dist/ directly, build overwrites" |
 | `discovery` | A non-obvious fact about the codebase or its dependencies  | "Build copies .opencode/ to dist/template/"     |
 | `warning`   | Something that will break if not followed                  | "Always run lint:fix before commit"             |
 
@@ -57,28 +57,46 @@ Skip obvious things. Skip things already in AGENTS.md.
 
 For each learning worth keeping, create an observation:
 
-```typescript
-observation({
-  type: "pattern", // or bugfix, decision, gotcha, discovery, warning
-  title: "[Concise, searchable title — what someone would search for]",
+```
+observation(
+  type: "pattern",  // or bugfix, decision, discovery, warning, learning
+  title: "[Concise, searchable title]",
   narrative: "[What happened, why it matters, how to apply it]",
   facts: "[comma, separated, key, facts]",
   concepts: "[searchable, keywords, for, future, retrieval]",
   files_modified: "[relevant/file.ts if applicable]",
-  confidence: "high", // high=verified, medium=likely, low=speculative
-});
+  confidence: "high",  // high=verified, medium=likely, low=speculative
+  subtitle: "[One-line semantic summary — WHY this matters for future work]"
+)
 ```
 
 **Minimum viable:** title + narrative. Everything else is bonus.
 
-## Phase 4: Check AGENTS.md / Skill Updates
+**Quality enrichment:** Add `subtitle` (WHY it matters) for high-impact observations.
+
+## Phase 4: Structural Loss Prevention
+
+When superseding an older observation, prevent accidental knowledge loss.
+
+**Trigger:** Only runs when `supersedes` is set on a new observation.
+
+1. **Read** the old observation via `memory-get`
+2. **Detect loss**: Compare facts, concepts, narrative length, file paths
+3. **Auto-merge if loss detected**:
+   - Array fields (facts, concepts): Union merge — keep all unique items from both
+   - Scalar fields (narrative): If new is shorter, append preserved section from old
+   - File paths: Union merge all paths
+4. **Flag confidence downgrades**: If old was `high` and new is `medium`/`low`, warn
+
+**Principle:** Knowledge should accumulate, not be replaced. Merging is safer than overwriting.
+
+## Phase 5: Check AGENTS.md / Skill Updates
 
 Ask: does this learning belong as a permanent rule?
 
 If YES (it's a codebase-level constraint everyone must follow):
 
-- Suggest updating `.opencode/memory/project/gotchas.md`
-- Or the relevant skill file if it's procedure-level
+- Suggest updating project gotchas or relevant skill file
 
 If MAYBE (it's a pattern, not a rule):
 
@@ -87,40 +105,48 @@ If MAYBE (it's a pattern, not a rule):
 
 **Rule:** AGENTS.md changes require user confirmation. Observations are automatic.
 
-## Phase 5: Search for Related Past Observations
+## Phase 6: Update Living Documentation
 
-```typescript
-// Check if this updates or supersedes an older observation
-memory_search({ query: "[key concept from the finding]", limit: 3 });
-```
+Check if the shipped work changed architecture, APIs, conventions, or tech stack. If so, update:
 
-If a newer finding contradicts or updates an older one, note it:
+| Doc              | Update When                                               | What to Update                              |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------- |
+| `tech-stack.md`  | New dependency added, build tool changed, runtime updated | Dependencies list, build tools, constraints |
+| `project.md`     | Architecture changed, new key files, success criteria met | Architecture section, key files, phase status |
+| `gotchas.md`     | New footgun discovered, constraint found                  | Add the gotcha with context                 |
 
-```typescript
-observation({
-  type: "decision",
-  title: "...",
-  narrative: "...",
-  supersedes: "42", // ID of the older observation
-});
-```
+**Rule:** Only update docs when the change is structural. Don't update for routine bug fixes.
 
-## Phase 6: Output Summary
-
-Report what was codified:
+## Phase 7: Search for Related Past Observations
 
 ```
-## Compound Summary
+memory-search(query: "[key concept from the finding]", limit: 3)
+```
+
+If a newer finding contradicts or updates an older one:
+
+```
+observation(type: "decision", title: "...", narrative: "...", supersedes: "42")
+```
+
+## Phase 8: Output Summary
+
+Present extracted learnings for user review:
+
+```
+## Compound Review
 
 **Work reviewed:** [brief description]
-**Learnings captured:** [N] observations
+**Learnings extracted:** [N] observations
 
-| # | Type      | Title                        | Concepts               |
-|---|-----------|------------------------------|------------------------|
-| 1 | pattern   | ...                          | auth, jwt              |
-| 2 | gotcha    | ...                          | node, build            |
-| 3 | bugfix    | ...                          | typecheck, strict-mode |
+| # | Type    | Title | Impact | Action   |
+|---|---------|-------|--------|----------|
+| 1 | pattern | ...   | high   | Store    |
+| 2 | warning | ...   | medium | Store    |
+| 3 | bugfix  | ...   | low    | Skip     |
 
+**Observations stored:** [N]
+**Superseded:** [N] older observations updated
 **AGENTS.md updates suggested:** [yes/no - describe if yes]
 **Next recommended:** /pr  (or /plan <next-bead-id>)
 ```
@@ -135,9 +161,10 @@ Don't force observations. Quality over quantity.
 
 ## Related Commands
 
-| Need                   | Command   |
-| ---------------------- | --------- |
-| Full chain             | `/lfg`    |
-| Review before compound | `/review` |
-| Ship the work          | `/ship`   |
-| Create PR              | `/pr`     |
+| Need            | Command   |
+| --------------- | --------- |
+| Full chain      | `/lfg`    |
+| Review before   | `/review` |
+| Ship the work   | `/ship`   |
+| Curate memory   | `/curate` |
+| Create PR       | `/pr`     |

@@ -8,6 +8,7 @@ dependencies: []
 
 # Brainstorming Ideas Into Designs
 
+> **Replaces** jumping straight to implementation without exploring alternatives, constraints, or edge cases
 ## When to Use
 
 - You have a rough idea that needs clarification into a design or spec
@@ -26,7 +27,7 @@ Start by understanding the current project context, then ask questions one at a 
 
 **Part of:** `development-lifecycle` skill (Phase 1: Ideation)
 
-**Output template:** `.pi/templates/design.md`
+**Output template:** `.opencode/memory/_templates/design.md`
 
 ## The Process
 
@@ -57,24 +58,24 @@ Start by understanding the current project context, then ask questions one at a 
 **Documentation:**
 
 - Write the validated design to `.beads/artifacts/<bead-id>/design.md`
-- Use template from `.pi/templates/design.md`
+- Use template from `.opencode/memory/_templates/design.md`
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
 
 **Next Phase (if continuing):**
 
 - Ask: "Ready to create the PRD?"
-- Load next skill: `/skill:prd`
+- Load next skill: `skill({ name: "prd" })`
 - This moves to Phase 2: Specification
 
 **Alternative paths:**
 
-- Use `/skill:using-git-worktrees` to create isolated workspace first
-- Use `/skill:writing-plans` if skipping formal PRD
+- Use `skill({ name: "using-git-worktrees" })` to create isolated workspace first
+- Use `skill({ name: "writing-plans" })` if skipping formal PRD
 
 **Full lifecycle reference:**
 
-- Use `/skill:development-lifecycle` to see all phases
+- Use `skill({ name: "development-lifecycle" })` to see all phases
 
 ## Key Principles
 
@@ -84,3 +85,30 @@ Start by understanding the current project context, then ask questions one at a 
 - **Explore alternatives** - Always propose 2-3 approaches before settling
 - **Incremental validation** - Present design in sections, validate each
 - **Be flexible** - Go back and clarify when something doesn't make sense
+
+## Example Flow
+
+**User request**: "Add dark mode to the app"
+
+**Good brainstorming questions**:
+1. "Should dark mode be system-preference-aware, manual toggle, or both?"
+2. "Where does theme state live — CSS variables, React context, localStorage?"
+3. "Are there existing color tokens, or do we need to create a design token system?"
+4. "What about images/icons — do they need dark variants?"
+
+**Bad brainstorming** (jumping to solution):
+1. "I'll add a ThemeContext with useState and toggle button" ← skipped alternatives
+
+## Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Asking questions the codebase can answer (search first) | Wastes turns and slows decisions; signals weak preparation | Do quick repo/docs lookup first, then ask only unresolved questions |
+| Brainstorming during mechanical/routine tasks | Adds overhead when execution is already clear | Skip to execution using the relevant implementation skill |
+| Generating 10+ alternatives without narrowing criteria | Creates analysis paralysis and no decision pressure | Present 2-3 viable options with explicit decision criteria |
+| Continuing to brainstorm after a clear direction emerges | Burns time and erodes momentum | Confirm direction, summarize decisions, transition to PRD/plan |
+
+## See Also
+
+- `writing-plans` - Turn validated direction into zero-ambiguity implementation tasks
+- `prd` - Capture behavioral requirements before implementation

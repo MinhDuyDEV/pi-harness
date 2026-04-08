@@ -147,6 +147,37 @@ export function parseCSV(value: string | undefined): string[] | undefined {
 		.filter((s) => s.length > 0);
 }
 
+/**
+ * Parse a concepts field (JSON array or CSV string) into normalized strings.
+ * Handles both `["a","b"]` JSON and `"a, b"` CSV formats.
+ */
+export function parseConcepts(raw: string | null): string[] {
+	if (!raw) return [];
+	try {
+		const parsed = JSON.parse(raw);
+		if (Array.isArray(parsed))
+			return parsed.map((c: string) => c.toLowerCase().trim());
+		// JSON.parse succeeded but not an array (e.g., a plain string) — fall through to CSV
+	} catch {
+		// Not JSON — fall through to CSV
+	}
+	return raw
+		.split(",")
+		.map((c) => c.toLowerCase().trim())
+		.filter((c) => c.length > 0);
+}
+
+/**
+ * Check if a word appears in text with word-boundary matching.
+ * Prevents false positives from substring matches (e.g., "use" in "because").
+ */
+export function hasWord(text: string, word: string): boolean {
+	return new RegExp(
+		`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+		"i",
+	).test(text);
+}
+
 export function formatObservation(obs: {
 	id: number;
 	type: string;

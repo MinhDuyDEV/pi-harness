@@ -1,152 +1,153 @@
 ---
 name: design-system-audit
-description: Use when auditing existing design systems for consistency, documenting undocumented design tokens, identifying design debt, preparing for design system refactoring, or comparing implementation vs design specs
-version: 1.0.0
-tags: [design, code-quality]
+description: Use when auditing an existing design system for consistency — token audits, pattern analysis, visual comparison against design specs. Load AFTER implementation to review, not during initial build.
+version: 2.0.0
+tags: [design, audit, ui]
 dependencies: []
 ---
 
-# Design System Audit Skill
+# Design System Audit
+
+> **Replaces** separate, overlapping design review skills — unified design analysis covering UI patterns, design tokens, and visual properties
+
+Use this skill for end-to-end design analysis across code, screenshots, and design specs.
 
 ## When to Use
 
-- Auditing existing design systems for consistency
-- Documenting undocumented design tokens
-- Identifying design debt
-- Preparing for design system refactoring
-- Comparing implementation vs design specs
+- Auditing UI consistency across a component library or app
+- Documenting existing patterns before refactor or migration
+- Extracting/validating design tokens from implementation and visuals
+- Comparing rendered output against mockups/Figma/screenshots
 
 ## When NOT to Use
 
-- No design system or token set to analyze.
+- Pure backend work with no user-facing UI
+- One-off micro tweak where system-level consistency is irrelevant
 
+## Modes
 
-## Core Workflow
+### UI Pattern Analysis
+Analyze component patterns, identify inconsistencies, document undocumented patterns.
 
-### Phase 1: Visual Inventory
+Focus areas:
 
-```
-Analyze application screenshots and create a visual inventory:
+- Component variants and usage drift
+- Repeated interaction patterns (forms, tables, dialogs, navigation)
+- Pattern ownership (where canonical implementation should live)
+- Inconsistent states (hover/focus/disabled/error/loading)
 
-1. COLOR PALETTE
-   - Primary colors (brand)
-   - Secondary colors
-   - Neutral/gray scale
-   - Semantic colors (success, warning, error, info)
+Deliverables:
 
-2. TYPOGRAPHY SCALE
-   - Heading sizes (H1-H6)
-   - Body text sizes
-   - Font families used
-   - Font weights observed
+- Pattern inventory with file references
+- Consolidation candidates
+- Priority fixes by user impact
 
-3. SPACING PATTERNS
-   - Common padding values
-   - Common margin values
-   - Gap patterns
+### Design Token Audit
+Extract and verify color, typography, spacing tokens against implementation.
 
-4. COMPONENT VARIANTS
-   - Button styles
-   - Input field styles
-   - Card variations
+Focus areas:
 
-5. INCONSISTENCIES DETECTED
-   - Similar but different colors
-   - Inconsistent spacing
-   - Typography variations
+- Color token usage vs one-off literals
+- Typography scale consistency (size/weight/line-height)
+- Spacing/radius/shadow value normalization
+- Semantic token gaps (text-muted, border-subtle, success, warning, etc.)
 
-Output as structured JSON design tokens.
-```
+Deliverables:
 
-### Phase 2: Consistency Analysis
+- Token map (source of truth + current usage)
+- Drift report (where implementation diverges)
+- Proposed canonical token set and migration order
 
-```
-Compare visual inventory with code.
+### Visual Comparison
+Compare rendered output against mockups/specs with specific measurements.
 
-Identify:
-1. Tokens used in code but not in designs
-2. Visual patterns not codified as tokens
-3. Naming inconsistencies
-4. Redundant/duplicate values
-5. Missing semantic tokens
-```
+Focus areas:
 
-## Design Token Structure
+- Pixel-level spacing/sizing mismatches
+- Color differences (hex-level)
+- Typography mismatches (font, size, weight, line height)
+- Layout/responsive behavior across breakpoints
 
-```json
-{
-  "color": {
-    "primitive": {
-      "blue": { "50": "#eff6ff", "500": "#3b82f6", "900": "#1e3a8a" }
-    },
-    "semantic": {
-      "primary": "{color.primitive.blue.500}",
-      "background": { "default": "#f9fafb", "muted": "#f3f4f6" },
-      "text": { "default": "#111827", "muted": "#6b7280" }
-    }
-  },
-  "spacing": { "1": "0.25rem", "2": "0.5rem", "4": "1rem", "8": "2rem" },
-  "typography": {
-    "fontFamily": { "sans": "Inter", "mono": "JetBrains Mono" },
-    "fontSize": { "sm": "0.875rem", "base": "1rem", "lg": "1.125rem" }
-  },
-  "borderRadius": { "sm": "0.125rem", "md": "0.375rem", "lg": "0.5rem" }
-}
-```
+Deliverables:
 
-## Audit Report Template
+- Spec-vs-implementation discrepancy list
+- Severity-ranked visual defects
+- Concrete fix list with measurable targets
+
+## Recommended Workflow
+
+1. **Scope**
+   - Identify target surfaces (pages/components/states/breakpoints)
+   - Gather artifacts (code paths, screenshots, mockups)
+
+2. **Inventory**
+   - Capture pattern and token inventory from code + visuals
+   - Note duplicates, drift, and undocumented conventions
+
+3. **Cross-Reference**
+   - Validate findings against design system tokens/components
+   - Distinguish intentional exceptions from accidental drift
+
+4. **Measure**
+   - Record measurable values for each issue:
+     - hex color
+     - px/rem size
+     - spacing/gap/padding values
+     - breakpoint-specific behavior
+
+5. **Report**
+   - Produce actionable findings with file:line and target value
+   - Group by severity and migration effort
+
+## Audit Output Template
 
 ```markdown
-# Design System Audit Report
+## Design Audit: [Scope]
 
-**Date:** [Date]
-**Application:** [Name]
+### Findings
+1. [Severity] [Issue]
+   - File: `path/to/file.tsx:123`
+   - Current: `#6B7280`, `14px`, `gap: 10px`
+   - Expected: `var(--color-text-muted)`, `13px`, `gap: 8px`
+   - Impact: [consistency/accessibility/brand mismatch]
 
-## Summary
+### Token Drift Summary
+- Colors: X one-offs, Y missing semantic mappings
+- Typography: X non-scale values
+- Spacing: X non-token values
 
-- Total unique colors: X (recommended: <20)
-- Total spacing values: X (recommended: 8-12)
-- Typography variants: X
-- Consistency score: X/100
-
-## Color Audit
-
-| Category   | Count | Issues       |
-| ---------- | ----- | ------------ |
-| Primitives | X     | X duplicates |
-| Semantics  | X     | X missing    |
-| One-offs   | X     | Should be 0  |
-
-### Recommendations
-
-1. Consolidate similar colors
-2. Add semantic tokens
-3. Remove one-off colors
-
-## Priority Actions
-
-### High Priority
-
-1. [Action with impact]
-
-### Medium Priority
-
-1. [Action]
-
-### Low Priority (Design Debt)
-
-1. [Action]
+### Priority Actions
+- P0: [high impact, low effort]
+- P1: [high impact, medium effort]
+- P2: [design debt cleanup]
 ```
+
+## Anti-Patterns
+
+| Anti-Pattern | Why It Hurts | Better Approach |
+| --- | --- | --- |
+| Vague feedback ("looks good") instead of specific measurements | Not actionable, impossible to verify | Report concrete values (hex, px/rem, exact delta) |
+| Not checking existing design tokens before proposing new values | Creates token sprawl and inconsistency | Map to existing tokens first; add new tokens only when justified |
+| Auditing in isolation without cross-referencing the design system | Flags intentional patterns as bugs | Validate each finding against canonical component/token sources |
+| Reporting visual issues without checking responsive breakpoints | Misses major UX regressions on mobile/tablet | Verify each issue across defined breakpoints and states |
+
+## Verification
+
+After audit: every finding should reference a specific file:line and measurable value (hex color, px size, etc.)
+
+Minimum quality gate:
+
+- Each finding has location + current value + expected value
+- Each recommendation maps to token/system guidance
+- Responsive states checked for impacted components
 
 ## Storage
 
-Save audit reports to `docs/design/audits/`
-Save design tokens to `docs/design/tokens/`
+- Save audits to `.opencode/memory/design/audits/`
+- Save extracted token snapshots to `.opencode/memory/design/tokens/`
 
-## Related Skills
+## See Also
 
-| Need                 | Skill                 |
-| -------------------- | --------------------- |
-| Aesthetic principles | `frontend-design`     |
-| Implement components | `mockup-to-code`      |
-| Accessibility        | `accessibility-audit` |
+- `mockup-to-code`
+- `frontend-design`
+- `accessibility-audit`

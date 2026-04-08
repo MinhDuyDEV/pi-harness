@@ -12,6 +12,7 @@ dependencies: []
 
 # Beads Workflow - Multi-Agent Task Coordination
 
+> **Replaces** ad-hoc task tracking with sticky notes, TODO comments, or mental checklists that lose state between sessions
 ## When to Use
 
 - Coordinating multi-session work with dependencies, blockers, or file locking needs
@@ -19,7 +20,7 @@ dependencies: []
 
 ## When NOT to Use
 
-- Single-session, linear tasks tracked with an in-session task list
+- Single-session, linear tasks tracked via TodoWrite
 - Quick changes with no dependencies or handoff needs
 
 ## Overview
@@ -29,14 +30,14 @@ dependencies: []
 **Key Distinction**:
 
 - **br CLI**: Multi-session work, dependencies, file locking, agent coordination
-- **In-session task list**: Single-session tasks, linear execution, conversation-scoped
+- **TodoWrite**: Single-session tasks, linear execution, conversation-scoped
 
-**When to Use br vs in-session task list**:
+**When to Use br vs TodoWrite**:
 
 - "Will I need this context in 2 weeks?" → **YES** = br
 - "Does this have blockers/dependencies?" → **YES** = br
 - "Multiple agents editing same codebase?" → **YES** = br
-- "Will this be done in this session?" → **YES** = in-session task list
+- "Will this be done in this session?" → **YES** = TodoWrite
 
 **Decision Rule**: If resuming in 2 weeks would be hard without beads, use beads.
 
@@ -110,6 +111,22 @@ See: `references/MULTI_AGENT.md` for swarm tool usage and examples.
 5. **Write notes for future agents** - Assume zero conversation context
 6. **Claim file paths before editing** - Use reserve to declare ownership (multi-agent only)
 
+## Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Claiming a bead without reading its current state first (`br show`) | Misses dependencies, blockers, and prior context | Run `br show <id>` before `br update <id> --status in_progress` |
+| Closing a bead without verification evidence | Marks incomplete or broken work as done | Run verification commands and capture output before `br close` |
+| Working on blocked beads (dependencies not met) | Wastes time and causes out-of-order delivery | Use `br ready` and confirm dependencies in `br show <id>` |
+| Modifying bead state without user confirmation | Violates workflow expectations and can surprise collaborators | Ask before changing bead status, especially close/sync actions |
+| Using `br sync` without `--flush-only` (can cause conflicts) | May write unexpected state and increase sync conflict risk | Always use `br sync --flush-only` then commit `.beads/` manually |
+
+## Verification
+
+- **Before closing:** run verification commands, paste output as evidence
+- **After close:** `br show <id>` confirms `status=closed`
+- **After sync:** `git status` shows clean working tree
+
 ## File Path Claiming (Summary)
 
 Claim files before editing in multi-agent work using `br reserve <id> --files "..."`.
@@ -157,3 +174,8 @@ MAINTENANCE:
 - `references/MULTI_AGENT.md`
 - `references/FILE_CLAIMING.md`
 - `references/BEST_PRACTICES.md`
+
+## See Also
+
+- `verification-before-completion`
+- `beads-bridge`

@@ -8,6 +8,8 @@ dependencies: []
 
 # Defense-in-Depth Validation
 
+> **Replaces** single-layer validation where bad data propagates silently until it causes cryptic failures deep in execution
+
 ## When to Use
 
 - A bug is caused by invalid data flowing through multiple layers
@@ -17,6 +19,15 @@ dependencies: []
 
 - Simple, single-layer validation at an obvious entry point is enough
 - The issue is unrelated to invalid data or boundary checks
+
+## Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Validating only at the entry point (trusting downstream) | Alternate paths and refactors bypass one gate | Add independent checks at each boundary |
+| Duplicating identical validation at every layer | Creates noise without improving safety | Tailor each layer to boundary-specific invariants |
+| Catching and swallowing errors silently | Hides failures and delays detection | Raise explicit errors with actionable context |
+| Mixing validation with business logic | Makes behavior hard to reason about and test | Keep validation checks explicit and separate from core logic |
 
 ## Overview
 
@@ -144,3 +155,12 @@ All four layers were necessary. During testing, each layer caught bugs the other
 - Debug logging identified structural misuse
 
 **Don't stop at one validation point.** Add checks at every layer.
+
+## Verification
+
+- Test with invalid input at each layer boundary — each should reject independently.
+- Remove one validation layer — the next layer should still catch the error.
+
+## See Also
+
+- **structured-edit** - Reliable read/verify/edit workflow when changing validation code across layers

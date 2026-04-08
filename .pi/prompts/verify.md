@@ -1,26 +1,21 @@
 ---
 description: Verify implementation completeness, correctness, and coherence
-argument-hint: "<bead-id> [--quick] [--fix]"
+argument-hint: "<bead-id> [--quick] [--full] [--fix] [--no-cache]"
 ---
 
 # Verify: $ARGUMENTS
 
 Check implementation against PRD before shipping.
 
-## Load Skills
-
-```typescript
-skill({ name: "beads" });
-skill({ name: "verification-before-completion" });
-```
-
 ## Parse Arguments
 
-| Argument    | Default  | Description                      |
-| ----------- | -------- | -------------------------------- |
-| `<bead-id>` | required | The bead to verify               |
-| `--quick`   | false    | Gates only, skip coherence check |
-| `--fix`     | false    | Auto-fix lint/format issues      |
+| Argument     | Default  | Description                                    |
+| ------------ | -------- | ---------------------------------------------- |
+| `<bead-id>`  | required | The bead to verify                             |
+| `--quick`    | false    | Gates only, skip coherence check               |
+| `--full`     | false    | Force full verification mode (non-incremental) |
+| `--fix`      | false    | Auto-fix lint/format issues                    |
+| `--no-cache` | false    | Bypass verification cache, force fresh run     |
 
 ## Determine Input Type
 
@@ -37,14 +32,31 @@ skill({ name: "verification-before-completion" });
 - **Run the gates**: Build, test, lint, typecheck are non-negotiable
 - **Use project conventions**: Check `package.json` scripts first
 
+## Phase 0: Check Verification Cache
+
+Before running any gates, check if a recent verification is still valid:
+
+```bash
+CURRENT_STAMP=$(printf '%s\n%s' \
+  "$(git rev-parse HEAD)" \
+  "$(git diff HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx')" \
+  | shasum -a 256 | cut -d' ' -f1)
+LAST_STAMP=$(tail -1 .beads/verify.log 2>/dev/null | awk '{print $1}')
+```
+
+| Condition                                 | Action                                      |
+| ----------------------------------------- | ------------------------------------------- |
+| `--no-cache` or `--full`                  | Skip cache check, run fresh                 |
+| `CURRENT_STAMP == LAST_STAMP`             | Report **cached PASS**, skip to completeness |
+| `CURRENT_STAMP != LAST_STAMP` or no cache | Run gates normally                          |
+
 ## Phase 1: Gather Context
 
 ```bash
 br show $ARGUMENTS
-ls .beads/artifacts/$ARGUMENTS/
 ```
 
-Read the PRD and any other artifacts (plan.md, research.md, design.md).
+Read bead artifacts (PRD, plan, research, design).
 
 **Verify guards:**
 
@@ -62,20 +74,36 @@ Extract all requirements/tasks from the PRD and verify each is implemented:
 
 ## Phase 3: Correctness
 
-Detect project type and run the appropriate verification gates:
+**Default: incremental mode** (changed files only, parallel gates).
 
-| Project Type    | Detect Via                    | Build            | Test            | Lint                          | Typecheck                             |
-| --------------- | ----------------------------- | ---------------- | --------------- | ----------------------------- | ------------------------------------- |
-| Node/TypeScript | `package.json`                | `npm run build`  | `npm test`      | `npm run lint`                | `npm run typecheck` or `tsc --noEmit` |
-| Rust            | `Cargo.toml`                  | `cargo build`    | `cargo test`    | `cargo clippy -- -D warnings` | (included in build)                   |
-| Python          | `pyproject.toml` / `setup.py` | —                | `pytest`        | `ruff check .`                | `mypy .`                              |
-| Go              | `go.mod`                      | `go build ./...` | `go test ./...` | `golangci-lint run`           | (included in build)                   |
+| Mode        | When                                      | Behavior                         |
+| ----------- | ----------------------------------------- | -------------------------------- |
+| Incremental | Default, <20 changed files                | Lint changed files, test changed |
+| Full        | `--full` flag, >20 changed files, or ship | Lint all, test all               |
 
-Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
+**Execution order:**
+
+1. **Parallel**: typecheck + lint (simultaneously)
+2. **Sequential** (after parallel passes): test, then build (ship only)
+
+Report results:
+
+```
+| Gate      | Status | Mode        | Time   |
+|-----------|--------|-------------|--------|
+| Typecheck | PASS   | full        | 2.1s   |
+| Lint      | PASS   | incremental | 0.3s   |
+| Test      | PASS   | incremental | 1.2s   |
+| Build     | SKIP   | —           | —      |
+```
+
+**After all gates pass**, record to verification cache:
+
+```bash
+echo "$CURRENT_STAMP $(date -u +%Y-%m-%dT%H:%M:%SZ) PASS" >> .beads/verify.log
+```
 
 If `--fix` flag provided, run the project's auto-fix command (e.g., `npm run lint:fix`, `ruff check --fix`, `cargo clippy --fix`).
-
-Report gate results (pass/warn/fail for each).
 
 ## Phase 4: Coherence (skip with --quick)
 
@@ -97,7 +125,7 @@ Output:
 
 1. **Result**: READY TO SHIP / NEEDS WORK / BLOCKED
 2. **Completeness**: score and status
-3. **Correctness**: gate results
+3. **Correctness**: gate results (with mode column)
 4. **Coherence**: contradictions found (if not --quick)
 5. **Blocking issues** to fix before shipping
 6. **Next step**: `/ship $ARGUMENTS` if ready, or list fixes needed

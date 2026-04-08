@@ -8,6 +8,8 @@ dependencies: []
 
 # Mockup to Code Skill
 
+> **Replaces** manual pixel-by-pixel CSS translation from designs — structured extraction of layout, colors, typography, and components from visual references
+
 ## When to Use
 
 - Converting Figma/Sketch mockups to React/Vue/HTML
@@ -19,6 +21,12 @@ dependencies: []
 
 - No visual reference or mockup to implement.
 
+## Workflow
+
+1. **Analyze** — Use vision agent to extract: layout structure, color palette, typography, spacing, components
+2. **Map** — Match extracted elements to existing design tokens/components in the codebase
+3. **Implement** — Build components using extracted specs, reusing existing tokens where possible
+4. **Verify** — Screenshot the result and compare visually to the original mockup
 
 ## Core Workflow
 
@@ -156,14 +164,21 @@ Requirements:
 - [ ] Uses tokens (no hardcoded values)
 - [ ] Accessible markup
 
+## Anti-Patterns
+
+| Anti-Pattern                                                           | Why It Fails                                                | Instead                                                                 |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Hardcoding colors/sizes instead of using design tokens                 | Creates inconsistency and makes global updates expensive    | Map values to existing tokens first; add new tokens only when truly new |
+| Building from scratch when existing components cover 80% of the design | Reintroduces solved problems and increases maintenance cost | Compose and extend existing components, then patch gaps                 |
+| Pixel-perfect matching without responsive considerations               | Breaks on different viewport sizes and device classes       | Match intent at multiple breakpoints and validate mobile/tablet/desktop |
+| Not extracting reusable components from repeated patterns              | Duplicates code and drifts visual behavior over time        | Promote repeated UI blocks into reusable components with variants       |
+
 ## Storage
 
-Save implementations to `docs/design/implementations/`
+Save implementations to `.opencode/memory/design/implementations/`
 
-## Related Skills
+## See Also
 
-| Need              | Skill                 |
-| ----------------- | --------------------- |
-| Aesthetic quality | `frontend-design`     |
-| Accessibility     | `accessibility-audit` |
-| Design tokens     | `design-system-audit` |
+- `frontend-design`
+- `visual-analysis`
+- `accessibility-audit`

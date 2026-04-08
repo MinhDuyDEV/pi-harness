@@ -1,171 +1,181 @@
-# Motion Core (formerly Framer Motion)
+# Motion Core (motion/react)
 
 **Import**: `import { motion, AnimatePresence } from 'motion/react'`
 
-## Basic Animation
+## Motion Principles
+
+- Animate for clarity, not decoration
+- Use motion to explain state change and hierarchy
+- Prefer subtle distance (`8-16px`) and opacity shifts
+- Use consistent timing/easing system across the app
+
+## Timing System
+
+| Use Case                      | Duration   |
+| ----------------------------- | ---------- |
+| Instant feedback (hover/tap)  | 100-150ms  |
+| State changes (menus/toggles) | 200-300ms  |
+| Layout transitions            | 300-500ms  |
+| Large entrances               | 500-800ms  |
+
+**Rule**: exit duration = ~75% of enter duration.
+
+## Easing System
+
+Use exponential easing by default:
 
 ```tsx
-// Simple animate on mount
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.6 }}
-/>
-
-// Shorthand (no transition object)
-<motion.div animate={{ scale: 1.1 }} />
+const EASING_ENTER = [0.16, 1, 0.3, 1];
+const EASING_EXIT = [0.4, 0, 1, 1];
 ```
 
-## Variants (Recommended Pattern)
+Avoid bounce/elastic easings for product UI.
+
+## Performance Rules
+
+Animate only compositor-friendly properties:
+
+- `transform`
+- `opacity`
+
+Avoid animating:
+
+- `width`, `height`
+- `top`, `left`
+- `margin`, `padding`
+
+## Basic Pattern
 
 ```tsx
-const variants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
+<motion.div
+  initial={{ opacity: 0, y: 12 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+/>
+```
+
+## Variants Pattern (Recommended)
+
+```tsx
+const card = {
+  hidden: { opacity: 0, y: 12 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
+  },
 };
 
-<motion.div
-  variants={variants}
-  initial="hidden"
-  animate="visible"
-/>
+<motion.div variants={card} initial="hidden" animate="visible" />
 ```
 
-## Gestures
-
-```tsx
-<motion.button
-  whileHover={{ scale: 1.05 }}
-  whileTap={{ scale: 0.95 }}
-  whileFocus={{ outline: '2px solid blue' }}
-/>
-
-// Drag
-<motion.div
-  drag
-  dragConstraints={{ left: 0, right: 300 }}
-  dragElastic={0.2}
-/>
-```
-
-## Layout Animations
-
-```tsx
-// Automatic layout animation
-<motion.div layout />
-
-// Shared layout
-<motion.div layoutId="shared-element" />
-
-// Layout with spring
-<motion.div layout transition={{ type: 'spring', stiffness: 300 }} />
-```
+Use variants for shared timing and maintainability.
 
 ## Exit Animations (AnimatePresence)
 
 ```tsx
-import { AnimatePresence } from 'motion/react';
-
-<AnimatePresence>
-  {isVisible && (
+<AnimatePresence mode="wait">
+  {open && (
     <motion.div
-      key="modal"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      key="panel"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 4 }}
+      transition={{ duration: 0.22, ease: [0.4, 0, 1, 1] }}
     />
   )}
 </AnimatePresence>
 ```
 
-## Stagger Children
+Always provide stable `key` values for exiting elements.
+
+## Stagger Patterns
 
 ```tsx
 const container = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.05,
+    },
+  },
 };
 
 const item = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 }
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0 },
 };
-
-<motion.ul variants={container} initial="hidden" animate="visible">
-  {items.map(i => <motion.li key={i} variants={item} />)}
-</motion.ul>
 ```
 
-## Transition Types
+Cap total stagger windows to ~500ms.
+
+## Layout Animations
 
 ```tsx
-// Spring (default for physical properties)
-transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-
-// Tween
-transition={{ type: 'tween', duration: 0.5, ease: 'easeInOut' }}
-
-// Inertia (for drag)
-transition={{ type: 'inertia', velocity: 50 }}
+<motion.div layout />
 ```
 
-## Common Easing
+Use `layout` for reordering and size changes. Add spring only when needed:
 
 ```tsx
-ease: 'linear'
-ease: 'easeIn' | 'easeOut' | 'easeInOut'
-ease: 'circIn' | 'circOut' | 'circInOut'
-ease: 'backIn' | 'backOut' | 'backInOut'
-ease: [0.4, 0, 0.2, 1]  // cubic-bezier
+<motion.div layout transition={{ type: 'spring', stiffness: 320, damping: 28 }} />
 ```
 
-## useAnimate Hook
+## Gestures
 
 ```tsx
-import { useAnimate } from 'motion/react';
-
-function Component() {
-  const [scope, animate] = useAnimate();
-  
-  const handleClick = async () => {
-    await animate(scope.current, { x: 100 });
-    await animate(scope.current, { scale: 1.2 });
-  };
-  
-  return <div ref={scope} onClick={handleClick} />;
-}
-```
-
-## Motion Values
-
-```tsx
-import { useMotionValue, useTransform } from 'motion/react';
-
-const x = useMotionValue(0);
-const opacity = useTransform(x, [0, 100], [1, 0]);
-
-<motion.div style={{ x, opacity }} drag="x" />
-```
-
-## Integration with Tailwind
-
-```tsx
-// Motion handles animation, Tailwind handles styling
-<motion.div
-  className="bg-blue-500 rounded-lg p-4"
-  whileHover={{ scale: 1.05 }}
-  transition={{ type: 'spring' }}
+<motion.button
+  whileHover={{ scale: 1.02 }}
+  whileTap={{ scale: 0.98 }}
+  transition={{ duration: 0.12 }}
 />
 ```
 
-## Validation Checklist
+Keep gesture amplitudes subtle (`0.98-1.03`).
 
-- [ ] Import from `motion/react` (not `framer-motion`)
-- [ ] Use variants for complex animations
-- [ ] Wrap conditional renders with `AnimatePresence`
-- [ ] Add `key` prop to animated elements in `AnimatePresence`
-- [ ] Use `layout` for automatic layout animations
-- [ ] Prefer `whileHover`/`whileTap` over CSS `:hover`
+## Height Expand/Collapse (No height animation)
+
+Use CSS grid technique:
+
+```css
+.accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.accordion-content[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+
+.accordion-inner {
+  overflow: hidden;
+}
+```
+
+## Reduced Motion (Mandatory)
+
+```css
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+```
+
+For motion/react, switch spatial movement to opacity-only when reduced motion is enabled.
+
+## Quick Checklist
+
+- [ ] Uses `motion/react` import
+- [ ] Timing follows 100/300/500ms system
+- [ ] Exponential easing, no bounce/elastic
+- [ ] Animates only `transform` and `opacity`
+- [ ] Uses `AnimatePresence` for exit states
+- [ ] Includes reduced motion support
+- [ ] Stagger windows stay under 500ms

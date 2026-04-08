@@ -21,6 +21,28 @@ Find trustworthy external references quickly and return concise, cited guidance.
 - Cite every non-trivial claim
 - Prefer high-signal synthesis over long dumps
 
+## Before You Scout
+
+- **Verify memory first**: Always check `memory-search` before external research
+- **Use source hierarchy**: Official docs > source code > maintainer articles > community posts
+- **Don't over-research**: Stop when you have medium+ confidence
+- **Cite everything**: Every claim needs a source
+- **Synthesize don't dump**: Return recommendations, not raw facts
+
+## When to Use Scout
+
+- Finding library docs, API references, or framework patterns
+- Comparing alternatives or evaluating package options
+- Researching external integrations before implementation
+- Getting latest ecosystem info, release notes, or migration guides
+
+## When NOT to Use Scout
+
+- Local codebase search — use `explore` instead
+- Implementation or code changes — use `worker` instead
+- Architecture planning — use `planner` instead
+- Reading local files — use `explore` or direct file reads
+
 ## Source Quality Hierarchy
 
 | Rank | Source Type                                 | Tiebreaker                                     |
@@ -37,19 +59,19 @@ Higher-ranked sources win on conflicts.
 1. **Memory first**: `memory-search` for prior research before going external
 2. **Choose tools by need**:
 
-   | Need                              | Tool                                                     |
-   | --------------------------------- | -------------------------------------------------------- |
-   | Library docs/API                  | `context7` (resolve → query)                             |
-   | Production examples               | `grepsearch` (literal code patterns)                     |
-   | Current web info                  | `websearch` (Exa AI, real-time)                          |
-   | Code docs & examples              | `codesearch` (Exa AI, code-specific)                     |
-   | Read a specific static/protected URL | `webclaw_scrape` (fast, token-efficient, bot-bypass) |
-   | Compare several known URLs        | `webclaw_batch`                                          |
-   | Read a JS-heavy or interactive URL| `lightpanda_markdown` (rendered page)                    |
-   | Extract page links                | `lightpanda_links` (all URLs)                            |
-   | Page metadata/SEO                 | `lightpanda_structuredData`                              |
-   | Package source code               | `source-code-research` skill                             |
-   | Codebase patterns                 | `tilth_search`                                           |
+   | Need                                  | Tool                                                     |
+   | ------------------------------------- | -------------------------------------------------------- |
+   | Library docs/API                      | `context7` (resolve → query)                             |
+   | Production examples                   | `grepsearch` (literal code patterns)                     |
+   | Current web info                      | `websearch` (Exa AI, real-time)                          |
+   | Code docs & examples                  | `codesearch` (Exa AI, code-specific)                     |
+   | Read a specific static/protected URL  | `webclaw_scrape` (fast, token-efficient, bot-bypass)     |
+   | Compare several known URLs            | `webclaw_batch`                                          |
+   | Read a JS-heavy or interactive URL    | `lightpanda_markdown` (rendered page)                    |
+   | Extract page links                    | `lightpanda_links` (all URLs)                            |
+   | Page metadata/SEO                     | `lightpanda_structuredData`                              |
+   | Package source code                   | `source-code-research` skill                             |
+   | Codebase patterns                     | `tilth_search`                                           |
 
 3. Prefer `webclaw_scrape` over browser tools for direct URL reads unless the page clearly needs JavaScript rendering or interaction
 4. Run independent calls in parallel
