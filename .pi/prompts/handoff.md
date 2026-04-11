@@ -32,7 +32,7 @@ br show $ARGUMENTS
 git status --porcelain
 git branch --show-current
 git rev-parse --short HEAD
-ls .beads/artifacts/$ARGUMENTS/ 2>/dev/null
+Read `.beads/artifacts/$ARGUMENTS/` to check existing artifacts.
 ```
 
 ---
@@ -59,9 +59,11 @@ question({
 If user chooses commit:
 
 ```bash
-git add -A
+git add <specific-files-you-modified>
 git commit -m "WIP: $ARGUMENTS - [brief description of where you stopped]"
 ```
+
+**Never use `git add -A` or `git add .`** — stage only the files you modified.
 
 ---
 
@@ -80,12 +82,6 @@ memory_update({
 
 ## Done
 - [completed work]
-
-## What Worked
-- [approaches/tools that succeeded — keep using these]
-
-## What Didn't Work
-- [failed approaches — do NOT retry these]
 
 ## In Progress
 - [current step] — stopped because [reason]

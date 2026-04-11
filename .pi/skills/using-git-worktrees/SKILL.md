@@ -110,6 +110,32 @@ git worktree add "$path" -b "$BRANCH_NAME"
 cd "$path"
 ```
 
+## Worktree Tracking
+
+After creating a worktree, persist its absolute path for session resume:
+
+```bash
+# After creating worktree
+mkdir -p .beads/artifacts/$BEAD_ID
+echo "/absolute/path/to/worktree" > .beads/artifacts/$BEAD_ID/worktree.txt
+```
+
+On session resume, restore the active worktree if tracking exists:
+
+```bash
+# Check if worktree exists for active bead
+if [ -f .beads/artifacts/$BEAD_ID/worktree.txt ]; then
+  WORKTREE_PATH=$(cat .beads/artifacts/$BEAD_ID/worktree.txt)
+  cd "$WORKTREE_PATH"
+fi
+```
+
+On worktree cleanup (after merge), remove the tracking file:
+
+```bash
+rm -f .beads/artifacts/$BEAD_ID/worktree.txt
+```
+
 ### 3. Run Project Setup
 
 Auto-detect and run appropriate setup:

@@ -1,6 +1,7 @@
 ---
 description: Review code for quality, security, and compliance
 argument-hint: "[path|bead-id|pr-number|'all'] [--quick|--thorough]"
+agentType: reviewer
 ---
 
 # Review: $ARGUMENTS
@@ -10,6 +11,7 @@ argument-hint: "[path|bead-id|pr-number|'all'] [--quick|--thorough]"
 ```typescript
 skill({ name: "beads" });
 skill({ name: "requesting-code-review" });
+skill({ name: "verification-gates" });
 ```
 
 ## Determine Input Type
@@ -31,13 +33,13 @@ skill({ name: "requesting-code-review" });
 
 ## Available Tools
 
-| Tool         | Use When                                |
-| ------------ | --------------------------------------- |
-| `explore`    | Finding patterns in codebase, prior art |
-| `scout`      | External research, best practices       |
-| `lsp`        | Finding symbol definitions, references  |
-| `grep`       | Finding code patterns                   |
-| `codesearch` | Real-world usage examples               |
+| Tool                 | Use When                                |
+| -------------------- | --------------------------------------- |
+| `explore`            | Finding patterns in codebase, prior art |
+| `scout`              | External research, best practices       |
+| `lsp`                | Finding symbol definitions, references  |
+| `tilth_tilth_search` | Finding code patterns                   |
+| `codesearch`         | Real-world usage examples               |
 
 ## Phase 1: Gather Context
 
@@ -65,16 +67,9 @@ If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
 
 If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
 
-## Phase 2: Automated Checks
+## Phase 3: Automated Checks
 
-Detect project type and run the appropriate checks in parallel:
-
-| Project Type    | Detect Via                    | Build            | Test            | Lint                          | Typecheck                             |
-| --------------- | ----------------------------- | ---------------- | --------------- | ----------------------------- | ------------------------------------- |
-| Node/TypeScript | `package.json`                | `npm run build`  | `npm test`      | `npm run lint`                | `npm run typecheck` or `tsc --noEmit` |
-| Rust            | `Cargo.toml`                  | `cargo build`    | `cargo test`    | `cargo clippy -- -D warnings` | (included in build)                   |
-| Python          | `pyproject.toml` / `setup.py` | —                | `pytest`        | `ruff check .`                | `mypy .`                              |
-| Go              | `go.mod`                      | `go build ./...` | `go test ./...` | `golangci-lint run`           | (included in build)                   |
+Follow the [verification-gates](../skill/verification-gates/SKILL.md) skill protocol.
 
 Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
 
@@ -85,7 +80,7 @@ Also scan for common issues appropriate to the detected language:
 - `TODO|FIXME|HACK` markers
 - Hardcoded secrets patterns
 
-## Phase 3: Manual Review
+## Phase 4: Manual Review
 
 Review each category:
 
@@ -104,7 +99,7 @@ Review each category:
 - Default: Full automated + manual review
 - `--thorough`: Deep analysis of all categories
 
-## Phase 4: Report
+## Phase 5: Report
 
 Group findings by severity:
 
@@ -119,7 +114,17 @@ Include:
 3. Verdict: Ready to merge / With fixes / No
 4. Reasoning (1-2 sentences)
 
-Record significant findings with `observation()`.
+Record significant findings with `observation()`:
+
+```typescript
+observation({
+  type: "discovery", // or "warning", "pattern", "bugfix"
+  title: "Review: [scope] [key finding]",
+  narrative: "[What was found, severity, file:line, recommended fix]",
+  concepts: "code-review, [category]",
+  confidence: "high",
+});
+```
 
 ## Related Commands
 

@@ -7,9 +7,16 @@ argument-hint: "[bead-id]"
 
 Capture what was learned. This is the flywheel step — each cycle makes the next cycle faster.
 
-> **Workflow:** `/plan` → `/ship` → `/review` → **`/compound`** → `/pr`
+> **Workflow:** `/plan` → `/ship` → **`/compound`** → `/pr`
 >
 > Run after every completed task, review, or PR merge. The value compounds over time.
+
+## Load Skills
+
+```typescript
+skill({ name: "memory-system" });
+skill({ name: "verification-before-completion" });
+```
 
 ## What This Does
 
@@ -47,7 +54,7 @@ For each finding, assign a type:
 | `bugfix`    | A non-obvious bug and its root cause                       | "Bun doesn't support X, use Y instead"          |
 | `decision`  | An architectural or design choice with rationale           | "Chose JWT over sessions because..."            |
 | `warning`   | A footgun, constraint, or thing that looks wrong but isn't | "Don't modify dist/ directly, build overwrites" |
-| `discovery` | A non-obvious fact about the codebase or its dependencies  | "Build copies .opencode/ to dist/template/"     |
+| `discovery` | A non-obvious fact about the codebase or its dependencies  | "Build copies .pi/ to dist/template/"     |
 | `warning`   | Something that will break if not followed                  | "Always run lint:fix before commit"             |
 
 **Quality bar:** Only record learnings that would save future-you 15+ minutes.
@@ -57,36 +64,58 @@ Skip obvious things. Skip things already in AGENTS.md.
 
 For each learning worth keeping, create an observation:
 
-```
-observation(
-  type: "pattern",  // or bugfix, decision, discovery, warning, learning
-  title: "[Concise, searchable title]",
+```typescript
+observation({
+  type: "pattern", // or bugfix, decision, discovery, warning, learning
+  title: "[Concise, searchable title — what someone would search for]",
   narrative: "[What happened, why it matters, how to apply it]",
   facts: "[comma, separated, key, facts]",
   concepts: "[searchable, keywords, for, future, retrieval]",
   files_modified: "[relevant/file.ts if applicable]",
-  confidence: "high",  // high=verified, medium=likely, low=speculative
-  subtitle: "[One-line semantic summary — WHY this matters for future work]"
-)
+  confidence: "high", // high=verified, medium=likely, low=speculative
+  // ByteRover-inspired quality fields:
+  subtitle: "[One-line semantic summary — WHY this matters for future work]",
+});
 ```
 
 **Minimum viable:** title + narrative. Everything else is bonus.
 
-**Quality enrichment:** Add `subtitle` (WHY it matters) for high-impact observations.
+**Quality enrichment:** Add `subtitle` (WHY it matters) for high-impact observations. Skip for routine findings.
 
 ## Phase 4: Structural Loss Prevention
 
 When superseding an older observation, prevent accidental knowledge loss.
 
-**Trigger:** Only runs when `supersedes` is set on a new observation.
+**Trigger:** Only runs when `supersedes: "ID"` is set on a new observation.
 
-1. **Read** the old observation via `memory-get`
-2. **Detect loss**: Compare facts, concepts, narrative length, file paths
-3. **Auto-merge if loss detected**:
-   - Array fields (facts, concepts): Union merge — keep all unique items from both
-   - Scalar fields (narrative): If new is shorter, append preserved section from old
-   - File paths: Union merge all paths
-4. **Flag confidence downgrades**: If old was `high` and new is `medium`/`low`, warn
+### Step 1: Read the old observation
+
+```typescript
+const old = memory_get({ ids: "<superseded-id>" });
+```
+
+### Step 2: Detect structural loss
+
+Compare the new observation against the old one:
+
+| Field            | Loss Detection                                                  |
+| ---------------- | --------------------------------------------------------------- |
+| `facts`          | Old facts not present in new facts (comma-separated comparison) |
+| `concepts`       | Old concepts not present in new concepts                        |
+| `narrative`      | New narrative significantly shorter than old (< 50% length)     |
+| `files_modified` | Old file paths not present in new list                          |
+
+### Step 3: Auto-merge if loss detected
+
+- **Array fields** (facts, concepts): Union merge — keep all old items, add new items, deduplicate
+- **Scalar fields** (narrative): If new is shorter, append `\n\n[Preserved from superseded observation #ID:]\n` + old narrative section
+- **File paths**: Union merge all paths
+
+### Step 4: Flag for review if high-impact
+
+If the old observation had `confidence: "high"` and the new one has `confidence: "medium"` or `confidence: "low"`, flag with a warning:
+
+> ⚠️ Confidence downgrade detected: superseding a high-confidence observation (#ID) with lower confidence. Verify this is intentional.
 
 **Principle:** Knowledge should accumulate, not be replaced. Merging is safer than overwriting.
 
@@ -96,7 +125,8 @@ Ask: does this learning belong as a permanent rule?
 
 If YES (it's a codebase-level constraint everyone must follow):
 
-- Suggest updating project gotchas or relevant skill file
+- Suggest updating `.pi/memory/project/gotchas.md`
+- Or the relevant skill file if it's procedure-level
 
 If MAYBE (it's a pattern, not a rule):
 
@@ -107,31 +137,48 @@ If MAYBE (it's a pattern, not a rule):
 
 ## Phase 6: Update Living Documentation
 
-Check if the shipped work changed architecture, APIs, conventions, or tech stack. If so, update:
+Check if the shipped work changed architecture, APIs, conventions, or tech stack. If so, update the relevant project docs.
 
-| Doc              | Update When                                               | What to Update                              |
-| ---------------- | --------------------------------------------------------- | ------------------------------------------- |
-| `tech-stack.md`  | New dependency added, build tool changed, runtime updated | Dependencies list, build tools, constraints |
-| `project.md`     | Architecture changed, new key files, success criteria met | Architecture section, key files, phase status |
-| `gotchas.md`     | New footgun discovered, constraint found                  | Add the gotcha with context                 |
+**Check each:**
 
-**Rule:** Only update docs when the change is structural. Don't update for routine bug fixes.
+| Doc                   | Update When                                               | What to Update                                      |
+| --------------------- | --------------------------------------------------------- | --------------------------------------------------- |
+| `tech-stack.md`       | New dependency added, build tool changed, runtime updated | Dependencies list, build tools, constraints         |
+| `project.md`          | Architecture changed, new key files, success criteria met | Architecture section, key files table, phase status |
+| `gotchas.md`          | New footgun discovered, constraint found                  | Add the gotcha with context                         |
+| `AGENTS.md` (project) | New convention established, boundary rule needed          | Boundaries, gotchas, code example sections          |
+
+```typescript
+// Check what changed
+// If tech stack changed:
+memory_update({ file: "project/tech-stack", content: "...", mode: "append" });
+// If new gotcha:
+memory_update({ file: "project/gotchas", content: "...", mode: "append" });
+```
+
+**Rule:** Only update docs when the change is structural (new pattern, new dep, new constraint). Don't update for routine bug fixes or small features. Ask user before modifying `AGENTS.md`.
 
 ## Phase 7: Search for Related Past Observations
 
-```
-memory-search(query: "[key concept from the finding]", limit: 3)
+```typescript
+// Check if this updates or supersedes an older observation
+memory_search({ query: "[key concept from the finding]", limit: 3 });
 ```
 
-If a newer finding contradicts or updates an older one:
+If a newer finding contradicts or updates an older one, note it:
 
-```
-observation(type: "decision", title: "...", narrative: "...", supersedes: "42")
+```typescript
+observation({
+  type: "decision",
+  title: "...",
+  narrative: "...",
+  supersedes: "42", // ID of the older observation
+});
 ```
 
 ## Phase 8: Output Summary
 
-Present extracted learnings for user review:
+Present extracted learnings for user review before finalizing:
 
 ```
 ## Compound Review
@@ -139,16 +186,38 @@ Present extracted learnings for user review:
 **Work reviewed:** [brief description]
 **Learnings extracted:** [N] observations
 
-| # | Type    | Title | Impact | Action   |
-|---|---------|-------|--------|----------|
-| 1 | pattern | ...   | high   | Store    |
-| 2 | warning | ...   | medium | Store    |
-| 3 | bugfix  | ...   | low    | Skip     |
+| # | Type | Title | Impact | Action |
+|---|------|-------|--------|--------|
+| 1 | pattern | ... | high | ✅ Store |
+| 2 | warning | ... | medium | ✅ Store |
+| 3 | bugfix | ... | low | ⏭️ Skip (routine) |
+```
+
+```typescript
+question({
+  questions: [
+    {
+      header: "Approve Learnings",
+      question: "Review extracted learnings. Store all approved observations?",
+      options: [
+        { label: "Store all (Recommended)", description: "Persist all marked ✅" },
+        { label: "Let me adjust", description: "I'll modify before storing" },
+        { label: "Skip compound", description: "Nothing worth persisting" },
+      ],
+    },
+  ],
+});
+```
+
+**After approval:** Store observations and report final summary:
+
+```
+## Compound Summary
 
 **Observations stored:** [N]
 **Superseded:** [N] older observations updated
 **AGENTS.md updates suggested:** [yes/no - describe if yes]
-**Next recommended:** /pr  (or /plan <next-bead-id>)
+**Next recommended:** /pr (or /plan <next-bead-id>)
 ```
 
 ## When Nothing to Compound
@@ -161,10 +230,10 @@ Don't force observations. Quality over quantity.
 
 ## Related Commands
 
-| Need            | Command   |
-| --------------- | --------- |
-| Full chain      | `/lfg`    |
-| Review before   | `/review` |
-| Ship the work   | `/ship`   |
-| Curate memory   | `/curate` |
-| Create PR       | `/pr`     |
+| Need            | Command            |
+| --------------- | ------------------ |
+| Full chain      | `/lfg`             |
+| Review codebase | `/review-codebase` |
+| Ship the work   | `/ship`            |
+| Curate memory   | `/curate`          |
+| Create PR       | `/pr`              |

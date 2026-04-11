@@ -1,6 +1,8 @@
 ---
 description: Review UI/UX design for quality, aesthetics, and best practices
 argument-hint: "<image-or-component-path> [--responsive] [--dark-mode]"
+agentType: vision
+model: proxypal/gemini-3-pro-preview
 ---
 
 # UI Review: $ARGUMENTS
@@ -86,5 +88,4 @@ observation({
 | Need                 | Command   |
 | -------------------- | --------- |
 | Design from scratch  | `/design` |
-| Start implementation | `/start`  |
 | Ship implementation  | `/ship`   |

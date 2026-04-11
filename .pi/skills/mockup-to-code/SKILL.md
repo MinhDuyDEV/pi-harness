@@ -175,7 +175,7 @@ Requirements:
 
 ## Storage
 
-Save implementations to `.opencode/memory/design/implementations/`
+Save implementations to `.pi/memory/design/implementations/`
 
 ## See Also
 

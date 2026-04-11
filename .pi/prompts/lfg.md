@@ -22,8 +22,9 @@ Full compound engineering cycle. One command, all four steps.
 
 ```bash
 br show $BEAD_ID
-ls .beads/artifacts/$BEAD_ID/
 ```
+
+Read `.beads/artifacts/$BEAD_ID/` to check what artifacts exist.
 
 Verify:
 
@@ -59,22 +60,22 @@ Execute the plan:
 
 ```typescript
 skill({ name: "executing-plans" });
+skill({ name: "reflection-checkpoints" }); // Phase transition + mid-point checks
 // Load plan.md, execute wave-by-wave
 // Per-task commits after each task passes verification
 ```
 
-Run verification after each wave:
+Follow the [Verification Protocol](../skill/verification-before-completion/references/VERIFICATION_PROTOCOL.md):
 
-- `npm run typecheck`
-- `npm run lint`
-- `vitest` (if tests exist for changed areas)
+- Use **full mode** for final verification
+- Use **incremental mode** between implementation waves
 
 Checkpoint only at `checkpoint:human-verify` or `checkpoint:decision` tasks.
 
 ## Step 3: REVIEW
 
 ```bash
-BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~$(git log --oneline | wc -l | tr -d ' '))
+BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git merge-base HEAD origin/main)
 HEAD_SHA=$(git rev-parse HEAD)
 ```
 

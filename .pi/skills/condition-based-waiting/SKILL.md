@@ -8,6 +8,8 @@ dependencies: []
 
 # Condition-Based Waiting
 
+> **Replaces** arbitrary `sleep()` / `setTimeout()` calls and hardcoded delays that cause flaky tests and slow CI
+
 ## When to Use
 
 - Tests are flaky due to arbitrary delays or timing guesses
@@ -17,6 +19,17 @@ dependencies: []
 
 - You are explicitly testing timing behavior (debounce, throttle, intervals)
 - A fixed, documented timeout is part of the requirement
+
+## Common Rationalizations
+
+| Rationalization                               | Rebuttal                                                                       |
+| --------------------------------------------- | ------------------------------------------------------------------------------ |
+| "50ms is plenty of time"                      | It's plenty on YOUR machine. CI runners under load disagree                    |
+| "The sleep worked in local testing"           | Local = fast SSD, idle CPU. CI = shared resources, variable latency            |
+| "Adding a waitFor is more complex than sleep" | A 5-line waitFor is simpler than debugging a flaky test 10 times               |
+| "This operation is always fast"               | "Always" until garbage collection, disk I/O, or network latency says otherwise |
+| "I'll increase the timeout if it flakes"      | Increasing timeouts slows the entire suite and masks the real problem          |
+| "It only fails sometimes"                     | "Sometimes" = race condition. Condition-based waiting eliminates it entirely   |
 
 ## Overview
 
@@ -101,6 +114,12 @@ await new Promise((r) => setTimeout(r, 200)); // Then: wait for timed behavior
 2. Based on known timing (not guessing)
 3. Comment explaining WHY
 
+## Verification
+
+- **After applying:** run the previously flaky test 5+ times — should pass consistently
+- **Check:** no hardcoded sleep/delay values remain in the test file
+- **Measure:** test execution time should decrease (no wasted wait time)
+
 ## Real-World Impact
 
 From debugging session (2025-10-03):
@@ -109,3 +128,8 @@ From debugging session (2025-10-03):
 - Pass rate: 60% → 100%
 - Execution time: 40% faster
 - No more race conditions
+
+## See Also
+
+- `systematic-debugging`
+- `test-driven-development`

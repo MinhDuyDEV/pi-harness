@@ -4,26 +4,27 @@ description: >
   Runtime-enforced context management for Pi coding agents. Covers DCP's automatic
   pruning strategies (dedup, supersede-writes, purge-errors), the compress tool for
   manual phase crystallization, nudge system, summary buffer, priority maps, deferred
-  drop queue, fact extraction, and ctx_expand for reversible compression.
-version: 2.1.0
+  drop queue, fact extraction, ctx_expand for reversible compression, and vcc_recall/
+  vcc_snapshot for deterministic session recovery.
+version: 2.2.0
 tags: [context, dcp, compression, pruning]
 dependencies: []
 ---
 
-# Dynamic Context Pruning (DCP v2.1)
+# Dynamic Context Pruning (DCP v2.2)
 
 > Runtime-enforced context management for Pi coding agents. Prune + compress conversation to stay in budget.
 
 ## Overview
 
-DCP v2.1 operates at **two levels**:
+DCP v2.2 operates at **two levels**:
 
 1. **Runtime enforcement** — The extension hooks into Pi's `context`, `turn_end`, `session_before_compact`, and `before_agent_start` events to automatically prune, nudge, and compact.
 2. **Agent behavior** — The `compress` tool remains available for manual crystallization of completed phases.
 
 **Key change from v1**: Strategies (dedup, supersede-writes, purge-errors) now execute automatically via the `context` event before every LLM call. They are no longer just behavioral guidance.
 
-**v2.1 additions** (from v3.1.4 research):
+**v2.1+ additions** (from v3.1.4 research):
 - **Summary buffer** — Compressed block tokens extend effective nudge thresholds (prevents nudge storms)
 - **Priority map** — Nudges include biggest compression targets by name (e.g., "read 5x, ~25k tokens")
 - **Message-mode compression** — `compress` in message mode includes priority suggestions
@@ -90,6 +91,35 @@ ctx_expand({ blockId: 3 })  // Expands block b3 back to raw transcript
 ```
 
 Capped at ~15k tokens per expansion.
+
+### Use `vcc_recall` for Targeted History Recovery
+
+Search session history (including compacted parts) when you need specific prior details:
+
+```
+vcc_recall()                                // recent entries
+vcc_recall({ query: "auth|token|blocker" }) // regex/keyword lookup
+vcc_recall({ expand: [42] })                 // full entry payload
+```
+
+Use when:
+- a compressed summary is too high-level
+- you need exact prior tool output or user wording
+- resume/handoff notes are incomplete
+
+### Use `vcc_snapshot` for Deterministic Session Summaries
+
+Generate an algorithmic summary of goals, file activity, blockers, preferences, and brief transcript:
+
+```
+vcc_snapshot()
+vcc_snapshot({ query: "dcp|snapshot.ts", limit: 200 })
+```
+
+Use when:
+- writing handoffs
+- resuming work after reload
+- quickly establishing "what changed" before coding
 
 ## Dual-Band Token Budget (with Summary Buffer)
 

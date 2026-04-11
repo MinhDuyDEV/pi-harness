@@ -1,6 +1,6 @@
 ---
 name: chrome-devtools
-description: Chrome DevTools for debugging, performance analysis, and browser automation. Use when debugging web apps, analyzing performance, inspecting network requests, or automating browser interactions.
+description: Use when debugging web apps in Chrome — performance profiling, network inspection, DOM debugging, or console automation. MUST load before any Chrome DevTools-based debugging session.
 version: 1.0.0
 tags: [automation, debugging]
 dependencies: []
@@ -15,6 +15,7 @@ dependencies: []
 ## When NOT to Use
 
 - When cross-browser automation is required (use Playwright-based skills instead).
+
 
 ## Available Tools
 
@@ -41,19 +42,19 @@ dependencies: []
 
 ```
 # Get page structure with element UIDs
-take_snapshot()
+skill_mcp(skill_name="chrome-devtools", tool_name="take_snapshot")
 
 # Navigate to URL
-navigate_page({"type": "url", "url": "https://example.com"})
+skill_mcp(skill_name="chrome-devtools", tool_name="navigate_page", arguments='{"type": "url", "url": "https://example.com"}')
 
 # Click element (use UID from snapshot)
-click({"uid": "e123"})
+skill_mcp(skill_name="chrome-devtools", tool_name="click", arguments='{"uid": "e123"}')
 
 # Fill input field
-fill({"uid": "e456", "value": "hello"})
+skill_mcp(skill_name="chrome-devtools", tool_name="fill", arguments='{"uid": "e456", "value": "hello"}')
 
 # Take screenshot
-take_screenshot()
+skill_mcp(skill_name="chrome-devtools", tool_name="take_screenshot")
 ```
 
 ## Tips

@@ -272,7 +272,7 @@ Custom DCP prompts are enabled (`experimental.customPrompts: true`).
 
 Override precedence:
 
-1. `.opencode/dcp-prompts/overrides/` (project)
+1. `.pi/dcp-prompts/overrides/` (project)
 2. config directory overrides
 3. `~/.config/opencode/dcp-prompts/overrides/` (global)
 

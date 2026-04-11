@@ -83,6 +83,8 @@ import {
 	storeRawTranscript,
 } from "./dcp/db.js";
 import { registerCompressTool } from "./dcp/tools.js";
+import { registerRecallTool } from "./dcp/recall.js";
+import { registerSnapshotTool } from "./dcp/snapshot.js";
 import { applyStrategies, applyDeferredDrops, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
 import { TagManager } from "./dcp/tags.js";
 import { DropQueue } from "./dcp/queue.js";
@@ -156,10 +158,12 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		initialized = true;
 	}
 
-	// 3. Register tools (compress + ctx_expand)
+	// 3. Register tools (compress + ctx_expand + vcc_recall + vcc_snapshot)
 	// Pass getPriorityMap callback so compress tool can show priority suggestions in message mode
 	registerCompressTool(pi, config, () => nudgeManager.getPriorityMap());
 	registerExpandTool(pi, config);
+	registerRecallTool(pi);
+	registerSnapshotTool(pi);
 
 	// -----------------------------------------------------------------------
 	// EVENT: input — Track turn count + reset nudge consecutive counter

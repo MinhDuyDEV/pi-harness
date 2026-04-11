@@ -1,13 +1,14 @@
 ---
 description: UI/UX visual design with aesthetic direction and code output
 argument-hint: "<component|page|system> [topic] [--quick]"
+agentType: vision
 ---
 
 # Design: $ARGUMENTS
 
 Design a component, page, or design system with a clear aesthetic point of view.
 
-> **Design track (optional):** Not part of the core `/create → /start → /ship` workflow.
+> **Design track (optional):** Not part of the core `/create → /ship` workflow.
 > Use when you need visual design guidance before or during implementation.
 
 ## Parse Arguments
@@ -31,9 +32,9 @@ skill({ name: "frontend-design" }); // Design system guidance, anti-patterns, re
 ## Phase 1: Detect Existing Design System
 
 ```typescript
-glob({ pattern: "**/tailwind.config.{js,ts,mjs}" });
-glob({ pattern: "**/globals.css" });
-glob({ pattern: "**/components.json" }); // shadcn
+tilth_tilth_files({ pattern: "**/tailwind.config.{js,ts,mjs}" });
+tilth_tilth_files({ pattern: "**/globals.css" });
+tilth_tilth_files({ pattern: "**/components.json" }); // shadcn
 ```
 
 Read what exists. Don't design in a vacuum — build on the project's current system.
@@ -107,5 +108,4 @@ observation({
 | Need               | Command         |
 | ------------------ | --------------- |
 | Review existing UI | `/ui-review`    |
-| Start building     | `/start <bead>` |
 | Ship it            | `/ship <bead>`  |

@@ -1,6 +1,6 @@
 ---
 name: polar
-description: Polar payment platform integration for monetization, subscriptions, and license keys. Use when implementing checkout, managing products, or building customer portals.
+description: Use when implementing payment flows, subscriptions, license keys, or customer portals with Polar. MUST load before writing any checkout, monetization, or billing code using Polar platform.
 version: 1.0.0
 tags: [integration, mcp]
 dependencies: []

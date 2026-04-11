@@ -102,7 +102,7 @@ for (const group of plan.dependency_graph.parallelizable_groups) {
   const spawnPromises = group.map((taskId) => {
     const node = plan.dependency_graph.nodes.find((n) => n.id === taskId);
     return Task({
-      subagent_type: "general",
+      subagent_type: "worker",
       description: `Execute ${taskId}`,
       prompt: `Execute bead ${taskId}: ${node.content}
 

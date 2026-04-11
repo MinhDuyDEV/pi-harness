@@ -71,11 +71,9 @@ Create `./AGENTS.md` — **target <60 lines** (max 150). Follow the `index-knowl
 
 ## Phase 4: Create tech-stack.md
 
-From template `.opencode/memory/_templates/tech-stack.md`:
+From template `.pi/memory/_templates/tech-stack.md`:
 
-```bash
-cp .opencode/memory/_templates/tech-stack.md .opencode/memory/project/tech-stack.md
-```
+Read the template from `.pi/memory/_templates/tech-stack.md` and write it to `.pi/memory/project/tech-stack.md`.
 
 Fill detected values:
 

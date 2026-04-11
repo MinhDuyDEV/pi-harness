@@ -8,10 +8,12 @@ description: >
 version: "2.1.0"
 license: MIT
 tags: [agent-coordination, workflow]
-dependencies: [beads-bridge]
+dependencies: [beads]
 ---
 
 # Swarm Coordination - Kimi K2.5 PARL Multi-Agent Execution
+
+> **Replaces** manual task-by-task execution of large plans — sequential bottleneck when tasks have no dependencies
 
 ## When to Use
 
@@ -22,7 +24,6 @@ dependencies: [beads-bridge]
 
 - Single-task or tightly sequential work without parallelizable groups
 - Simple 1–2 file changes better handled by a single agent
-
 
 ## Overview
 
@@ -91,7 +92,7 @@ SWARM LAUNCH (PARL):
      → Detect/prevent serial collapse
   3. DELEGATE: swarm({ operation: "delegate", ... })
      → Create packets for each worker
-  4. SPAWN: Task({ subagent_type: "general" })
+  4. SPAWN: Task({ subagent_type: "worker" })
      → Launch workers using parallelizable_groups order
   5. MONITOR: swarm({ operation: "monitor", action: "render_block" })
      → Real-time TUI progress
@@ -136,6 +137,71 @@ SHUTDOWN:
 - `monitor`: Progress tracking + visualization (actions: progress_update, render_block, status, clear)
 - `sync`: Beads ↔ OpenCode todos (actions: push, pull, create_shared, get_shared, update_shared, list_shared)
 
+## Beads Integration
+
+### Session Start: Load Beads into Todos
+
+Make Beads tasks visible to subagents:
+
+```typescript
+// Push Beads to OpenCode todos
+const result = await swarm({
+  operation: "sync",
+  action: "push",
+  filter: "open", // or "in_progress", "all"
+});
+```
+
+### Session End: Sync Back to Beads
+
+```typescript
+// Pull completed todos back to Beads
+await swarm({ operation: "sync", action: "pull" });
+
+// Clear swarm state
+await swarm({
+  operation: "monitor",
+  action: "clear",
+  team_name: "api-refactor-swarm",
+});
+
+// Sync and commit
+await bash("br sync --flush-only");
+await bash("git add .beads/ && git commit -m 'close swarm'");
+```
+
+### Cross-Session Handoff
+
+For work spanning multiple sessions, use shared task lists:
+
+```typescript
+// Create shared list
+const list = await swarm({
+  operation: "sync",
+  action: "create_shared",
+  name: "api-refactor-swarm",
+  tasks: JSON.stringify([
+    { id: "task-1", content: "Refactor auth", status: "pending", priority: "high" },
+  ]),
+});
+
+// Resume in new session
+const shared = await swarm({
+  operation: "sync",
+  action: "get_shared",
+  list_id: "api-refactor-swarm",
+});
+```
+
+### Data Locations
+
+| Data Type         | Location                                        | Persistence   |
+| ----------------- | ----------------------------------------------- | ------------- |
+| Beads tasks       | `.beads/issues/*.md`                            | Git-backed    |
+| Swarm progress    | `.beads/swarm-progress.jsonl`                   | Session       |
+| Shared task lists | `~/.local/share/opencode/storage/shared-tasks/` | Cross-session |
+| OpenCode todos    | `~/.local/share/opencode/storage/todo/`         | Session       |
+
 ## Rules
 
 1. **Leader spawns, workers execute** - Clear role separation
@@ -150,6 +216,15 @@ SHUTDOWN:
 10. **Use reconciler at scale** - Required for 50+ agents, recommended for 10+
 11. **Reconciler watches continuously** - Spawns fix tasks on detected failures
 
+## Anti-Patterns
+
+| Anti-Pattern                                            | Why It Fails                                               | Instead                                                           |
+| ------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| Spawning agents for tasks with shared file dependencies | Workers block or overwrite each other, causing merge churn | Partition work by non-overlapping files/modules first             |
+| Not tracking agent completion status                    | Leader loses visibility; work appears done when it is not  | Require `monitor.progress_update` lifecycle (start/progress/done) |
+| Dispatching without pre-computed dependency graph       | Tasks run out of order, causing rework and serial fallback | Run `swarm plan` first and dispatch by `parallelizable_groups`    |
+| Using swarm for < 3 tasks (overhead not worth it)       | Coordination overhead exceeds execution savings            | Use a single agent or 2 direct `Task()` calls                     |
+
 ## References
 
 - `references/architecture.md` - Swarm architecture diagram
@@ -161,3 +236,9 @@ SHUTDOWN:
 - `references/integration-beads.md` - Swarm integration workflow with Beads
 - `references/tmux-integration.md` - Tmux monitoring setup and commands
 - `references/tier-enforcement.md` - Tier enforcement (Longshot pattern)
+
+## See Also
+
+- `agent-teams` — for coordinated multi-role collaboration beyond large plan execution
+- `dispatching-parallel-agents` — for lightweight parallel debugging of independent failures
+- `executing-plans` — for plan-driven execution when parallelism is moderate or bounded

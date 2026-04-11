@@ -1,6 +1,6 @@
 ---
 name: playwright
-description: Browser automation for testing, screenshots, form validation, and UX verification. Uses Playwright CLI for token-efficient automation, with MCP fallback for complex exploratory workflows.
+description: Use when running automated browser tests, taking screenshots, validating forms, or verifying UX flows. Playwright CLI for token efficiency with MCP fallback for complex exploration. Also covers agent-browser CLI alternative. MUST load before any automated browser testing.
 version: 1.0.0
 tags: [automation, mcp, testing]
 dependencies: []
@@ -18,16 +18,29 @@ dependencies: []
 
 ## Quick Decision
 
-| Scenario                                            | Use     |
-| --------------------------------------------------- | ------- |
-| Quick screenshots, simple forms, token efficiency   | **CLI** |
-| Complex exploratory testing, self-healing workflows | **MCP** |
+| Scenario                                                         | Use                                 |
+| ---------------------------------------------------------------- | ----------------------------------- |
+| Quick screenshots, simple forms, token efficiency                | **Playwright CLI**                  |
+| Native binary speed + persistent isolated daemon-backed sessions | **agent-browser CLI** (alternative) |
+| Complex exploratory testing, self-healing workflows              | **MCP**                             |
 
 ---
 
 ## CLI Mode (Recommended)
 
 The CLI approach is **token-efficient** - no large schemas or verbose accessibility trees in context. Best for most automation tasks.
+
+### Alternative: agent-browser CLI
+
+- `agent-browser` is a Playwright-based automation stack with a **Rust binary** front-end and a **Node.js daemon** back-end.
+- Commands execute through the native CLI while the daemon keeps browser state warm between calls.
+- Uses the same snapshot-ref interaction pattern (`snapshot` → `@eN` refs → `click/fill/...`) as Playwright workflows.
+- Prefer this alternative when you want native binary command performance on repeated operations.
+- Prefer this alternative when you need explicitly isolated named sessions backed by persistent daemons.
+- Good fit for multi-session parallel workflows where each session keeps independent browser/auth/storage state.
+- Keep defaulting to `playwright-cli` for broad compatibility and token-efficient standard flows.
+- Use MCP mode when you need richer introspection or complex exploratory automation.
+- Full command and options reference lives at: `./references/agent-browser-cli.md`.
 
 ### Installation
 
@@ -246,16 +259,28 @@ Use MCP for complex exploratory workflows or when you need persistent browser st
 
 ```typescript
 // Navigate
-browser_navigate({ url: "https://example.com" });
+skill_mcp(
+  (skill_name = "playwright"),
+  (tool_name = "browser_navigate"),
+  (arguments = '{"url": "https://example.com"}'),
+);
 
 // Get element refs
-browser_snapshot();
+skill_mcp((skill_name = "playwright"), (tool_name = "browser_snapshot"));
 
 // Interact
-browser_click({ element: "Submit", ref: "e12" });
+skill_mcp(
+  (skill_name = "playwright"),
+  (tool_name = "browser_click"),
+  (arguments = '{"element": "Submit", "ref": "e12"}'),
+);
 
 // Screenshot
-browser_take_screenshot({ filename: "/tmp/result.png" });
+skill_mcp(
+  (skill_name = "playwright"),
+  (tool_name = "browser_take_screenshot"),
+  (arguments = '{"filename": "/tmp/result.png"}'),
+);
 ```
 
 ### MCP Configuration

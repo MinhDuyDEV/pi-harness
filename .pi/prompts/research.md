@@ -1,6 +1,7 @@
 ---
 description: Research a topic or bead before implementation
 argument-hint: "<topic-or-bead-id> [--quick|--thorough]"
+agentType: scout
 ---
 
 # Research: $ARGUMENTS
@@ -13,6 +14,7 @@ Gather information before implementation. Find answers, document findings, stop 
 
 ```typescript
 skill({ name: "beads" });
+skill({ name: "memory-grounding" });
 // For --thorough mode:
 skill({ name: "deep-research" });
 ```
@@ -63,7 +65,9 @@ br show $ARGUMENTS
 
 Read PRD if it exists and extract questions that need answering.
 
-Check memory for previous research on this topic.
+### Memory Search (Required)
+
+Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Use findings to: skip already-answered questions, narrow scope to gaps only, avoid contradicting prior decisions without justification.
 
 ## Phase 2: Research
 
@@ -117,8 +121,8 @@ Report:
 
 ## Related Commands
 
-| Need          | Command       |
-| ------------- | ------------- |
-| Create spec   | `/create`     |
-| Plan details  | `/plan <id>`  |
-| Start working | `/start <id>` |
+| Need           | Command      |
+| -------------- | ------------ |
+| Create + start | `/create`    |
+| Plan details   | `/plan <id>` |
+| Pick up work   | `/ship <id>` |

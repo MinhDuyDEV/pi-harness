@@ -7,16 +7,18 @@ argument-hint: "<bead-id>"
 
 Execute PRD tasks, verify each passes, run review, close the bead.
 
-> **Workflow:** `/create` → `/start <id>` → **`/ship <id>`**
+> **Workflow:** `/create` → **`/ship <id>`**
 >
-> ⛔ Bead MUST be `in_progress` with `prd.md`. Run `/start` first if not.
+> Bead MUST have `prd.md`. If not yet claimed, `/ship` auto-claims it.
 
 ## Load Skills
 
 ```typescript
 skill({ name: "beads" });
+skill({ name: "memory-grounding" });
+skill({ name: "workspace-setup" });
 skill({ name: "verification-before-completion" });
-skill({ name: "code-cleanup" }); // optional post-verification cleanup pass
+skill({ name: "reflection-checkpoints" }); // Mid-point + completion checks during execution
 ```
 
 ## Determine Input Type
@@ -35,19 +37,24 @@ skill({ name: "code-cleanup" }); // optional post-verification cleanup pass
 - **Verify goals**: Tasks completing ≠ goals achieved (use goal-backward verification)
 - **Commit before close**: Per-task commits required, don't ship without git history
 - **Ask before closing**: Never close bead without user confirmation
-- **Clean up before review when needed**: If the implementation works but the diff is noisy or obviously overbuilt, run `code-cleanup` on changed files and rerun the same gates before review
 
 ## Available Tools
 
-| Tool      | Use When                                  |
-| --------- | ----------------------------------------- |
-| `explore` | Finding patterns in codebase, prior art   |
-| `scout`   | External research, best practices         |
-| `lsp`     | Finding symbol definitions, references    |
-| `grep`    | Finding code patterns                     |
-| `task`    | Spawning subagents for parallel execution |
+| Tool                 | Use When                                  |
+| -------------------- | ----------------------------------------- |
+| `explore`            | Finding patterns in codebase, prior art   |
+| `scout`              | External research, best practices         |
+| `lsp`                | Finding symbol definitions, references    |
+| `tilth_tilth_search` | Finding code patterns                     |
+| `task`               | Spawning subagents for parallel execution |
 
 ## Phase 1: Guards
+
+### Memory Grounding
+
+Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: failed approaches to avoid repeating.
+
+### Bead Validation
 
 ```bash
 br show $ARGUMENTS
@@ -55,14 +62,28 @@ br show $ARGUMENTS
 
 Verify:
 
-- Bead status is `in_progress` (if not, tell user to run `/start $ARGUMENTS`)
+- Bead is `in_progress` or unclaimed (auto-claim if needed)
 - `.beads/artifacts/$ARGUMENTS/prd.md` exists (if not, tell user to run `/create` first)
 
 Check what artifacts exist:
 
+Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
+
+## Phase 1B: Auto-Claim (if not yet in_progress)
+
+If bead status is NOT `in_progress`, auto-claim it:
+
 ```bash
-ls .beads/artifacts/$ARGUMENTS/
+br update $ARGUMENTS --status in_progress
 ```
+
+Then ask about workspace:
+
+### Workspace Setup
+
+Follow the [workspace-setup](../skill/workspace-setup/SKILL.md) skill protocol.
+
+**If bead is already `in_progress`:** Skip this phase entirely.
 
 ## Phase 2: Route to Execution
 
@@ -76,13 +97,15 @@ ls .beads/artifacts/$ARGUMENTS/
 
 If `plan.md` exists with dependency graph:
 
-1. **Parse waves** from plan header (Wave 1, Wave 2, etc.)
-2. **Execute Wave 1** (independent tasks) in parallel using `task()` subagents
-3. **Wait for Wave 1 completion** — all tasks pass or report failures
-4. **Execute Wave 2** (depends on Wave 1) in parallel
+1. **Load skill:** `skill({ name: "executing-plans" })`
+2. **Parse waves** from dependency graph section
+3. **Execute wave-by-wave:**
+   - Single-task wave → execute directly (no subagent overhead)
+   - Multi-task wave → dispatch parallel `task({ subagent_type: "worker" })` subagents, one per task
+4. **Review after each wave** — run verification gates, report, wait for feedback
 5. **Continue** until all waves complete
 
-**Parallel safety:** Only tasks within same wave run in parallel. Tasks in Wave N+1 wait for Wave N.
+**Parallel safety:** Only tasks within same wave run in parallel. Tasks must NOT share files. Tasks in Wave N+1 wait for Wave N.
 
 ### Phase 3A: PRD Task Loop (Sequential Fallback)
 
@@ -194,67 +217,15 @@ After each task completes (verification passed):
 - Modifying files outside task scope → stop, ask user
 - Rule 4 deviation encountered → stop, present options
 
-## Phase 4: Choose Verification Gates
+## Phase 4: Verification
 
-Ask user which gates to run:
+Follow the [Verification Protocol](../skill/verification-before-completion/references/VERIFICATION_PROTOCOL.md):
 
-```typescript
-question({
-  questions: [
-    {
-      header: "Verification Gates",
-      question: "Which verification gates should run?",
-      options: [
-        {
-          label: "All (Recommended)",
-          description: "build + test + lint + typecheck — full validation",
-        },
-        {
-          label: "Essential only",
-          description: "build + test — faster, basic validation",
-        },
-        {
-          label: "Test only",
-          description: "Just run tests",
-        },
-        {
-          label: "Skip gates",
-          description: "Trust my changes, skip verification",
-        },
-      ],
-    },
-  ],
-});
-```
+- Use **full mode** (shipping requires all gates)
+- All 4 gates must pass before proceeding to commit/push
+- Also run PRD `Verify:` commands
 
-## Phase 5: Run Verification Gates
-
-Based on selection, run appropriate gates. Detect project type:
-
-| Project Type    | Detect Via                    | Build            | Test            | Lint                          | Typecheck                             |
-| --------------- | ----------------------------- | ---------------- | --------------- | ----------------------------- | ------------------------------------- |
-| Node/TypeScript | `package.json`                | `npm run build`  | `npm test`      | `npm run lint`                | `npm run typecheck` or `tsc --noEmit` |
-| Rust            | `Cargo.toml`                  | `cargo build`    | `cargo test`    | `cargo clippy -- -D warnings` | (included in build)                   |
-| Python          | `pyproject.toml` / `setup.py` | —                | `pytest`        | `ruff check .`                | `mypy .`                              |
-| Go              | `go.mod`                      | `go build ./...` | `go test ./...` | `golangci-lint run`           | (included in build)                   |
-
-Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first.
-
-Also run PRD `Verify:` commands.
-
-If any gate fails, fix before proceeding.
-
-## Phase 5B: Optional Cleanup Pass
-
-If verification passes but the changed code is still noisy:
-
-1. Follow the `code-cleanup` skill
-2. Limit cleanup to changed files or directly adjacent support files
-3. Apply the skill's simplification rules without expanding scope
-4. Re-run the same verification gates from Phase 5
-5. Only continue to review if the cleanup pass is still green
-
-## Phase 6: Review
+## Phase 5: Review
 
 Load and run the review skill:
 
@@ -279,7 +250,7 @@ Wait for all 5 agents to return. Synthesize findings.
 
 **Auto-fix rule:**
 
-- Critical issues → fix inline, re-run Phase 5 gates, continue
+- Critical issues → fix inline, re-run Phase 4 verification, continue
 - Important issues → fix inline, continue
 - Minor issues → add to bead comments, note for `/compound` step
 
@@ -318,7 +289,7 @@ return Response.json({ok: true})  // Static, not query result
 
 If any artifact fails Level 2 or 3 → fix → re-verify.
 
-## Phase 7: Close
+## Phase 6: Close
 
 Ask user before closing:
 
@@ -386,8 +357,7 @@ Report:
 
 ## Related Commands
 
-| Need        | Command       |
-| ----------- | ------------- |
-| Create spec | `/create`     |
-| Claim task  | `/start <id>` |
-| Create PR   | `/pr`         |
+| Need        | Command   |
+| ----------- | --------- |
+| Create spec | `/create` |
+| Create PR   | `/pr`     |

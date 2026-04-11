@@ -137,7 +137,7 @@ Output CSS/Tailwind structure.
 
 ## Storage
 
-Save findings to `.opencode/memory/design/analysis/`
+Save findings to `.pi/memory/design/analysis/`
 
 ## Anti-Patterns
 

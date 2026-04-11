@@ -20,14 +20,24 @@ dependencies: []
 - Simple, single-layer validation at an obvious entry point is enough
 - The issue is unrelated to invalid data or boundary checks
 
+## Common Rationalizations
+
+| Rationalization                                  | Rebuttal                                                                                                  |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| "One validation at the entry point is enough"    | Different code paths, refactors, and mocks all bypass a single gate — each layer catches what others miss |
+| "This adds too much boilerplate"                 | Each validation is 2-3 lines. The bug it prevents costs hours of debugging                                |
+| "The caller already validates this"              | You don't control the caller. New callers won't know your assumptions                                     |
+| "Tests will catch it"                            | Tests run after the fact. Validation prevents the bug from existing                                       |
+| "This is an internal function, input is trusted" | Internal functions get called from new paths during refactors. Trust no input                             |
+
 ## Anti-Patterns
 
-| Anti-Pattern | Why It Fails | Instead |
-| --- | --- | --- |
-| Validating only at the entry point (trusting downstream) | Alternate paths and refactors bypass one gate | Add independent checks at each boundary |
-| Duplicating identical validation at every layer | Creates noise without improving safety | Tailor each layer to boundary-specific invariants |
-| Catching and swallowing errors silently | Hides failures and delays detection | Raise explicit errors with actionable context |
-| Mixing validation with business logic | Makes behavior hard to reason about and test | Keep validation checks explicit and separate from core logic |
+| Anti-Pattern                                             | Why It Fails                                  | Instead                                                      |
+| -------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
+| Validating only at the entry point (trusting downstream) | Alternate paths and refactors bypass one gate | Add independent checks at each boundary                      |
+| Duplicating identical validation at every layer          | Creates noise without improving safety        | Tailor each layer to boundary-specific invariants            |
+| Catching and swallowing errors silently                  | Hides failures and delays detection           | Raise explicit errors with actionable context                |
+| Mixing validation with business logic                    | Makes behavior hard to reason about and test  | Keep validation checks explicit and separate from core logic |
 
 ## Overview
 

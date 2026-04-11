@@ -1,300 +1,148 @@
 ---
 name: memory-system
 description: Use when persisting learnings, loading previous context, or searching past decisions - covers memory file structure, tools, and when to update each file
-version: 1.0.0
+version: 1.2.0
 tags: [context, workflow]
 dependencies: []
 ---
 
 # Memory System Best Practices
 
+> **Replaces** losing context between sessions — persistent knowledge that survives session boundaries
+
 ## When to Use
 
-- Starting work and needing to recall prior decisions, bugs, or patterns
-- Recording non-obvious learnings or decisions for future sessions
+- Starting work and needing prior decisions, bugfixes, or patterns
+- Recording non-obvious decisions/learnings for future sessions
+- Creating handoffs so the next session can continue quickly
 
 ## When NOT to Use
 
-- For ephemeral notes that won't matter beyond the current session
-- When you need to change actual markdown files (use read/write), not SQLite memory entries
-
-
-## Architecture
-
-```
-message.part.updated → capture.ts → temporal_messages
-                                        ↓ (session.idle, 10+ messages)
-                                     distill.ts → distillations (TF-IDF + key sentences)
-                                        ↓ (session.idle)
-                                     curator.ts → observations (pattern-matched)
-                                        ↓
-system.transform ← inject.ts ← FTS5 search → scored + packed → system prompt
-messages.transform ← context.ts → token budget enforcement
-```
-
-### 4 Tiers
-
-| Tier              | Storage       | Populated By        | Purpose                         |
-| ----------------- | ------------- | ------------------- | ------------------------------- |
-| temporal_messages | SQLite        | Automatic (capture) | Raw message text, 180-day TTL   |
-| distillations     | SQLite + FTS5 | Automatic (idle)    | TF-IDF compressed sessions      |
-| observations      | SQLite + FTS5 | Manual + curator    | Decisions, bugs, patterns, etc. |
-| memory_files      | SQLite        | Manual              | Static docs, handoffs, research |
+- Ephemeral debugging notes that won't matter after the current task
+- Storing generated artifacts/log dumps as long-term memory
 
 ## Core Principle
 
-**Progressive disclosure** — search compactly, fetch fully, timeline chronologically. Never load all memory at once.
+**Progressive disclosure**: search compactly, fetch fully only when relevant, then record high-signal observations.
 
----
+## Session Workflow
 
-## The Ritual
-
-Follow this every session. Memory is not optional — it's how knowledge compounds.
-
-### 1. Ground — Search Before You Start
-
-Always search memory first.
-
-```typescript
-// Search for relevant past work
-memory - search({ query: "<task keywords>", limit: 5 });
-memory - search({ query: "bugfix <component>", type: "observations" });
-
-// Check recent handoffs
-memory - search({ query: "handoff", type: "handoffs", limit: 3 });
-```
-
-**Why:** Past you already solved this. Don't rediscover.
-
-### 2. Calibrate — Progressive Disclosure
-
-Don't fetch full content until you know you need it.
-
-```typescript
-// 1. Search returns compact index (50-100 tokens per result)
-const results = memory - search({ query: "auth patterns" });
-// Returns: [{id: 42, title: "Auth bug fixed", ...}]
-
-// 2. Fetch full details ONLY for relevant IDs
-memory - get({ ids: "42,45" });
-
-// 3. See what led to this decision
-memory - timeline({ anchor_id: 42, depth_before: 3 });
-```
-
-**Why:** Prevents context bloat. High signal, low noise.
-
-### 3. Transform — Record Discoveries
-
-Create observations for anything non-obvious. Don't wait until the end.
-
-```typescript
-observation({
-  type: "pattern", // decision | bugfix | pattern | discovery | warning | learning
-  title: "Brief description",
-  narrative: "Context and reasoning...",
-  facts: "key, facts, here",
-  concepts: "searchable, keywords",
-  files_modified: "src/file.ts",
-  source: "manual", // manual (default) | curator | imported
-});
-```
-
-| Type        | Use When                   | Example                            |
-| ----------- | -------------------------- | ---------------------------------- |
-| `decision`  | Architectural choice made  | "Use zod over yup"                 |
-| `bugfix`    | Root cause found & fixed   | "Race condition in async init"     |
-| `pattern`   | Reusable code pattern      | "Repository with error boundaries" |
-| `discovery` | New capability learned     | "Bun.test supports mocking"        |
-| `warning`   | Dangerous pattern to avoid | "Don't use fs.watch in Docker"     |
-| `learning`  | General insight            | "Always validate at boundary"      |
-
-### 4. Reset — Handoff for Next Session
-
-Document completion state for future you.
-
-```typescript
-memory -
-  update({
-    file: "handoffs/YYYY-MM-DD-task",
-    content: `## Completed
-- X
-
-## Blockers
-- Y
-
-## Next
-- Z`,
-    mode: "append",
-  });
-```
-
----
-
-## Memory Tools Reference
-
-### memory-search (Start Here)
-
-Fast FTS5 full-text search with porter stemming. Returns **compact index** for progressive disclosure.
-
-```typescript
-memory - search({ query: "authentication" });
-memory - search({ query: "bugfix", type: "observations", limit: 5 });
-memory - search({ query: "session", type: "handoffs" });
-memory - search({ query: "patterns", type: "all" }); // Search everything
-```
-
-**Search modes:**
-
-- `observations` (default): Search SQLite with FTS5 BM25 ranking
-- `handoffs`, `research`, `templates`: Search specific directories
-- `beads`: Search .beads/artifacts
-- `all`: Search everything
-
-### memory-get (Progressive Disclosure)
-
-Fetch full observation details after identifying relevant IDs:
-
-```typescript
-memory - get({ ids: "42" }); // Single observation
-memory - get({ ids: "1,5,10" }); // Multiple observations
-```
-
-### memory-timeline (Chronological Context)
-
-See what happened before/after a specific observation:
-
-```typescript
-memory - timeline({ anchor_id: 42, depth_before: 5, depth_after: 5 });
-```
-
-### memory-read (Files)
-
-Load project files, handoffs, or templates:
-
-```typescript
-memory - read({ file: "project/gotchas" });
-memory - read({ file: "handoffs/2024-01-20-phase-1" });
-memory - read({ file: "research/auth-patterns" });
-```
-
-### memory-update (Files)
-
-Save to project files or handoffs:
-
-```typescript
-memory -
-  update({
-    file: "project/gotchas",
-    content: "### New Gotcha\n\nDescription...",
-    mode: "append", // or "replace"
-  });
-```
-
-### memory-admin (Maintenance)
-
-```typescript
-// Check current status (schema, FTS5, counts, DB size)
-memory - admin({ operation: "status" });
-
-// Full maintenance (archive >90 days, checkpoint WAL, vacuum)
-memory - admin({ operation: "full" });
-
-// Preview what would be archived
-memory - admin({ operation: "archive", older_than_days: 60, dry_run: true });
-
-// Capture pipeline stats (temporal messages, distillations, compression)
-memory - admin({ operation: "capture-stats" });
-
-// Force distillation for current session
-memory - admin({ operation: "distill-now" });
-
-// Force curator run (extract observations from distillations)
-memory - admin({ operation: "curate-now" });
-```
-
-**Automatic:** On session idle — distillation, curation, FTS5 optimize, WAL checkpoint.
-
-**Manual:** Run `memory-admin({ operation: "status" })` to check health.
-
----
+1. **Ground (search first)**
+   - Run `memory-search` with task keywords before implementation.
+   - Check recent handoffs when resuming interrupted work.
+2. **Calibrate (progressive disclosure)**
+   - Use search results as index.
+   - Fetch full entries only for relevant IDs (`memory-get`).
+   - Pull timeline context only when sequencing matters (`memory-timeline`).
+3. **Record (high-signal only)**
+   - Create `observation` for decisions, bugfixes, patterns, warnings, or durable learnings.
+   - Include searchable concepts and concrete file references.
+4. **Handoff (if session boundary)**
+   - Write a concise status note with completed work, blockers, and next steps using `memory-update` under `handoffs/`.
 
 ## What Goes Where
 
-### SQLite (observations)
+| Store | Put Here | Avoid Here |
+| --- | --- | --- |
+| `observation` (SQLite) | Events: decisions, bugfixes, reusable patterns, warnings | Temporary notes, speculative ideas without evidence |
+| `memory-update` files | Durable docs: handoffs, research, project notes | Every minor runtime detail from a single debug run |
+| Auto pipeline | Captured messages + distillations (automatic) | Manual copying of full transcripts |
 
-- Events: decisions, bugfixes, patterns discovered
-- Searchable via FTS5 with porter stemming
-- Created manually via `observation()` or automatically by curator
-- Use `observation()` to create
+## Observation Quality Bar
 
-### SQLite (distillations — automatic)
+Use this checklist before creating an observation:
 
-- Compressed session summaries with TF-IDF terms
-- Created automatically when 10+ messages accumulate
-- Searchable via FTS5
-- Used for relevance-scored LTM injection
+- Is it likely useful in a future session?
+- Is it non-obvious (not already in code/comments)?
+- Can I summarize it in one clear title + short narrative?
+- Did I include strong search terms in `concepts` and relevant files?
 
-### Markdown Files
+If most answers are "no", skip creating the observation.
 
-- Static knowledge: user preferences, tech stack
-- Handoffs: session summaries
-- Research: deep-dive documents
-- Use `memory-read()` / `memory-update()`
+## Anti-Patterns
 
-| Location                   | Content                    | Tool                                |
-| -------------------------- | -------------------------- | ----------------------------------- |
-| `project/user.md`          | User identity, preferences | `memory-read()`                     |
-| `project/tech-stack.md`    | Frameworks, constraints    | `memory-read()`                     |
-| `project/gotchas.md`       | Footguns, warnings         | `memory-update({ mode: "append" })` |
-| `handoffs/YYYY-MM-DD-*.md` | Session summaries          | `memory-update()`                   |
-| `research/*.md`            | Deep-dive analysis         | `memory-update()`                   |
-| SQLite observations        | Events, decisions          | `observation()`                     |
-| SQLite distillations       | Session summaries          | Automatic (idle) or `distill-now`   |
-| SQLite temporal_messages   | Raw captured text          | Automatic (message events)          |
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Storing transient debugging info as permanent observations | Pollutes search results with low-value noise | Keep transient info in session context; record only durable findings |
+| Creating observations for every small finding (signal-to-noise) | Important items get buried and retrieval quality drops | Batch minor notes; publish one distilled observation per meaningful outcome |
+| Not searching memory before creating duplicate observations | Produces conflicting/duplicated records | Run `memory-search` first; update/supersede existing records when appropriate |
+| Using `memory-update` for data that should be an observation | Durable events become hard to discover and rank | Use `observation` for events; reserve `memory-update` for document-style files |
 
----
+## Verification
 
-## Observations Schema
+After creating an observation: `memory-search` with relevant keywords should find it.
 
-```typescript
-observation({
-  type: "decision", // decision, bugfix, pattern, discovery, warning, learning
-  title: "Use JWT auth",
-  narrative: "Decided to use JWT because it's stateless...",
-  facts: "stateless, scalable, industry standard",
-  concepts: "auth, jwt, security",
-  confidence: "high", // high, medium, low
-  files_read: "src/auth.ts, src/middleware.ts",
-  files_modified: "src/auth.ts",
-  bead_id: "br-abc123", // Link to task (optional)
-  source: "manual", // manual (default), curator, imported
-});
+## Practical Defaults
+
+- Prefer specific queries over broad ones (`"auth race condition init"` > `"auth"`).
+- For ongoing work, append to one handoff file per task/day instead of many tiny files.
+- Keep observation titles concrete and action-oriented.
+
+## Admin Operations
+
+The `memory-admin` tool supports these operations:
+
+### Core (existing)
+| Operation | Purpose |
+|---|---|
+| `status` | Storage stats, FTS5 health, pipeline counts |
+| `full` | Full maintenance cycle (archive + checkpoint + vacuum) |
+| `archive` | Archive observations older than N days |
+| `checkpoint` | Checkpoint WAL file |
+| `vacuum` | Vacuum database |
+| `migrate` | Import .pi/memory/observations/*.md into SQLite |
+| `capture-stats` | Temporal message capture statistics |
+| `distill-now` | Force distillation for current session |
+| `curate-now` | Force curator run |
+
+### Knowledge Intelligence (new in v2.1)
+| Operation | Purpose |
+|---|---|
+| `lint` | Find duplicates, contradictions, stale/orphan observations |
+| `index` | Generate a structured catalog of all observations |
+| `compile` | Build concept-grouped articles from observation clusters |
+| `log` | View the append-only operation audit trail |
+
+Examples:
+```
+memory-admin({ operation: "lint" })
+memory-admin({ operation: "lint", older_than_days: 60 })
+memory-admin({ operation: "index" })
+memory-admin({ operation: "compile" })
+memory-admin({ operation: "log" })
 ```
 
----
+### Reading Compiled Artifacts
+```
+memory-read({ file: "index" })             // Full observation catalog
+memory-read({ file: "compiled/auth" })      // Compiled article for "auth" concept
+memory-read({ file: "log" })                // Operation audit trail
+```
 
-## Anti-Patterns (Don't Do This)
+## Validation Gate
 
-| ❌ Don't                            | ✅ Do Instead                          |
-| ----------------------------------- | -------------------------------------- |
-| Load full memory at session start   | Use progressive disclosure             |
-| Create observations for everything  | Only non-obvious decisions             |
-| Duplicate in files AND observations | Files = static, SQLite = events        |
-| Vague search queries                | Use specific keywords, file paths      |
-| Subagents writing to memory         | Only leader agents create observations |
-| Wait until end to record            | Create observations as you discover    |
+The `observation` tool now validates before storing:
+- **Exact duplicate** → rejected (returns duplicate ID + supersede hint)
+- **Near-duplicate** → stored with warning
+- **Contradiction** → stored with warning (for decisions sharing concepts)
+- **Low quality** → stored with warning (no narrative + no concepts)
 
----
+To update an existing observation, use `supersedes`:
+```
+observation({ type: "decision", title: "Use JWT", supersedes: "42", ... })
+```
 
-## Philosophy
+## Idle Pipeline
 
-**Memory is not a dumping ground. It's curated signal.**
+During `session.idle`, the memory system automatically runs:
+1. Distill undistilled messages
+2. Curate observations from distillations
+3. Optimize FTS5 index
+4. Checkpoint WAL if large
+5. Compile concept articles (max 10)
+6. Regenerate memory index
 
-- Search before you build
-- Record what you learned
-- Hand off to future you
+## See Also
 
-> "The body is architecture. The breath is wiring. The rhythm is survival."
-
-Memory is rhythm — it carries knowledge across the silence between sessions.
+- `context-management`
+- `session-management`

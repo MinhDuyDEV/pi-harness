@@ -126,8 +126,8 @@ For each example, identify:
 ### Step 3: Create the Skill
 
 ```bash
-mkdir -p .opencode/skill/my-skill
-touch .opencode/skill/my-skill/SKILL.md
+mkdir -p .pi/skill/my-skill
+touch .pi/skill/my-skill/SKILL.md
 ```
 
 ### Step 4: Edit SKILL.md

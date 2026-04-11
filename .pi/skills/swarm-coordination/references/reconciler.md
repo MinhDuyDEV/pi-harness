@@ -59,7 +59,7 @@ async function runReconciler(teamName: string, buildCommand: string) {
 
         // 6. Assign to targeted worker
         await Task({
-          subagent_type: "general",
+          subagent_type: "worker",
           description: `Fix ${error.worker}`,
           prompt: `Fix the error in ${error.file}.
 

@@ -8,6 +8,8 @@ dependencies: []
 
 # Dispatching Parallel Agents
 
+> **Replaces** sequential investigation of independent failures — one-by-one debugging when problems don't share state
+
 ## When to Use
 
 - 3+ independent failures across different subsystems or test files
@@ -80,6 +82,7 @@ Good agent prompts are:
 1. **Focused** - One clear problem domain
 2. **Self-contained** - All context needed to understand the problem
 3. **Specific about output** - What should the agent return?
+4. **Structured termination** - Include the Structured Termination Contract from AGENTS.md (Result/Verification/Summary/Blockers format)
 
 ```markdown
 Fix the 3 failing tests in src/agents/agent-tool-abort.test.ts:
@@ -99,8 +102,10 @@ These are timing/race condition issues. Your task:
 
 Do NOT just increase timeouts - find the real issue.
 
-Return: Summary of what you found and what you fixed.
+[Include Structured Termination Contract here]
 ```
+
+For large investigations (context >500 tokens), use the **Context File Pattern** from AGENTS.md — write context to `.beads/artifacts/<id>/investigation-context.md` and reference by path in the dispatch prompt.
 
 ## Common Mistakes
 
@@ -178,3 +183,9 @@ From debugging session (2025-10-03):
 - All investigations completed concurrently
 - All fixes integrated successfully
 - Zero conflicts between agent changes
+
+## See Also
+
+- `agent-teams` — for coordinated parallel work (not just debugging)
+- `swarm-coordination` — for large-scale task decomposition
+- `executing-plans` — for plan-driven parallel execution

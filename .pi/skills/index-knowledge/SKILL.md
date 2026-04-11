@@ -1,6 +1,6 @@
 ---
 name: index-knowledge
-description: Generate hierarchical AGENTS.md knowledge base for a codebase. Creates root + complexity-scored subdirectory documentation.
+description: Use when generating or refreshing AGENTS.md knowledge bases for a codebase. MUST load before creating hierarchical documentation or complexity-scored subdirectory guides.
 version: 1.0.0
 tags: [documentation, workflow]
 dependencies: []
@@ -16,6 +16,7 @@ dependencies: []
 
 - When only a single small directory needs a manual note instead of a full knowledge hierarchy.
 
+
 ## Usage
 
 ```
@@ -27,8 +28,8 @@ dependencies: []
 ## Load Skills
 
 ```typescript
-/skill:memory-system; // Search for existing patterns
-/skill:deep-research; // For thorough LSP exploration
+skill({ name: "memory-system" }); // Search for existing patterns
+skill({ name: "deep-research" }); // For thorough LSP exploration
 ```
 
 ## Check Memory First
@@ -49,15 +50,17 @@ memory_search({ query: "AGENTS.md conventions patterns", limit: 3 });
 4. **Review** - Deduplicate, trim, validate
 
 <critical>
-**Track ALL phases. Mark in_progress → completed in real-time.**
-
-Tasks to track:
-
-- discovery: "Fire explore agents + LSP codemap + read existing" (high priority)
-- scoring: "Score directories, determine locations" (high priority)
-- generate: "Generate AGENTS.md files (root + subdirs)" (high priority)
-- review: "Deduplicate, validate, trim" (medium priority)
-  </critical>
+**TodoWrite ALL phases. Mark in_progress → completed in real-time.**
+  
+```typescript
+todowrite({ todos: [
+  { id: "discovery", content: "Fire explore agents + LSP codemap + read existing", status: "pending", priority: "high" },
+  { id: "scoring", content: "Score directories, determine locations", status: "pending", priority: "high" },
+  { id: "generate", content: "Generate AGENTS.md files (root + subdirs)", status: "pending", priority: "high" },
+  { id: "review", content: "Deduplicate, validate, trim", status: "pending", priority: "medium" }
+]});
+```
+</critical>
 
 ---
 

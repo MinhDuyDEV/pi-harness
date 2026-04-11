@@ -1,5 +1,8 @@
 {
 	"private": true,
+	"scripts": {
+		"smoke:vcc-snapshot": "npx --yes esbuild dcp/scripts/smoke-snapshot.ts --bundle --platform=node --format=esm --alias:@sinclair/typebox=./dcp/scripts/typebox-shim.ts --outfile=/tmp/pikit-vcc-snapshot-smoke.mjs && node /tmp/pikit-vcc-snapshot-smoke.mjs"
+	},
 	"dependencies": {
 		"@google/stitch-sdk": "^0.0.3",
 		"@huggingface/transformers": "^3.4.0",

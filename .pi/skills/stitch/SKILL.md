@@ -1,212 +1,148 @@
 ---
 name: stitch
-description: Google Stitch AI-powered UI design via native extension. Generate production-ready HTML/CSS from text prompts, edit screens, extract code, and build multi-page sites. Use when working with Stitch designs and UI generation.
+description: Use when generating, editing, or creating variants of UI screens in Google Stitch. MUST load before any stitch_generate_screen or stitch_edit_screens tool calls.
 version: 2.0.0
-tags: [design, ui, google, stitch, extension]
+tags: [design, ui, stitch]
 dependencies: []
 ---
 
-# Google Stitch Extension
+# Google Stitch Plugin
 
 ## When to Use
 
-- Generating UI screens from text prompts via Gemini
-- Editing existing Stitch designs with AI
-- Extracting production-ready HTML/CSS from Stitch screens
-- Building multi-page sites from Stitch projects
-- Browsing and managing Stitch projects and screens
+- When you need to generate or inspect Google Stitch UI designs.
 
 ## When NOT to Use
 
-- When you don't have Stitch access or a Google Cloud project
-- For non-UI tasks unrelated to design generation
+- When you don't have Stitch access or don't need Stitch-generated UI.
 
 ## Overview
 
-[Stitch](https://stitch.withgoogle.com) is Google's Gemini-powered AI platform that generates production-ready HTML/CSS UI designs from text prompts. This extension uses `@google/stitch-sdk` directly — no MCP proxy, no subprocess, no cold-start issues.
-
-The extension registers **11 tools**: 8 SDK tools mapping to Stitch API operations, plus 3 virtual tools that fetch resolved content (HTML code, screenshots, multi-page sites).
+Stitch tools are registered as native OpenCode tools via the Stitch plugin (`.pi/plugin/stitch.ts`), using `@google/stitch-sdk` for direct HTTP to `stitch.googleapis.com/mcp`. No MCP subprocess needed.
 
 ## Prerequisites
 
-### Authentication
+1. **Google Cloud Project** with Stitch API enabled
+2. **Google Cloud CLI** (`gcloud`) installed and initialized
+3. **Required IAM Roles**:
+   - `roles/serviceusage.serviceUsageAdmin` (to enable the service)
+   - `roles/mcp.toolUser` (to call MCP tools)
 
-Set one of these auth methods via environment variables:
+## Setup Steps
 
-**Option 1: API Key (simpler)**
+### 1. Enable Stitch API in Google Cloud
+
+```bash
+gcloud config set project PROJECT_ID
+gcloud beta services mcp enable stitch.googleapis.com --project=PROJECT_ID
+```
+
+### 2. Set Environment Variables
+
+**API Key auth** (recommended):
+
 ```bash
 export STITCH_API_KEY="your-api-key"
 ```
 
-**Option 2: OAuth via gcloud (recommended for personal projects)**
+**Or OAuth auth**:
+
 ```bash
-export STITCH_ACCESS_TOKEN="$(gcloud auth application-default print-access-token)"
+export STITCH_ACCESS_TOKEN=$(gcloud auth print-access-token)
 export GOOGLE_CLOUD_PROJECT="your-project-id"
 ```
 
-### First-Time API Enablement
+### 3. Restart OpenCode
 
-Enable the Stitch API on your Google Cloud project:
-```bash
-gcloud beta services mcp enable stitch.googleapis.com --project=YOUR_PROJECT_ID
-```
-
-### Verify Setup
-
-```bash
-# Quick check — should list your projects
-stitch_list_projects
-```
+Tools are available immediately after env vars are set and OpenCode restarts.
 
 ## Available Tools
 
-### Project Management
-
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `stitch_create_project` | Create a new Stitch project | `title?: string` |
-| `stitch_get_project` | Get project details by resource name | `name: string` — format: `projects/{id}` |
-| `stitch_list_projects` | List all accessible projects | `filter?: string` — e.g. `view=owned`, `view=shared` |
-
-### Screen Management
-
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `stitch_list_screens` | List all screens in a project | `projectId: string` |
-| `stitch_get_screen` | Get screen details (includes download URLs) | `name: string`, `projectId: string`, `screenId: string` |
-
-### AI Generation
-
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `stitch_generate_screen` | Generate a new screen from a text prompt | `projectId: string`, `prompt: string`, `deviceType?`, `modelId?` |
-| `stitch_edit_screens` | Edit existing screens with a text prompt | `projectId: string`, `selectedScreenIds: string[]`, `prompt: string` |
-| `stitch_generate_variants` | Generate design variants of screens | `projectId: string`, `selectedScreenIds: string[]`, `prompt: string`, `variantOptions: object` |
-
-### Content Retrieval (Virtual Tools)
-
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `stitch_get_screen_code` | Fetch resolved HTML code for a screen | `projectId: string`, `screenId: string` |
-| `stitch_get_screen_image` | Fetch screenshot as base64 PNG | `projectId: string`, `screenId: string` |
-| `stitch_build_site` | Build multi-page site from screen-to-route mapping | `projectId: string`, `routes: [{path, screenId}]` |
-
-### Parameter Reference
-
-**deviceType** (optional): `MOBILE`, `DESKTOP`, `TABLET`, `AGNOSTIC`, `DEVICE_TYPE_UNSPECIFIED`
-
-**modelId** (optional): `GEMINI_3_PRO` (higher quality), `GEMINI_3_FLASH` (faster), `MODEL_ID_UNSPECIFIED`
-
-**variantOptions** (for `stitch_generate_variants`):
-- `variantCount?: number` — 1 to 5 (default: 3)
-- `creativeRange?: string` — `REFINE`, `EXPLORE` (default), `REIMAGINE`
-- `aspects?: string[]` — `LAYOUT`, `COLOR_SCHEME`, `IMAGES`, `TEXT_FONT`, `TEXT_CONTENT`
-
-> **Important:** `stitch_generate_screen`, `stitch_edit_screens`, and `stitch_generate_variants` can take several minutes. Do **not** retry on timeout — check with `stitch_get_screen` afterward.
+| Tool                       | Description                          |
+| -------------------------- | ------------------------------------ |
+| `stitch_create_project`    | Create a new Stitch project          |
+| `stitch_get_project`       | Get project details by resource name |
+| `stitch_list_projects`     | List all projects (optional filter)  |
+| `stitch_list_screens`      | List screens in a project            |
+| `stitch_get_screen`        | Get screen details with HTML code    |
+| `stitch_generate_screen`   | Generate UI from text prompt         |
+| `stitch_edit_screens`      | Edit existing screens with a prompt  |
+| `stitch_generate_variants` | Generate design variants of screens  |
 
 ## Usage Examples
 
-### List Your Projects
+### List Projects
 
-```
-stitch_list_projects()
+```typescript
+stitch_list_projects({});
 ```
 
 ### Create a Project
 
-```
-stitch_create_project({ title: "My E-commerce App" })
+```typescript
+stitch_create_project({ title: "My E-commerce App" });
 ```
 
-### Generate a Screen from Text
+### Generate Screen from Text
 
-```
+```typescript
 stitch_generate_screen({
-  projectId: "123456",
-  prompt: "Modern login page with email/password fields, social login buttons, and forgot password link",
-  deviceType: "MOBILE"
-})
+  projectId: "my-project-123",
+  prompt:
+    "Create a modern login page with email and password fields, social login buttons, and a forgot password link",
+  deviceType: "MOBILE",
+});
 ```
 
-### Edit an Existing Screen
+### Edit Existing Screens
 
-```
+```typescript
 stitch_edit_screens({
-  projectId: "123456",
+  projectId: "my-project-123",
   selectedScreenIds: ["screen-abc"],
-  prompt: "Change the primary button color to blue and add a dark mode toggle"
-})
+  prompt: "Make the login button larger and change the color scheme to dark mode",
+});
 ```
 
 ### Generate Design Variants
 
-```
+```typescript
 stitch_generate_variants({
-  projectId: "123456",
+  projectId: "my-project-123",
   selectedScreenIds: ["screen-abc"],
-  prompt: "Create variations with different color schemes",
-  variantOptions: {
-    variantCount: 3,
-    creativeRange: "EXPLORE",
-    aspects: ["COLOR_SCHEME", "LAYOUT"]
-  }
-})
+  prompt: "Create variants with different color schemes",
+  variantCount: 3,
+  creativeRange: "MEDIUM",
+});
 ```
 
-### Get Screen HTML Code
+## Parameters
 
-```
-stitch_get_screen_code({ projectId: "123456", screenId: "screen-abc" })
-```
+### Device Types
 
-Returns the actual HTML string — not just a download URL.
+`DEVICE_TYPE_UNSPECIFIED` | `MOBILE` | `DESKTOP` | `TABLET` | `AGNOSTIC`
 
-### Get Screen Screenshot
+### Model IDs
 
-```
-stitch_get_screen_image({ projectId: "123456", screenId: "screen-abc" })
-```
+`MODEL_ID_UNSPECIFIED` | `GEMINI_3_PRO` | `GEMINI_3_FLASH`
 
-Returns base64-encoded PNG data.
+### Variant Options
 
-### Build a Multi-Page Site
-
-```
-stitch_build_site({
-  projectId: "123456",
-  routes: [
-    { path: "/", screenId: "screen-home" },
-    { path: "/about", screenId: "screen-about" },
-    { path: "/dashboard", screenId: "screen-dashboard" }
-  ]
-})
-```
-
-## Workflow: Design → Code
-
-1. **Browse projects** — `stitch_list_projects` → find your project ID
-2. **List screens** — `stitch_list_screens` with `projectId` → see available screens
-3. **Generate or pick a screen** — `stitch_generate_screen` or select existing
-4. **Get the HTML** — `stitch_get_screen_code` → returns production-ready HTML/CSS
-5. **Implement** — Convert the HTML into your framework (React, Next.js, etc.)
-
-## Workflow: Build Full Site
-
-1. **List screens** — `stitch_list_screens` to see all designs
-2. **Map routes** — Decide which screen maps to which URL path
-3. **Build** — `stitch_build_site` with route mappings → returns HTML for each page
-4. **Deploy** — Output includes HTML for each route, ready for static hosting
+- `variantCount`: Number of variants (1-10)
+- `creativeRange`: `LOW` | `MEDIUM` | `HIGH`
+- `aspects`: Comma-separated aspects to vary (e.g. "color,layout")
 
 ## Troubleshooting
 
-### "No auth configured"
+### "AUTH_FAILED"
 
-Set either `STITCH_API_KEY` or both `STITCH_ACCESS_TOKEN` + `GOOGLE_CLOUD_PROJECT` as environment variables.
+```bash
+# API key auth
+export STITCH_API_KEY="your-key"
 
-### "Authentication failed" / 401
-
-- **API Key**: Verify `STITCH_API_KEY` is correct and the API is enabled
-- **OAuth**: Token may have expired — refresh with `export STITCH_ACCESS_TOKEN="$(gcloud auth application-default print-access-token)"`
+# Or OAuth (token expires after ~1 hour)
+export STITCH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+```
 
 ### "Stitch API not enabled"
 
@@ -214,21 +150,15 @@ Set either `STITCH_API_KEY` or both `STITCH_ACCESS_TOKEN` + `GOOGLE_CLOUD_PROJEC
 gcloud beta services mcp enable stitch.googleapis.com --project=YOUR_PROJECT_ID
 ```
 
-### "Generation timed out"
-
-Generation can take several minutes. Don't retry — check with `stitch_get_screen` to see if it completed.
-
 ## Documentation
 
 - [Google Stitch](https://stitch.withgoogle.com)
-- [@google/stitch-sdk](https://github.com/google-labs-code/stitch-sdk)
+- [Stitch SDK](https://github.com/google-labs-code/stitch-sdk)
+- [Stitch MCP Setup](https://stitch.withgoogle.com/docs/mcp/setup)
 
 ## Tips
 
-- Use descriptive, detailed prompts for better AI generation results
+- API key auth is simpler than OAuth (no token refresh)
+- Use descriptive prompts for better UI generation
 - `GEMINI_3_PRO` produces higher quality; `GEMINI_3_FLASH` is faster
-- Set `deviceType` to match your target — `MOBILE`, `DESKTOP`, `TABLET`, or `AGNOSTIC`
-- `stitch_get_screen_code` returns resolved HTML (not just a URL) — ready to use
-- `stitch_build_site` maps screens to routes for a complete multi-page site
-- The response from `stitch_generate_screen` may include suggestion fields — present these to the user
-- The extension connects lazily — no startup delay when Stitch tools aren't used
+- Test generated code in your target framework before production use

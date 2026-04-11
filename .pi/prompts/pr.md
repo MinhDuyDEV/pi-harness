@@ -1,9 +1,18 @@
 ---
-description: Create and submit pull request with bead traceability and pre-PR review
+description: Create and submit pull request with bead traceability
 argument-hint: "[bead-id] [--draft]"
 ---
 
-# Pull Request: $ARGUMENTS
+# Pull Request
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "memory-grounding" });
+skill({ name: "verification-gates" });
+skill({ name: "verification-before-completion" });
+```
 
 ## Parse Arguments
 
@@ -20,13 +29,19 @@ git status --porcelain
 
 If uncommitted changes exist, ask whether to commit first.
 
-Run verification gates — all must pass before creating the PR:
+Follow the [verification-gates](../skill/verification-gates/SKILL.md) skill protocol. All gates must pass before creating the PR.
 
-- Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands
-- Run typecheck, lint, test as appropriate
-- If any gate fails, stop. Fix errors first, then run `/pr` again.
+Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
+
+If any gate fails, stop. Fix errors first, then run `/pr` again.
 
 ## Phase 2: Gather Context
+
+### Memory Grounding
+
+Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Include relevant findings in the PR description.
+
+### Git Context
 
 ```bash
 git branch --show-current
@@ -40,18 +55,32 @@ If bead ID provided:
 br show $ARGUMENTS
 ```
 
-Read bead artifacts to extract goal and success criteria for the PR description.
+Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
+
+Read the PRD to extract goal and success criteria for the PR description.
 
 ## Phase 2B: Pre-PR Review
 
 This is the last gate before code hits GitHub. Run it every time.
 
-Run **parallel review agents** covering: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
+Load the review skill:
+
+```typescript
+skill({ name: "requesting-code-review" });
+```
+
+Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
 
 ```bash
 BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git merge-base HEAD origin/main)
 HEAD_SHA=$(git rev-parse HEAD)
 ```
+
+Fill placeholders:
+
+- `{WHAT_WAS_IMPLEMENTED}`: what this PR delivers (from git log summary)
+- `{PLAN_OR_REQUIREMENTS}`: PRD path or brief requirements
+- `{BASE_SHA}` / `{HEAD_SHA}`: from above
 
 **Gate rule:** All Critical issues must be resolved before pushing. No exceptions.
 Important issues: fix or document as known limitation in PR body.
@@ -60,7 +89,23 @@ After fixing issues, re-run verification gates from Phase 1 if code was changed.
 
 ## Phase 3: Push and Confirm
 
-Show what will be pushed and confirm with the user before proceeding.
+Show what will be pushed and ask the user:
+
+```typescript
+question({
+  questions: [
+    {
+      header: "Push",
+      question: "Ready to push and create PR. Proceed?",
+      options: [
+        { label: "Push & create PR (Recommended)", description: "Push branch and create PR" },
+        { label: "Push & draft PR", description: "Create as draft for review" },
+        { label: "Show diff first", description: "Review changes before pushing" },
+      ],
+    },
+  ],
+});
+```
 
 If confirmed:
 
@@ -100,7 +145,8 @@ EOF
 ```
 
 If `--draft`, add `--draft` flag.
-If bead ID provided, add artifacts section linking to PRD.
+
+If bead ID provided, add artifacts section linking to `.beads/artifacts/$ARGUMENTS/prd.md`.
 
 ## Output
 

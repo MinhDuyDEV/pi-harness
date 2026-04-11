@@ -56,7 +56,7 @@ if (inside_session) {
 
 // Spawn the actual worker
 await Task({
-  subagent_type: "general",
+  subagent_type: "worker",
   description: "Execute worker-1",
   prompt: `...`,
 });

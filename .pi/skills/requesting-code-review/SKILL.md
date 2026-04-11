@@ -149,7 +149,7 @@ If work is still uncommitted, use the working tree review path and clearly say s
 
 ```typescript
 task({
-  subagent_type: "review",
+  subagent_type: "reviewer",
   description: "Security + correctness review",
   prompt: `Review this implementation for real bugs in changed code only.
 
@@ -181,7 +181,7 @@ Return:
 
 ```typescript
 task({
-  subagent_type: "review",
+  subagent_type: "reviewer",
   description: "Performance + architecture review",
   prompt: `Review this implementation for performance and architecture issues.
 
@@ -211,7 +211,7 @@ Return:
 
 ```typescript
 task({
-  subagent_type: "review",
+  subagent_type: "reviewer",
   description: "Type safety + test review",
   prompt: `Review this implementation for type safety and test quality.
 
@@ -237,7 +237,7 @@ Return:
 
 ```typescript
 task({
-  subagent_type: "review",
+  subagent_type: "reviewer",
   description: "Conventions + patterns review",
   prompt: `Review this implementation against existing codebase patterns.
 
@@ -264,7 +264,7 @@ Return:
 
 ```typescript
 task({
-  subagent_type: "review",
+  subagent_type: "reviewer",
   description: "Simplicity + completeness review",
   prompt: `Review this implementation for completeness and unnecessary complexity.
 

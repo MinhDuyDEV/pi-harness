@@ -1,11 +1,25 @@
 ---
-description: Initialize GSD-style project planning context with integrated skill usage
+description: Initialize project planning context (roadmap, state) with optional brownfield analysis
 argument-hint: "[--skip-questions] [--brownfield]"
 ---
 
 # Init-Context: $ARGUMENTS
 
-Initialize GSD-style project planning with integrated skill usage.
+Initialize project planning context files from templates.
+
+## Architecture
+
+**Auto-injected files** (always loaded into every prompt via `instructions[]`):
+- `user.md` — identity, preferences
+- `tech-stack.md` — framework, constraints
+- `project.md` — vision, success criteria, principles
+- `git-context.md` — spatial awareness
+
+**On-demand files** (created by this command, loaded via `memory-read` when needed):
+- `roadmap.md` — phases, milestones, bead planning
+- `state.md` — current position, blockers, next actions
+
+> **Warning:** Do NOT add roadmap.md or state.md to `instructions[]`. Per-prompt injection of too many files causes session OOM crashes. Use `memory-read({ file: "project/roadmap" })` or `memory-read({ file: "project/state" })` when needed.
 
 ## Load Skills
 
@@ -29,18 +43,20 @@ const args = {
 
 ### 1.1 Check Existing Context
 
-```bash
-ls .opencode/memory/project/ 2>/dev/null && HAS_CONTEXT=true || HAS_CONTEXT=false
-cat .opencode/memory/project/project.md 2>/dev/null | head -20
+Use tilth or Read to check for existing files:
+
+```typescript
+tilth_tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
+// Or: Read({ filePath: ".pi/memory/project/project.md", limit: 20 });
 ```
 
-**If context exists:**
+**If planning context exists:**
 
 ```
 Existing planning context found:
-- project.md: [exists/size]
-- roadmap.md: [exists/size]
-- state.md: [exists/size]
+- project.md: [exists/size] (auto-injected)
+- roadmap.md: [exists/size] (on-demand)
+- state.md: [exists/size] (on-demand)
 
 Options:
 1. Refresh - Delete and recreate from templates
@@ -55,23 +71,22 @@ Wait for user selection.
 If `--brownfield` flag is set:
 
 ```typescript
-// Spawn parallel analysis agents (like GSD map-codebase)
 skill({ name: "swarm-coordination" });
 
 // Agent 1: Map tech stack
-Task({
+task({
   subagent_type: "explore",
   description: "Analyze tech stack",
   prompt:
-    "Analyze the codebase technology stack. Write findings to .opencode/memory/project/tech-analysis.md covering: languages, frameworks, dependencies, build tools. Return file path and line count only.",
+    "Analyze the codebase technology stack. Write findings to .pi/memory/project/codebase/tech-analysis.md covering: languages, frameworks, dependencies, build tools. Return file path and line count only.",
 });
 
 // Agent 2: Map architecture
-Task({
+task({
   subagent_type: "explore",
   description: "Analyze architecture",
   prompt:
-    "Analyze the codebase architecture. Write findings to .opencode/memory/project/arch-analysis.md covering: patterns, directory structure, entry points. Return file path and line count only.",
+    "Analyze the codebase architecture. Write findings to .pi/memory/project/codebase/arch-analysis.md covering: patterns, directory structure, entry points. Return file path and line count only.",
 });
 
 // Wait for agents and collect confirmations
@@ -79,12 +94,11 @@ Task({
 
 ## Phase 2: Requirements Gathering
 
-### 2.1 Load Brainstorming Skill (if not --skip-questions)
+### 2.1 Brainstorming (if not --skip-questions)
 
 ```typescript
 if (!args.skipQuestions) {
-  skill({ name: "brainstorming" });
-
+  // brainstorming skill already loaded in Load Skills phase
   // Follow brainstorming process for project vision
   // Ask questions one at a time (as per brainstorming skill)
   // Output: Refined vision, success criteria, target users
@@ -103,12 +117,14 @@ Use template defaults with placeholders for:
 
 ## Phase 3: Document Creation
 
-### 3.1 Create project.md
+### 3.1 Update project.md (auto-injected)
+
+This file is auto-injected into every prompt. Keep it concise.
 
 **Load template:**
 
-```bash
-cat .opencode/memory/_templates/project.md
+```typescript
+Read({ filePath: ".pi/memory/_templates/project.md" });
 ```
 
 **Fill with gathered data:**
@@ -119,9 +135,15 @@ cat .opencode/memory/_templates/project.md
 - Core principles (convention over config, minimal, extensible)
 - Current phase (from user input or template default)
 
-**Write to:** `.opencode/memory/project/project.md`
+**Write using memory tools:**
 
-### 3.2 Create roadmap.md
+```typescript
+memory-update({ file: "project/project", content: filledContent, mode: "replace" });
+```
+
+### 3.2 Create roadmap.md (on-demand)
+
+This file is NOT auto-injected. Access via `memory-read({ file: "project/roadmap" })`.
 
 **Parse phases from input:**
 
@@ -138,9 +160,15 @@ cat .opencode/memory/_templates/project.md
 | [Phase 1] | [Goal] | [Status] | [#]   |
 ```
 
-**Write to:** `.opencode/memory/project/roadmap.md`
+**Write using memory tools:**
 
-### 3.3 Create state.md
+```typescript
+memory-update({ file: "project/roadmap", content: roadmapContent, mode: "replace" });
+```
+
+### 3.3 Create state.md (on-demand)
+
+This file is NOT auto-injected. Access via `memory-read({ file: "project/state" })`.
 
 **Initialize with:**
 
@@ -154,7 +182,11 @@ cat .opencode/memory/_templates/project.md
 - Open Questions: (empty table)
 - Next Actions: (empty list)
 
-**Write to:** `.opencode/memory/project/state.md`
+**Write using memory tools:**
+
+```typescript
+memory-update({ file: "project/state", content: stateContent, mode: "replace" });
+```
 
 ### 3.4 Brownfield Analysis Integration (if applicable)
 
@@ -162,17 +194,19 @@ If `--brownfield` analysis was run:
 
 ```typescript
 // Append tech/arch findings to project.md Context Notes section
-// Or create separate .opencode/memory/project/codebase/ documents
-// (similar to GSD's .planning/codebase/ approach)
+// Or create separate .pi/memory/project/codebase/ documents
 ```
 
 ## Phase 4: Verification & Security
 
 ### 4.1 Verify Documents Created
 
-```bash
-ls -la .opencode/memory/project/
-wc -l .opencode/memory/project/*.md
+```typescript
+tilth_tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
+// Verify each file exists and has content
+Read({ filePath: ".pi/memory/project/project.md", limit: 5 });
+Read({ filePath: ".pi/memory/project/roadmap.md", limit: 5 });
+Read({ filePath: ".pi/memory/project/state.md", limit: 5 });
 ```
 
 **Check:**
@@ -182,20 +216,19 @@ wc -l .opencode/memory/project/*.md
 - [ ] state.md exists and >20 lines
 - [ ] All files are readable
 
-### 4.2 Secret Scan (Critical - from GSD pattern)
+### 4.2 Secret Scan
 
 ```bash
 # Scan for accidentally leaked secrets in generated docs
-grep -E '(sk-[a-zA-Z0-9]{20,}|sk_live_[a-zA-Z0-9]+|AKIA[A-Z0-9]{16}|ghp_[a-zA-Z0-9]{36}|-----BEGIN.*PRIVATE KEY)' .opencode/memory/project/*.md 2>/dev/null && SECRETS_FOUND=true || SECRETS_FOUND=false
+grep -rE '(sk-[a-zA-Z0-9]{20,}|sk_live_[a-zA-Z0-9]+|AKIA[A-Z0-9]{16}|ghp_[a-zA-Z0-9]{36}|xoxb-[a-zA-Z0-9-]+|-----BEGIN.*PRIVATE KEY)' .pi/memory/project/*.md 2>/dev/null && SECRETS_FOUND=true || SECRETS_FOUND=false
 ```
 
 **If secrets found:** Alert user and pause before proceeding.
 
-### 4.3 Load Verification Skill
+### 4.3 Run Verification
 
 ```typescript
-skill({ name: "verification-before-completion" });
-
+// verification-before-completion skill already loaded
 // Run verification checklist:
 // 1. IDENTIFY: Files created, structure valid
 // 2. RUN: Validation commands
@@ -204,39 +237,43 @@ skill({ name: "verification-before-completion" });
 // 5. CLAIM: Context initialization complete
 ```
 
-## Phase 5: Beads Integration
-
-### 5.1 Create Initialization Bead (optional)
-
-```bash
-# If user wants to track context setup as a bead
-br create "Initialize project context" --type=task
-br update <bead-id> --status closed --reason="Context files created"
-```
-
 ## Output
 
-Creates in `.opencode/memory/project/`:
+Creates planning context in `.pi/memory/project/`:
 
-| File         | Purpose                                  | Lines (typical) |
-| ------------ | ---------------------------------------- | --------------- |
-| `project.md` | Vision, success criteria, principles     | 50-100          |
-| `roadmap.md` | Phases, milestones, bead planning        | 80-150          |
-| `state.md`   | Current position, blockers, next actions | 60-100          |
+| File         | Purpose                                  | Injection   | Access                                       |
+| ------------ | ---------------------------------------- | ----------- | -------------------------------------------- |
+| `project.md` | Vision, success criteria, principles     | Auto-injected | Updated in-place (already in `instructions[]`) |
+| `roadmap.md` | Phases, milestones, bead planning        | On-demand   | `memory-read({ file: "project/roadmap" })`   |
+| `state.md`   | Current position, blockers, next actions | On-demand   | `memory-read({ file: "project/state" })`     |
 
 **If `--brownfield`:**
-Additional files in `.opencode/memory/project/codebase/`:
+Additional files in `.pi/memory/project/codebase/`:
 
 - `tech-analysis.md` - Stack and dependencies
 - `arch-analysis.md` - Architecture patterns
 
 ## Success Criteria
 
-- [ ] All required documents created from templates
+- [ ] All planning documents created from templates
 - [ ] Documents follow template structure
 - [ ] No secrets leaked in generated files
 - [ ] Files pass basic validation (readable, non-empty)
-- [ ] User informed of next steps
+- [ ] User informed of next steps and access patterns
+
+## Custom Context (Optional)
+
+Inform user about `.pi/context/` for additional project-specific context:
+
+```
+Custom context folder available at .pi/context/
+- Add .md files with architecture decisions, domain knowledge, team agreements
+- This folder is preserved during init --force and upgrade
+
+⚠️  Only add files to instructions[] if they are essential for EVERY prompt.
+    Per-prompt injection adds ~2-4KB each. Too many files cause session OOM.
+    Prefer memory-read() for on-demand access instead.
+```
 
 ## Next Steps
 
@@ -245,6 +282,7 @@ After init-context completes:
 1. **For new projects:** Use `/plan` to create first implementation plan
 2. **For brownfield:** Review codebase analysis, then `/plan`
 3. **For existing beads:** Use `/resume` to continue tracked work
+4. **For custom context:** Add `.md` files to `.pi/context/` (on-demand via Read, not auto-injected)
 
 ---
 
@@ -252,7 +290,7 @@ After init-context completes:
 
 | Skill                            | When Used                         | Purpose                        |
 | -------------------------------- | --------------------------------- | ------------------------------ |
+| `context-initialization`         | Phase 1                           | Template verification          |
 | `brainstorming`                  | Phase 2 (if not --skip-questions) | Refine vision and requirements |
 | `swarm-coordination`             | Phase 1.2 (if --brownfield)       | Parallel codebase analysis     |
 | `verification-before-completion` | Phase 4                           | Validate created files         |
-| `beads`                          | Phase 5                           | Track as bead if desired       |

@@ -8,6 +8,8 @@ dependencies: []
 
 # Systematic Debugging
 
+> **Replaces** "shotgun debugging" — making random changes hoping something fixes the issue without understanding the cause
+
 ## When to Use
 
 - Test failures, production bugs, build breaks, or unexpected behavior
@@ -172,7 +174,7 @@ You MUST complete each phase before proceeding to the next.
 
    **WHEN error is deep in call stack:**
 
-   **REQUIRED SUB-SKILL:** Use /skill:root-cause-tracing for backward tracing technique
+   **REQUIRED SUB-SKILL:** Use skill({ name: "root-cause-tracing" }) for backward tracing technique
 
    **Quick version:**
    - Where does bad value originate?
@@ -257,7 +259,7 @@ You MUST complete each phase before proceeding to the next.
    - Automated test if possible
    - One-off test script if no framework
    - MUST have before fixing
-   - **REQUIRED SUB-SKILL:** Use /skill:test-driven-development for writing proper failing tests
+   - **REQUIRED SUB-SKILL:** Use skill({ name: "test-driven-development" }) for writing proper failing tests
 
 2. **Implement Single Fix**
    - Address the root cause identified
@@ -338,6 +340,15 @@ If you catch yourself thinking:
 | "I see the problem, let me fix it"           | Seeing symptoms ≠ understanding root cause.                             |
 | "One more fix attempt" (after 2+ failures)   | 3+ failures = architectural problem. Question pattern, don't fix again. |
 
+## Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Changing multiple things at once | You can’t isolate what actually fixed or broke behavior | Change one variable at a time and measure outcome |
+| Not reading the error message carefully | You skip direct clues (file, line, code, failing invariant) | Read the full error and stack trace before edits |
+| Assuming the bug is in the most recently changed code | Correlation bias hides older or shared-state causes | Trace actual data/control flow from symptom to source |
+| Skipping reproduction steps | Non-repro bugs encourage guessing and untestable fixes | Establish reliable repro steps, then verify fix against them |
+
 ## Quick Reference
 
 | Phase                 | Key Activities                                         | Success Criteria            |
@@ -379,3 +390,13 @@ From debugging sessions:
 - Random fixes approach: 2-3 hours of thrashing
 - First-time fix rate: 95% vs 40%
 - New bugs introduced: Near zero vs common
+
+## Verification
+
+- Confirm the fix: reproduce the original bug scenario — it must now succeed.
+- Regression check: run related tests to ensure fix didn't break adjacent behavior.
+
+## See Also
+
+- **root-cause-tracing** - Deep call-stack tracing to identify original trigger before fixing
+- **condition-based-waiting** - Stabilize timing/race-condition fixes with state-based waits

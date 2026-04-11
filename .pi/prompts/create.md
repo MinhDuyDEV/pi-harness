@@ -11,6 +11,16 @@ Create a bead, write its specification (PRD), claim it, set up the workspace, an
 >
 > Use `--spec-only` to create the specification without claiming or setting up workspace.
 
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "memory-grounding" });
+skill({ name: "workspace-setup" });
+skill({ name: "prd" }); // PRD template guidance
+skill({ name: "prd-task" }); // PRD → executable tasks (Phase 8)
+```
+
 ## Parse Arguments
 
 | Argument        | Default       | Description                               |
@@ -18,6 +28,14 @@ Create a bead, write its specification (PRD), claim it, set up the workspace, an
 | `<description>` | required      | What to build/fix (quoted string)         |
 | `--type`        | auto-detected | Override: epic, feature, task, bug        |
 | `--spec-only`   | false         | Create spec without claiming or workspace |
+
+## Determine Input Type
+
+| Input Type  | Detection            | Action                        |
+| ----------- | -------------------- | ----------------------------- |
+| Quoted text | `"description here"` | Create PRD from description   |
+| Short form  | Simple string        | Ask for more detail if needed |
+| `--type`    | Flag provided        | Use provided type             |
 
 ## Before You Create
 
@@ -28,9 +46,21 @@ Create a bead, write its specification (PRD), claim it, set up the workspace, an
 - **Verify PRD**: Before saving, verify all sections are filled (no placeholders)
 - **Flag uncertainty**: Use `[NEEDS CLARIFICATION]` markers for unknowns — never guess silently
 
+## Available Tools
+
+| Tool      | Use When                                     |
+| --------- | -------------------------------------------- |
+| `explore` | Finding patterns in codebase, affected files |
+| `scout`   | External research, best practices            |
+| `br`      | Creating and managing beads                  |
+
 ## Phase 1: Duplicate Check
 
-Search memory for prior work on this topic, then check open beads:
+### Memory Search
+
+Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: duplicate bead detection, prior decisions.
+
+### Bead List Check
 
 ```bash
 br list --status=open --status=in_progress
@@ -40,7 +70,7 @@ If a matching bead exists, stop and tell the user to use `/ship <id>` instead.
 
 ## Phase 2: Classify Type
 
-If `--type` was provided, use it directly. Otherwise, suggest a type:
+If `--type` was provided, use it directly. Otherwise, suggest a type based on the description and ask the user to confirm:
 
 - **epic**: Multi-session, cross-domain (redesign, migrate, overhaul)
 - **feature**: New capability, scoped (add, implement, build, integrate)
@@ -51,29 +81,66 @@ If `--type` was provided, use it directly. Otherwise, suggest a type:
 
 Ask user before spawning agents:
 
-| Depth    | Agents                                             | Time     |
-| -------- | -------------------------------------------------- | -------- |
-| Deep     | 3-5 agents: patterns, tests, deps, best practices | ~2 min   |
-| Standard | 2 agents: patterns + tests                        | ~1 min   |
-| Minimal  | 1 agent: quick file scan                          | ~30 sec  |
-| Skip     | No agents, use existing knowledge                 | Instant  |
+```typescript
+question({
+  questions: [
+    {
+      header: "Research Depth",
+      question: "How much codebase research do you need?",
+      options: [
+        {
+          label: "Deep (Recommended for complex work)",
+          description: "3-5 agents: patterns, tests, deps, best practices (~2 min)",
+        },
+        {
+          label: "Standard",
+          description: "2 agents: patterns + tests (~1 min)",
+        },
+        {
+          label: "Minimal",
+          description: "1 agent: quick file scan (~30 sec)",
+        },
+        {
+          label: "Skip",
+          description: "I know the codebase, use existing knowledge",
+        },
+      ],
+    },
+  ],
+});
+```
 
 ## Phase 4: Gather Context
 
 Based on research depth choice, spawn agents:
 
-**Deep:** 3x `explore` (patterns, tests, deps) + 1x `scout` (feature/epic) + 1x `reviewer` (epic)
-**Standard:** 2x `explore` (patterns, tests) + 1x `scout` (feature/epic only)
-**Minimal:** 1x `explore` (patterns)
-**Skip:** No agents
+**If Deep:**
 
-**While agents run**, ask clarifying questions if scope or expected outcome is unclear.
+- 3x `explore` (patterns, tests, deps)
+- 1x `scout` (feature/epic)
+- 1x `review` (epic)
+
+**If Standard:**
+
+- 2x `explore` (patterns, tests)
+- 1x `scout` (feature/epic only)
+
+**If Minimal:**
+
+- 1x `explore` (patterns)
+
+**If Skip:**
+
+- No agents, use existing AGENTS.md context
+
+**While agents run**, ask clarifying questions if the description lacks scope or expected outcome. For bugs, also ask for reproduction steps and expected vs actual behavior.
 
 ## Phase 5: Create Bead
 
-Extract title and description from `$ARGUMENTS`:
-- Single line → use for both title and description
-- Multiple lines → first line as title, full text as description
+Extract bead title and description from `$ARGUMENTS` before creating the bead.
+
+- If user provided a single line, use it for both title and description.
+- If user provided multiple lines, use first line as title and full text as description.
 
 ```bash
 BEAD_ID=$(br create --title "$TITLE" --description "$DESCRIPTION" --type $BEAD_TYPE --json | jq -r '.id')
@@ -82,27 +149,30 @@ mkdir -p ".beads/artifacts/$BEAD_ID"
 
 ## Phase 6: Determine PRD Rigor
 
-Not every change needs a full spec. Assess complexity:
+Not every change needs a full spec. Assess complexity to choose the right PRD level:
 
-| Signal         | Lite PRD                  | Full PRD                        |
-| -------------- | ------------------------- | ------------------------------- |
-| Type           | `bug`, `task`             | `feature`, `epic`               |
-| Files affected | 1-3                       | 4+                              |
-| Scope          | Clear, single-concern     | Cross-cutting, multi-system     |
-| Research depth | Skip or Minimal           | Standard or Deep                |
+| Signal | Lite PRD | Full PRD |
+| --- | --- | --- |
+| Type | `bug`, `task` | `feature`, `epic` |
+| Files affected | 1-3 | 4+ |
+| Scope | Clear, single-concern | Cross-cutting, multi-system |
+| Research depth | Skip or Minimal | Standard or Deep |
+| Description | "Fix X in Y" | "Implement X with Y and Z" |
 
-**Auto-detect:** If type is `bug`/`task` AND research was Skip/Minimal AND simple description → Lite.
+**Auto-detect:** If type is `bug` or `task` AND research was Skip/Minimal AND description is a single sentence → default to Lite.
 
 ### Lite PRD Format
+
+For simple, well-scoped work (bugs, small tasks):
 
 ```markdown
 # [Title]
 
 ## Problem
-[1-2 sentences]
+[1-2 sentences: what's wrong or what's needed]
 
 ## Solution
-[1-2 sentences]
+[1-2 sentences: what to do]
 
 ## Affected Files
 - `src/path/to/file.ts`
@@ -112,51 +182,64 @@ Not every change needs a full spec. Assess complexity:
 
 ## Success Criteria
 - Verify: `npm run typecheck && npm run lint`
+- Verify: `[specific test or check]`
 ```
 
 ### Full PRD Format
 
-Use the full PRD template with all sections:
-Problem Statement, Scope, Proposed Solution, Success Criteria, Technical Context, Affected Files, Tasks, Risks, Open Questions.
+For features and complex work, use the full template:
+
+Read the PRD template from `.pi/memory/_templates/prd.md` and write it to `.beads/artifacts/$BEAD_ID/prd.md`.
 
 ## Phase 7: Write PRD
 
-Fill the chosen format using context from Phase 4.
+Copy and fill the PRD template (lite or full) using context from Phase 4.
 
-| Section           | Source                                   | Required          |
-| ----------------- | ---------------------------------------- | ----------------- |
-| Problem Statement | User description + clarifying questions  | Always            |
-| Scope (In/Out)    | User input + codebase exploration        | Always            |
-| Proposed Solution | Codebase patterns + user intent          | Always            |
-| Success Criteria  | Must include `Verify:` commands          | Always            |
-| Affected Files    | Real paths from exploration              | Always            |
-| Tasks             | Derived from scope + solution            | Always            |
-| Risks             | Codebase exploration                     | Feature/epic only |
+**If Lite PRD:** Fill the lite format directly. No template file needed.
+
+**If Full PRD:** Read the template and fill all required sections:
+
+| Section           | Source                                                     | Required          |
+| ----------------- | ---------------------------------------------------------- | ----------------- |
+| Problem Statement | User description + clarifying questions                    | Always            |
+| Scope (In/Out)    | User input + codebase exploration                          | Always            |
+| Proposed Solution | Codebase patterns + user intent                            | Always            |
+| Success Criteria  | User verification + test commands (must include `Verify:`) | Always            |
+| Technical Context | Explore agent findings                                     | Always            |
+| Affected Files    | Explore agent findings (real paths from Phase 4)           | Always            |
+| Tasks             | Derived from scope + solution                              | Always            |
+| Risks             | Codebase exploration                                       | Feature/epic only |
+| Open Questions    | Unresolved items from Phase 4                              | If any exist      |
 
 ### Task Format
 
+Tasks must follow the `prd-task` skill format:
+
 - Title with `[category]` tag
 - One-sentence **end state** description (not step-by-step)
-- Metadata: `depends_on`, `parallel`, `conflicts_with`, `files`
+- Metadata block: `depends_on`, `parallel`, `conflicts_with`, `files`
 - At least one verification command per task
 
 ## Phase 8: Validate PRD
 
-Before saving:
+Before saving, verify:
 
-- [ ] No placeholder text remains
+- [ ] No placeholder text remains (e.g., "[Clear description", "[List what's allowed]")
 - [ ] Success criteria include `Verify:` commands
-- [ ] Technical context references actual paths from exploration
+- [ ] Technical context references actual `src/` paths from exploration
 - [ ] Affected files list real paths
-- [ ] Tasks have `[category]` headings and verification
+- [ ] Tasks have `[category]` headings
+- [ ] Each task has verification
 - [ ] No implementation code in the PRD
-- [ ] No unresolved `[NEEDS CLARIFICATION]` markers remain
+- [ ] No unresolved `[NEEDS CLARIFICATION]` markers remain (convert to Open Questions or resolve)
 
 If any check fails, fix it — don't ask the user.
 
 ## Phase 9: Claim and Prepare Workspace
 
-**If `--spec-only` was passed, skip to Phase 10 (Report).**
+**If `--spec-only` was passed, skip to Phase 12 (Report).**
+
+### Workspace Check
 
 ```bash
 git status --porcelain
@@ -167,13 +250,29 @@ br list --status=in_progress
 - If uncommitted changes: ask user to stash, commit, or continue
 - If other tasks in progress: warn before claiming another
 
+### Claim Bead
+
 ```bash
 br update $BEAD_ID --status in_progress
 ```
 
-Create branch and optionally offer worktree setup.
+### Create Branch
 
-## Phase 10: Report
+### Workspace Setup
+
+Follow the [workspace-setup](../skill/workspace-setup/SKILL.md) skill protocol.
+
+Additionally offer a "Create worktree" option:
+
+```typescript
+skill({ name: "using-git-worktrees" });
+```
+
+## Phase 10: Convert PRD to Tasks
+
+Use `prd-task` skill to convert PRD markdown → executable JSON (`prd.json`).
+
+## Phase 11: Report
 
 Output:
 
@@ -186,6 +285,8 @@ Output:
 ```bash
 br comments add $BEAD_ID "Created prd.md with [N] tasks, [M] success criteria"
 ```
+
+---
 
 ## Related Commands
 

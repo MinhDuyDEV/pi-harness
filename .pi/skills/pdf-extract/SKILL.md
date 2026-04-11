@@ -1,6 +1,6 @@
 ---
 name: pdf-extract
-description: Extract text, images, tables, and metadata from PDF files. Choose the right library based on extraction needs - text only, structured data, or complex layouts.
+description: Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction library based on PDF complexity — simple text vs structured data vs complex layouts.
 version: 1.0.0
 tags: [research, integration]
 dependencies: []

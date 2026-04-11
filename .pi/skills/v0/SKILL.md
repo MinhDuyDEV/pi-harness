@@ -1,6 +1,6 @@
 ---
 name: v0
-description: AI-powered UI generation via v0 MCP. Create chats, generate React components, get design assistance. Use when building UI components, dashboards, or need AI design help.
+description: Use when you need AI-powered UI generation for React components, dashboards, or quick prototypes via v0. MUST load before creating v0 chats or generating components via v0 MCP.
 mcp:
   v0:
     command: npx
@@ -22,6 +22,7 @@ dependencies: []
 
 - When you need to implement UI from a fixed design system without AI generation.
 
+
 ## Prerequisites
 
 Set your v0 API key as an environment variable:
@@ -38,10 +39,16 @@ To get your v0 API key:
 
 ## Quick Start
 
-After loading this skill with `/skill:v0`, the tools listed below are available directly. Use them to generate UI components:
+After loading this skill, list available tools:
 
 ```
-create_chat({"prompt": "Create a React dashboard component with a sidebar"})
+skill_mcp(skill_name="v0", list_tools=true)
+```
+
+Then invoke tools:
+
+```
+skill_mcp(skill_name="v0", tool_name="create_chat", arguments='{"prompt": "Create a React dashboard component with a sidebar"}')
 ```
 
 ## Available Tools
@@ -57,7 +64,7 @@ Create a new v0 chat with a prompt.
 **Example:**
 
 ```
-create_chat({"prompt": "Build a responsive navbar with dark mode toggle"})
+skill_mcp(skill_name="v0", tool_name="create_chat", arguments='{"prompt": "Build a responsive navbar with dark mode toggle"}')
 ```
 
 ### get_chat
@@ -71,7 +78,7 @@ Get details about an existing chat.
 **Example:**
 
 ```
-get_chat({"chatId": "abc123"})
+skill_mcp(skill_name="v0", tool_name="get_chat", arguments='{"chatId": "abc123"}')
 ```
 
 ### find_chats
@@ -85,7 +92,7 @@ Search through your v0 chats.
 **Example:**
 
 ```
-find_chats({"query": "React components"})
+skill_mcp(skill_name="v0", tool_name="find_chats", arguments='{"query": "React components"}')
 ```
 
 ### send_message
@@ -100,7 +107,7 @@ Continue a conversation in an existing chat.
 **Example:**
 
 ```
-send_message({"chatId": "abc123", "message": "Add dark mode support"})
+skill_mcp(skill_name="v0", tool_name="send_message", arguments='{"chatId": "abc123", "message": "Add dark mode support"}')
 ```
 
 ## Workflow
@@ -109,7 +116,7 @@ send_message({"chatId": "abc123", "message": "Add dark mode support"})
 
 ```
 # Create a new chat with your requirements
-create_chat({"prompt": "Create a modern pricing table with 3 tiers using Tailwind CSS"})
+skill_mcp(skill_name="v0", tool_name="create_chat", arguments='{"prompt": "Create a modern pricing table with 3 tiers using Tailwind CSS"}')
 
 # The response includes a chat ID and generated code
 ```
@@ -118,14 +125,14 @@ create_chat({"prompt": "Create a modern pricing table with 3 tiers using Tailwin
 
 ```
 # Send follow-up messages to refine
-send_message({"chatId": "chat-id-here", "message": "Make the recommended tier more prominent with a gradient border"})
+skill_mcp(skill_name="v0", tool_name="send_message", arguments='{"chatId": "chat-id-here", "message": "Make the recommended tier more prominent with a gradient border"}')
 ```
 
 ### 3. Search Previous Work
 
 ```
 # Find relevant previous chats
-find_chats({"query": "dashboard"})
+skill_mcp(skill_name="v0", tool_name="find_chats", arguments='{"query": "dashboard"}')
 ```
 
 ## Use Cases

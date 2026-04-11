@@ -1,6 +1,6 @@
 ---
 name: v1-run
-description: npm package intelligence via MCP. Real-time versions, vulnerability data, health scores, and package comparisons. Use when selecting npm packages, checking for vulnerabilities, or comparing alternatives.
+description: Use when selecting npm packages, checking for vulnerabilities, comparing alternatives, or verifying package health scores. MUST load before recommending or evaluating npm dependencies. Requires network.
 version: 1.0.0
 tags: [integration, mcp, research]
 dependencies: []
@@ -15,6 +15,7 @@ dependencies: []
 ## When NOT to Use
 
 - When package selection or security analysis is not in scope.
+
 
 ## Overview
 
@@ -35,8 +36,8 @@ v1.run is an MCP-first npm registry by Midday.ai that provides:
 
 v1.run MCP is pre-configured as a skill. Load it with:
 
-```
-/skill:v1-run
+```typescript
+skill({ name: "v1-run" });
 ```
 
 ### Manual Setup (if needed)
@@ -81,7 +82,7 @@ Packages are scored 0-100 based on:
 
 ```typescript
 // Get comprehensive health info for a package (primary tool)
-get_package_health({ name: "zod" });
+skill_mcp({ skill_name: "v1-run", tool_name: "get_package_health", arguments: '{"name": "zod"}' });
 ```
 
 Response includes:
@@ -98,28 +99,44 @@ Response includes:
 
 ```typescript
 // Check if package is deprecated and get alternatives
-check_deprecated({ name: "request" });
+skill_mcp({
+  skill_name: "v1-run",
+  tool_name: "check_deprecated",
+  arguments: '{"name": "request"}',
+});
 ```
 
 ### Check Vulnerabilities
 
 ```typescript
 // Check specific version for security issues
-check_vulnerabilities({ name: "lodash", version: "4.17.20" });
+skill_mcp({
+  skill_name: "v1-run",
+  tool_name: "check_vulnerabilities",
+  arguments: '{"name": "lodash", "version": "4.17.20"}',
+});
 ```
 
 ### Find Alternatives
 
 ```typescript
 // Find alternative packages
-find_alternatives({ name: "moment" });
+skill_mcp({
+  skill_name: "v1-run",
+  tool_name: "find_alternatives",
+  arguments: '{"name": "moment"}',
+});
 ```
 
 ### Compare Packages
 
 ```typescript
 // Compare similar packages (2-5 packages)
-compare_packages({ packages: ["zod", "yup", "joi", "valibot"] });
+skill_mcp({
+  skill_name: "v1-run",
+  tool_name: "compare_packages",
+  arguments: '{"packages": ["zod", "yup", "joi", "valibot"]}',
+});
 ```
 
 ## Pre-built Categories (50+)

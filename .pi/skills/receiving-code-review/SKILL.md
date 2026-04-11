@@ -8,6 +8,8 @@ dependencies: []
 
 # Code Review Reception
 
+> **Replaces** blind agreement with reviewer suggestions — requires technical verification and understanding before implementing any feedback
+
 ## When to Use
 
 - You received review feedback and need to evaluate it before implementing
@@ -17,6 +19,17 @@ dependencies: []
 
 - You already verified and accepted the feedback and are ready to implement
 - You need to request a review (use requesting-code-review)
+
+## Common Rationalizations
+
+| Rationalization                                   | Rebuttal                                                                               |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| "The reviewer is experienced, they must be right" | Experience doesn't mean they have YOUR codebase context. Verify against reality        |
+| "It's faster to just implement it than to verify" | A wrong implementation costs more than the 2 minutes to check                          |
+| "Pushing back will create conflict"               | Technical correctness > social comfort. Shipping wrong code creates bigger conflict    |
+| "I'll fix it and verify later"                    | "Later" means after the wrong change is merged and depended upon                       |
+| "The suggestion is small, no need to verify"      | Small changes break things too. One wrong import can crash a module                    |
+| "I understood the feedback, no need to restate"   | Restating catches misunderstandings BEFORE you waste time implementing the wrong thing |
 
 ## Overview
 
@@ -242,3 +255,9 @@ You understand 1,2,3,6. Unclear on 4,5.
 Verify. Question. Then implement.
 
 No performative agreement. Technical rigor always.
+
+## See Also
+
+- **requesting-code-review** — the complementary skill for dispatching reviews
+- **verification-before-completion** — verification after implementing review feedback
+- **systematic-debugging** — when review feedback reveals a deeper issue

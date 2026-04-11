@@ -172,11 +172,11 @@ PRD converted:
   - .beads/artifacts/<bead-id>/progress.txt
 
 Next: Create detailed implementation plan
-  /skill:writing-plans
+  skill({ name: "writing-plans" })
 
 Or start execution directly:
   /start <bead-id>
 
 Full lifecycle reference:
-  /skill:development-lifecycle
+  skill({ name: "development-lifecycle" })
 ```

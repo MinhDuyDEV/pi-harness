@@ -1,6 +1,6 @@
 ---
 name: supabase
-description: Comprehensive Supabase platform MCP for database operations, edge functions, development tools, debugging, and project management. Use when working with Supabase projects, databases, or APIs.
+description: Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.
 version: 1.0.0
 tags: [integration, mcp]
 dependencies: []
@@ -15,6 +15,7 @@ dependencies: []
 ## When NOT to Use
 
 - When the backend is not Supabase or MCP access is unavailable.
+
 
 ## Available Tools
 
@@ -58,43 +59,43 @@ dependencies: []
 
 ```
 # List projects
-list_projects()
+skill_mcp(skill_name="supabase", tool_name="list_projects")
 
 # List tables in database
-list_tables()
+skill_mcp(skill_name="supabase", tool_name="list_tables")
 
 # Execute SQL query
-execute_sql({"query": "SELECT * FROM users LIMIT 10"})
+skill_mcp(skill_name="supabase", tool_name="execute_sql", arguments='{"query": "SELECT * FROM users LIMIT 10"}')
 
 # Generate TypeScript types
-generate_typescript_types()
+skill_mcp(skill_name="supabase", tool_name="generate_typescript_types")
 
 # Search docs
-search_docs({"query": "auth custom claims"})
+skill_mcp(skill_name="supabase", tool_name="search_docs", arguments='{"query": "auth custom claims"}')
 ```
 
 ### Get Project Credentials
 
 ```
 # Get API URL and keys for project
-get_project_url()
-get_publishable_keys()
+skill_mcp(skill_name="supabase", tool_name="get_project_url")
+skill_mcp(skill_name="supabase", tool_name="get_publishable_keys")
 
 # List Edge Functions
-list_edge_functions()
+skill_mcp(skill_name="supabase", tool_name="list_edge_functions")
 
 # Deploy Edge Function
-deploy_edge_function({"name": "my-function", "import_map": {...}, "entrypoint": "index.ts"})
+skill_mcp(skill_name="supabase", tool_name="deploy_edge_function", arguments='{"name": "my-function", "import_map": {...}, "entrypoint": "index.ts"}')
 ```
 
 ### Debug Issues
 
 ```
 # Get logs by service
-get_logs({"service": "postgres", "limit": 100})
+skill_mcp(skill_name="supabase", tool_name="get_logs", arguments='{"service": "postgres", "limit": 100}')
 
 # Check advisories
-get_advisors()
+skill_mcp(skill_name="supabase", tool_name="get_advisors")
 ```
 
 ## Security Notes

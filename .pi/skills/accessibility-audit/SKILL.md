@@ -181,7 +181,7 @@ For each interactive component:
 
 ## Storage
 
-Save audit reports to `docs/design/accessibility/`
+Save audit reports to `.pi/memory/design/accessibility/`
 
 ## Related Skills
 

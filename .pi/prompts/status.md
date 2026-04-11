@@ -43,7 +43,7 @@ skill({ name: "beads" });
 | --------------- | --------------------- |
 | `br`            | Task status and stats |
 | `git`           | Git state and history |
-| `memory-search` | Recent session context |
+| `find_sessions` | Recent sessions       |
 
 ## Phase 1: Gather State (Parallel)
 
@@ -62,7 +62,7 @@ git log --oneline -5
 ```
 
 ```typescript
-memory-search({ query: "recent work", type: "handoffs" })
+find_sessions({ query: "<project-name or recent-bead-keywords>", limit: 5 });
 ```
 
 ---
@@ -85,8 +85,8 @@ GIT
   Changes: [from git status, or "clean"]
   Recent:  [from git log]
 
-RECENT CONTEXT
-  [from memory-search]
+SESSIONS TODAY
+  [from find_sessions]
 ```
 
 ---
@@ -98,7 +98,7 @@ Based on gathered state, recommend ONE next step:
 | State                        | Suggestion                    |
 | ---------------------------- | ----------------------------- |
 | Has in_progress tasks        | `/ship <id>` (continue work)  |
-| Has ready tasks, none active | `/start <id>` (pick up work)  |
+| Has ready tasks, none active | `/ship <id>` (pick up work)   |
 | Uncommitted changes          | Review and commit             |
 | Nothing active or ready      | `/create "<desc>"` (new work) |
 

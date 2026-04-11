@@ -1,6 +1,6 @@
 ---
 name: prd
-description: Create Product Requirements Documents (PRDs) that define the end state of a feature. Use when planning new features, migrations, or refactors. Generates structured PRDs with acceptance criteria.
+description: Use when planning new features, migrations, or refactors that need a structured requirements document. MUST load before writing any PRD or defining acceptance criteria for a feature.
 version: 1.0.0
 tags: [planning, documentation]
 dependencies: []
@@ -37,7 +37,7 @@ If no bead id exists, create one first: `br create "Feature Name"`, then use the
 1. Confirm if the user has an existing bead id.
    - If yes: use `.beads/artifacts/<bead-id>/prd.md`
    - If no: create bead with `br create "Feature Name"`, then use artifact path
-2. Read template from `.pi/templates/prd.md`
+2. Read template from `.pi/memory/_templates/prd.md`
 3. Ask clarifying questions (5–7 max).
 4. Explore codebase patterns and constraints.
 5. Write a PRD following the template structure, including:
@@ -82,7 +82,7 @@ If no bead id exists, create one first: `br create "Feature Name"`, then use the
 
 ## Output Format
 
-**Read the template:** `.pi/templates/prd.md`
+**Read the template:** `.pi/memory/_templates/prd.md`
 
 Follow the template structure which includes:
 
@@ -128,10 +128,10 @@ After PRD is written, tell the user:
 PRD written: .beads/artifacts/<bead-id>/prd.md
 
 Next: Convert to executable tasks:
-/skill:prd-task
+skill({ name: "prd-task" })
 
 Or view the full lifecycle:
-/skill:development-lifecycle
+skill({ name: "development-lifecycle" })
 
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: writing-skills
-description: "Use when creating new skills, editing existing skills, or verifying skills work before deployment - applies TDD to process documentation by testing with subagents before writing, iterating until bulletproof against rationalization"
+description: "Use when creating new skills, editing existing skills, or verifying skills work before deployment - applies TDD to process documentation by testing with subagents before writing, iterating until bulletproof against rationalization. Includes complete pressure testing methodology."
 version: 1.0.0
 tags: [documentation, workflow]
 dependencies: []
@@ -211,12 +211,48 @@ Run same scenarios WITH skill. Agent should now comply.
 
 Agent found new rationalization? Add explicit counter. Re-test until bulletproof.
 
-**REQUIRED SUB-SKILL:** Use /skill:testing-skills-with-subagents for the complete testing methodology:
+**DETAILED TESTING METHODOLOGY:** See `references/testing-methodology.md` for the complete testing guide:
 
-- How to write pressure scenarios
-- Pressure types (time, sunk cost, authority, exhaustion)
-- Plugging holes systematically
-- Meta-testing techniques
+- Full RED-GREEN-REFACTOR testing workflow for skills
+- Scenario templates and pressure campaign examples
+- Rationalization hardening patterns and iteration loops
+- End-to-end checklists and worked examples
+
+### Inline Testing Summary (Merged Essentials)
+
+Use this quick inline summary while authoring; use `references/testing-methodology.md` for full details.
+
+#### Pressure scenarios (test format)
+
+- Test behavior under realistic stress, not quiz-style prompts
+- Force concrete A/B/C choices so violations are observable
+- Combine at least 3 pressures per scenario for discipline skills
+- Capture exact rationalizations verbatim during RED
+
+| Pressure Type   | What to Inject                              |
+| --------------- | ------------------------------------------- |
+| Time            | Deadline, production incident, deploy clock |
+| Sunk cost       | Hours already spent, large diff to discard  |
+| Authority       | Senior/manager asking to skip process       |
+| Economic        | Revenue loss, promotion/job pressure        |
+| Exhaustion      | End-of-day fatigue, urgency to finish       |
+| Social          | Fear of looking rigid or uncooperative      |
+| Pragmatic frame | "Be practical, not dogmatic" framing        |
+
+#### Meta-testing (after failure)
+
+When agent fails with skill loaded, ask how the skill should be rewritten to make the right choice unambiguous.
+
+- If response is "skill was clear, I ignored it" → strengthen foundational principle
+- If response is "skill should explicitly say X" → add X verbatim
+- If response is "I missed section Y" → improve placement/prominence
+
+#### Exit criteria for bulletproof skills
+
+- Agent chooses correct action under maximum pressure
+- Agent cites relevant sections to justify action
+- No new rationalizations emerge across retests
+- Meta-test confirms clarity, not ambiguity
 
 ## STOP: Before Moving to Next Skill
 
@@ -234,7 +270,7 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 
 ## Skill Creation Checklist (TDD Adapted)
 
-**IMPORTANT: Track EACH checklist item below as you work (mark in_progress → completed).**
+**IMPORTANT: Use TodoWrite to create todos for EACH checklist item below.**
 
 **RED Phase - Write Failing Test:**
 
@@ -281,6 +317,7 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 - `references/claude-search-optimization.md` - CSO guidance: descriptions, keywords, token efficiency, cross-references
 - `references/flowcharts-and-examples.md` - Flowchart usage rules and code example guidance
 - `references/file-organization.md` - Patterns for self-contained vs heavy-reference skills
+- `references/testing-methodology.md` - Complete pressure-testing methodology merged from testing-skills-with-subagents
 - `references/testing-skill-types.md` - How to test discipline, technique, pattern, and reference skills
 - `references/rationalization-hardening.md` - Loophole closure, rationalization tables, red flags
 - `references/anti-patterns.md` - Anti-patterns to avoid

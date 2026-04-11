@@ -3,7 +3,16 @@ name: development-lifecycle
 description: Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm → design → specify → plan → implement → verify) and loads appropriate sub-skills at each stage.
 version: 1.0.0
 tags: [workflow, planning]
-dependencies: [brainstorming, prd, writing-plans, executing-plans, verification-before-completion, requesting-code-review, finishing-a-development-branch]
+dependencies:
+  [
+    brainstorming,
+    prd,
+    writing-plans,
+    executing-plans,
+    verification-before-completion,
+    requesting-code-review,
+    finishing-a-development-branch,
+  ]
 ---
 
 ---
@@ -19,11 +28,12 @@ dependencies: [brainstorming, prd, writing-plans, executing-plans, verification-
 
 - You are already mid-phase and only need a specific sub-skill
 - The change is trivial and can skip the full lifecycle
-- You need enforced quality gates, state persistence across sessions, and artifact traceability — use `/skill:sprint` instead (adds Think forcing questions, multi-perspective plan review, scope drift detection, QA phase, adversarial review, retro with sprint grading)
 
 ## Overview
 
 This skill orchestrates the complete feature development workflow, guiding you through each phase and loading the appropriate sub-skills automatically.
+
+**Note:** For quick skill routing by intent, see the Intent → Skill Mapping table in `AGENTS.md`. This skill is for full end-to-end orchestration when you need phase-by-phase guidance.
 
 **Use when:** Starting any new feature, migration, refactor, or significant change.
 
@@ -59,12 +69,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 
 **When:** You have a rough idea but need to explore and refine it.
 
-**Load skill:**
-
-```typescript
-/skill:brainstorming;
-```
-
 **Entry criteria:** User has an idea or problem to solve.
 
 **Process:**
@@ -79,7 +83,7 @@ This skill orchestrates the complete feature development workflow, guiding you t
 - Design validated by user
 - Output: `.beads/artifacts/<bead-id>/design.md`
 
-**Template:** `.pi/templates/design.md`
+**Template:** `.pi/memory/_templates/design.md`
 
 ---
 
@@ -92,12 +96,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 - [ ] Write `.beads/artifacts/<bead-id>/prd.md`
 
 **When:** Design is validated, need formal requirements and task breakdown.
-
-**Load skill:**
-
-```typescript
-/skill:prd;
-```
 
 **Entry criteria:** Design document exists and is validated.
 
@@ -113,7 +111,7 @@ This skill orchestrates the complete feature development workflow, guiding you t
 - PRD with all sections completed
 - Output: `.beads/artifacts/<bead-id>/prd.md`
 
-**Template:** `.pi/templates/prd.md`
+**Template:** `.pi/memory/_templates/prd.md`
 
 ---
 
@@ -126,12 +124,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 - [ ] Ensure `progress.txt` exists
 
 **When:** PRD is complete, need executable task list.
-
-**Load skill:**
-
-```typescript
-/skill:prd-task;
-```
 
 **Entry criteria:** PRD exists at `.beads/artifacts/<bead-id>/prd.md`.
 
@@ -159,12 +151,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 
 **When:** Tasks defined, need detailed implementation instructions.
 
-**Load skill:**
-
-```typescript
-/skill:writing-plans;
-```
-
 **Entry criteria:** Task list exists (prd.json or tasks.md).
 
 **Process:**
@@ -179,7 +165,7 @@ This skill orchestrates the complete feature development workflow, guiding you t
 - Detailed plan ready for execution
 - Output: `.beads/artifacts/<bead-id>/plan.md`
 
-**Template:** `.pi/templates/tasks.md` (for task structure reference)
+**Template:** `.pi/memory/_templates/tasks.md` (for task structure reference)
 
 ---
 
@@ -192,12 +178,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 - [ ] Report for feedback between batches
 
 **When:** Plan is ready, time to build.
-
-**Load skill:**
-
-```typescript
-/skill:executing-plans;
-```
 
 **Entry criteria:** Plan exists at `.beads/artifacts/<bead-id>/plan.md`.
 
@@ -226,12 +206,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 
 **When:** Implementation complete, before claiming done.
 
-**Load skill:**
-
-```typescript
-/skill:verification-before-completion;
-```
-
 **Entry criteria:** All implementation tasks marked complete.
 
 **Process:**
@@ -250,17 +224,6 @@ This skill orchestrates the complete feature development workflow, guiding you t
 ---
 
 ## Phase Transitions
-
-### Quick Start (Skip to appropriate phase)
-
-| Starting Point                    | Begin At | Command                                             |
-| --------------------------------- | -------- | --------------------------------------------------- |
-| Rough idea                        | Phase 1  | `/skill:brainstorming`                  |
-| Design done, need requirements    | Phase 2  | `/skill:prd`                            |
-| PRD done, need task JSON          | Phase 3  | `/skill:prd-task`                       |
-| Tasks defined, need detailed plan | Phase 4  | `/skill:writing-plans`                  |
-| Plan ready, time to build         | Phase 5  | `/skill:executing-plans`                |
-| Done coding, need verification    | Phase 6  | `/skill:verification-before-completion` |
 
 ### Skipping Phases
 
@@ -312,34 +275,34 @@ br sync --flush-only
 User: "I want to add a dark mode toggle"
 
 1. IDEATION
-   → /skill:brainstorming
+   → skill({ name: "brainstorming" })
    → Questions about scope, triggers, persistence
    → Design decisions documented
    → Output: .beads/artifacts/br-dark-mode/design.md
 
 2. SPECIFICATION
-   → /skill:prd
+   → skill({ name: "prd" })
    → Full PRD with requirements
    → Tasks section for conversion
    → Output: .beads/artifacts/br-dark-mode/prd.md
 
 3. TASK CONVERSION
-   → /skill:prd-task
+   → skill({ name: "prd-task" })
    → JSON task list with dependencies
    → Output: .beads/artifacts/br-dark-mode/prd.json
 
 4. PLANNING
-   → /skill:writing-plans
+   → skill({ name: "writing-plans" })
    → Bite-sized implementation steps
    → Output: .beads/artifacts/br-dark-mode/plan.md
 
 5. IMPLEMENTATION
-   → /skill:executing-plans
+   → skill({ name: "executing-plans" })
    → Execute in batches with feedback
    → All code written and committed
 
 6. VERIFICATION
-   → /skill:verification-before-completion
+   → skill({ name: "verification-before-completion" })
    → Tests pass: ✓
    → Lint clean: ✓
    → Build succeeds: ✓

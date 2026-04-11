@@ -13,6 +13,7 @@ dependencies: []
 # Beads Workflow - Multi-Agent Task Coordination
 
 > **Replaces** ad-hoc task tracking with sticky notes, TODO comments, or mental checklists that lose state between sessions
+
 ## When to Use
 
 - Coordinating multi-session work with dependencies, blockers, or file locking needs
@@ -98,7 +99,7 @@ See: `references/EXAMPLES.md` for complete usage examples.
 
 ## Multi-Agent Coordination (Summary)
 
-For parallel execution with multiple subagents, use the **beads-bridge** skill.
+For parallel execution with multiple subagents, use the **swarm-coordination** skill.
 
 See: `references/MULTI_AGENT.md` for swarm tool usage and examples.
 
@@ -113,13 +114,13 @@ See: `references/MULTI_AGENT.md` for swarm tool usage and examples.
 
 ## Anti-Patterns
 
-| Anti-Pattern | Why It Fails | Instead |
-| --- | --- | --- |
-| Claiming a bead without reading its current state first (`br show`) | Misses dependencies, blockers, and prior context | Run `br show <id>` before `br update <id> --status in_progress` |
-| Closing a bead without verification evidence | Marks incomplete or broken work as done | Run verification commands and capture output before `br close` |
-| Working on blocked beads (dependencies not met) | Wastes time and causes out-of-order delivery | Use `br ready` and confirm dependencies in `br show <id>` |
-| Modifying bead state without user confirmation | Violates workflow expectations and can surprise collaborators | Ask before changing bead status, especially close/sync actions |
-| Using `br sync` without `--flush-only` (can cause conflicts) | May write unexpected state and increase sync conflict risk | Always use `br sync --flush-only` then commit `.beads/` manually |
+| Anti-Pattern                                                        | Why It Fails                                                  | Instead                                                          |
+| ------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Claiming a bead without reading its current state first (`br show`) | Misses dependencies, blockers, and prior context              | Run `br show <id>` before `br update <id> --status in_progress`  |
+| Closing a bead without verification evidence                        | Marks incomplete or broken work as done                       | Run verification commands and capture output before `br close`   |
+| Working on blocked beads (dependencies not met)                     | Wastes time and causes out-of-order delivery                  | Use `br ready` and confirm dependencies in `br show <id>`        |
+| Modifying bead state without user confirmation                      | Violates workflow expectations and can surprise collaborators | Ask before changing bead status, especially close/sync actions   |
+| Using `br sync` without `--flush-only` (can cause conflicts)        | May write unexpected state and increase sync conflict risk    | Always use `br sync --flush-only` then commit `.beads/` manually |
 
 ## Verification
 
@@ -178,4 +179,4 @@ MAINTENANCE:
 ## See Also
 
 - `verification-before-completion`
-- `beads-bridge`
+- `swarm-coordination`

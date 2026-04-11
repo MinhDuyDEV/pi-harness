@@ -16,6 +16,7 @@ dependencies: []
 
 - When exact string matching or known file paths can be handled by grep/read/LSP locally.
 
+
 ## Available Tools
 
 - `augment_code_search` - Semantic search across indexed GitHub repositories
@@ -32,10 +33,10 @@ dependencies: []
 
 ```
 # Search a GitHub repo for authentication code
-augment_code_search({"repo_owner": "myorg", "repo_name": "myapp", "query": "authentication middleware that validates JWT tokens"})
+skill_mcp(skill_name="augment-context-engine", tool_name="augment_code_search", arguments='{"repo_owner": "myorg", "repo_name": "myapp", "query": "authentication middleware that validates JWT tokens"}')
 
 # Search a specific branch with more results
-augment_code_search({"repo_owner": "myorg", "repo_name": "myapp", "query": "error handling patterns", "branch": "develop", "max_results": 10})
+skill_mcp(skill_name="augment-context-engine", tool_name="augment_code_search", arguments='{"repo_owner": "myorg", "repo_name": "myapp", "query": "error handling patterns", "branch": "develop", "max_results": 10}')
 ```
 
 > **Tip:** Get `repo_owner` and `repo_name` from git: `git remote get-url origin`

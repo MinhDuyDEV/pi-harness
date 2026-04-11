@@ -8,6 +8,8 @@ dependencies: []
 
 # Root Cause Tracing
 
+> **Replaces** ad-hoc print-statement debugging and "try random fixes until it works" approaches
+
 ## When to Use
 
 - Errors occur deep in a call stack and the immediate failure is just a symptom
@@ -17,6 +19,15 @@ dependencies: []
 
 - The error is at the entry point and the root cause is obvious
 - You’re doing feature work with no failures to trace
+
+## Anti-Patterns
+
+| Anti-Pattern | Why It Fails | Instead |
+| --- | --- | --- |
+| Fixing symptoms where error appears | Hides origin; bug returns via other paths | Trace backward until original trigger is found |
+| Skipping stack trace analysis | Misses the real caller and bad input source | Read full stack, file paths, and line numbers first |
+| Adding instrumentation without hypothesis | Produces noisy logs and slows investigation | Instrument one boundary at a time to answer a specific question |
+| Guessing the cause without evidence | Leads to random fixes and regressions | Form evidence-backed hypothesis, then test |
 
 ## Overview
 
@@ -175,3 +186,7 @@ From debugging session (2025-10-03):
 - Fixed at source (getter validation)
 - Added 4 layers of defense
 - 1847 tests passed, zero pollution
+
+## See Also
+
+- **systematic-debugging** - Full four-phase process before/after tracing deep stack failures

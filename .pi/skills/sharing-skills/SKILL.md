@@ -41,7 +41,7 @@ Contribute skills from your local branch back to the upstream repository.
 ## Prerequisites
 
 - `gh` CLI installed and authenticated
-- Working directory is `.pi/skills/` (your project skills)
+- Working directory is `.pi/skill/` (your project skills)
 - **REQUIRED:** Skill has been tested using writing-skills TDD process
 
 ## Sharing Workflow
@@ -49,7 +49,7 @@ Contribute skills from your local branch back to the upstream repository.
 ### 1. Ensure You're on Main and Synced
 
 ```bash
-cd .pi/skills/
+cd .pi/skill/
 git checkout main
 git pull upstream main
 git push origin main  # Push to your fork
@@ -118,7 +118,7 @@ Here's a complete example of sharing a skill called "async-patterns":
 
 ```bash
 # 1. Sync with upstream
-cd .pi/skills/
+cd .pi/skill/
 git checkout main
 git pull upstream main
 git push origin main
@@ -161,7 +161,7 @@ Once your PR is merged:
 1. Sync your local main branch:
 
 ```bash
-cd .pi/skills/
+cd .pi/skill/
 git checkout main
 git pull upstream main
 git push origin main

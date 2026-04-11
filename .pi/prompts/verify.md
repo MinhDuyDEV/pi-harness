@@ -1,11 +1,19 @@
 ---
 description: Verify implementation completeness, correctness, and coherence
 argument-hint: "<bead-id> [--quick] [--full] [--fix] [--no-cache]"
+agentType: reviewer
 ---
 
 # Verify: $ARGUMENTS
 
 Check implementation against PRD before shipping.
+
+## Load Skills
+
+```typescript
+skill({ name: "beads" });
+skill({ name: "verification-before-completion" });
+```
 
 ## Parse Arguments
 
@@ -37,6 +45,7 @@ Check implementation against PRD before shipping.
 Before running any gates, check if a recent verification is still valid:
 
 ```bash
+# Compute current state fingerprint (commit hash + diff)
 CURRENT_STAMP=$(printf '%s\n%s' \
   "$(git rev-parse HEAD)" \
   "$(git diff HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx')" \
@@ -44,11 +53,17 @@ CURRENT_STAMP=$(printf '%s\n%s' \
 LAST_STAMP=$(tail -1 .beads/verify.log 2>/dev/null | awk '{print $1}')
 ```
 
-| Condition                                 | Action                                      |
-| ----------------------------------------- | ------------------------------------------- |
-| `--no-cache` or `--full`                  | Skip cache check, run fresh                 |
-| `CURRENT_STAMP == LAST_STAMP`             | Report **cached PASS**, skip to completeness |
-| `CURRENT_STAMP != LAST_STAMP` or no cache | Run gates normally                          |
+| Condition                                 | Action                                                 |
+| ----------------------------------------- | ------------------------------------------------------ |
+| `--no-cache` or `--full`                  | Skip cache check, run fresh                            |
+| `CURRENT_STAMP == LAST_STAMP`             | Report **cached PASS**, skip to Phase 2 (completeness) |
+| `CURRENT_STAMP != LAST_STAMP` or no cache | Run gates normally                                     |
+
+When cache hits, report:
+
+```text
+Verification: cached PASS (no changes since <timestamp from verify.log>)
+```
 
 ## Phase 1: Gather Context
 
@@ -56,7 +71,9 @@ LAST_STAMP=$(tail -1 .beads/verify.log 2>/dev/null | awk '{print $1}')
 br show $ARGUMENTS
 ```
 
-Read bead artifacts (PRD, plan, research, design).
+Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
+
+Read the PRD and any other artifacts (plan.md, research.md, design.md).
 
 **Verify guards:**
 
@@ -74,6 +91,8 @@ Extract all requirements/tasks from the PRD and verify each is implemented:
 
 ## Phase 3: Correctness
 
+Follow the [Verification Protocol](../skill/verification-before-completion/references/VERIFICATION_PROTOCOL.md):
+
 **Default: incremental mode** (changed files only, parallel gates).
 
 | Mode        | When                                      | Behavior                         |
@@ -86,9 +105,9 @@ Extract all requirements/tasks from the PRD and verify each is implemented:
 1. **Parallel**: typecheck + lint (simultaneously)
 2. **Sequential** (after parallel passes): test, then build (ship only)
 
-Report results:
+Report results with mode column:
 
-```
+```text
 | Gate      | Status | Mode        | Time   |
 |-----------|--------|-------------|--------|
 | Typecheck | PASS   | full        | 2.1s   |
@@ -130,7 +149,17 @@ Output:
 5. **Blocking issues** to fix before shipping
 6. **Next step**: `/ship $ARGUMENTS` if ready, or list fixes needed
 
-Record significant findings with `observation()`.
+Record significant findings with `observation()`:
+
+```typescript
+observation({
+  type: "discovery", // or "warning", "bugfix"
+  title: "Verify: [bead-id] [key finding]",
+  narrative: "[What was found, impact, resolution]",
+  concepts: "verification, [component]",
+  confidence: "high",
+});
+```
 
 ## Related Commands
 

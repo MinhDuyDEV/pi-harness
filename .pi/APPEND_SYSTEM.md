@@ -124,6 +124,15 @@ Need human approval before code changes?
   YES → pi-teams with plan_mode_required: true
 ```
 
+## Context Continuity (DCP/VCC)
+
+Use these during long-running delegated work or before handoff/resume:
+
+- `/dcp` to inspect context pressure and active compression blocks
+- `vcc_snapshot()` to generate deterministic session state (goals/files/blockers/preferences)
+- `vcc_recall({ query: "..." })` for targeted history recovery; `vcc_recall({ expand: [index] })` for full entry content
+- `compress` calls must be serialized (never in parallel)
+
 ## Combo Patterns
 
 **Pattern 1: Quick Parallel** — Use `Agent` directly, no tasks needed.

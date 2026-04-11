@@ -1,15 +1,16 @@
 ---
 description: Create detailed implementation plan with TDD steps for a bead
-argument-hint: "<bead-id> [--create-beads] [--consensus] [--premortem]"
+argument-hint: "<bead-id> [--create-beads]"
+agentType: planner
 ---
 
 # Plan: $ARGUMENTS
 
-Create a detailed implementation plan with TDD steps. Optional deep-planning between `/start` and `/ship`.
+Create a detailed implementation plan with TDD steps. Optional deep-planning between `/create` and `/ship`.
 
-> **Workflow:** `/create` → `/start <id>` → **`/plan <id>`** (optional) → `/ship <id>`
+> **Workflow:** `/create` → **`/plan <id>`** (optional) → `/ship <id>`
 >
-> ⛔ Bead MUST be `in_progress` with `prd.md`. Use `/start` first.
+> Bead MUST be `in_progress` with `prd.md`. Use `/create` first.
 >
 > **When to use:** Complex tasks where PRD verification steps aren't enough guidance. Skip for simple tasks.
 
@@ -17,17 +18,16 @@ Create a detailed implementation plan with TDD steps. Optional deep-planning bet
 
 ```typescript
 skill({ name: "beads" });
+skill({ name: "memory-grounding" });
 skill({ name: "writing-plans" }); // TDD plan format
 ```
 
 ## Parse Arguments
 
-| Argument         | Default  | Description                                                        |
-| ---------------- | -------- | ------------------------------------------------------------------ |
-| `<bead-id>`      | required | The bead to plan                                                   |
-| `--create-beads` | false    | Create child beads for each phase                                  |
-| `--consensus`    | false    | Force explicit options analysis + ADR before locking the plan       |
-| `--premortem`    | false    | Force a pre-mortem section with likely failure modes and mitigations |
+| Argument         | Default  | Description                       |
+| ---------------- | -------- | --------------------------------- |
+| `<bead-id>`      | required | The bead to plan                  |
+| `--create-beads` | false    | Create child beads for each phase |
 
 ## Before You Plan
 
@@ -36,8 +36,6 @@ skill({ name: "writing-plans" }); // TDD plan format
 - **Budget context**: Target ~50% context per execution
 - **Split signals**: Create child beads for complex work
 - **Vertical slices**: Each task should cover one feature end-to-end
-- **Clarify before planning**: If 2+ material ambiguities remain around scope, constraints, non-goals, or success criteria, stop and run `/clarify` before writing the final plan
-- **Consensus is for branching/risky work**: Use `--consensus` for decisions with real trade-offs (auth, migrations, destructive ops, public API changes, architecture forks)
 
 ## Phase 0: Institutional Research (Mandatory)
 
@@ -47,12 +45,7 @@ Before touching the PRD or planning anything, load what the codebase already kno
 
 ### Step 1: Search institutional memory
 
-```typescript
-// Search for past decisions, patterns, gotchas related to this work
-memory_search({ query: "<bead-title or feature keywords>", limit: 5 });
-memory_search({ query: "<key technical concept from bead>", type: "bugfix", limit: 3 });
-memory_read({ file: "handoffs/last" }); // Check last session context
-```
+Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: bugfixes, existing plans (ask user before overwriting).
 
 If relevant observations found: incorporate them directly into the plan. Don't re-solve solved problems.
 
@@ -100,8 +93,9 @@ task({
 
 ```bash
 br show $ARGUMENTS
-ls .beads/artifacts/$ARGUMENTS/
 ```
+
+Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
 
 Verify:
 
@@ -124,29 +118,29 @@ Before research, determine discovery level based on PRD:
 
 - Level 2+: New library not in package.json, external API, "choose/select/evaluate"
 - Level 3: "architecture/design/system", data modeling, auth design
-- Force `--consensus` when there are 2+ viable technical approaches with materially different risk/cost profiles
-- Force `--premortem` for migrations, destructive changes, security-sensitive work, or user-visible outage risk
 
 **Decision:** Ask user to confirm or adjust:
 
 ```typescript
-const suggestedLevel = assessDiscoveryLevel(prdContent);
-
 question({
   questions: [
     {
       header: "Discovery Level",
-      question: `Suggested: Level ${suggestedLevel} (${getLevelDescription(suggestedLevel)}). Proceed?`,
+      question: "Suggested discovery level based on PRD complexity. Proceed?",
       options: [
-        { label: `Yes, Level ${suggestedLevel} (Recommended)` },
-        { label: "Lower (less research)", description: "If you know the patterns" },
-        { label: "Higher (more research)", description: "If uncertain about approach" },
-        { label: "Skip research", description: "I know the codebase" },
+        {
+          label: "Deep (Recommended for complex work)",
+          description: "Level 2-3: spawn scout + explore agents",
+        },
+        { label: "Standard", description: "Level 1: quick doc lookup" },
+        { label: "Skip research", description: "Level 0: I know the codebase" },
       ],
     },
   ],
 });
 ```
+
+Determine level from PRD content: Level 2+ if new library, external API, or "choose/evaluate" language. Level 3 if "architecture/design/system".
 
 ## Phase 3: Research (if Level 1-3)
 
@@ -206,23 +200,6 @@ For each truth: "What must EXIST for this to be true?"
 | API       | Database  | `prisma.query`      | Query returns static, not DB result |
 | Component | Real data | `useEffect` fetch   | Shows placeholder, not messages     |
 
-### Phase 4B: Decision Framing (Consensus / High-Risk Mode)
-
-When `--consensus` is set or the task has real architectural branching:
-
-1. List **2-3 viable options** only — not fake alternatives
-2. Compare each option on implementation cost, blast radius, testability, rollback path, and long-term maintenance
-3. Recommend one option explicitly
-4. Explain **why the other options were not chosen**
-5. Write a short ADR block before task decomposition:
-   - **Decision**
-   - **Drivers**
-   - **Alternatives considered**
-   - **Consequences / follow-ups**
-6. If the choice materially changes scope or future work, get user confirmation before finalizing the plan
-
-When `--premortem` is set or the work is high-risk, add a **Pre-mortem** section with at least 3 failure modes and one mitigation per failure.
-
 ## Phase 5: Decompose with Context Budget
 
 **Quality Degradation Rule:** Target ~50% context per execution. More plans, smaller scope = consistent quality.
@@ -278,11 +255,6 @@ Wave 3: C (depends on B)
 
 Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill format:
 
-**Section inclusion rules:**
-- Include `Options Considered` and `ADR` only when `--consensus` is set or the work has real branching trade-offs
-- Include `Pre-mortem` only when `--premortem` is set or the work is high-risk
-- Omit those sections entirely for straightforward plans
-
 ### Required Plan Header
 
 ```markdown
@@ -320,29 +292,6 @@ Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill 
 | ----------- | ----- | ------- | -------------- |
 | [Component] | [API] | `fetch` | [Failure mode] |
 
-## Options Considered (required for `--consensus` or branching work)
-
-| Option | Pros | Cons | Why chosen / rejected |
-| ------ | ---- | ---- | --------------------- |
-| A      |      |      |                       |
-| B      |      |      |                       |
-
-## ADR (required for `--consensus` or branching work)
-
-- **Decision:** [chosen path]
-- **Drivers:** [top reasons]
-- **Alternatives considered:** [options reviewed]
-- **Consequences:** [trade-offs, follow-ups, rollback notes]
-
-## Pre-mortem (required for `--premortem` or high-risk work)
-
-1. **Failure mode:** [what breaks]
-   - Mitigation: [how to prevent / detect]
-2. **Failure mode:** [what breaks]
-   - Mitigation: [how to prevent / detect]
-3. **Failure mode:** [what breaks]
-   - Mitigation: [how to prevent / detect]
-
 ## Dependency Graph
 ```
 
@@ -368,7 +317,68 @@ Wave 3: C
 - **Each step is 2-5 minutes** — one action per step
 - **Tasks map to PRD tasks**
 
-## Phase 8: Create Child Beads (if --create-beads or L size)
+## Phase 8: Constitutional Compliance Gate
+
+Before executing, scan the plan against AGENTS.md hard constraints. This catches violations before they become implementation bugs.
+
+### Automated Checks
+
+Scan `plan.md` content for these patterns:
+
+| Violation Pattern                                 | AGENTS.md Rule                              | Severity     |
+| ------------------------------------------------- | ------------------------------------------- | ------------ |
+| `git add .` or `git add -A`                       | Multi-Agent Safety: stage specific files    | **CRITICAL** |
+| `--force` push or `force push`                    | Git Safety: never force push main           | **CRITICAL** |
+| `--no-verify`                                     | Git Safety: never bypass hooks              | **CRITICAL** |
+| `as any` or `@ts-ignore` without justification    | Quality Bar: strong typing                  | **WARNING**  |
+| New package/dependency without approval step      | Guardrails: no new deps without approval    | **WARNING**  |
+| Task modifying >3 files without plan confirmation | Guardrails: no surprise edits               | **WARNING**  |
+| `reset --hard` or `checkout .` or `clean -fd`     | Git Restore: never without explicit request | **CRITICAL** |
+| Secret/credential patterns                        | Security: never expose credentials          | **CRITICAL** |
+
+### Check Process
+
+```bash
+# Scan plan for violation patterns (fixed-string mode to avoid regex false positives)
+grep -inF "git add ." .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF "git add -A" .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF -- "--no-verify" .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF "force push" .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF -- "--force" .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF "reset --hard" .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF "checkout ." .beads/artifacts/$ARGUMENTS/plan.md
+grep -inF "clean -fd" .beads/artifacts/$ARGUMENTS/plan.md
+```
+
+Also check:
+
+- Count files per task: if any task lists >3 files in its `files:` metadata, flag as WARNING
+- Check for `as any` or `@ts-ignore` usage that lacks a documented reason
+- Check if any task adds new dependencies (look for `npm install`, `pnpm add`, `yarn add`, `pip install`, `cargo add`)
+
+### Violation Response
+
+| Severity     | Action                                                             |
+| ------------ | ------------------------------------------------------------------ |
+| **CRITICAL** | Stop. Remove violation from plan. Report to user.                  |
+| **WARNING**  | Flag in plan output. Add confirmation checkpoint to affected task. |
+
+If no violations found, report: `Constitutional compliance: ✓ PASS`
+
+If violations found:
+
+```markdown
+## ⚠️ Constitutional Compliance Check
+
+| #   | Pattern Found        | Location       | Severity | Action                              |
+| --- | -------------------- | -------------- | -------- | ----------------------------------- |
+| 1   | `git add .`          | Task 3, step 2 | CRITICAL | Removed — use specific file staging |
+| 2   | New dependency `zod` | Task 1         | WARNING  | Added approval checkpoint           |
+
+Violations resolved. Plan is compliant.
+```
+
+## Phase 9: Create Child Beads (if --create-beads or L size)
 
 For large work, create child beads for each plan phase:
 
@@ -377,7 +387,7 @@ CHILD=$(br create "[Phase title]" --type task --json | jq -r '.id')
 br dep add $CHILD $ARGUMENTS
 ```
 
-## Phase 9: Report
+## Phase 10: Report
 
 Output:
 
@@ -387,10 +397,9 @@ Output:
 4. **Dependency Waves:** [N] waves for parallel execution
 5. **Task count:** [N] tasks, [M] TDD steps
 6. **Files affected:** [List]
-7. **Decision record:** options table + ADR included only when branching/risky
-8. **Plan location:** `.beads/artifacts/$ARGUMENTS/plan.md`
-9. **Child bead hierarchy:** (if created)
-10. **Next step:** `/ship $ARGUMENTS` or `/clarify $ARGUMENTS` if ambiguity remains
+7. **Plan location:** `.beads/artifacts/$ARGUMENTS/plan.md`
+8. **Child bead hierarchy:** (if created)
+9. **Next step:** `/ship $ARGUMENTS`
 
 ```bash
 br comments add $ARGUMENTS "Created plan.md: Level [N] discovery, [X] waves, [Y] tasks, [Z] TDD steps"
@@ -398,10 +407,8 @@ br comments add $ARGUMENTS "Created plan.md: Level [N] discovery, [X] waves, [Y]
 
 ## Related Commands
 
-| Need              | Command         |
-| ----------------- | --------------- |
-| Create spec       | `/create`       |
-| Clarify scope     | `/clarify <id>` |
-| Start working     | `/start <id>`   |
-| Execute plan      | `/ship <id>`    |
-| Research first    | `/research`     |
+| Need           | Command      |
+| -------------- | ------------ |
+| Create spec    | `/create`    |
+| Execute plan   | `/ship <id>` |
+| Research first | `/research`  |

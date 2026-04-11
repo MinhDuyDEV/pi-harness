@@ -208,7 +208,7 @@ for (const group of plan.dependency_graph.parallelizable_groups) {
   for (const taskId of group) {
     const node = plan.dependency_graph.nodes.find((n) => n.id === taskId);
     Task({
-      subagent_type: "general",
+      subagent_type: "worker",
       description: `Execute ${taskId}`,
       prompt: `Execute task ${taskId}: ${node.content}
       

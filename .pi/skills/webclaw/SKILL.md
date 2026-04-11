@@ -12,7 +12,7 @@ Fast, local-first web content extraction for LLMs. Rust-based scraper with TLS f
 - `webclaw-mcp` binary installed at `~/.webclaw/webclaw-mcp`
 - Install: `brew tap 0xMassi/webclaw && brew install webclaw`
 - Or: download from https://github.com/0xMassi/webclaw/releases
-- MCP server must be enabled in `.opencode/opencode.json` (`"enabled": true`)
+- MCP server must be enabled in `.pi/opencode.json` (`"enabled": true`)
 
 ## When to Use
 
@@ -131,7 +131,7 @@ webclaw-mcp --version
 
 ## Configuration
 
-After install, enable in `.opencode/opencode.json`:
+After install, enable in `.pi/opencode.json`:
 
 ```json
 {

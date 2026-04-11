@@ -41,6 +41,18 @@ Then check DCP status:
 
 If `--all` is provided, also check global stats via `/dcp`.
 
+Optionally capture deterministic session activity summary (useful for "what changed" context):
+
+```typescript
+vcc_snapshot({ limit: 120 })
+```
+
+For targeted history lookup (optional):
+
+```typescript
+vcc_recall({ query: "$ARGUMENTS" })
+```
+
 Get current DCP budget settings from:
 - `.pi/extensions/dcp/config.ts` (`DEFAULT_CONFIG.compress`)
 

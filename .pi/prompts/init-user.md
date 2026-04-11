@@ -10,6 +10,12 @@ Create personalized user profile. Optional but recommended for better AI respons
 > **Prerequisite:** Run `/init` first for core setup
 > **Related:** `/init-context` for project planning setup
 
+## Load Skills
+
+```typescript
+skill({ name: "memory-system" });
+```
+
 ## Options
 
 | Argument           | Default | Description                         |
@@ -30,7 +36,13 @@ If skipped, infer from `git config user.name` and `git config user.email`.
 
 ## Phase 2: Create user.md
 
-Write to memory system:
+From template `.pi/memory/_templates/user.md`:
+
+```bash
+cp .pi/memory/_templates/user.md .pi/memory/project/user.md
+```
+
+Fill in gathered answers:
 
 ```markdown
 ---
@@ -68,22 +80,45 @@ updated: [today]
 
 ### Persist to Memory System
 
-Store key preferences as a memory observation for cross-session retrieval:
+After writing the file, also store key preferences as a memory observation for cross-session retrieval:
 
-```
-observation(
+```typescript
+observation({
   type: "decision",
   title: "User profile: [name]",
-  narrative: "User preferences captured: [style], [workflow prefs], [technical prefs].",
+  narrative: "User preferences captured: [style], [workflow prefs], [technical prefs]. Source: /init-user command.",
   concepts: "user-profile, preferences",
-  confidence: "high"
-)
+  confidence: "high",
+  files_modified: ".pi/memory/project/user.md",
+});
 ```
 
-## Phase 3: Report
+## Phase 3: Update opencode.json
+
+Ensure `user.md` is loaded in `instructions` (bare paths, no `file://` prefix).
+
+The default `instructions[]` includes 4 auto-injected files:
+
+```json
+{
+  "instructions": [
+    ".pi/memory/project/user.md",
+    ".pi/memory/project/tech-stack.md",
+    ".pi/memory/project/project.md",
+    ".pi/context/git-context.md"
+  ]
+}
+```
+
+> **Warning:** Do not add more files to `instructions[]` unless they are essential for every prompt. Per-prompt injection of too many files causes session OOM crashes. Use `memory-read()` for on-demand access instead.
+
+## Phase 4: Report
 
 Output:
 
-1. user.md created
+1. user.md created at `.pi/memory/project/user.md`
 2. Preferences captured
-3. Next step: `/init-context` for project planning setup
+3. 4 files are auto-injected by default: user.md, tech-stack.md, project.md, git-context.md
+4. Additional planning files (roadmap.md, state.md) are on-demand via `/init-context`
+5. Custom context available at `.pi/context/` (preserved during init --force and upgrade)
+6. Next step: `/init-context` if the user wants fuller project-planning memory files

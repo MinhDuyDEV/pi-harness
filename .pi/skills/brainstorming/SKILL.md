@@ -27,7 +27,7 @@ Start by understanding the current project context, then ask questions one at a 
 
 **Part of:** `development-lifecycle` skill (Phase 1: Ideation)
 
-**Output template:** `.opencode/memory/_templates/design.md`
+**Output template:** `.pi/memory/_templates/design.md`
 
 ## The Process
 
@@ -58,7 +58,7 @@ Start by understanding the current project context, then ask questions one at a 
 **Documentation:**
 
 - Write the validated design to `.beads/artifacts/<bead-id>/design.md`
-- Use template from `.opencode/memory/_templates/design.md`
+- Use template from `.pi/memory/_templates/design.md`
 - Use elements-of-style:writing-clearly-and-concisely skill if available
 - Commit the design document to git
 

@@ -28,6 +28,18 @@ pnpm-debug.log*
 .pi/extensions/bun.lock
 .pi/extensions/package-lock.json
 .pi/tasks/
+.pi/.pi/
+.pi/cache/
+.pi/sessions/
+.pi/fff/
+.pi/auth.json
+.pi/mcp-cache.json
+.pi/mcp-npx-cache.json
+.pi/mcp.json
+.pi/models.json
+.pi/pi-sub-bar-settings.json
+.pi/pi-sub-core-settings.json
+.pi/extensions/*.bak
 
 # SQLite databases (local state, not source code)
 *.db

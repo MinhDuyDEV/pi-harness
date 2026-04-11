@@ -189,7 +189,7 @@ utils/
 
 ```typescript
 task({
-  subagent_type: "general",
+  subagent_type: "worker",
   prompt: `Use tilth CLI for code navigation (run via: npx -y tilth).
 
 Find the definition of \`initCommand\` and understand how it's called:

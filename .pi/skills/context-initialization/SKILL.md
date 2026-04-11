@@ -22,7 +22,7 @@ dependencies: []
 ### 1. Verify Templates
 
 ```typescript
-tilth_tilth_files({ pattern: "*.md", scope: ".opencode/memory/_templates" });
+tilth_tilth_files({ pattern: "*.md", scope: ".pi/memory/_templates" });
 // Required templates: project.md, roadmap.md, state.md
 ```
 
@@ -44,7 +44,7 @@ Skip if `--skip-questions` flag set.
 
 **project.md** (auto-injected — keep concise)
 
-- Read template via `Read({ filePath: ".opencode/memory/_templates/project.md" })`
+- Read template via `Read({ filePath: ".pi/memory/_templates/project.md" })`
 - Fill with answers
 - Write via `memory-update({ file: "project/project", content: ..., mode: "replace" })`
 
@@ -63,7 +63,7 @@ Skip if `--skip-questions` flag set.
 ### 4. Verify
 
 ```typescript
-tilth_tilth_files({ pattern: "*.md", scope: ".opencode/memory/project" });
+tilth_tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
 ```
 
 Report created files with their injection status (auto-injected vs on-demand).

@@ -1,6 +1,6 @@
 ---
 name: jira
-description: Jira and Confluence integration via official Atlassian MCP. Search issues, create tickets, update status, and access Confluence docs. Uses OAuth 2.1 authorization with Rovo Search.
+description: Use when interacting with Jira issues or Confluence docs — searching tickets, creating issues, updating status, or reading wiki pages. MUST load before any Atlassian integration. Requires network access to Atlassian MCP.
 version: 1.0.0
 tags: [integration, mcp, workflow]
 dependencies: []
@@ -15,6 +15,7 @@ dependencies: []
 ## When NOT to Use
 
 - When the project does not use Atlassian Cloud or MCP access is unavailable.
+
 
 ## Key Features
 
@@ -86,46 +87,68 @@ Most tools require a `cloudId`. Get it from your site URL or use the utility:
 
 ```typescript
 // Get accessible resources and cloudId
-getAccessibleAtlassianResources({});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "getAccessibleAtlassianResources"),
+  (arguments = "{}"),
+);
 ```
 
 Or use your site URL directly as cloudId (e.g., `"ibet.atlassian.net"`).
 
-### 3. Use Tools Directly
+### 3. Use MCP Tools
 
 ```typescript
 // Universal search (recommended for discovery)
-search({ query: "authentication bug" });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "search"),
+  (arguments = '{"query": "authentication bug"}'),
+);
 
 // Get issue details
-getJiraIssue({ cloudId: "your-site.atlassian.net", issueIdOrKey: "PROJ-123" });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "getJiraIssue"),
+  (arguments = '{"cloudId": "your-site.atlassian.net", "issueIdOrKey": "PROJ-123"}'),
+);
 
 // Search with JQL
-searchJiraIssuesUsingJql({
-  cloudId: "your-site.atlassian.net",
-  jql: "project = PROJ AND status = Open",
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "searchJiraIssuesUsingJql"),
+  (arguments = '{"cloudId": "your-site.atlassian.net", "jql": "project = PROJ AND status = Open"}'),
+);
 
 // Create issue
-createJiraIssue({
-  cloudId: "your-site.atlassian.net",
-  projectKey: "PROJ",
-  issueTypeName: "Bug",
-  summary: "Login fails on mobile",
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "createJiraIssue"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "projectKey": "PROJ", "issueTypeName": "Bug", "summary": "Login fails on mobile"}'),
+);
 
 // Transition issue status
-transitionJiraIssue({
-  cloudId: "your-site.atlassian.net",
-  issueIdOrKey: "PROJ-123",
-  transition: { id: "21" },
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "transitionJiraIssue"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "issueIdOrKey": "PROJ-123", "transition": {"id": "21"}}'),
+);
 
 // Get Confluence page
-getConfluencePage({ cloudId: "your-site.atlassian.net", pageId: "123456789" });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "getConfluencePage"),
+  (arguments = '{"cloudId": "your-site.atlassian.net", "pageId": "123456789"}'),
+);
 
 // Search Confluence with CQL
-searchConfluenceUsingCql({ cloudId: "your-site.atlassian.net", cql: 'title ~ "Onboarding"' });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "searchConfluenceUsingCql"),
+  (arguments = '{"cloudId": "your-site.atlassian.net", "cql": "title ~ \"Onboarding\""}'),
+);
 ```
 
 ## Common Workflows
@@ -133,38 +156,52 @@ searchConfluenceUsingCql({ cloudId: "your-site.atlassian.net", cql: 'title ~ "On
 ### Daily Standup
 
 ```typescript
-searchJiraIssuesUsingJql({
-  cloudId: "your-site.atlassian.net",
-  jql: "assignee = currentUser() AND updated >= -1d",
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "searchJiraIssuesUsingJql"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "jql": "assignee = currentUser() AND updated >= -1d"}'),
+);
 ```
 
 ### Bug Triage
 
 ```typescript
-searchJiraIssuesUsingJql({
-  cloudId: "your-site.atlassian.net",
-  jql: "type = Bug AND priority in (High, Critical) AND status != Done",
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "searchJiraIssuesUsingJql"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "jql": "type = Bug AND priority in (High, Critical) AND status != Done"}'),
+);
 ```
 
 ### Sprint Planning
 
 ```typescript
-searchJiraIssuesUsingJql({
-  cloudId: "your-site.atlassian.net",
-  jql: "project = PROJ AND sprint in openSprints()",
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "searchJiraIssuesUsingJql"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "jql": "project = PROJ AND sprint in openSprints()"}'),
+);
 ```
 
 ### Quick Discovery with Rovo Search
 
 ```typescript
 // Best for finding content when you don't know exact location
-search({ query: "authentication implementation" });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "search"),
+  (arguments = '{"query": "authentication implementation"}'),
+);
 
 // Then fetch details using ARI from results
-fetch({ id: "ari:cloud:jira:cloudId:issue/10107" });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "fetch"),
+  (arguments = '{"id": "ari:cloud:jira:cloudId:issue/10107"}'),
+);
 ```
 
 ## JQL Examples
@@ -210,11 +247,12 @@ For Confluence pages, you can specify content format:
 - `"adf"` - Atlassian Document Format (native format)
 
 ```typescript
-getConfluencePage({
-  cloudId: "your-site.atlassian.net",
-  pageId: "123456",
-  contentFormat: "markdown",
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "getConfluencePage"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "pageId": "123456", "contentFormat": "markdown"}'),
+);
 ```
 
 ## Transition Workflow
@@ -223,14 +261,19 @@ To change issue status, first get available transitions:
 
 ```typescript
 // 1. Get available transitions
-getTransitionsForJiraIssue({ cloudId: "your-site.atlassian.net", issueIdOrKey: "PROJ-123" });
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "getTransitionsForJiraIssue"),
+  (arguments = '{"cloudId": "your-site.atlassian.net", "issueIdOrKey": "PROJ-123"}'),
+);
 
 // 2. Use transition ID to change status
-transitionJiraIssue({
-  cloudId: "your-site.atlassian.net",
-  issueIdOrKey: "PROJ-123",
-  transition: { id: "31" },
-});
+skill_mcp(
+  (skill_name = "jira"),
+  (tool_name = "transitionJiraIssue"),
+  (arguments =
+    '{"cloudId": "your-site.atlassian.net", "issueIdOrKey": "PROJ-123", "transition": {"id": "31"}}'),
+);
 ```
 
 ## Resources

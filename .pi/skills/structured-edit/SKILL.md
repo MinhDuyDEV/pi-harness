@@ -18,6 +18,16 @@ dependencies: []
 - One-line edits where a direct edit is safe and unambiguous
 - Large refactors better served by full rewrites or file splits
 
+## Common Rationalizations
+
+| Rationalization                                   | Rebuttal                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| "I remember what the file looks like"             | You remember what it looked like 5 edits ago. Read it fresh                                 |
+| "The edit is simple, I don't need to verify"      | Simple edits fail most often — whitespace, encoding, duplicate matches                      |
+| "LSP lookup is an extra step I can skip"          | LSP takes 1 call. Retrying a failed edit takes 3-5 calls                                    |
+| "I'll just use a larger context block to be safe" | Larger blocks = more chances for invisible character mismatches. Use minimal unique context |
+| "The file hasn't changed since I last read it"    | Other edits, formatters, and git operations can modify files between your reads             |
+
 ## Overview
 
 The `str_replace` edit tool is the #1 source of failures in LLM coding. Models reproduce content with subtle differences (whitespace, encoding, line endings) causing "string not found" errors.

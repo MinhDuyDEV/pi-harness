@@ -62,7 +62,7 @@ Extend it by:
 | Reading entire files    | Use `lsp documentSymbol` for outline    |
 | Loading whole documents | Read specific line ranges               |
 | Flat file loading       | Navigate AGENTS.md hierarchy            |
-| Keeping completed work  | Prune aggressively (context-management) |
+| Keeping completed work  | Compress closed phases, sweep stale noise (context-management) |
 
 ## Anti-Patterns
 
@@ -106,8 +106,8 @@ Every task dispatched to a worker agent MUST include an explicit context block:
 ### Static Context (always available)
 
 - Project rules: AGENTS.md
-- Tech stack: docs/project/tech-stack.md
-- Gotchas: docs/project/gotchas.md
+- Tech stack: .pi/memory/project/tech-stack.md
+- Gotchas: .pi/memory/project/gotchas.md
 
 ### Runtime Context (this task only)
 
@@ -157,7 +157,7 @@ Verification:
 These files are the project's invariant layer. Always available, never stale:
 
 ```
-docs/project/
+.pi/memory/project/
 ├── user.md          # User preferences, workflow rules
 ├── tech-stack.md    # Frameworks, constraints
 ├── gotchas.md       # Footguns, warnings

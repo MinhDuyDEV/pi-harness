@@ -1,6 +1,6 @@
 ---
 name: resend
-description: Use when working with Resend email platform - sending transactional emails, receiving inbound emails, creating email templates with React Email, handling webhooks, or integrating email into applications.
+description: MUST load before sending transactional emails, creating React Email templates, handling email webhooks, or any Resend platform integration. Covers send, receive inbound, templates, and webhook handling.
 references:
   - send-email
   - receive-email

@@ -51,9 +51,12 @@ memory_read({ file: "project/gotchas" });
 
 **Delegate to explore agent** for comprehensive LSP analysis instead of manual operations:
 
-Perform thorough LSP analysis of `<symbol/module>`:
+```typescript
+task({
+  subagent_type: "explore",
+  description: "LSP analysis of <target>",
+  prompt: `Very thorough LSP analysis of <symbol/module>.
 
-```
 Target files:
 - src/path/to/file.ts
 - src/related/module.ts
@@ -65,7 +68,8 @@ Questions to answer:
 4. Where is this symbol referenced across the codebase?
 5. Are there interface implementations to consider?
 
-Return structured findings with file:line references.
+Return structured findings with file:line references.`,
+});
 ```
 
 The explore agent will run:
@@ -223,7 +227,7 @@ Based on LSP analysis:
 When scout enters deep mode, load this skill:
 
 ```typescript
-/skill:deep-research;
+skill({ name: "deep-research" });
 ```
 
 Scout then follows the protocol for external + internal analysis.
@@ -233,7 +237,7 @@ Scout then follows the protocol for external + internal analysis.
 When `/research <topic> --thorough` is invoked:
 
 ```typescript
-/skill:deep-research;
+skill({ name: "deep-research" });
 // Follow full protocol with ~100 tool budget
 ```
 
@@ -242,7 +246,7 @@ When `/research <topic> --thorough` is invoked:
 Before any complex edit:
 
 ```typescript
-/skill:deep-research;
+skill({ name: "deep-research" });
 // Run Phase 2 (LSP) on all symbols being modified
 // Proceed only when all 9 operations complete
 ```
@@ -256,13 +260,22 @@ Before any complex edit:
 memory_search({ query: "authentication middleware rate limiting" });
 memory_read({ file: "project/architecture" });
 
-// Phase 2: Thorough LSP analysis of authentication middleware
-// Analyze src/middleware/auth.ts:
-// 1. What functions are exported from auth.ts?
-// 2. What calls the auth middleware? (incoming calls)
-// 3. What does it depend on? (outgoing calls)
-// 4. Are there existing rate limiting patterns?
-// Return file:line references for all findings.
+// Phase 2: Delegate LSP exploration to explore agent
+task({
+  subagent_type: "explore",
+  description: "Analyze auth middleware",
+  prompt: `Very thorough LSP analysis of authentication middleware.
+
+Target: src/middleware/auth.ts
+
+Questions:
+1. What functions are exported from auth.ts?
+2. What calls the auth middleware? (incoming calls)
+3. What does it depend on? (outgoing calls)
+4. Are there existing rate limiting patterns?
+
+Return file:line references for all findings.`,
+});
 
 // Phase 3: Pattern discovery (parallel with Phase 2)
 grep({ pattern: "middleware", include: "*.<ext>" });
@@ -289,8 +302,12 @@ write({
 read({ filePath: "src/auth.ts" });
 // Then immediately editing...
 
-// Good: Run thorough LSP analysis of src/auth.ts first
-// (documentSymbol, goToDefinition, findReferences, incomingCalls, outgoingCalls...)
+// Good: Delegate to explore agent first
+task({
+  subagent_type: "explore",
+  description: "Analyze auth.ts",
+  prompt: "Very thorough LSP analysis of src/auth.ts...",
+});
 // Then edit with understanding
 ```
 
@@ -347,8 +364,8 @@ PROTOCOL:
 3. Patterns → grep + glob (parallel)
 4. External → only if needed
 
-ANALYSIS:
-Run thorough LSP analysis (all 9 operations) on target symbols
+DELEGATION:
+task({ subagent_type: "explore", prompt: "Very thorough LSP analysis..." })
 
 CONFIDENCE:
 High = LSP + tests + docs

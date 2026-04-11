@@ -1,6 +1,6 @@
 {
-  "defaultProvider": "github-copilot",
-  "defaultModel": "claude-opus-4.6",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.3-codex",
   "defaultThinkingLevel": "high",
   "theme": "catppuccin",
   "editorPaddingX": 0,
@@ -9,12 +9,14 @@
   },
   "packages": [
     "npm:@tintinweb/pi-subagents",
+    "npm:@tintinweb/pi-tasks",
     "npm:pi-teams",
     "npm:pi-mcp-adapter",
     "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@aliou/pi-guardrails",
     "https://github.com/badlogic/pi-diff-review",
-    "npm:@tintinweb/pi-tasks",
+    "npm:pi-image-preview",
+    "npm:@marckrenn/pi-sub-bar",
     "npm:pi-rewind",
     "npm:pi-notify",
     "npm:@heyhuynhgiabuu/pi-diff",
@@ -37,7 +39,14 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [".pi/skills/"],
-  "prompts": [".pi/prompts/"],
-  "extensions": [".pi/extensions/"]
+  "skills": [
+    ".pi/skills/"
+  ],
+  "prompts": [
+    ".pi/prompts/"
+  ],
+  "extensions": [
+    ".pi/extensions/"
+  ],
+  "lastChangelogVersion": "0.66.1"
 }

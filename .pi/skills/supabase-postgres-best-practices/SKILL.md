@@ -1,6 +1,6 @@
 ---
 name: supabase-postgres-best-practices
-description: Postgres performance optimization and best practices from Supabase. Use this skill when writing, reviewing, or optimizing Postgres queries, schema designs, or database configurations.
+description: MUST load when writing, reviewing, or optimizing Postgres queries, schema designs, indexes, or RLS policies in Supabase. Covers Supabase-specific Postgres performance patterns and common pitfalls.
 version: 1.0.0
 tags: [integration, code-quality]
 dependencies: []

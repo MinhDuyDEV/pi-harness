@@ -11,6 +11,7 @@ Pick up where a previous session left off. Recover context, verify state, contin
 
 ```typescript
 skill({ name: "beads" });
+skill({ name: "memory-grounding" });
 ```
 
 ## Phase 1: Verify Task
@@ -32,24 +33,14 @@ If not on the right branch, check out the feature branch. If uncommitted changes
 
 ## Phase 3: Find Handoff
 
-Check for handoff notes:
+Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: handoff file by bead ID, session history.
 
-```bash
-ls .beads/artifacts/$ARGUMENTS/handoffs/ 2>/dev/null
-```
-
-If a handoff exists, read the latest one. It tells you:
+If a handoff exists, it tells you:
 
 - What was completed
 - Where work stopped
 - What to do next
 - Any blockers
-
-Also search previous sessions:
-
-```typescript
-memory-search({ query: "$ARGUMENTS", type: "handoffs" })
-```
 
 ## Phase 4: Load Artifacts
 

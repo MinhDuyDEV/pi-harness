@@ -107,7 +107,7 @@ Dispatch parallel subagents — one per task:
 ```typescript
 // Dispatch all tasks in this wave simultaneously
 task({
-  subagent_type: "general",
+  subagent_type: "worker",
   description: `Wave ${N}: Task A — ${taskTitle}`,
   prompt: `You are implementing Task A from the plan.
 

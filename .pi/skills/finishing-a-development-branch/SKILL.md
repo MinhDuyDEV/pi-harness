@@ -67,14 +67,30 @@ Or ask: "This branch split from main - is that correct?"
 
 ### Step 3: Present Options
 
-Present options to the user:
+Use question tool to present completion options:
 
-"Implementation complete. What would you like to do?
-
-- Merge locally (Recommended) — Merge to base branch
-- Push & create PR — Create pull request for review
-- Keep branch — I'll handle it later
-- Discard work — Delete this branch"
+```typescript
+question({
+  questions: [
+    {
+      header: "Complete",
+      question: "Implementation complete. What would you like to do?",
+      options: [
+        {
+          label: "Merge locally (Recommended)",
+          description: "Merge to base branch",
+        },
+        {
+          label: "Push & create PR",
+          description: "Create pull request for review",
+        },
+        { label: "Keep branch", description: "I'll handle it later" },
+        { label: "Discard work", description: "Delete this branch" },
+      ],
+    },
+  ],
+});
+```
 
 **Don't add explanation** - keep options concise.
 
