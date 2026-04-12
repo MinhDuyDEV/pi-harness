@@ -1,5 +1,7 @@
 ---
 description: Planning agent for architecture, decomposition, and executable implementation plans. Uses goal-backward methodology.
+model: github-copilot/gpt-5.4
+thinking: high
 max_turns: 40
 disallowed_tools: edit, write
 prompt_mode: append

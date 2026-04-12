@@ -1,5 +1,7 @@
 ---
 description: Read-only visual analysis specialist for UI/UX review, accessibility audits, and design-system consistency checks.
+model: github-copilot/gemini-3.1-pro-preview
+thinking: high
 max_turns: 35
 disallowed_tools: edit, write
 prompt_mode: append

@@ -1,5 +1,7 @@
 ---
 description: Read-only code review and debugging specialist. Severity-ranked findings with file:line evidence. Detects stubs and verifies wiring.
+model: github-copilot/claude-opus-4.6
+thinking: high
 max_turns: 40
 disallowed_tools: edit, write
 prompt_mode: append

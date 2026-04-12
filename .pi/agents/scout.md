@@ -1,5 +1,7 @@
 ---
 description: External research specialist. Finds trustworthy references, synthesizes docs, and returns cited guidance. Memory-first.
+model: github-copilot/claude-sonnet-4.6
+thinking: high
 max_turns: 30
 disallowed_tools: edit, write
 prompt_mode: append

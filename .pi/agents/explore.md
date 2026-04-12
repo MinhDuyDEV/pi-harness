@@ -1,5 +1,7 @@
 ---
 description: Read-only codebase cartographer. Finds files, symbols, usage patterns, and call paths without modifying anything.
+model: github-copilot/claude-haiku-4.5
+thinking: high
 max_turns: 25
 disallowed_tools: edit, write
 prompt_mode: append
