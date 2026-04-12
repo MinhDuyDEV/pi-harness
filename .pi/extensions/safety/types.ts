@@ -23,7 +23,8 @@ export type ThreatCategory =
 	| "unverified-completion"
 	| "sensitive-modification"
 	| "network-exfiltration"
-	| "registry-publish";
+	| "registry-publish"
+	| "prompt-injection";
 
 export interface Verdict {
 	readonly kind: VerdictKind;
@@ -63,6 +64,8 @@ export interface ToolCallContext {
 	readonly command?: string;
 	/** File path for write/edit tools */
 	readonly path?: string;
+	/** File content being written/edited. Extracted from write.content or edit.edits[].newText. */
+	readonly content?: string;
 	/** Working directory */
 	readonly cwd: string;
 	/** Session identifier */

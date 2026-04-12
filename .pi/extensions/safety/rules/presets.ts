@@ -9,6 +9,7 @@ import type { RuleSet } from "../types.js";
 import { credentialRules } from "./credentials.js";
 import { destructiveRules } from "./destructive.js";
 import { gitRules } from "./git.js";
+import { injectionRules } from "./injection.js";
 import { networkRules } from "./network.js";
 import { publishRules } from "./publish.js";
 import { systemRules } from "./system.js";
@@ -31,6 +32,7 @@ export function defaultRules(
 		publishRules,
 		systemRules,
 		networkRules,
+		injectionRules,
 		workspaceRules(config),
 		verificationRules(vt),
 	);

@@ -30,7 +30,24 @@ export function contextFromEvent(event: unknown, cwd: string): ToolCallContext |
 	if (toolName === "write" || toolName === "edit") {
 		const path = String(input.path ?? "").trim();
 		if (!path) return null;
-		return { tool: toolName, path, cwd, sessionId };
+
+		// Extract content for injection scanning
+		let content: string | undefined;
+		if (toolName === "write") {
+			const raw = input.content;
+			if (typeof raw === "string") content = raw;
+		} else {
+			// edit tool: join all newText from edits array
+			const edits = input.edits;
+			if (Array.isArray(edits)) {
+				const parts = edits
+					.map((e: any) => typeof e?.newText === "string" ? e.newText : "")
+					.filter(Boolean);
+				if (parts.length > 0) content = parts.join("\n");
+			}
+		}
+
+		return { tool: toolName, path, content, cwd, sessionId };
 	}
 
 	// TaskUpdate — for unverified-completion rule

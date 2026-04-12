@@ -54,8 +54,138 @@ const COPILOT_HEADERS: Record<string, string> = {
 
 const OAUTH_POLLING_MARGIN_MS = 3000;
 
-const RATE_LIMIT_PATTERN =
-  /(too many requests|rate\s*limit|exhausted this model|429)/i;
+// ─── Error Classification ───────────────────────────────────
+
+type ErrorClass =
+  | "rate_limit"       // 429, "too many requests" — fallback to different model
+  | "auth"             // 401/403, "unauthorized" — not retryable, prompt re-login
+  | "billing"          // 402, "insufficient credits" — rotate model immediately
+  | "context_overflow"  // "context length", "token limit" — trigger compression
+  | "server_error"     // 500/502/503 — retry with backoff
+  | "timeout"          // ETIMEDOUT, ECONNRESET — retry with backoff
+  | "model_not_found"  // 404, "invalid model" — fallback immediately
+  | "unknown";         // catch-all — fallback
+
+interface ClassifiedError {
+  class: ErrorClass;
+  retryable: boolean;
+  shouldCompress: boolean;
+  shouldFallback: boolean;
+  message: string;
+}
+
+const ERROR_PATTERNS: ReadonlyArray<{
+  class: ErrorClass;
+  patterns: RegExp[];
+}> = [
+  {
+    class: "rate_limit",
+    patterns: [
+      /too many requests/i,
+      /rate\s*limit/i,
+      /exhausted this model/i,
+      /429/,
+      /throttled/i,
+      /requests per minute/i,
+      /tokens per minute/i,
+    ],
+  },
+  {
+    class: "billing",
+    patterns: [
+      /insufficient credits/i,
+      /payment required/i,
+      /billing hard limit/i,
+      /exceeded your current quota/i,
+      /credits have been exhausted/i,
+      /402/,
+    ],
+  },
+  {
+    class: "context_overflow",
+    patterns: [
+      /context length/i,
+      /context.*too long/i,
+      /token limit/i,
+      /too many tokens/i,
+      /reduce the length/i,
+      /maximum context/i,
+      /prompt is too long/i,
+      /exceeds the limit/i,
+    ],
+  },
+  {
+    class: "auth",
+    patterns: [
+      /unauthorized/i,
+      /invalid.*(?:api key|token|credential)/i,
+      /authentication failed/i,
+      /forbidden/i,
+      /access denied/i,
+      /401/,
+      /403/,
+    ],
+  },
+  {
+    class: "server_error",
+    patterns: [
+      /internal server error/i,
+      /bad gateway/i,
+      /service unavailable/i,
+      /502/,
+      /503/,
+      /500/,
+    ],
+  },
+  {
+    class: "timeout",
+    patterns: [
+      /timeout/i,
+      /ETIMEDOUT/,
+      /ECONNRESET/,
+      /ECONNREFUSED/,
+      /network error/i,
+      /socket hang up/i,
+    ],
+  },
+  {
+    class: "model_not_found",
+    patterns: [
+      /model not found/i,
+      /invalid model/i,
+      /does not exist/i,
+      /no such model/i,
+      /404/,
+    ],
+  },
+];
+
+function classifyError(errorMessage: string): ClassifiedError {
+  const msg = errorMessage || "";
+
+  for (const { class: errorClass, patterns } of ERROR_PATTERNS) {
+    if (patterns.some((p) => p.test(msg))) {
+      return {
+        class: errorClass,
+        retryable: errorClass === "server_error" || errorClass === "timeout",
+        shouldCompress: errorClass === "context_overflow",
+        shouldFallback:
+          errorClass === "rate_limit" ||
+          errorClass === "billing" ||
+          errorClass === "model_not_found",
+        message: msg,
+      };
+    }
+  }
+
+  return {
+    class: "unknown",
+    retryable: false,
+    shouldCompress: false,
+    shouldFallback: true,
+    message: msg,
+  };
+}
 
 const MODEL_FALLBACKS: Record<string, string> = {
   "claude-opus-4.6": "gpt-5.4",
@@ -537,6 +667,8 @@ export default function copilotProvider(pi: ExtensionAPI) {
 
   // Auto-fallback for model-specific rate limits.
   // We only switch model for subsequent turns (never auto-replay the same prompt).
+  // Structured error recovery — classifies errors and routes to correct action.
+  // Replaces the old rate-limit-only handler with full classification.
   pi.on("turn_end", async (event: any, ctx: any) => {
     const msg = event?.message;
     if (!msg || msg.role !== "assistant") return;
@@ -544,35 +676,78 @@ export default function copilotProvider(pi: ExtensionAPI) {
     if (msg.stopReason !== "error") return;
 
     const errorMessage = String(msg.errorMessage || "");
-    if (!RATE_LIMIT_PATTERN.test(errorMessage)) return;
-
+    const classified = classifyError(errorMessage);
     const currentModelId = String(msg.model || "");
-    const fallbackModelId = getFallbackModelId(currentModelId);
-    if (!fallbackModelId) return;
 
-    const fallbackModel = ctx.modelRegistry.find(
-      "github-copilot",
-      fallbackModelId,
-    );
-    if (!fallbackModel) {
+    // Auth errors: not recoverable via model switch — notify user
+    if (classified.class === "auth") {
       ctx.ui.notify(
-        `Rate-limited on github-copilot/${currentModelId}. Fallback model github-copilot/${fallbackModelId} not found.`,
+        `Authentication error on github-copilot/${currentModelId}. Run /login to re-authenticate.`,
+        "error",
+      );
+      return;
+    }
+
+    // Context overflow: suggest compression, don't switch model
+    if (classified.shouldCompress) {
+      ctx.ui.notify(
+        `Context overflow on github-copilot/${currentModelId}. Use the compress tool to reduce context size before continuing.`,
         "warning",
       );
       return;
     }
 
-    const switched = await pi.setModel(fallbackModel);
-    if (switched) {
-      ctx.ui.notify(
-        `Rate-limited on github-copilot/${currentModelId}. Switched to github-copilot/${fallbackModelId} for next turn.`,
-        "warning",
+    // For errors that should fallback to a different model
+    if (classified.shouldFallback) {
+      const fallbackModelId = getFallbackModelId(currentModelId);
+      if (!fallbackModelId) {
+        ctx.ui.notify(
+          `${classified.class} on github-copilot/${currentModelId}. No fallback model available.\n${classified.message}`,
+          "error",
+        );
+        return;
+      }
+
+      const fallbackModel = ctx.modelRegistry.find(
+        "github-copilot",
+        fallbackModelId,
       );
-    } else {
-      ctx.ui.notify(
-        `Rate-limited on github-copilot/${currentModelId}. Could not switch to fallback github-copilot/${fallbackModelId}.`,
-        "warning",
-      );
+      if (!fallbackModel) {
+        ctx.ui.notify(
+          `${classified.class} on github-copilot/${currentModelId}. Fallback github-copilot/${fallbackModelId} not found.`,
+          "warning",
+        );
+        return;
+      }
+
+      const switched = await pi.setModel(fallbackModel);
+      if (switched) {
+        ctx.ui.notify(
+          `${classified.class} on github-copilot/${currentModelId}. Switched to github-copilot/${fallbackModelId} for next turn.`,
+          "warning",
+        );
+      } else {
+        ctx.ui.notify(
+          `${classified.class} on github-copilot/${currentModelId}. Could not switch to github-copilot/${fallbackModelId}.`,
+          "warning",
+        );
+      }
+      return;
     }
+
+    // Retryable but no fallback needed (server_error, timeout) — just notify
+    if (classified.retryable) {
+      ctx.ui.notify(
+        `Transient error (${classified.class}) on github-copilot/${currentModelId}. Retry your last message.`,
+        "warning",
+      );
+      return;
+    }
+
+    // Unknown / unclassified — generic notification
+    ctx.ui.notify(
+      `Error on github-copilot/${currentModelId}: ${classified.message}`,
+      "error",
+    );
   });
 }

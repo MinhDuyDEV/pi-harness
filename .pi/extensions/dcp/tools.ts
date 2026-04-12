@@ -68,6 +68,9 @@ WHEN NOT TO USE
 
 IMPORTANT: Never run multiple compress calls in parallel. Always serialize compression calls.
 
+ITERATIVE COMPRESSION
+When compressing for the 2nd+ time in a session, prior compression summaries are shown in the tool output. Build on them — reference prior blocks by [bN] ID instead of repeating information. Each successive summary should capture only NEW information not already in prior blocks.
+
 Before compressing, ask: "Is this range closed enough to become summary-only right now?"`;
 
 // ---------------------------------------------------------------------------
@@ -284,6 +287,33 @@ export function registerCompressTool(
 				"",
 				params.summary,
 			];
+
+			// Iterative summary support: show prior blocks so agent builds
+			// on previous summaries instead of starting from scratch.
+			const priorBlocks = getActiveBlocks(sessionId).filter(
+				(b) => b.block_id !== blockId,
+			);
+			if (priorBlocks.length > 0) {
+				resultLines.push("");
+				resultLines.push(
+					"--- Prior compression summaries (build on these, don't repeat) ---",
+				);
+				for (const prior of priorBlocks) {
+					resultLines.push(
+						`[b${prior.block_id}: ${prior.topic}] (~${prior.compressed_tokens} tokens)`,
+					);
+					// Truncate prior summaries to avoid ballooning token cost
+					const truncated =
+						prior.summary.length > 500
+							? prior.summary.slice(0, 500) + "... [truncated]"
+							: prior.summary;
+					resultLines.push(truncated);
+					resultLines.push("");
+				}
+				resultLines.push(
+					"Tip: Reference prior block findings by [bN] instead of repeating them. Focus your summary on NEW information.",
+				);
+			}
 
 			// Message-mode: include priority suggestions for next compression targets
 			if (compressMode === "message" && getPriorityMap) {
