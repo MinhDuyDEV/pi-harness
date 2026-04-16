@@ -39,17 +39,14 @@ import type {
 
 const CLIENT_ID = "Ov23li8tweQw6odWQebz";
 const DEFAULT_COPILOT_API_URL = "https://api.githubcopilot.com";
+const COPILOT_USER_AGENT = "opencode/1.3.17";
 
 /**
  * Static Copilot headers — propagated to all models via provider-level headers.
- * These make requests look like VS Code Copilot Chat, which is key to
- * avoiding premium quota counting.
+ * Requests identify this extension with the OpenCode User-Agent only.
  */
 const COPILOT_HEADERS: Record<string, string> = {
-  "User-Agent": "GitHubCopilotChat/0.35.0",
-  "Editor-Version": "vscode/1.107.0",
-  "Editor-Plugin-Version": "copilot-chat/0.35.0",
-  "Copilot-Integration-Id": "vscode-chat",
+  "User-Agent": COPILOT_USER_AGENT,
 };
 
 const OAUTH_POLLING_MARGIN_MS = 3000;
@@ -507,7 +504,7 @@ async function loginCopilot(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": "GitHubCopilotChat/0.35.0",
+      "User-Agent": COPILOT_USER_AGENT,
     },
     body: JSON.stringify({
       client_id: CLIENT_ID,
@@ -540,7 +537,7 @@ async function loginCopilot(
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "GitHubCopilotChat/0.35.0",
+        "User-Agent": COPILOT_USER_AGENT,
       },
       body: JSON.stringify({
         client_id: CLIENT_ID,
