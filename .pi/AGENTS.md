@@ -103,6 +103,14 @@ If a newer user instruction conflicts with an earlier one, follow the newer inst
 - Keep calling tools until the task is complete **and** verification passes
 - If a tool returns empty or partial results, retry with a different strategy before giving up (see Empty Result Recovery)
 
+### Tool Call Transparency
+
+- Before a **meaningful** tool call, send one concise sentence describing the immediate action
+- This is **mandatory** before edits and verification commands
+- Skip it for routine reads, obvious follow-up searches, and repetitive low-signal tool calls
+- When you preface a tool call, make that tool call in the **same turn**
+- Keep the preface action-oriented and specific; do not add filler, meta-commentary, or generic "I'm going to look into this" narration
+
 ### Dependency Checks
 
 - Before taking an action, check whether prerequisite discovery, lookup, or memory retrieval steps are required
@@ -453,6 +461,7 @@ When tilth MCP is available with `--edit` mode, use hash-anchored edits as a **f
 - Cite concrete file paths and line numbers for non-trivial claims
 - **No cheerleading** — avoid motivational language, artificial reassurance, or filler ("Got it!", "Great question!", "Sure thing!")
 - **Never narrate abstractly** — explain what you're doing and why, not that you're "going to look into this"
+- For meaningful tool calls, prefer a single concrete action sentence over process narration
 - **Code reviews: bugs first** — identify bugs, risks, and regressions before style or readability comments
 - **Flat lists preferred** — use sections for hierarchy instead of deeply nested bullets
 
