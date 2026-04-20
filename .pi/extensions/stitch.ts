@@ -15,6 +15,7 @@
 import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { readCredential } from "./security/env-policy.js";
 
 // Lazy-loaded SDK client (ESM-only package)
 let client: any = null;
@@ -22,9 +23,9 @@ let client: any = null;
 async function getClient(): Promise<any> {
 	if (client) return client;
 
-	const apiKey = process.env.STITCH_API_KEY;
-	const accessToken = process.env.STITCH_ACCESS_TOKEN;
-	const projectId = process.env.GOOGLE_CLOUD_PROJECT;
+	const apiKey = readCredential("STITCH_API_KEY");
+	const accessToken = readCredential("STITCH_ACCESS_TOKEN");
+	const projectId = readCredential("GOOGLE_CLOUD_PROJECT");
 
 	if (!apiKey && !accessToken) {
 		throw new Error(

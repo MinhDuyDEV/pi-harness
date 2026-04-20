@@ -31,6 +31,18 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 **Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
 
+## Hermes-Grade Plan Contract
+
+A plan is not execution-ready until it includes all of the following:
+
+- `## Discovery` with concrete repo findings, file paths, symbols, and constraints
+- `## Must-Haves` with outcome-shaped truths and artifacts
+- `## Task Dependencies` / waves showing what can run in parallel
+- Per-task execution packets: scope, file list, acceptance checks, verification, non-goals
+- Explicit review gates: when to run review and what depth to use
+
+If any of these are missing, the plan is still strategy prose, not an executable workflow artifact.
+
 ## Bite-Sized Task Granularity
 
 **Each step is one action (2-5 minutes):**
@@ -58,6 +70,29 @@ Assume they are a skilled developer, but know almost nothing about our toolset o
 
 ---
 ```
+
+### Discovery Section (REQUIRED)
+
+Document the codebase evidence that justifies the plan before defining tasks.
+
+```markdown
+## Discovery
+
+### What Exists Today
+- `src/path/file.ts` — [what it currently does]
+- `src/other/file.ts` — [constraint/pattern to reuse]
+
+### Constraints / Risks
+- [technical constraint]
+- [migration or compatibility risk]
+- [security or verification concern]
+
+### Reuse Decisions
+- Reuse `existingHelper()` from `src/path/file.ts`
+- Do NOT create a new wrapper around `existingService`
+```
+
+This section must be substantive enough that an engineer can understand *why* the plan is structured this way.
 
 ### Goal-Backward Section (REQUIRED)
 
@@ -105,6 +140,33 @@ Wave 1: A, B (parallel)
 Wave 2: C (after Wave 1)
 
 ````
+
+### Per-Task Execution Packet (REQUIRED)
+
+Every task must be self-contained enough that a worker can execute it without guessing.
+
+```markdown
+### Task N: [Name]
+
+**Why:** [one sentence]
+
+**Files:**
+- Modify: `exact/path.ts`
+- Create: `exact/new-file.ts`
+- Verify: `npm test -- exact-test`
+
+**Acceptance Checks:**
+- [observable behavior 1]
+- [observable behavior 2]
+
+**Non-Goals:**
+- [what this task must not touch]
+- [what will be handled in a later wave]
+
+**Review Gate:** targeted | standard | full
+```
+
+Default to `targeted` review for a single low-risk task, escalate to `standard` or `full` when auth, concurrency, migrations, security, or cross-cutting behavior is involved.
 
 ## Tiered Task Hierarchy
 
@@ -305,11 +367,12 @@ After saving the plan, offer execution choice:
 **If Subagent-Driven chosen:**
 - **REQUIRED SUB-SKILL:** Use skill({ name: "subagent-driven-development" })
 - Stay in this session
-- Fresh subagent per task + code review
+- Fresh subagent per task + mandatory review gate after each task
 
 **If Parallel Session chosen:**
 - Guide them to open new session in worktree
 - **REQUIRED SUB-SKILL:** New session uses skill({ name: "executing-plans" })
+- Run review at each wave boundary, not only at the end
 ```
 ````
 

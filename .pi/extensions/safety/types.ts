@@ -66,6 +66,10 @@ export interface ToolCallContext {
 	readonly path?: string;
 	/** File content being written/edited. Extracted from write.content or edit.edits[].newText. */
 	readonly content?: string;
+	/** Primary URL for URL-based tools. */
+	readonly url?: string;
+	/** Multiple URLs for URL-based tools. */
+	readonly urls?: readonly string[];
 	/** Working directory */
 	readonly cwd: string;
 	/** Session identifier */

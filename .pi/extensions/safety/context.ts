@@ -20,11 +20,17 @@ export function contextFromEvent(event: unknown, cwd: string): ToolCallContext |
 
 	const input = (e.input ?? e.params ?? {}) as Record<string, unknown>;
 	const sessionId = String(e.sessionId ?? "default");
+	const url = typeof input.url === "string" ? input.url.trim() : undefined;
+	const urls = Array.isArray(input.urls)
+		? input.urls
+			.map((entry) => typeof entry === "string" ? entry.trim() : "")
+			.filter(Boolean)
+		: undefined;
 
 	if (toolName === "bash") {
 		const command = String(input.command ?? "").replace(/\s+/g, " ").trim();
 		if (!command) return null;
-		return { tool: "bash", command, cwd, sessionId };
+		return { tool: "bash", command, url, urls, cwd, sessionId };
 	}
 
 	if (toolName === "write" || toolName === "edit") {
@@ -47,7 +53,7 @@ export function contextFromEvent(event: unknown, cwd: string): ToolCallContext |
 			}
 		}
 
-		return { tool: toolName, path, content, cwd, sessionId };
+		return { tool: toolName, path, content, url, urls, cwd, sessionId };
 	}
 
 	// TaskUpdate — for unverified-completion rule
@@ -58,6 +64,16 @@ export function contextFromEvent(event: unknown, cwd: string): ToolCallContext |
 		return {
 			tool: "taskupdate",
 			command: `TaskUpdate taskId=${taskId} status=${status}`,
+			cwd,
+			sessionId,
+		};
+	}
+
+	if (url || (urls && urls.length > 0)) {
+		return {
+			tool: toolName,
+			url,
+			urls,
 			cwd,
 			sessionId,
 		};

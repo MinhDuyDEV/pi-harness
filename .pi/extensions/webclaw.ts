@@ -20,6 +20,7 @@
 import { execFile } from "node:child_process";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { buildSubprocessEnv } from "./security/env-policy.js";
 
 type OutputFormat = "llm" | "markdown" | "text" | "json" | "html";
 
@@ -43,7 +44,7 @@ function runWebclaw(
 			WEBCLAW_BIN,
 			args,
 			{
-				env: process.env,
+				env: buildSubprocessEnv("webclaw"),
 				timeout: timeoutMs,
 				maxBuffer: MAX_BUFFER_BYTES,
 				signal,

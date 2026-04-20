@@ -29,11 +29,22 @@ dependencies: [executing-plans]
 - Code review after each task (catch issues early)
 - Faster iteration (no human-in-loop between tasks)
 
+**Hermes-style discipline:** stable task packet → one implementation subagent → distrust/verify output → review gate → only then continue.
+
 ## The Process
 
 ### 1. Load Plan
 
 Read plan file, create TodoWrite with all tasks.
+
+Before dispatching any implementation subagent, extract a **task packet** from the plan:
+
+- task goal
+- exact files in scope
+- acceptance checks
+- verification commands
+- explicit non-goals
+- review depth (`targeted`, `standard`, or `full`)
 
 **Context file pattern:** If the plan exceeds ~500 tokens, write it to `.beads/artifacts/<id>/plan-context.md` and reference by path in subagent prompts instead of inlining. This saves tokens when dispatching multiple subagents from the same plan.
 
@@ -41,24 +52,40 @@ Read plan file, create TodoWrite with all tasks.
 
 For each task:
 
-**Dispatch fresh subagent:**
+**Dispatch fresh subagent with a stable task packet:**
 
 ```
-Task tool (general-purpose):
+Task tool (worker or general-purpose):
   description: "Implement Task N: [task name]"
   prompt: |
     You are implementing Task N from [plan-file].
 
-    Read that task carefully. Your job is to:
-    1. Implement exactly what the task specifies
-    2. Write tests (following TDD if task says to)
-    3. Verify implementation works
-    4. Commit your work
-    5. Report back
+    ## Goal
+    [one-sentence task goal]
+
+    ## Files In Scope
+    - [exact file path]
+    - [exact file path]
+
+    ## Acceptance Checks
+    - [behavior that must be true]
+    - [behavior that must stay unchanged]
+
+    ## Verification
+    - [exact command]
+    - [exact command]
+
+    ## Non-Goals
+    - [what not to touch]
+
+    Your job is to:
+    1. Implement exactly this task packet
+    2. Write or update tests only when the task requires it
+    3. Run the required verification commands
+    4. Do NOT commit unless explicitly instructed by the parent agent
+    5. Return the structured termination contract from AGENTS.md
 
     Work from: [directory]
-
-    [Include Structured Termination Contract from AGENTS.md]
 ```
 
 **After subagent reports back** — follow the **Worker Distrust Protocol** from AGENTS.md:
@@ -66,23 +93,28 @@ Task tool (general-purpose):
 1. Read changed files directly (don't trust the report)
 2. Run verification on modified files (typecheck + lint minimum)
 3. Check acceptance criteria against original task spec
-4. Only then mark the task as complete
+4. Confirm the subagent stayed inside its file scope
+5. Only then mark the task as complete
 
 ### 3. Review Subagent's Work
 
-**Dispatch review subagent:**
+Dispatch a review gate immediately after each task.
 
-Use template at requesting-code-review/review.md
+**Default:** targeted review
+**Escalate to parallel review:** standard/full when the task touches auth, concurrency, migrations, security, or cross-cutting behavior.
 
-WHAT_WAS_IMPLEMENTED: [from subagent's report]
-PLAN_OR_REQUIREMENTS: Task N from [plan-file]
-BASE_SHA: [commit before task]
-HEAD_SHA: [current commit]
-DESCRIPTION: [task summary]
+Review packet:
 
-```
+- WHAT_WAS_IMPLEMENTED: [from subagent's report]
+- PLAN_OR_REQUIREMENTS: Task N from [plan-file]
+- BASE_SHA: [commit before task]
+- HEAD_SHA: [current state or working tree]
+- DESCRIPTION: [task summary]
+- REVIEW_DEPTH: targeted | standard | full
 
-**Code reviewer returns:** Strengths, Issues (Critical/Important/Minor), Assessment
+Use the `requesting-code-review` skill for reviewer dispatch and synthesis.
+
+**Code reviewers return:** severity-ranked findings with file:line evidence.
 
 ### 4. Apply Review Feedback
 
@@ -90,14 +122,13 @@ DESCRIPTION: [task summary]
 
 - Fix Critical issues immediately
 - Fix Important issues before next task
-- Note Minor issues
+- Note Minor issues only if consciously deferred
+- Re-run verification after fixes
 
 **Dispatch follow-up subagent if needed:**
 
 ```
-
-"Fix issues from code review: [list issues]"
-
+"Fix these review findings and nothing else: [list issues]"
 ```
 
 ### 5. Mark Complete, Next Task

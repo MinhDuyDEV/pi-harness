@@ -41,6 +41,16 @@ This skill is for **asking for review**, not blindly obeying reviewers. The revi
 6. **Fix or push back with evidence**
 7. **Re-verify after changes**
 
+## Review Loop Defaults
+
+Treat review as a workflow phase, not an optional epilogue.
+
+- After a meaningful task batch: run at least `targeted` review
+- After risky or cross-cutting work: run `standard` or `full` parallel review before calling it done
+- After review fixes: re-run verification, then review again if the fixes were non-trivial
+
+The default loop is: **implement → verify → review → fix → re-verify**.
+
 ## Review Packet
 
 Before dispatching any reviewer, assemble a packet with:
@@ -87,6 +97,20 @@ Choose the smallest review depth that still covers the risk.
 | **targeted** | Small fix, one main risk, one area changed  | 1-2    |
 | **standard** | Typical feature/fix ready for merge         | 3      |
 | **full**     | Risky, cross-cutting, release-critical work | 5      |
+
+### Parallel Review Lanes
+
+When using `standard` or `full`, assign reviewers to explicit lanes so they do not all produce the same vague feedback.
+
+| Lane | Focus | Always? |
+| ---- | ----- | ------- |
+| **A** | security + correctness | yes |
+| **B** | type safety + test quality | yes |
+| **C** | completeness + unnecessary complexity | yes |
+| **D** | conventions + existing patterns | full only |
+| **E** | performance + architecture | full only |
+
+If you cannot name the lane, the reviewer prompt is too vague.
 
 ### Routing Rules
 
@@ -291,8 +315,10 @@ Return:
 | Depth        | Reviewers to Run             |
 | ------------ | ---------------------------- |
 | **targeted** | Choose the 1-2 most relevant |
-| **standard** | A + C + E                    |
+| **standard** | A + B + C                    |
 | **full**     | A + B + C + D + E            |
+
+`standard` is the default parallel review mode for meaningful implementation work. Use `full` only when the added lanes are justified by real risk.
 
 ## Step 3: Synthesize Findings
 
@@ -302,6 +328,8 @@ Return:
 - [ ] Keep the strongest explanation when multiple reviewers report same issue
 - [ ] Separate real blockers from optional improvements
 - [ ] Mark disputed / uncertain findings explicitly
+- [ ] Discard findings without a concrete failure mode or file:line evidence
+- [ ] Prefer one strong finding per issue over five weak paraphrases
 
 Output format:
 

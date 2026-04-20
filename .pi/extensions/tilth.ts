@@ -21,6 +21,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { Type } from "@sinclair/typebox";
 import { createInterface, type Interface } from "node:readline";
+import { buildSubprocessEnv } from "./security/env-policy.js";
 
 // ---------------------------------------------------------------------------
 // MCP JSON-RPC client for subprocess communication
@@ -66,7 +67,7 @@ class TilthMCPClient {
 
 		this.proc = spawn("npx", args, {
 			stdio: ["pipe", "pipe", "pipe"],
-			env: { ...process.env },
+			env: buildSubprocessEnv("tilth"),
 		});
 
 		this.proc.on("error", (err) => {

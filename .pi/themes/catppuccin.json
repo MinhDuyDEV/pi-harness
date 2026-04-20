@@ -27,7 +27,8 @@
     "pink": "#f5c2e7",
     "flamingo": "#f2cdcd",
     "rosewater": "#f5e0dc",
-    "black": "#000000"
+    "black": "#000000",
+    "dark": "#001d2b"
   },
   "colors": {
     "accent": "mauve",
@@ -48,8 +49,8 @@
     "customMessageText": "base",
     "customMessageLabel": "mauve",
     "toolPendingBg": "base",
-    "toolSuccessBg": "black",
-    "toolErrorBg": "black",
+    "toolSuccessBg": "dark",
+    "toolErrorBg": "#2e1e1e",
     "toolTitle": "mauve",
     "toolOutput": "text",
     "mdHeading": "peach",

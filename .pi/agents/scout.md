@@ -61,23 +61,25 @@ Higher-ranked sources win on conflicts.
 1. **Memory first**: `memory-search` for prior research before going external
 2. **Choose tools by need**:
 
-   | Need                                  | Tool                                                     |
-   | ------------------------------------- | -------------------------------------------------------- |
-   | Library docs/API                      | `context7` (resolve → query)                             |
-   | Production examples                   | `grepsearch` (literal code patterns)                     |
-   | Current web info                      | `websearch` (Exa AI, real-time)                          |
-   | Code docs & examples                  | `codesearch` (Exa AI, code-specific)                     |
-   | Read a specific static/protected URL  | `webclaw_scrape` (fast, token-efficient, bot-bypass)     |
-   | Compare several known URLs            | `webclaw_batch`                                          |
-   | Read a JS-heavy or interactive URL    | `lightpanda_markdown` (rendered page)                    |
-   | Extract page links                    | `lightpanda_links` (all URLs)                            |
-   | Page metadata/SEO                     | `lightpanda_structuredData`                              |
-   | Package source code                   | `source-code-research` skill                             |
-   | Codebase patterns                     | `tilth_search`                                           |
+   | Need                                  | Tool                                                          |
+   | ------------------------------------- | ------------------------------------------------------------- |
+   | Library docs/API                      | `context7` (resolve → query)                                  |
+   | Production examples                   | `grepsearch` (literal code patterns)                          |
+   | Discover current web info             | `websearch` (Exa AI, real-time)                               |
+   | Discover code docs & examples         | `codesearch` (Exa AI, code-specific)                          |
+   | Read a selected search result URL     | `web_fetch` (follow-up after `websearch` / `codesearch`)      |
+   | Read a specific static/protected URL  | `webclaw_scrape` (fast, token-efficient, bot-bypass)          |
+   | Compare several known URLs            | `webclaw_batch`                                               |
+   | Read a JS-heavy or interactive URL    | `lightpanda_markdown` (rendered page)                         |
+   | Extract page links                    | `lightpanda_links` (all URLs)                                 |
+   | Page metadata/SEO                     | `lightpanda_structuredData`                                   |
+   | Package source code                   | `source-code-research` skill                                  |
+   | Codebase patterns                     | `tilth_search`                                                |
 
-3. Prefer `webclaw_scrape` over browser tools for direct URL reads unless the page clearly needs JavaScript rendering or interaction
-4. Run independent calls in parallel
-5. Return concise recommendations with sources
+3. In pi-search v0.2.2 workflows, use `websearch` / `codesearch` to find candidate links, then `web_fetch` to read the chosen URL.
+4. Prefer `webclaw_scrape` over browser tools for direct URL reads when `web_fetch` is blocked/protected; use `lightpanda_*` only if JavaScript rendering or interaction is required.
+5. Run independent calls in parallel
+6. Return concise recommendations with sources
 
 ## Output
 

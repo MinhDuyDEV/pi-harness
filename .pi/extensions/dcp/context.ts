@@ -1,11 +1,29 @@
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 
+interface EventWithSessionId {
+	sessionId?: unknown;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+	return typeof value === "string" && value.trim().length > 0;
+}
+
 /**
- * Get the current Pi session identifier for DCP persistence.
+ * Get the current Pi session identifier for persistence.
  *
- * Pi exposes a stable session ID via `ctx.sessionManager.getSessionId()`.
- * We use that directly instead of deriving IDs from session file paths.
+ * Prefer the runtime session manager when available, but tolerate partial event
+ * payloads during extension hooks so non-DCP extensions can share the helper.
  */
-export function getSessionId(ctx: Pick<ExtensionContext, "sessionManager">): string {
-	return ctx.sessionManager.getSessionId();
+export function getSessionId(
+	ctx?: Pick<ExtensionContext, "sessionManager"> | null,
+	event?: EventWithSessionId | null,
+): string {
+	const manager = ctx?.sessionManager as { getSessionId?: () => string } | undefined;
+	if (manager?.getSessionId) {
+		const sessionId = manager.getSessionId();
+		if (isNonEmptyString(sessionId)) return sessionId;
+	}
+
+	if (isNonEmptyString(event?.sessionId)) return event.sessionId.trim();
+	return "default";
 }

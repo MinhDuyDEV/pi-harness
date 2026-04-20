@@ -1,6 +1,6 @@
 {
   "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.3-codex",
+  "defaultModel": "gpt-5.4",
   "defaultThinkingLevel": "high",
   "theme": "catppuccin",
   "editorPaddingX": 0,
@@ -20,7 +20,8 @@
     "npm:pi-rewind",
     "npm:pi-notify",
     "npm:@heyhuynhgiabuu/pi-diff",
-    "npm:@heyhuynhgiabuu/pi-pretty"
+    "npm:@heyhuynhgiabuu/pi-pretty",
+    "npm:@heyhuynhgiabuu/pi-search"
   ],
   "compaction": {
     "enabled": true,
@@ -48,5 +49,8 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.66.1"
+  "lastChangelogVersion": "0.67.68",
+  "treeFilterMode": "default",
+  "transport": "sse",
+  "hideThinkingBlock": false
 }

@@ -30,11 +30,12 @@ import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
 import { distillSession } from "./memory/distill.js";
 import { clearEmbeddings, embed, warmupEmbeddings } from "./memory/embeddings.js";
 import { checkpointWAL, optimizeFTS5 } from "./memory/maintenance.js";
-import { backfillEmbeddings } from "./memory/observations.js";
-import { storeTemporalMessage } from "./memory/pipeline.js";
+import { backfillEmbeddings, getObservationStats } from "./memory/observations.js";
+import { getRelevantKnowledge, storeTemporalMessage } from "./memory/pipeline.js";
 import { sanitize } from "./memory/sanitize.js";
 import { refreshAllScores } from "./memory/scoring.js";
 import { registerMemoryTools } from "./memory/tools.js";
+import { getSessionId } from "./dcp/context.js";
 
 // ---------------------------------------------------------------------------
 // Extension factory (Pi entry point)
@@ -58,7 +59,7 @@ export default function memoryExtension(pi: any): void {
 	// 3. Register event handlers
 
 	// --- Capture user messages ---
-	pi.on("input", (event: any) => {
+	pi.on("input", (event: any, ctx: any) => {
 		if (!MEMORY_CONFIG.capture.enabled) return;
 
 		try {
@@ -78,9 +79,10 @@ export default function memoryExtension(pi: any): void {
 
 			const tokenEstimate = Math.ceil(content.length / 4);
 			const now = Date.now();
+			const sessionId = getSessionId(ctx, event);
 
 			storeTemporalMessage({
-				session_id: "default",
+				session_id: sessionId,
 				message_id: `user-${now}-${Math.random().toString(36).slice(2, 8)}`,
 				role: "user",
 				content,
@@ -93,7 +95,7 @@ export default function memoryExtension(pi: any): void {
 	});
 
 	// --- Capture tool results ---
-	pi.on("tool_result", (event: any) => {
+	pi.on("tool_result", (event: any, ctx: any) => {
 		if (!MEMORY_CONFIG.capture.enabled) return;
 
 		try {
@@ -128,9 +130,10 @@ export default function memoryExtension(pi: any): void {
 			const tokenEstimate = Math.ceil(content.length / 4);
 			const now = Date.now();
 			const toolName = event?.name ?? event?.toolName ?? "tool";
+			const sessionId = getSessionId(ctx, event);
 
 			storeTemporalMessage({
-				session_id: "default",
+				session_id: sessionId,
 				message_id: `tool-${toolName}-${now}-${Math.random().toString(36).slice(2, 8)}`,
 				role: "assistant",
 				content: `[${toolName}] ${content}`,
@@ -143,13 +146,15 @@ export default function memoryExtension(pi: any): void {
 	});
 
 	// --- Run pipeline on agent_end ---
-	pi.on("agent_end", async () => {
+	pi.on("agent_end", async (event: any, ctx: any) => {
 		try {
+			const sessionId = getSessionId(ctx, event);
+
 			// Distill accumulated messages
-			const distillationId = distillSession("default");
+			const distillationId = distillSession(sessionId);
 			if (distillationId) {
 				// Curate observations from distillations
-				curateFromDistillations("default");
+				curateFromDistillations(sessionId);
 			}
 
 			// Refresh time-decay scores periodically
@@ -171,35 +176,22 @@ export default function memoryExtension(pi: any): void {
 		if (!MEMORY_CONFIG.injection.enabled) return;
 
 		try {
-			const { getRelevantKnowledge } = await import(
-				"./memory/pipeline.js"
-			);
-			const { getObservationStats } = await import(
-				"./memory/observations.js"
-			);
-
 			const stats = getObservationStats();
-			const totalObs = Object.values(stats).reduce(
-				(sum, n) => sum + n,
-				0,
-			);
-			if (totalObs === 0) return; // No observations yet
+			const totalObs = Object.values(stats).reduce((sum, n) => sum + n, 0);
+			if (totalObs === 0) return;
 
-			// Extract terms from the user's task/message if available
-			const userMessage =
-				event?.userMessage ?? event?.message ?? event?.input ?? "";
-			const taskTerms = typeof userMessage === "string"
-				? userMessage
+			const userMessage = event?.userMessage ?? event?.message ?? event?.input ?? "";
+			const taskTerms =
+				typeof userMessage === "string"
+					? userMessage
 						.toLowerCase()
 						.split(/\s+/)
 						.filter((t: string) => t.length > 2)
 						.slice(0, 20)
-				: [];
+					: [];
 
-			if (taskTerms.length === 0) return; // Nothing to match against
+			if (taskTerms.length === 0) return;
 
-			// Retrieve relevant knowledge (uses FTS5 + BM25 + recency decay + vector when available)
-			// Generate query embedding for hybrid search
 			let queryEmbedding: number[] | null = null;
 			try {
 				queryEmbedding = await embed(taskTerms.join(" "));
@@ -215,7 +207,6 @@ export default function memoryExtension(pi: any): void {
 
 			if (knowledge.length === 0) return;
 
-			// Build injection block
 			const lines = [
 				"\n\n## Relevant Memory (Auto-Injected)",
 				"_The following observations were retrieved from memory based on the current task. Use them as context._\n",
@@ -223,9 +214,7 @@ export default function memoryExtension(pi: any): void {
 
 			for (const item of knowledge) {
 				const scoreStr = item.score.toFixed(2);
-				lines.push(
-					`- **[${item.type}]** ${item.title} _(score: ${scoreStr})_`,
-				);
+				lines.push(`- **[${item.type}]** ${item.title} _(score: ${scoreStr})_`);
 				if (item.content) {
 					const snippet = item.content.slice(0, 200).replace(/\n/g, " ");
 					lines.push(`  ${snippet}`);
