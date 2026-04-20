@@ -32,6 +32,8 @@ pnpm-debug.log*
 .pi/cache/
 .pi/sessions/
 .pi/fff/
+.pi/pi-pretty/
+.pi/pi-crash.log
 .pi/auth.json
 .pi/mcp-cache.json
 .pi/mcp-npx-cache.json
