@@ -16,6 +16,7 @@ Execute PRD tasks, verify each passes, run review, close the bead.
 ```typescript
 skill({ name: "beads" });
 skill({ name: "memory-grounding" });
+skill({ name: "behavioral-kernel" });
 skill({ name: "workspace-setup" });
 skill({ name: "verification-before-completion" });
 skill({ name: "reflection-checkpoints" }); // Mid-point + completion checks during execution
@@ -37,6 +38,7 @@ skill({ name: "reflection-checkpoints" }); // Mid-point + completion checks duri
 - **Verify goals**: Tasks completing ≠ goals achieved (use goal-backward verification)
 - **Commit before close**: Per-task commits required, don't ship without git history
 - **Ask before closing**: Never close bead without user confirmation
+- **Apply the behavioral kernel**: before each wave or fallback task, state the smallest current slice, what is explicitly out of scope, and the proof path that will confirm the task is actually done
 
 ## Available Tools
 

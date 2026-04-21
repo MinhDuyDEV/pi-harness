@@ -9,7 +9,9 @@
 		"url": "https://github.com/huynhgiabuu/pikit"
 	},
 	"scripts": {
-		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec"
+		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec",
+		"sync:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs",
+		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check"
 	},
 	"pi": {
 		"extensions": [".pi/extensions"],

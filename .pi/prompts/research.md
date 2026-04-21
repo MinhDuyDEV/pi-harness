@@ -15,6 +15,7 @@ Gather information before implementation. Find answers, document findings, stop 
 ```typescript
 skill({ name: "beads" });
 skill({ name: "memory-grounding" });
+skill({ name: "behavioral-kernel" });
 // For --thorough mode:
 skill({ name: "deep-research" });
 ```
@@ -38,6 +39,7 @@ Default depth: ~30 tool calls for moderate exploration.
 
 ## Before You Research
 
+- **Apply the behavioral kernel**: surface the concrete question first, keep the scope to the smallest research slice that unblocks implementation, avoid speculative rabbit holes, and define the evidence threshold that will count as "enough to proceed"
 - **Be certain**: Only research what you need for implementation
 - **Don't over-research**: Stop when you have enough to proceed
 - **Use source priority**: Codebase → Docs → Source → GitHub → Web

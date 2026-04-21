@@ -58,7 +58,7 @@ Slash-command workflows in `.pi/prompts/`:
 
 `/init` `/plan` `/design` `/create` `/ship` `/review` `/review-codebase` `/research` `/test` `/fix` `/refactor` `/explain` `/commit` `/pr` `/verify` `/status` `/start` `/resume` `/handoff` `/lfg` `/compound` `/ui-review` `/init-context` `/init-user`
 
-### Skills (75)
+### Skills (76)
 
 Reusable procedures in `.pi/skills/` — loaded on demand:
 
@@ -82,7 +82,7 @@ See `.pi/APPEND_SYSTEM.md` for the full delegation guide with decision flowchart
 
 ## Global Agent Rules
 
-On first session start, pikit auto-installs `~/.pi/agent/AGENTS.md` if it doesn't exist. This file contains universal rules (tone, execution approach, tool priorities, edit protocol) that stack into every project.
+On first session start, pikit auto-installs `~/.pi/agent/AGENTS.md` if it doesn't exist. This file contains universal rules (tone, execution approach, tool priorities, edit protocol) that stack into every project. The template now includes a compact **Behavioral Kernel** that keeps Pi agents anchored on four always-on habits: clarify uncertainty, choose the smallest working change, keep diffs surgical, and define proof before acting.
 
 The template lives at `.pi/templates/AGENTS.md`. To update after install:
 
@@ -91,6 +91,8 @@ cp .pi/templates/AGENTS.md ~/.pi/agent/AGENTS.md
 ```
 
 To customize, edit `~/.pi/agent/AGENTS.md` directly — it's your personal config, not overwritten on updates.
+
+If you update the kernel source in `.pi/templates/behavioral-kernel.md`, run `npm run sync:behavioral-kernel` to refresh Pikit's Pi-native instruction surfaces.
 
 ## Configuration
 

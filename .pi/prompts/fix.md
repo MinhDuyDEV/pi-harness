@@ -12,6 +12,7 @@ Systematically debug and fix the reported issue.
 ```typescript
 skill({ name: "systematic-debugging" });
 skill({ name: "root-cause-tracing" });
+skill({ name: "behavioral-kernel" });
 skill({ name: "verification-before-completion" });
 ```
 
@@ -31,6 +32,7 @@ skill({ name: "verification-before-completion" });
 
 ### Phase 3: Fix
 
+- Apply the behavioral kernel: surface assumptions before changing code, keep the fix to the smallest working slice, state what is explicitly out of scope, and name the proof path before editing
 - Apply the minimal fix that addresses root cause (not symptoms)
 - Auto-fix related issues found during investigation (deviation rules 1-3)
 - Stop and ask about architectural changes (deviation rule 4)

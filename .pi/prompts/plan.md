@@ -19,6 +19,7 @@ Create a detailed implementation plan with TDD steps. Optional deep-planning bet
 ```typescript
 skill({ name: "beads" });
 skill({ name: "memory-grounding" });
+skill({ name: "behavioral-kernel" });
 skill({ name: "writing-plans" }); // TDD plan format
 ```
 
@@ -36,6 +37,7 @@ skill({ name: "writing-plans" }); // TDD plan format
 - **Budget context**: Target ~50% context per execution
 - **Split signals**: Create child beads for complex work
 - **Vertical slices**: Each task should cover one feature end-to-end
+- **Apply the behavioral kernel**: surface assumptions first, prefer the smallest workable plan, avoid speculative architecture, and define proof paths for every task before writing the plan
 
 ## Phase 0: Institutional Research (Mandatory)
 
