@@ -1,16 +1,11 @@
 ---
 name: tilth
-description: >
-  AST-aware code intelligence via tilth MCP server. Use when searching code for definitions,
-  reading large files with structural outlines, finding files by glob, or checking blast radius
-  before breaking changes. Replaces grep, cat, find, ls with tree-sitter powered equivalents.
-  Reduces agent cost per correct answer by ~40%.
+description: Use when navigating code with tree-sitter indexed search, smart file reads, symbol lookup, caller tracing, or blast-radius checks before edits.
 version: 1.0.0
 tags: [code-intelligence, search, mcp, tools]
 dependencies: []
-references:
-  - references/tools.md
-  - references/patterns.md
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Tilth — Code Intelligence
@@ -111,3 +106,8 @@ Rust, TypeScript, TSX, JavaScript, Python, Go, Java, Scala, C, C++, Ruby, PHP, C
 
 The tilth extension (`.pi/extensions/tilth.ts`) spawns tilth as a subprocess MCP server.
 Requires `tilth` binary available via `npx tilth` or `cargo install tilth`.
+
+
+## Consolidated CLI And Subagent Mode
+
+`tilth-cli` was removed as a separate optional skill. Keep tree-sitter search, smart reads, symbol/caller tracing, blast-radius checks, and subagent CLI usage in this canonical Tilth workflow.

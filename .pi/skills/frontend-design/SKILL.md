@@ -4,6 +4,8 @@ description: MUST load when building any web UI with React-based frameworks — 
 version: 1.1.0
 tags: [ui, design]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Frontend Design
@@ -233,3 +235,13 @@ Button labels: specific verb + object ("Save changes" not "OK"). Error formula: 
 ## Backgrounds
 
 Create atmosphere: gradient meshes, noise textures, geometric patterns, layered transparencies, dramatic shadows, grain overlays.
+
+
+## Consolidated HTML Prototype Mode
+
+`html-design-prototyping` was removed as a separate optional skill. Use this skill for non-production HTML prototypes, interactive demos, slide-like artifacts, motion studies, and browser-verified design explorations; keep production app work on the normal frontend path.
+
+
+## Agent-Skills Compatibility
+
+This skill is Pi's canonical equivalent of `frontend-ui-engineering`: component architecture, design systems, responsive behavior, stateful UI, and accessibility for user-facing interfaces.

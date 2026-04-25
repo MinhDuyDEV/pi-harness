@@ -1,6 +1,11 @@
 ---
 name: redesign-existing-projects
 description: Use when upgrading an existing website or app's visual design to premium quality. Audits current design, identifies generic AI patterns, applies high-end standards without breaking functionality. MUST load before any design overhaul of existing projects.
+version: 1.0.0
+tags: [workflow]
+dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 ## When to Use

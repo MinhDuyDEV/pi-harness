@@ -4,6 +4,8 @@ description: "Use when writing, debugging, or optimizing Core Data code on iOS/m
 version: 1.0.0
 tags: [apple, integration]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Core Data Expert

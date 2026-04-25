@@ -4,6 +4,8 @@ description: Use when deprecating APIs, migrating between library versions, remo
 version: 1.0.0
 tags: [architecture, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Deprecation & Migration

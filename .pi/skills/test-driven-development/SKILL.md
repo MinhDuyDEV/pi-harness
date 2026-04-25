@@ -4,6 +4,8 @@ description: Use when implementing any feature or bugfix, before writing impleme
 version: 1.0.0
 tags: [testing, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Test-Driven Development (TDD)
@@ -386,3 +388,15 @@ Otherwise → not TDD
 ```
 
 No exceptions without your human partner's permission.
+
+## Skill Result Contract
+
+```xml
+<skill_result>
+  <skill>test-driven-development</skill>
+  <status>success|partial|blocked|failure</status>
+  <evidence>Verification checklist results and commands/checks run</evidence>
+  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
+  <risks>Skipped checks, unresolved assumptions, or none</risks>
+</skill_result>
+```

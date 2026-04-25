@@ -1,13 +1,11 @@
 ---
 name: agent-teams
-description: >
-  Use when working with Claude Code-style agent teams for parallel research, review, competing hypotheses,
-  or any task that benefits from multiple agents working simultaneously under a lead coordinator.
-  Covers team configuration, task distribution, coordination patterns, and best practices.
+description: Use when coordinating a small team of agents for parallel research, review, or competing implementation hypotheses where shared findings and lead coordination matter.
 version: "1.0.0"
-license: MIT
 tags: [agent-coordination, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Agent Teams - Multi-Agent Team Coordination
@@ -266,3 +264,8 @@ Before dispatching a team:
 
 - `dispatching-parallel-agents` — for independent debugging-focused parallel investigations
 - `swarm-coordination` — for dependency-aware large-plan execution
+
+
+## Consolidated Team Patterns
+
+`best-of-n`, `dispatching-parallel-agents`, and `swarm-coordination` were removed as separate optional skills. Keep competing implementation attempts, parallel failure investigation, dependency-wave execution, fan-out/fan-in synthesis, and review gates in this canonical team-coordination workflow.

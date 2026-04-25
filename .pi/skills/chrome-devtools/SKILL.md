@@ -4,6 +4,8 @@ description: Use when debugging web apps in Chrome — performance profiling, ne
 version: 1.0.0
 tags: [automation, debugging]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Chrome DevTools (MCP)

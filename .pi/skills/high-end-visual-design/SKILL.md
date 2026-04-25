@@ -1,6 +1,11 @@
 ---
 name: high-end-visual-design
 description: Use INSTEAD OF design-taste-frontend when user explicitly requests premium, agency-quality, or luxury visual design. Defines exact fonts, spacing, shadows, and animations that make websites feel expensive. Blocks cheap AI defaults.
+version: 1.0.0
+tags: [workflow]
+dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 ## When to Use

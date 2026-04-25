@@ -4,6 +4,8 @@ description: Semantic codebase search via Augment Context Engine MCP. Use when y
 version: 1.0.0
 tags: [research, context]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Augment Context Engine (MCP)

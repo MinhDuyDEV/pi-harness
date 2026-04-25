@@ -4,6 +4,8 @@ description: Use when setting up CI/CD pipelines, GitHub Actions workflows, auto
 version: 1.0.0
 tags: [devops, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # CI/CD & Automation
@@ -200,3 +202,8 @@ jobs:
 - **verification-gates** — Detecting project type and running appropriate checks
 - **git-workflow-and-versioning** — Branch strategy and commit conventions
 - **security-and-hardening** — Secrets management and supply chain security
+
+
+## Core Lifecycle Role
+
+This skill is core because CI/CD is part of shipping safely: shift-left verification, fast feedback, feature flags, quality gates, and repeatable deploy pipelines.

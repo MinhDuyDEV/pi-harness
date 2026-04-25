@@ -4,6 +4,8 @@ description: Use when invalid data causes failures deep in execution, requiring 
 version: 1.0.0
 tags: [code-quality, debugging]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Defense-in-Depth Validation
@@ -174,3 +176,15 @@ All four layers were necessary. During testing, each layer caught bugs the other
 ## See Also
 
 - **structured-edit** - Reliable read/verify/edit workflow when changing validation code across layers
+
+## Skill Result Contract
+
+```xml
+<skill_result>
+  <skill>defense-in-depth</skill>
+  <status>success|partial|blocked|failure</status>
+  <evidence>Verification checklist results and commands/checks run</evidence>
+  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
+  <risks>Skipped checks, unresolved assumptions, or none</risks>
+</skill_result>
+```

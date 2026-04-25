@@ -4,6 +4,8 @@ description: Use when interacting with Jira issues or Confluence docs — search
 version: 1.0.0
 tags: [integration, mcp, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Jira & Confluence Integration (MCP)

@@ -4,6 +4,8 @@ description: Use when editing files to reduce str_replace failures - combines LS
 version: 1.0.0
 tags: [code-quality, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Structured Edit Protocol

@@ -4,6 +4,8 @@ description: Use when converting UI mockups, screenshots, Figma/Sketch designs, 
 version: 1.0.0
 tags: [ui, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Mockup to Code Skill
@@ -182,3 +184,8 @@ Save implementations to `.pi/memory/design/implementations/`
 - `frontend-design`
 - `visual-analysis`
 - `accessibility-audit`
+
+
+## Consolidated Visual Analysis
+
+`visual-analysis` was removed as a separate optional skill. Treat screenshot/mockup inspection, color/typography/layout extraction, and visual difference analysis as the input phase of mockup-to-code work.

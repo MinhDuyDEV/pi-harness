@@ -4,6 +4,8 @@ description: Use when navigating unfamiliar code, tracing cross-file dependencie
 version: 1.0.0
 tags: [workflow, code-quality, context]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Code Navigation Skill

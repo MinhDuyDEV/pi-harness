@@ -1,13 +1,11 @@
 ---
 name: beads
-description: >
-  Multi-agent task coordination using br (beads_rust) CLI. Use when work spans multiple
-  sessions, has dependencies, needs file locking, or requires agent coordination. Covers
-  claim/reserve/done cycle, dependency management, hierarchical decomposition, and session protocols.
+description: Use when coordinating persistent multi-session or multi-agent work with dependencies, blockers, ownership, and handoffs that must survive beyond the current conversation.
 version: "2.0.0"
-license: MIT
 tags: [workflow, agent-coordination]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Beads Workflow - Multi-Agent Task Coordination
@@ -180,3 +178,8 @@ MAINTENANCE:
 
 - `verification-before-completion`
 - `swarm-coordination`
+
+
+## Consolidated Beads Ecosystem
+
+`beads-bridge` and `prd-task` were removed as separate optional skills. Keep cross-session coordination, OpenCode todo bridging, swarm monitor notes, and `.beads/artifacts/<bead-id>/prd.md` to executable task conversion in this canonical Beads workflow.

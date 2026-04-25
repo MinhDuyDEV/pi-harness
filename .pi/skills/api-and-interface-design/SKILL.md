@@ -4,6 +4,8 @@ description: Use when designing REST/GraphQL APIs, SDK interfaces, or public mod
 version: 1.0.0
 tags: [architecture, code-quality]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # API & Interface Design
@@ -160,3 +162,15 @@ type ApiResult<T> = { success: true; data: T } | { success: false; error: ApiErr
 - **defense-in-depth** — Validation at every layer, not just the API boundary
 - **incremental-implementation** — Build API endpoints as thin vertical slices
 - **test-driven-development** — Write API contract tests before implementation
+
+## Skill Result Contract
+
+```xml
+<skill_result>
+  <skill>api-and-interface-design</skill>
+  <status>success|partial|blocked|failure</status>
+  <evidence>Verification checklist results and commands/checks run</evidence>
+  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
+  <risks>Skipped checks, unresolved assumptions, or none</risks>
+</skill_result>
+```

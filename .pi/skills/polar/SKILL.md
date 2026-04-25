@@ -4,6 +4,8 @@ description: Use when implementing payment flows, subscriptions, license keys, o
 version: 1.0.0
 tags: [integration, mcp]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Polar Integration

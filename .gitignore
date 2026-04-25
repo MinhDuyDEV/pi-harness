@@ -1,6 +1,8 @@
 .beads/
 .opencode/
 docs/
+!.pi/docs/
+!.pi/docs/**
 
 # OS noise
 .DS_Store
@@ -42,6 +44,9 @@ pnpm-debug.log*
 .pi/pi-sub-bar-settings.json
 .pi/pi-sub-core-settings.json
 .pi/extensions/*.bak
+
+# Pi skill source manifests are committed; runtime lock/caches are local.
+.pi/skills-lock.json
 
 # SQLite databases (local state, not source code)
 *.db

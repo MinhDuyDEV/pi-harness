@@ -4,6 +4,8 @@ description: Use when working with any Supabase service — database operations,
 version: 1.0.0
 tags: [integration, mcp]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Supabase Platform (MCP)

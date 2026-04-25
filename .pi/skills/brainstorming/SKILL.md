@@ -4,6 +4,8 @@ description: Use when creating or developing, before writing code or implementat
 version: 1.0.0
 tags: [planning, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Brainstorming Ideas Into Designs
@@ -112,3 +114,8 @@ Start by understanding the current project context, then ask questions one at a 
 
 - `writing-plans` - Turn validated direction into zero-ambiguity implementation tasks
 - `prd` - Capture behavioral requirements before implementation
+
+
+## Agent-Skills Compatibility
+
+This skill is Pi's canonical equivalent of `idea-refine`: divergent/convergent exploration that turns vague ideas into concrete proposals before specification.

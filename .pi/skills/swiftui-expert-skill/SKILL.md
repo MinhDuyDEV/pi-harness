@@ -4,6 +4,8 @@ description: Write, review, or improve SwiftUI code following best practices for
 version: 1.0.0
 tags: [apple, ui]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # SwiftUI Expert Skill

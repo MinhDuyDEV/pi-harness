@@ -4,6 +4,8 @@ description: Use when you need to understand how a library works internally, deb
 version: 1.1.0
 tags: [research, integration, source-code]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # opensrc

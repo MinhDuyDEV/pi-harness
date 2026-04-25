@@ -4,15 +4,8 @@ description: Orchestrates the full feature development lifecycle from ideation t
 version: 1.0.0
 tags: [workflow, planning]
 dependencies:
-  [
-    brainstorming,
-    prd,
-    writing-plans,
-    executing-plans,
-    verification-before-completion,
-    requesting-code-review,
-    finishing-a-development-branch,
-  ]
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 ---

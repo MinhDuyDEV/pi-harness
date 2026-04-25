@@ -362,9 +362,26 @@ For major tracked work:
 ## Skills Policy
 
 - **Commands** define user workflows
-- **Skills** hold reusable procedures
+- **Skills** hold reusable procedures with evidence contracts
 - **Agent prompts** stay role-focused; don't duplicate long checklists
 - **Load skills on demand**, not by default
+- **Use `skills/registry.json` as the active skill manifest**: core skills are default operating procedures; optional skills load only by explicit trigger, domain, or tool need
+- **Removed redundant skills are not valid targets**; use `docs/removed-redundant-skills.md` to find their canonical replacements
+- **Use the smallest skill bundle** that changes behavior and proves completion
+- **Finish skill use with evidence**: artifacts, commands/checks, skipped steps, and risks
+
+### Pi Lifecycle Commands
+
+These command names may be user-facing aliases or internal routing labels:
+
+| Command   | Phase  | Skill Bundle                                                                 |
+| --------- | ------ | ---------------------------------------------------------------------------- |
+| `/spec`   | Define | `spec-driven-development`                                                     |
+| `/plan`   | Plan   | `planning-and-task-breakdown`                                                 |
+| `/build`  | Build  | `incremental-implementation` + `test-driven-development`                      |
+| `/test`   | Verify | `test-driven-development` + `debugging-and-error-recovery`                    |
+| `/review` | Review | `code-review-and-quality` + `verification-before-completion`                  |
+| `/ship`   | Ship   | `shipping-and-launch` + `documentation-and-adrs` + `verification-before-completion` |
 
 ### Intent → Skill Mapping
 
@@ -372,32 +389,43 @@ When user intent is clear, load the appropriate skills:
 
 | Intent                    | Phase          | Skills to Load                                                                     |
 | ------------------------- | -------------- | ---------------------------------------------------------------------------------- |
-| "Build a feature"         | Define → Build | `prd` → `writing-plans` → `incremental-implementation` + `test-driven-development` |
-| "Fix a bug"               | Verify         | `systematic-debugging` → `root-cause-tracing`                                      |
-| "Review code"             | Review         | `receiving-code-review` or `requesting-code-review`                                |
-| "Simplify / refactor"     | Review         | `code-simplification`                                                              |
-| "Ship it"                 | Ship           | `verification-before-completion` → `finishing-a-development-branch`                |
-| "Plan this"               | Plan           | `brainstorming` → `prd` → `writing-plans`                                          |
-| "Execute a plan"          | Build          | `executing-plans` + `subagent-driven-development`                                  |
-| "Debug flaky tests"       | Verify         | `condition-based-waiting` + `systematic-debugging`                                 |
-| "Debug in browser"        | Verify         | `chrome-devtools` or `playwright`                                                  |
+| "Build a feature"         | Define → Build | `spec-driven-development` → `planning-and-task-breakdown` → `incremental-implementation` + `test-driven-development` |
+| "Fix a bug"               | Verify         | `debugging-and-error-recovery` + `test-driven-development`                         |
+| "Review code"             | Review         | `code-review-and-quality` + `verification-before-completion`                       |
+| "Simplify / refactor"     | Review         | `code-cleanup` + `incremental-implementation`                                      |
+| "Ship it"                 | Ship           | `shipping-and-launch` + `verification-before-completion`                           |
+| "Plan this"               | Plan           | `spec-driven-development` → `planning-and-task-breakdown`                          |
+| "Execute a plan"          | Build          | `subagent-driven-development` + `incremental-implementation`                       |
+| "Debug flaky tests"       | Verify         | `debugging-and-error-recovery` + `test-driven-development`                         |
+| "Debug in browser"        | Verify         | `browser-testing-with-devtools` + `debugging-and-error-recovery`               |
 | "Write / fix tests"       | Verify         | `test-driven-development` + `testing-anti-patterns`                                |
-| "Build UI"                | Build          | `frontend-design` + `design-taste-frontend`                                        |
+| "Build UI"                | Build          | `frontend-design` + `design-taste-frontend` + `incremental-implementation`     |
 | "Build UI from mockup"    | Build          | `mockup-to-code` + `frontend-design`                                               |
 | "Redesign existing UI"    | Build          | `redesign-existing-projects` + `design-taste-frontend`                             |
-| "Review UI / UX"          | Review         | `web-design-guidelines` + `visual-analysis` + `accessibility-audit`                |
+| "Review UI / UX"          | Review         | `design-system-audit` + `accessibility-audit`                                      |
 | "Audit accessibility"     | Verify         | `accessibility-audit`                                                              |
 | "Build React / Next.js"   | Build          | `react-best-practices` + `frontend-design`                                         |
-| "Research X"              | Define         | `deep-research` or `opensrc`                                                       |
+| "Research X"              | Define         | `source-driven-development` + optional `opensrc` / `webclaw` / `gemini-large-context` |
 | "Design an API"           | Build          | `api-and-interface-design` + `documentation-and-adrs`                              |
-| "Set up CI/CD"            | Ship           | `ci-cd-and-automation` + `verification-gates`                                      |
-| "Deploy app"              | Ship           | `vercel-deploy-claimable`                                                          |
+| "Set up CI/CD"            | Ship           | `ci-cd-and-automation` + `verification-before-completion`                      |
+| "Deploy app"              | Ship           | `shipping-and-launch` + `vercel-deploy-claimable`                                  |
+| "Prepare commit / version" | Ship        | `git-workflow-and-versioning` + `verification-before-completion`               |
 | "Deprecate / migrate"     | Ship           | `deprecation-and-migration` + `incremental-implementation`                         |
 | "Write docs / record ADR" | Define         | `documentation-and-adrs`                                                           |
 | "Optimize performance"    | Verify         | `performance-optimization`                                                         |
 | "Harden security"         | Verify         | `security-and-hardening` + `defense-in-depth`                                      |
-| "Verify before merge"     | Ship           | `reconcile` + `verification-gates`                                                 |
-| "Create a skill"          | Build          | `skill-creator` + `writing-skills`                                                 |
+| "Verify before merge"     | Ship           | `code-review-and-quality` + `verification-before-completion`                       |
+| "Create a skill"          | Build          | `using-pi-skills` + `writing-skills`; follow `docs/skill-anatomy.md`               |
+
+### Active Skill Inventory
+
+- Active skills: **68** (`33` core, `35` optional)
+- Removed redundant skills: **55**
+- Registry: `skills/registry.json`
+- Human-readable registry: `docs/skills-registry.md`
+- Removal map: `docs/removed-redundant-skills.md`
+
+Optional packs currently include: `agent-coordination`, `browser-automation`, `design-tools`, `devops-release`, `frontend`, `integrations`, and `research-tools`.
 
 ---
 

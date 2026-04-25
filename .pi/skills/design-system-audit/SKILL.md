@@ -4,6 +4,8 @@ description: Use when auditing an existing design system for consistency — tok
 version: 2.0.0
 tags: [design, audit, ui]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Design System Audit
@@ -151,3 +153,8 @@ Minimum quality gate:
 - `mockup-to-code`
 - `frontend-design`
 - `accessibility-audit`
+
+
+## Consolidated Pattern Research
+
+`ui-ux-research` and part of `web-design-guidelines` were removed as separate optional skills. Use this skill to analyze existing UI patterns, compare design-system implementations, audit consistency, and ground redesign decisions before changing UI.

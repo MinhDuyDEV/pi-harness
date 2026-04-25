@@ -4,6 +4,8 @@ description: Use when errors occur deep in execution and you need to trace back 
 version: 1.0.0
 tags: [debugging, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Root Cause Tracing

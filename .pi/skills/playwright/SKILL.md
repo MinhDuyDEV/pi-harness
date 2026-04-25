@@ -4,6 +4,8 @@ description: Use when running automated browser tests, taking screenshots, valid
 version: 1.0.0
 tags: [automation, mcp, testing]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Playwright Browser Automation
@@ -330,3 +332,13 @@ skill_mcp(
 - [Playwright CLI GitHub](https://github.com/microsoft/playwright-cli)
 - [Playwright MCP GitHub](https://github.com/microsoft/playwright-mcp)
 - [Playwright Docs](https://playwright.dev)
+
+
+## Removed Optional Companion
+
+`playwriter` was removed as an optional skill. Prefer this skill for browser automation; if existing Chrome session/cookie reuse is required, treat it as a mode under this workflow rather than a separate skill.
+
+
+## Consolidated Browser Automation Modes
+
+`agent-browser` was removed as a separate optional skill. Keep browser automation, CLI-driven Playwright usage, screenshots, form checks, and UX-flow verification in this canonical skill. Prefer lightweight CLI flows when they provide the same evidence with less context.

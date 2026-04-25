@@ -1,15 +1,11 @@
 ---
 name: figma
 description: Use when implementing UI from Figma designs, extracting design tokens, or downloading assets via Framelink MCP. MUST load when user shares a Figma URL or references Figma files. Requires API token.
-mcp:
-  figma:
-    command: npx
-    args: ["-y", "figma-developer-mcp", "--stdio"]
-    env:
-      FIGMA_API_KEY: "${FIGMA_API_KEY}"
 version: 1.0.0
 tags: [design, mcp, integration]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Figma Design Data (MCP)
@@ -222,3 +218,8 @@ globalVars:
 **"Node not found"**: Check the nodeId format. Try both `1234:5678` and `1234-5678`.
 
 **Large response**: Use `nodeId` to fetch specific frames instead of entire files.
+
+
+## Consolidated Figma Modes
+
+This is the canonical active Figma skill. Former figma-go and figma-mcp-go content is archived as redundant; choose API-token mode or desktop-plugin mode based on available credentials and user constraints.

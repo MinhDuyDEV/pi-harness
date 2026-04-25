@@ -4,6 +4,8 @@ description: Use when analyzing large codebases, comparing multiple files, or re
 version: 1.0.0
 tags: [research, context]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Gemini CLI Large Context Analysis

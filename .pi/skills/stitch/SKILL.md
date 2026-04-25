@@ -4,6 +4,8 @@ description: Use when generating, editing, or creating variants of UI screens in
 version: 2.0.0
 tags: [design, ui, stitch]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Google Stitch Plugin
@@ -162,3 +164,8 @@ gcloud beta services mcp enable stitch.googleapis.com --project=YOUR_PROJECT_ID
 - Use descriptive prompts for better UI generation
 - `GEMINI_3_PRO` produces higher quality; `GEMINI_3_FLASH` is faster
 - Test generated code in your target framework before production use
+
+
+## Consolidated Stitch Design Quality
+
+`stitch-design-taste` was removed as a separate optional skill. Keep Stitch-specific DESIGN.md generation, premium anti-generic prompting, and variant quality checks in this canonical Stitch workflow.

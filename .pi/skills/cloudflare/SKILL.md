@@ -1,15 +1,11 @@
 ---
 name: cloudflare
 description: Use when deploying to or configuring ANY Cloudflare service — Workers, Pages, KV, D1, R2, AI, Tunnel, WAF. MUST load before writing Cloudflare Workers code, wrangler configs, or infrastructure-as-code for Cloudflare.
-references:
-  - workers
-  - pages
-  - d1
-  - durable-objects
-  - workers-ai
 version: 1.0.0
 tags: [integration, devops]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Cloudflare Platform Skill

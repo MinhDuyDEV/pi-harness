@@ -4,6 +4,8 @@ description: Use when about to claim work is complete, fixed, or passing, before
 version: 1.0.0
 tags: [workflow, code-quality]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Verification Before Completion
@@ -355,3 +357,8 @@ From 24 failure memories:
 Run the command. Read the output. THEN claim the result.
 
 This is non-negotiable.
+
+
+## Consolidated Verification Gate
+
+This is the canonical active verification gate. It absorbs verification-gates and reconcile. Before any success claim, produce evidence: command, result, coverage of user intent, and residual risk.

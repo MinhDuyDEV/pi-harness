@@ -1,6 +1,11 @@
 ---
 name: webclaw
 description: MUST load when webfetch returns 403 or bot protection errors, when crawling documentation sites, batch-extracting pages, or extracting brand identity. Primary web scraping tool — prefer over webfetch for all non-trivial scraping.
+version: 1.0.0
+tags: [workflow]
+dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Webclaw Skill
@@ -153,3 +158,8 @@ Optional env vars:
 - **No JS rendering** (local mode) — SPAs that render entirely client-side won't extract fully. Use `--cloud` with API key, or use `playwright` skill instead.
 - **Same-origin crawl only** — won't follow external links during crawl.
 - **Early version** — v0.3.2, MIT license. Report issues to https://github.com/0xMassi/webclaw/issues
+
+
+## Removed Optional Companion
+
+`lightpanda` was removed as an optional skill. Prefer this skill for web scraping, documentation crawling, bot-protected pages, and markdown extraction; use Playwright when actual browser interaction is required.

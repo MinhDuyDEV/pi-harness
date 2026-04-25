@@ -4,6 +4,8 @@ description: "Use when creating new skills, editing existing skills, or verifyin
 version: 1.0.0
 tags: [documentation, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Writing Skills
@@ -322,3 +324,13 @@ Deploying untested skills = deploying untested code. It's a violation of quality
 - `references/rationalization-hardening.md` - Loophole closure, rationalization tables, red flags
 - `references/anti-patterns.md` - Anti-patterns to avoid
 - `references/discovery-workflow.md` - How future agents find and use skills
+
+
+## Removed Optional Companions
+
+`sharing-skills` and `testing-skills-with-subagents` were removed as optional skills. Keep skill authoring, pressure testing, and contribution guidance in this canonical workflow.
+
+
+## Consolidated Skill Creation
+
+`skill-creator` was removed as a separate optional skill. Keep skill anatomy, trigger-rich descriptions, pressure testing, and skill update checklists in this canonical authoring workflow.

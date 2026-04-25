@@ -4,6 +4,8 @@ description: Use when writing technical documentation, Architecture Decision Rec
 version: 1.0.0
 tags: [workflow, code-quality]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Documentation & ADRs
@@ -218,3 +220,20 @@ export async function createProject(
 - **api-and-interface-design** — API docs are part of the interface contract
 - **deprecation-and-migration** — Deprecation decisions warrant ADRs
 - **prd** — Product requirements docs (higher-level than ADRs)
+
+## Skill Result Contract
+
+```xml
+<skill_result>
+  <skill>documentation-and-adrs</skill>
+  <status>success|partial|blocked|failure</status>
+  <evidence>Verification checklist results and commands/checks run</evidence>
+  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
+  <risks>Skipped checks, unresolved assumptions, or none</risks>
+</skill_result>
+```
+
+
+## Consolidated Knowledge Documentation
+
+`index-knowledge` was removed as a separate optional skill. Keep durable project knowledge, hierarchical docs, architectural notes, and AGENTS.md-style documentation updates in this documentation workflow.

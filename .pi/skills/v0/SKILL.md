@@ -1,15 +1,11 @@
 ---
 name: v0
 description: Use when you need AI-powered UI generation for React components, dashboards, or quick prototypes via v0. MUST load before creating v0 chats or generating components via v0 MCP.
-mcp:
-  v0:
-    command: npx
-    args: ["mcp-remote", "https://mcp.v0.dev", "--header", "Authorization: Bearer ${V0_API_KEY}"]
-    env:
-      V0_API_KEY: "${V0_API_KEY}"
 version: 1.0.0
 tags: [ui, mcp, design]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # v0 AI Code Generation (MCP)

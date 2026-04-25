@@ -4,6 +4,8 @@ description: Use when starting feature work that needs isolation from current wo
 version: 1.0.0
 tags: [git, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Using Git Worktrees
@@ -257,3 +259,8 @@ Ready to implement auth feature
 
 - **finishing-a-development-branch** - REQUIRED for cleanup after work complete
 - **executing-plans** or **subagent-driven-development** - Work happens in this worktree
+
+
+## Consolidated Workspace Setup
+
+This is the canonical active skill for isolated workspace setup. Former workspace-setup content is archived as redundant. Prefer worktrees when the active worktree is dirty or when parallel implementation could collide with user changes.

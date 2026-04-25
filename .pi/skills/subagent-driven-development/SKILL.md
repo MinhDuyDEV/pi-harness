@@ -4,6 +4,8 @@ description: Use when executing implementation plans with independent tasks in t
 version: 1.0.0
 tags: [workflow, agent-coordination]
 dependencies: [executing-plans]
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Subagent-Driven Development
@@ -266,3 +268,8 @@ See review template: requesting-code-review/review.md
 - **dispatching-parallel-agents** — for parallel investigation
 - **executing-plans** — for batch execution with checkpoints
 - **requesting-code-review** — for review between subagent tasks
+
+
+## Removed Optional Companion
+
+`ralph` was removed as an optional autonomous-loop skill. Use this workflow for autonomous task execution with subagents, review gates, and bounded coordination.

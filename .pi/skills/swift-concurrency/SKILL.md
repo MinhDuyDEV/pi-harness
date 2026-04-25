@@ -4,6 +4,8 @@ description: 'Expert guidance on Swift Concurrency best practices, patterns, and
 version: 1.0.0
 tags: [apple, code-quality]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Swift Concurrency

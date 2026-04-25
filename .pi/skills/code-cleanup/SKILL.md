@@ -4,6 +4,8 @@ description: Use after behavior is working but the diff is noisy, repetitive, ov
 version: 1.0.0
 tags: [refactor, code-quality, workflow]
 dependencies: [verification-before-completion]
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Code Cleanup
@@ -90,3 +92,13 @@ Minimum acceptable output:
 - [ ] Same verification rerun after cleanup
 - [ ] Simplifications reported concretely
 - [ ] No hidden architecture drift
+
+
+## Consolidated Simplification Workflow
+
+This is the canonical active simplification skill. It absorbs code-simplification. Only simplify after behavior is protected by tests or explicit verification. Avoid broad refactors bundled with feature work.
+
+
+## Agent-Skills Compatibility
+
+This skill is Pi's canonical equivalent of `code-simplification`: simplify working code while preserving exact behavior, respecting Chesterton's Fence, and re-verifying after cleanup.

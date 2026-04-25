@@ -4,6 +4,8 @@ description: Open-source AI-native vector design tool with concurrent agent team
 version: 1.0.0
 tags: [design, ui, mcp, openpencil, open-source, code-export]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # OpenPencil (MCP)
@@ -430,3 +432,8 @@ Pi Agent ←bash→ op CLI ←WebSocket→ OpenPencil Desktop/Web ← .op Files
 - [CLI Reference](https://github.com/ZSeven-W/openpencil/blob/main/apps/cli/README.md)
 - [OpenPencil Skill (LLM Plugin)](https://github.com/ZSeven-W/openpencil-skill)
 - [Demo](https://op.zseven.tech)
+
+
+## Consolidated OpenPencil Modes
+
+This is the canonical active OpenPencil skill. Former pencil content is archived as redundant; include CLI, MCP, desktop-app, and export workflows here.

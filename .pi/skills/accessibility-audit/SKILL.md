@@ -4,6 +4,8 @@ description: Use when auditing UI components or pages for accessibility complian
 version: 1.0.0
 tags: [ui, code-quality]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Accessibility Audit Skill
@@ -189,3 +191,8 @@ Save audit reports to `.pi/memory/design/accessibility/`
 | -------------- | ----------------- |
 | Design quality | `frontend-design` |
 | UI research    | `ui-ux-research`  |
+
+
+## Consolidated UI Review Guidance
+
+`web-design-guidelines` was removed as a separate optional skill. Keep accessibility, keyboard, contrast, UX review, and pre-launch interface checks here, paired with design-system-audit when consistency/token review is needed.

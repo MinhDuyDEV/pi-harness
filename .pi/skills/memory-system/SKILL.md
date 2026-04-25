@@ -4,6 +4,8 @@ description: Use when persisting learnings, loading previous context, or searchi
 version: 1.2.0
 tags: [context, workflow]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Memory System Best Practices
@@ -146,3 +148,8 @@ During `session.idle`, the memory system automatically runs:
 
 - `context-management`
 - `session-management`
+
+
+## Consolidated Reflection And Grounding
+
+This is the canonical active skill for durable learnings. Former memory-grounding and sprint-retro/reflection responsibilities are archived as redundant. Persist decisions, bug patterns, project conventions, and useful warnings when they are likely to help future sessions.

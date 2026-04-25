@@ -4,6 +4,8 @@ description: Use when tests have race conditions, timing dependencies, or incons
 version: 1.0.0
 tags: [testing, debugging]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Condition-Based Waiting

@@ -4,6 +4,8 @@ description: Use when profiling, optimizing, or adding performance budgets to ap
 version: 1.0.0
 tags: [performance, code-quality]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Performance Optimization

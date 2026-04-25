@@ -4,9 +4,8 @@ description: Use when working with Obsidian vault via MCP - read/write notes, se
 version: 1.0.0
 tags: [integration, documentation]
 dependencies: []
-mcp:
-  server: "@mauricio.wolff/mcp-obsidian"
-  args: ["{env:OBSIDIAN_VAULT_PATH}"]
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Obsidian Vault (MCP)

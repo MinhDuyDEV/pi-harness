@@ -4,6 +4,8 @@ description: Use when work starts drifting into silent assumptions, overengineer
 version: 1.0.0
 tags: [workflow, behavior, anti-slop]
 dependencies: []
+agent_types: [planner, worker, reviewer]
+tools: []
 ---
 
 # Behavioral Kernel
