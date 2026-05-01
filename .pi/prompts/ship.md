@@ -71,6 +71,19 @@ Check what artifacts exist:
 
 Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
 
+### Run Report Initialization
+
+Create or update `.beads/artifacts/$ARGUMENTS/agent-run-report.md` from `.pi/templates/agent-run-report.md` before implementation work begins.
+
+Minimum required fields before Phase 2:
+
+- Task: bead ID + title from `br show $ARGUMENTS`
+- Status: `in_progress`
+- Inputs: user request, bead ID, PRD/plan paths, memory/context consulted
+- Verification table initialized with planned commands
+
+Append to this report after each task, verification gate, review pass, blocker, subagent run, and approval checkpoint. This report is observability evidence; it does not replace progress.txt or PRD task status.
+
 ## Phase 1B: Auto-Claim (if not yet in_progress)
 
 If bead status is NOT `in_progress`, auto-claim it:
@@ -123,6 +136,7 @@ For each task (wave-based or sequential fallback):
 8. **Commit** — per-task commit (see below)
 9. **Mark** `passes: true` in `prd.json`
 10. **Append** progress to `.beads/artifacts/$ARGUMENTS/progress.txt`
+11. **Update** `.beads/artifacts/$ARGUMENTS/agent-run-report.md` with files changed, verification evidence, subagent outputs, deviations, and failures/recoveries for this task
 
 ### Checkpoint Protocol
 
@@ -291,6 +305,20 @@ return Response.json({ok: true})  // Static, not query result
 
 If any artifact fails Level 2 or 3 → fix → re-verify.
 
+## Phase 5B: Final Run Report Update
+
+Before asking to close the bead, update `.beads/artifacts/$ARGUMENTS/agent-run-report.md`:
+
+- Status: `completed` only if all verification and review gates passed; otherwise `blocked` or `partial`
+- Execution table: every major step and artifact path
+- Files changed: scoped to this bead only
+- Verification table: exact commands/checks and results
+- Subagents: agent IDs/types/status/output paths and whether the main agent independently verified results
+- Failures and recovery: failed attempts, root causes, and follow-ups
+- Approval gates: close/commit/push/destructive actions all explicitly recorded
+
+Do not claim the bead is ready to close unless this report contains fresh verification evidence.
+
 ## Phase 6: Close
 
 Ask user before closing:
@@ -329,6 +357,7 @@ Report:
    - Deviations applied (Rules 1-3)
    - Checkpoints encountered (human-verify/decision/human-action)
    - Commits made
+   - Run report: `.beads/artifacts/$ARGUMENTS/agent-run-report.md`
 
 2. **PRD Task Results:**
    - Each task status (✓ pass, ✗ fail, ⏸ checkpoint)

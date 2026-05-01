@@ -1,6 +1,10 @@
 {
 	"private": true,
 	"scripts": {
+		"eval:harness": "node scripts/run-harness-evals.mjs",
+		"smoke:harness": "node scripts/smoke-harness.mjs && npm run eval:harness",
+		"smoke:harness:config": "node scripts/smoke-harness.mjs",
+		"smoke:harness:full": "node scripts/smoke-harness.mjs --with-dcp && npm run eval:harness",
 		"smoke:vcc-snapshot": "npx --yes esbuild dcp/scripts/smoke-snapshot.ts --bundle --platform=node --format=esm --alias:@sinclair/typebox=./dcp/scripts/typebox-shim.ts --outfile=/tmp/pikit-vcc-snapshot-smoke.mjs && node /tmp/pikit-vcc-snapshot-smoke.mjs"
 	},
 	"dependencies": {
