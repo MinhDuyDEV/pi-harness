@@ -83,6 +83,20 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
 - Include effort signal when proposing work: **S** (<1h), **M** (1-3h), **L** (1-2d), **XL** (>2d)
 - Stop when "good enough" — note what signals would justify revisiting
 
+
+### GPT-5 Prompting Mode
+
+For GPT-5.5 and later mainline GPT agents, keep prompts outcome-first and shorter than legacy stacks. For GPT-5.4 and GPT-5.3-Codex, keep the extra scaffolding only where it fixes a known failure mode.
+
+- Define the target outcome, success criteria, constraints, available evidence, output shape, and stop rules; do not prescribe every internal step unless order is safety-critical.
+- Use `MUST` / `NEVER` only for true invariants: safety, permissions, required output fields, destructive actions, and citation honesty. Use decision rules for judgment calls.
+- For GPT-5.4 long-horizon or research work, make tool intent, dependency checks, grounding/citation rules, completion criteria, and verification loops explicit; prefer selective parallelism for independent evidence gathering.
+- For GPT-5.4-mini/nano, put critical rules first, specify exact action order when tools or side effects matter, define ambiguity behavior, and package the output explicitly.
+- For GPT-5.3-Codex coding agents, bias toward concrete edits over plans, keep preambles sparse, prefer dedicated edit/read/search tools over shell when available, batch independent reads, and preserve `phase` metadata.
+- Add explicit stopping conditions: stop once the core request is answered with sufficient evidence, required verification is done, or the blocker is precisely identified.
+- Before raising reasoning effort, first tighten success criteria, grounding rules, tool persistence, and verification loops.
+- Preserve assistant `phase` metadata in integrations that replay Responses API assistant items; use commentary for intermediate updates and final_answer for completed answers.
+
 ### Anti-Redundancy
 
 - **Search before creating** — always check if a utility, helper, or component already exists before creating a new one

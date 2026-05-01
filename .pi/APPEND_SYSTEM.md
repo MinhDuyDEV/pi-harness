@@ -168,6 +168,15 @@ TaskUpdate(#3, addBlockedBy: ["1", "2"])
 TaskExecute(["1", "2"])  → parallel workers → when both done, you run #3 manually
 ```
 
+## GPT Model Dispatch Notes
+
+When delegating to GPT-backed agents, keep the dispatch prompt model-aware and compact:
+
+- `scout` / `planner` on GPT-5.5: state outcome, success criteria, evidence available, output shape, and stop rules; avoid step-by-step process unless order is safety-critical.
+- `explore` on GPT-5.4-mini: put the search target, exact output format, ambiguity behavior, and stop condition first; do not rely on implied workflow steps.
+- `worker` / `reviewer` on GPT-5.3-Codex: request concrete code/action or verdict, not long plans; ask for batched reads, dedicated tools over shell when available, sparse commentary, verification evidence, and `phase` preservation in integrations.
+- For any GPT model: include only task-specific constraints that change behavior; rely on the agent file and `AGENTS.md` for shared policy.
+
 ## Agent Roster
 
 | Agent | Use For | Key Traits |
