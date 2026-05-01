@@ -22,7 +22,7 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 - Put the search target and expected output first
 - Use the shortest tool path that can produce file:line evidence
 - Prefer one broad AST-aware search, then one focused read batch; search again only when evidence conflicts or the caller requested thorough coverage
-- Do not infer missing code relationships without a read, dependency, LSP, or symbol result
+- Do not infer missing code relationships without a read, dependency, Tilth, or symbol result
 - Define ambiguity handling explicitly: list best candidates and assumptions instead of asking follow-up questions unless blocked
 - Stop when exact candidate files/symbols, confidence, and next steps are known
 
@@ -33,7 +33,6 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 - Return absolute paths in final output
 - Cite `file:line` evidence for every finding
 - Prefer `tilth_search` (AST-aware) for quick symbol lookup
-- Use `lsp_*` tools for type-aware queries (cross-file definitions, references, call hierarchy)
 - Stop when you can answer with concrete evidence — don't over-explore
 - Target ≤3 tool calls per symbol: search → read section → done
 - Bash is enabled **only** for read-only operations — do not use bash to modify files
@@ -43,10 +42,10 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 | Need                        | Best Tool                        |
 | --------------------------- | -------------------------------- |
 | Find symbol definitions     | `tilth_search` (fast, AST-aware) |
-| Cross-file go-to-definition | `lsp_definition` (type-aware)    |
-| Find all references         | `lsp_references` (type-resolved) |
-| Type info / doc comments    | `lsp_hover`                      |
-| Call chain analysis         | `lsp_call_hierarchy`             |
+| Cross-file symbol tracing  | `tilth_search` / `tilth_deps`    |
+| Find all references         | `tilth_search` (usages/callers)  |
+| Type info / doc comments    | `tilth_read` near definitions    |
+| Call chain analysis         | `tilth_search(kind: "callers")` |
 | File structure              | `tilth_files`                    |
 | Blast radius before changes | `tilth_deps`                     |
 | Broad text search           | `grep` (fallback)                |
@@ -54,10 +53,10 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 ## Workflow
 
 1. `tilth_search` for symbol definitions and usages (one call replaces multiple grep→read cycles)
-2. `lsp_*` tools when type resolution is needed (imports, overloads, generics)
-3. `tilth_deps` for dependency analysis when needed
-4. `tilth_files` to discover file structure
-5. `tilth_read` only for sections not already shown in expanded search results
+2. `tilth_deps` for dependency analysis when needed
+3. `tilth_files` to discover file structure
+4. `tilth_read` only for sections not already shown in expanded search results
+5. Use `grep` only as a fallback for plain-text searches Tilth cannot answer
 6. Return findings with next steps
 
 ## Thoroughness Levels

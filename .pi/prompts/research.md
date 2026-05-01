@@ -50,7 +50,7 @@ Default depth: ~30 tool calls for moderate exploration.
 
 | Tool         | Use When                        |
 | ------------ | ------------------------------- |
-| `explore`    | Codebase patterns, LSP analysis |
+| `explore`    | Codebase patterns, Tilth-backed analysis |
 | `scout`      | External docs, best practices   |
 | `context7`   | Official API references         |
 | `opensrc`    | Package source code inspection  |
@@ -75,7 +75,7 @@ Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol
 
 ### Source Priority
 
-1. **Codebase patterns** — delegate to `explore` agent for LSP analysis
+1. **Codebase patterns** — delegate to `explore` agent for Tilth-backed analysis
 2. **Official docs** — `context7` for API references
 3. **Source code** — `npx opensrc <package>` when docs are insufficient
 4. **GitHub examples** — `codesearch` / `grepsearch` for real-world patterns
@@ -85,7 +85,7 @@ Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol
 
 | What              | Agent                        | When                                   |
 | ----------------- | ---------------------------- | -------------------------------------- |
-| Codebase analysis | `explore`                    | Internal patterns, file structure, LSP |
+| Codebase analysis | `explore`                    | Internal patterns, file structure, call paths |
 | External docs     | `scout` (this agent)         | Library APIs, best practices           |
 | Multiple domains  | Parallel `explore` + `scout` | 3+ independent questions               |
 

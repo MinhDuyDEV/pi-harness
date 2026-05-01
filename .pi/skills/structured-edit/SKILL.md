@@ -1,6 +1,6 @@
 ---
 name: structured-edit
-description: Use when editing files to reduce str_replace failures - combines LSP location with read-verify-edit pattern for reliable edits
+description: Use when editing files to reduce str_replace failures - combines search/Tilth location with read-verify-edit pattern for reliable edits
 version: 1.0.0
 tags: [code-quality, workflow]
 dependencies: []
@@ -26,7 +26,7 @@ tools: []
 | ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | "I remember what the file looks like"             | You remember what it looked like 5 edits ago. Read it fresh                                 |
 | "The edit is simple, I don't need to verify"      | Simple edits fail most often — whitespace, encoding, duplicate matches                      |
-| "LSP lookup is an extra step I can skip"          | LSP takes 1 call. Retrying a failed edit takes 3-5 calls                                    |
+| "Search/locate is an extra step I can skip"       | A precise locate call is cheaper than 3-5 failed edit retries                              |
 | "I'll just use a larger context block to be safe" | Larger blocks = more chances for invisible character mismatches. Use minimal unique context |
 | "The file hasn't changed since I last read it"    | Other edits, formatters, and git operations can modify files between your reads             |
 
@@ -54,20 +54,20 @@ The `str_replace` edit tool is the #1 source of failures in LLM coding. Models r
 
 ### Step 1: LOCATE
 
-Use LSP to find exact positions instead of guessing:
+Use Tilth/search tools to find exact positions instead of guessing:
 
 ```typescript
-// Find where a function is defined
-lsp({ operation: "goToDefinition", filePath, line, character });
+// Find where a function is defined or used
+tilth_search({ query: "functionName", kind: "symbol" });
 
-// Find all references to a symbol
-lsp({ operation: "findReferences", filePath, line, character });
+// Find callers or references to a symbol
+tilth_search({ query: "functionName", kind: "callers" });
 
-// Get all symbols in a file
-lsp({ operation: "documentSymbol", filePath, line: 1, character: 1 });
+// Get structure for a large file
+tilth_read({ path: "src/large-file.ts" });
 
-// Search for symbol across workspace
-lsp({ operation: "workspaceSymbol", filePath, line: 1, character: 1 });
+// Fallback when Tilth cannot answer
+grep({ pattern: "functionName", path: "src/" });
 ```
 
 ### Step 2: READ
@@ -130,7 +130,7 @@ If you catch yourself:
 - Assuming content hasn't changed
 - Using large multi-line oldString values
 - Skipping the verify step
-- Guessing line numbers without LSP
+- Guessing line numbers without search/locate evidence
 
 **STOP.** Return to Step 1.
 
@@ -158,13 +158,13 @@ oldString: "return result;";
 oldString: "  // Calculate final value\n  const result = compute(input);\n  return result;";
 ```
 
-### When to Use LSP vs Direct
+### When to Use Locate Tools vs Direct
 
 | Scenario                  | Approach              |
 | ------------------------- | --------------------- |
-| Finding function/class    | LSP goToDefinition    |
-| Finding all usages        | LSP findReferences    |
-| Modifying specific symbol | LSP + structured edit |
+| Finding function/class    | `tilth_search`        |
+| Finding all usages        | `tilth_search` / `tilth_deps` |
+| Modifying specific symbol | Locate + structured edit |
 | Large refactoring         | Consider full rewrite |
 | Simple one-line change    | Direct edit OK        |
 
@@ -179,7 +179,7 @@ oldString: "  // Calculate final value\n  const result = compute(input);\n  retu
 ## Quick Reference
 
 ```
-LOCATE  → lsp({ operation: "goToDefinition" | "findReferences", ... })
+LOCATE  → tilth_search / tilth_deps / grep fallback
 READ    → read({ filePath, offset: line-10, limit: 30 })
 VERIFY  → Check expected content exists
 EDIT    → edit({ oldString: "...unique context...", newString: "..." })

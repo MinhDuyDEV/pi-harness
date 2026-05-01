@@ -24,7 +24,7 @@ Fetch and inspect dependency source code, then run a structured research workflo
 
 - Official docs already answer the question (check Context7 first)
 - You only need public API syntax or quick examples
-- The target is your own codebase (use project search/LSP tools)
+- The target is your own codebase (use Tilth/project search tools)
 
 ## Quick Start
 

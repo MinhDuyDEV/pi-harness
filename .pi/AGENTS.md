@@ -477,7 +477,7 @@ Optional packs currently include: `agent-coordination`, `browser-automation`, `d
 
 `str_replace` failures are the #1 source of LLM coding failures. Use the `edit` tool (str_replace) and `patch` tool as the **primary** editing method. Use `tilth_tilth_edit` (hash-anchored edits) only as a **fallback** when str_replace fails. For all edits, follow the structured edit flow:
 
-1. **LOCATE** — Use LSP tools (goToDefinition, findReferences) to find exact positions
+1. **LOCATE** — Use Tilth/search tools to find exact positions
 2. **READ** — Get fresh file content around target (offset: line-10, limit: 30)
 3. **VERIFY** — Confirm expected content exists before editing
 4. **EDIT** — Include 2-3 unique context lines before/after

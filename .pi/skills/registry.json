@@ -1066,7 +1066,7 @@
     {
       "name": "structured-edit",
       "path": "skills/structured-edit/SKILL.md",
-      "description": "Use when editing files to reduce str_replace failures - combines LSP location with read-verify-edit pattern for reliable edits",
+      "description": "Use when editing files to reduce str_replace failures - combines search/Tilth location with read-verify-edit pattern for reliable edits",
       "version": "1.0.0",
       "tags": [
         "code-quality",

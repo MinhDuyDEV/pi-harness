@@ -40,7 +40,7 @@ glob("*.ts") → read(file1) → "too big" → grep("functionName") → read(fil
 grep("functionName", path: "src/") → read(exact_file, offset: line-10, limit: 30)
 ```
 
-Start with search (grep, LSP findReferences) to locate, then read only what you need.
+Start with search (`tilth_search` or grep fallback) to locate, then read only what you need.
 
 ### Pattern 2: Multi-Symbol Search
 
@@ -49,7 +49,7 @@ When tracing a call chain (A calls B calls C), search for all symbols together:
 grep({ pattern: "functionA|functionB|functionC", path: "src/" })
 ```
 
-Or use LSP outgoingCalls to get the full call tree from a single point.
+Or use `tilth_search(kind: "callers")` plus expanded definitions to trace the call tree.
 
 ### Pattern 3: Don't Re-Read What You've Already Seen
 
@@ -66,8 +66,8 @@ If search results already show the code you need, work from that output. Only re
 **SKIP**: When adding new code, fixing internal bugs, or reading.
 
 Steps:
-1. `lsp({ operation: "findReferences" })` — find all callers
-2. `lsp({ operation: "incomingCalls" })` — get the call hierarchy
+1. `tilth_deps(path: "src/file.ts")` — find importers and downstream users
+2. `tilth_search(query: "symbolName", kind: "callers")` — find call sites
 3. Review each caller to assess impact
 4. Plan edits from leaf callers inward (furthest dependencies first)
 
@@ -75,17 +75,16 @@ Steps:
 
 When editing a file, search results from the same directory/package are more likely relevant. Pass context when available:
 - In grep: use `path: "src/same-module/"` to scope
-- In LSP: operations are already file-scoped
 - In tilth: pass `context` param to boost nearby results
 
 ### Pattern 6: Outline Before Deep Read
 
 For large files (>200 lines), get the structure first:
 ```
-lsp({ operation: "documentSymbol", filePath: "src/large-file.ts", line: 1, character: 1 })
+tilth_read(path: "src/large-file.ts")
 ```
 
-This gives you function names + line ranges. Then read only the section you need with `offset` and `limit`.
+This gives you structure and line ranges. Then read only the section you need.
 
 ### Pattern 7: Follow the Call Chain (Not the File Tree)
 
@@ -93,9 +92,9 @@ This gives you function names + line ranges. Then read only the section you need
 **Right**: Start from the entry point, follow function calls:
 
 ```
-1. lsp({ operation: "goToDefinition" })   → find where it's defined
-2. lsp({ operation: "outgoingCalls" })     → what does it call?
-3. lsp({ operation: "goToDefinition" })    → follow the interesting callee
+1. `tilth_search(query: "entryPoint")` → find where it is defined
+2. Read expanded `── calls ──` output or use `tilth_search(kind: "callers")`
+3. `tilth_read(section: "line-range")` → follow the interesting callee
 ```
 
 ## With tilth MCP
@@ -107,7 +106,7 @@ When tilth is available, it provides superior navigation:
 | `grep` + `read` | `tilth_search` (expand: 2) | Returns definitions with inline source — no second read needed |
 | `glob` | `tilth_files` | Adds token estimates per file |
 | `read` (large file) | `tilth_read` | Auto-outlines large files, shows structure |
-| `lsp(incomingCalls)` | `tilth_search(kind: "callers")` | Cross-language structural caller detection |
+| Manual caller grep | `tilth_search(kind: "callers")` | Cross-language structural caller detection |
 | Manual tracing | `tilth_deps` | Shows imports + downstream callers before breaking changes |
 
 **IMPORTANT**: If tilth is available, prefer it over built-in grep/glob/read for code navigation. Tilth's expanded search results include full source — do NOT re-read files already shown in search output.
@@ -127,6 +126,6 @@ Every tool call has a token cost. Efficient navigation means:
 |---|---|
 | Read entire large file | Use outline first, then section read |
 | Search → read same code again | Work from search results directly |
-| Trace calls one-by-one | Multi-symbol search or outgoingCalls |
+| Trace calls one-by-one | Multi-symbol search or `tilth_search(kind: "callers")` |
 | Explore randomly | Start from entry point, follow calls |
 | Forget to check blast radius | Always check before signature changes |

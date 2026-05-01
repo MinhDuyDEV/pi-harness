@@ -54,7 +54,7 @@
 | `source-driven-development` | core | core | Grounds implementation decisions in official docs, source code, and cited references. Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance. |
 | `spec-driven-development` | core | core | Guides agents from vague request to concrete specification before implementation. Use when starting a new feature, significant change, product idea, or when requirements are ambiguous. |
 | `stitch` | optional | design-tools | Use when generating, editing, or creating variants of UI screens in Google Stitch. MUST load before any stitch_generate_screen or stitch_edit_screens tool calls. |
-| `structured-edit` | core | core | Use when editing files to reduce str_replace failures - combines LSP location with read-verify-edit pattern for reliable edits |
+| `structured-edit` | core | core | Use when editing files to reduce str_replace failures - combines search/Tilth location with read-verify-edit pattern for reliable edits |
 | `subagent-driven-development` | core | core | Use when executing implementation plans with independent tasks in the current session - dispatches fresh subagent for each task with code review between tasks, enabling fast iteration with quality gates |
 | `supabase` | optional | integrations | Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions. |
 | `supabase-postgres-best-practices` | optional | integrations | MUST load when writing, reviewing, or optimizing Postgres queries, schema designs, indexes, or RLS policies in Supabase. Covers Supabase-specific Postgres performance patterns and common pitfalls. |

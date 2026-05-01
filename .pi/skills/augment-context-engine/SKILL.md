@@ -16,7 +16,7 @@ tools: []
 
 ## When NOT to Use
 
-- When exact string matching or known file paths can be handled by grep/read/LSP locally.
+- When exact string matching or known file paths can be handled by Tilth, grep, or read locally.
 
 
 ## Available Tools
@@ -93,19 +93,19 @@ Bad queries (use grep instead):
 | Find code by meaning     | `augment_code_search` | `grep` (text only)         |
 | Understand relationships | `augment_code_search` | `@explore` agent (heavier) |
 | Unfamiliar codebase      | `augment_code_search` | Manual file exploration    |
-| Cross-repo dependencies  | `augment_code_search` | LSP references (narrower)  |
+| Cross-repo dependencies  | `augment_code_search` | Local Tilth dependency checks |
 
 ## When NOT to Use
 
 - **Exact string matching** — Use `grep` instead (faster, free)
 - **Known file paths** — Use `read` directly
-- **Symbol definitions** — Use LSP `goToDefinition` (precise)
+- **Symbol definitions** — Use `tilth_search` locally first
 - **Local-only work** — This searches GitHub-indexed repos, not local files
 
 ## Tool Priority Integration
 
 ```
-grep (text) → semantic search (meaning) → read (full file) → LSP (symbols) → edit
+tilth_search (local symbols/text) → semantic search (meaning) → read (full file) → edit
 ```
 
 Use grep first for exact matches. Escalate to semantic search when grep results are noisy or you need conceptual understanding.
