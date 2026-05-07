@@ -1,8 +1,8 @@
 {
   "generated_by": "manual skill pruning registry generator",
-  "active_skill_count": 68,
+  "active_skill_count": 69,
   "core_skill_count": 33,
-  "optional_skill_count": 35,
+  "optional_skill_count": 36,
   "skills": [
     {
       "name": "accessibility-audit",
@@ -1042,6 +1042,29 @@
       ],
       "status": "core",
       "pack": "core"
+    },
+    {
+      "name": "srcwalk",
+      "path": "skills/srcwalk/SKILL.md",
+      "description": "Use when navigating code with srcwalk’s native CLI-first workflow — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.",
+      "version": "1.0.0",
+      "tags": [
+        "code-intelligence",
+        "search",
+        "cli",
+        "srcwalk"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "bash"
+      ],
+      "status": "optional",
+      "pack": "research-tools"
     },
     {
       "name": "stitch",

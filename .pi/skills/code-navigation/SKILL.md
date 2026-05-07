@@ -26,6 +26,12 @@ tools: []
 
 > Collapse multiple tool calls into fewer, smarter ones. Every unnecessary read or search wastes tokens and turns.
 
+## Choose The Right Navigation Layer
+
+- Use the `tilth` skill when you want project-stable Pi tools: `tilth_search`, `tilth_read`, `tilth_files`, `tilth_deps`
+- Use the `srcwalk` skill when you need native CLI-only commands such as `srcwalk map`, `srcwalk callees`, `srcwalk flow`, `srcwalk impact`, or `srcwalk guide`
+- Prefer `tilth` for existing project prompts and compatibility workflows; escalate to `srcwalk` for richer native analysis
+
 ## Navigation Patterns
 
 ### Pattern 1: Search First, Read Second
@@ -97,9 +103,9 @@ This gives you structure and line ranges. Then read only the section you need.
 3. `tilth_read(section: "line-range")` → follow the interesting callee
 ```
 
-## With tilth MCP
+## With tilth MCP Or Srcwalk Backend
 
-When tilth is available, it provides superior navigation:
+When the `tilth_*` compatibility tools are available, they provide superior navigation for existing project workflows:
 
 | Built-in Tool | tilth Equivalent | Advantage |
 |---|---|---|
@@ -109,7 +115,9 @@ When tilth is available, it provides superior navigation:
 | Manual caller grep | `tilth_search(kind: "callers")` | Cross-language structural caller detection |
 | Manual tracing | `tilth_deps` | Shows imports + downstream callers before breaking changes |
 
-**IMPORTANT**: If tilth is available, prefer it over built-in grep/glob/read for code navigation. Tilth's expanded search results include full source — do NOT re-read files already shown in search output.
+**IMPORTANT**: If `tilth_*` tools are available, prefer them over built-in grep/glob/read for code navigation inside existing project workflows. Their expanded search results often include full source — do NOT re-read files already shown in search output.
+
+If a task needs native srcwalk-only commands (`map`, `callees`, `flow`, `impact`, `guide`), load the `srcwalk` skill and use the installed CLI directly instead of trying to force that workflow through `tilth_*`.
 
 ## Cost Awareness
 

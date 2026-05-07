@@ -53,6 +53,7 @@
 | `shipping-and-launch` | core | core | Guides final readiness checks, rollback planning, documentation, and release handoff. Use when preparing to merge, deploy, release, or declare a development branch complete. |
 | `source-driven-development` | core | core | Grounds implementation decisions in official docs, source code, and cited references. Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance. |
 | `spec-driven-development` | core | core | Guides agents from vague request to concrete specification before implementation. Use when starting a new feature, significant change, product idea, or when requirements are ambiguous. |
+| `srcwalk` | optional | research-tools | Use when navigating code with srcwalk’s native CLI-first workflow — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins. |
 | `stitch` | optional | design-tools | Use when generating, editing, or creating variants of UI screens in Google Stitch. MUST load before any stitch_generate_screen or stitch_edit_screens tool calls. |
 | `structured-edit` | core | core | Use when editing files to reduce str_replace failures - combines search/Tilth location with read-verify-edit pattern for reliable edits |
 | `subagent-driven-development` | core | core | Use when executing implementation plans with independent tasks in the current session - dispatches fresh subagent for each task with code review between tasks, enabling fast iteration with quality gates |

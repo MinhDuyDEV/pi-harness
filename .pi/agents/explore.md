@@ -33,6 +33,7 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 - Return absolute paths in final output
 - Cite `file:line` evidence for every finding
 - Prefer `tilth_search` (AST-aware) for quick symbol lookup
+- Escalate to the native `srcwalk` skill only when you need CLI-only commands not exposed by `tilth_*` (for example `srcwalk map`, `srcwalk flow`, `srcwalk impact`, or `srcwalk callees`)
 - Stop when you can answer with concrete evidence — don't over-explore
 - Target ≤3 tool calls per symbol: search → read section → done
 - Bash is enabled **only** for read-only operations — do not use bash to modify files
@@ -57,7 +58,8 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 3. `tilth_files` to discover file structure
 4. `tilth_read` only for sections not already shown in expanded search results
 5. Use `grep` only as a fallback for plain-text searches Tilth cannot answer
-6. Return findings with next steps
+6. If a task requires native srcwalk-only commands, load the `srcwalk` skill and use the installed CLI directly
+7. Return findings with next steps
 
 ## Thoroughness Levels
 

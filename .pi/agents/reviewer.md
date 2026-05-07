@@ -150,9 +150,10 @@ return <div>No messages</div>  // State exists but not used
 ## Workflow
 
 1. Read changed files and nearby context (prefer `tilth_search` for fast cross-file tracing)
-2. Identify and validate findings by severity (P0, P1, P2, P3)
-3. For each finding: explain why, when it happens, and impact
-4. If no qualifying findings exist, say so explicitly
+2. If review needs native srcwalk-only commands (`map`, `callees`, `flow`, `impact`, `guide`), load the `srcwalk` skill and use the installed CLI directly
+3. Identify and validate findings by severity (P0, P1, P2, P3)
+4. For each finding: explain why, when it happens, and impact
+5. If no qualifying findings exist, say so explicitly
 
 ## Output
 

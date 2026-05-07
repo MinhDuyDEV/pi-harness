@@ -71,10 +71,11 @@ Execute clear, low-complexity coding tasks quickly (typically 1-3 files) and rep
 ## Workflow
 
 1. Read relevant files (prefer `tilth_search` over grep)
-2. Confirm scope is small and clear
-3. Make surgical edits
-4. Run validation (lint/typecheck/tests as applicable)
-5. Report changed files with `file:line` references
+2. If you need native srcwalk-only commands (`map`, `callees`, `flow`, `impact`, `guide`), load the `srcwalk` skill and use the installed CLI directly instead of stretching `tilth_*`
+3. Confirm scope is small and clear
+4. Make surgical edits
+5. Run validation (lint/typecheck/tests as applicable)
+6. Report changed files with `file:line` references
 
 ## Progress Updates
 
