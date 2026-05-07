@@ -237,7 +237,7 @@ Before ANY completion claim (bead close, PR creation, `/ship`, task completion):
 
 ### Gate 2: Agent Delegation Requires Post-Verification
 
-After ANY `task()` subagent returns with "success", follow the **Worker Distrust Protocol** from AGENTS.md — read changed files, run verification, check acceptance criteria. Do not trust agent self-reports.
+After ANY `task()` subagent returns with "success", follow the **Worker Distrust Protocol** from `.pi/APPEND_SYSTEM.md` — read changed files, run verification, check acceptance criteria. Do not trust agent self-reports.
 
 ### Enforcement Principle
 

@@ -1,5 +1,12 @@
 # Delegation — Three-Layer Model
 
+**Purpose**: Delegation mechanics only.
+**Boundary**: Global safety, honesty, verification, and edit discipline live in `AGENTS.md`. This file owns routing, delegation patterns, and subagent execution contracts.
+**Prompt semantics**: `APPEND_SYSTEM.md` appends to Pi's default system prompt; it does not replace the default prompt.
+**Use it for**: additive, repo-wide system instructions that must always be present for this scope.
+**Prefer it when**: the instruction can layer on top of Pi's default prompt instead of replacing it.
+**Do not use it for**: copying the whole `AGENTS.md`, restating local project conventions that belong in `AGENTS.md`, echoing `SYSTEM.md`, or full prompt replacement. If you truly need prompt replacement, use `.pi/SYSTEM.md` intentionally and keep it minimal.
+
 Three integrated systems for delegating work, each optimized for different scales:
 
 ```
@@ -10,21 +17,15 @@ Layer 3: pi-teams                  →  Multi-process coordination (full context
 
 ## Layer 1: Subagents (`@tintinweb/pi-subagents`)
 
-Lightweight in-process delegation. Results flow back into conversation. Queue-based concurrency (4 concurrent default).
+Lightweight in-process delegation. Results flow back into the conversation.
 
 | Tool | Purpose |
 |---|---|
 | `Agent` | Spawn a specialized agent (foreground or background) |
-| `get_subagent_result` | Fetch output from a background agent (wait or poll) |
-| `steer_subagent` | Send mid-run message to redirect a running agent |
+| `get_subagent_result` | Fetch output from a background agent |
+| `steer_subagent` | Redirect a running background agent |
 
-**Key features:**
-- Smart batching: 2+ background agents spawned in same turn → grouped notification
-- Resume support: continue agent from previous conversation via `resume: agentId`
-- Worktree isolation: `isolation: "worktree"` for safe parallel file modifications
-- Custom agent types from `.pi/agents/*.md`
-
-**When to use:** Quick tasks, single-shot delegation, parallel batches under 5 minutes each.
+**Use for:** quick tasks, single-shot delegation, and parallel batches under ~5 minutes each.
 
 ```
 Agent(type: "explore", prompt: "find all API routes", run_in_background: true)
@@ -37,23 +38,15 @@ DAG-based task management with dependency tracking and auto-cascade execution.
 
 | Tool | Purpose |
 |---|---|
-| `TaskCreate` | Create a task with subject/description (optionally `agentType` for auto-execution) |
-| `TaskList` | List all tasks with status and blockers |
-| `TaskGet` | Read full task details including dependencies |
-| `TaskUpdate` | Update status/owner/metadata/dependencies (`addBlocks`/`addBlockedBy`) |
-| `TaskExecute` | Execute agent-typed tasks as subagents (auto-cascades unblocked dependents) |
-| `TaskOutput` | Retrieve output from running/completed task |
-| `TaskStop` | Stop a running background task |
+| `TaskCreate` | Create a task (optionally with `agentType`) |
+| `TaskList` | List tasks and blockers |
+| `TaskGet` | Read full task details |
+| `TaskUpdate` | Update status/owner/dependencies |
+| `TaskExecute` | Execute agent-backed tasks |
+| `TaskOutput` | Retrieve output from running/completed tasks |
+| `TaskStop` | Stop a running task |
 
-**Statuses:** `pending` → `in_progress` → `completed` (`deleted` for removal)
-
-**Key features:**
-- **DAG dependencies**: `addBlockedBy: ["1"]` — task won't start until blockers complete
-- **Auto-cascade**: `TaskExecute` completes task #1 → auto-spawns unblocked task #2
-- **Agent coupling**: Tasks with `agentType` (e.g. `"explore"`, `"worker"`) are executable via `TaskExecute`
-- **Dual storage**: In-memory (session) or file-backed (`~/.pi/tasks/`) with file locking
-
-**When to use:** Multi-step work with dependencies, pipelines where order matters, tracking progress across complex features.
+**Use for:** multi-step work with dependencies, pipelines, and progress tracking.
 
 ```
 TaskCreate(subject: "Research auth patterns", agentType: "scout")           → #1
@@ -61,48 +54,29 @@ TaskCreate(subject: "Plan implementation", agentType: "planner")            → 
 TaskCreate(subject: "Implement auth module", agentType: "worker")           → #3
 TaskUpdate(taskId: "2", addBlockedBy: ["1"])
 TaskUpdate(taskId: "3", addBlockedBy: ["2"])
-TaskExecute(task_ids: ["1"])  → completes → auto-cascades #2 → auto-cascades #3
+TaskExecute(task_ids: ["1"])  → auto-cascades through #2 → #3
 ```
-
-**Manual tracking (no auto-execution):**
-1. `TaskCreate` tasks with clear subject + detailed description (no `agentType`)
-2. `TaskUpdate` status as you work (`pending` → `in_progress` → `completed`)
-3. `TaskList` after each completion to pick next available work
 
 ## Layer 3: Teams (`pi-teams`)
 
-Separate Pi processes in tmux panes. Each teammate gets its own **full context window**, task board, and messaging. Requires tmux session.
+Separate Pi processes in tmux panes/windows. Each teammate gets its own context window, task board, and inbox.
 
 | Tool | Purpose |
 |---|---|
-| `team_create` | Create a new team (sets up coordination directory) |
-| `spawn_teammate` | Launch agent in tmux pane with role prompt |
-| `send_message` | Send message to specific teammate |
-| `broadcast_message` | Send message to all teammates |
-| `read_inbox` | Check messages from teammates |
-| `check_teammate` | Verify agent is alive |
-| `task_create` (team) | Create task on shared team board |
-| `task_submit_plan` | Teammate submits implementation plan |
-| `task_evaluate_plan` | Lead approves/rejects submitted plan |
-| `task_update` (team) | Update team task status/owner |
-| `task_list` (team) | List team tasks |
-| `team_shutdown` | Clean up all panes and coordination files |
+| `team_create` | Create a team |
+| `spawn_teammate` | Launch an agent with a role prompt |
+| `send_message` / `broadcast_message` | Coordinate teammates |
+| `read_inbox` / `check_teammate` | Inspect teammate status |
+| `task_create` / `task_update` / `task_list` | Shared team task board |
+| `team_shutdown` | Clean up panes/windows and coordination files |
 
-**Key features:**
-- Multi-process isolation: each teammate can't crash parent, gets full context budget
-- File-based coordination: `~/.pi/teams/<name>/` (config, tasks, inboxes, PIDs)
-- Plan approval mode: `plan_mode_required: true` → governance before code changes
-- Visual oversight: human can watch agent work in real-time via tmux
-
-**When to use:** Long-running parallel work (15+ min each), multiple specialists needing deep context, human oversight required.
+**Use for:** long-running parallel work, multiple specialists needing deep context, or human-overseen coordination.
 
 ```
-team_create("auth-migration")
-spawn_teammate("auth-migration", "researcher", "Research OAuth2 patterns", cwd: ".")
-spawn_teammate("auth-migration", "implementer", "Implement auth after research", cwd: ".")
-send_message("auth-migration", "researcher", "Focus on PKCE flow specifically")
-read_inbox("auth-migration")  → check teammate reports
-team_shutdown("auth-migration")
+team_create("feature-x")
+spawn_teammate("feature-x", "researcher", "Research X", cwd: ".")
+spawn_teammate("feature-x", "implementer", "Build X", cwd: ".")
+spawn_teammate("feature-x", "tester", "Test X", cwd: ".")
 ```
 
 ## Decision Flowchart
@@ -113,15 +87,15 @@ Is it < 3 independent tasks?
   NO ↓
 
 Do tasks have dependencies (A must finish before B)?
-  YES → TaskCreate + TaskExecute (DAG auto-cascade)
+  YES → TaskCreate + TaskExecute
   NO ↓
 
 Do tasks need sustained context (> 15 min each)?
-  YES → pi-teams (separate processes, full context window)
-  NO → Agent with run_in_background (parallel batch)
+  YES → pi-teams
+  NO → background Agents in parallel
 
 Need human approval before code changes?
-  YES → pi-teams with plan_mode_required: true
+  YES → pi-teams with plan gating
 ```
 
 ## Context Continuity (DCP/VCC)
@@ -129,87 +103,152 @@ Need human approval before code changes?
 Use these during long-running delegated work or before handoff/resume:
 
 - `/dcp` to inspect context pressure and active compression blocks
-- `vcc_snapshot()` to generate deterministic session state (goals/files/blockers/preferences)
-- `vcc_recall({ query: "..." })` for targeted history recovery; `vcc_recall({ expand: [index] })` for full entry content
-- `compress` calls must be serialized (never in parallel)
+- `vcc_snapshot()` to generate deterministic session state
+- `vcc_recall({ query: "..." })` for targeted history recovery
+- `compress` calls must be serialized; never run multiple compressions in parallel
 
 ## Combo Patterns
 
-**Pattern 1: Quick Parallel** — Use `Agent` directly, no tasks needed.
+**Pattern 1: Quick Parallel**
 ```
 Agent(type: "explore", prompt: "find all API routes", run_in_background: true)
 Agent(type: "explore", prompt: "find all middleware", run_in_background: true)
-→ grouped notification when all complete
 ```
 
-**Pattern 2: Dependency Chain** — Use `pi-tasks` for DAG + auto-cascade.
+**Pattern 2: Dependency Chain**
 ```
 TaskCreate(#1: "Research", agentType: "scout")
 TaskCreate(#2: "Plan", agentType: "planner", blockedBy: [#1])
 TaskCreate(#3: "Implement", agentType: "worker", blockedBy: [#2])
-TaskExecute([#1])  → auto-cascades through #2 → #3
+TaskExecute([#1])
 ```
 
-**Pattern 3: Big Feature** — Use `pi-teams` for sustained parallel work.
+**Pattern 3: Big Feature**
 ```
 team_create("feature-x")
-spawn_teammate("feature-x", "researcher", "Deep research on X")
-spawn_teammate("feature-x", "implementer", "Build X after research")
-spawn_teammate("feature-x", "tester", "Write tests for X")
-→ each has full context window, coordinate via messages
+spawn_teammate("feature-x", "researcher", "Deep research on X", cwd: ".")
+spawn_teammate("feature-x", "implementer", "Build X after research", cwd: ".")
+spawn_teammate("feature-x", "tester", "Write tests for X", cwd: ".")
 ```
 
-**Pattern 4: Hybrid** — Tasks for tracking, subagents for execution.
+**Pattern 4: Hybrid**
 ```
 TaskCreate(#1: "Fix auth bug", agentType: "worker")
 TaskCreate(#2: "Fix payment bug", agentType: "worker")
-TaskCreate(#3: "Run full test suite")  ← manual, no agentType
+TaskCreate(#3: "Run full test suite")
 TaskUpdate(#3, addBlockedBy: ["1", "2"])
-TaskExecute(["1", "2"])  → parallel workers → when both done, you run #3 manually
+TaskExecute(["1", "2"])
 ```
 
 ## GPT Model Dispatch Notes
 
-When delegating to GPT-backed agents, keep the dispatch prompt model-aware and compact:
-
-- `scout` / `planner` on GPT-5.5: state outcome, success criteria, evidence available, output shape, and stop rules; avoid step-by-step process unless order is safety-critical.
-- `explore` on GPT-5.4-mini: put the search target, exact output format, ambiguity behavior, and stop condition first; do not rely on implied workflow steps.
-- `worker` / `reviewer` on GPT-5.3-Codex: request concrete code/action or verdict, not long plans; ask for batched reads, dedicated tools over shell when available, sparse commentary, verification evidence, and `phase` preservation in integrations.
-- For any GPT model: include only task-specific constraints that change behavior; rely on the agent file and `AGENTS.md` for shared policy.
+- `scout` / `planner` on GPT-5.5: state outcome, success criteria, evidence, output shape, and stop rule
+- `explore` on GPT-5.4-mini: put search target, exact output format, ambiguity behavior, and stop condition first
+- `worker` / `reviewer` on GPT-5.3-Codex: ask for concrete code or verdicts, sparse commentary, and verification evidence
+- Include only task-specific constraints that change behavior; rely on `AGENTS.md` for shared policy
 
 ## Agent Roster
 
-| Agent | Use For | Key Traits |
-|---|---|---|
-| `worker` | Small implementation tasks (1-3 files) | Auto-fix deviation rules, TDD support |
-| `explore` | Codebase search and pattern discovery | Read-only, AST-aware, thoroughness levels |
-| `scout` | External docs/research | Memory-first, source quality hierarchy, cited |
-| `reviewer` | Code review, debugging, security | Read-only, P0-P3 severity, stub detection |
-| `planner` | Architecture and execution plans | Goal-backward, dependency graphs, context budget |
-| `vision` | UI/UX and accessibility analysis | Read-only, WCAG-focused, design-system audit |
-| `painter` | Image generation/editing | Metadata contract, iterative edits |
+| Agent | Use For |
+|---|---|
+| `worker` | Small implementation tasks (1-3 files) |
+| `explore` | Codebase search and pattern discovery |
+| `scout` | External docs and research |
+| `reviewer` | Code review, debugging, security |
+| `planner` | Architecture and execution plans |
+| `vision` | UI/UX and accessibility analysis |
+| `painter` | Image generation/editing |
 
-## Auto-Delegation Rules (MANDATORY)
+## Auto-Delegation Rules
 
-**You MUST delegate to the appropriate subagent when the task matches their specialty.** Do not do the work yourself when a specialist exists. This saves your context window and produces better results.
+Use the specialist when the task clearly matches their specialty:
 
-| User asks... | You MUST delegate to | How |
-|---|---|---|
-| "research X", "look into X", "what is X" | `scout` | `Agent(type: "scout", prompt: "...")` |
-| "find X in codebase", "where is X used" | `explore` | `Agent(type: "explore", prompt: "...")` |
-| "review this code", "check for bugs" | `reviewer` | `Agent(type: "reviewer", prompt: "...")` |
-| "plan how to implement X" | `planner` | `Agent(type: "planner", prompt: "...")` |
-| "check this UI/design/screenshot" | `vision` | `Agent(type: "vision", prompt: "...")` |
-| "generate an image" | `painter` | `Agent(type: "painter", prompt: "...")` |
-| Small implementation (1-3 files) | `worker` | `Agent(type: "worker", prompt: "...")` |
+| User asks... | Delegate to |
+|---|---|
+| research / investigate / compare | `scout` |
+| find code / trace usage / locate symbols | `explore` |
+| review / check for bugs | `reviewer` |
+| plan implementation | `planner` |
+| inspect UI / screenshot / accessibility | `vision` |
+| generate image | `painter` |
+| small implementation (1-3 files) | `worker` |
 
-**Exceptions** (do it yourself):
-- Trivial lookups that take one tool call (e.g., reading a single file)
-- Follow-up questions in an active conversation where you already have context
-- Tasks that require your accumulated conversation context to answer
+**Do it yourself only when:**
+- the work is a trivial one-tool lookup
+- it is a tight follow-up and you already hold the necessary context
+- the task depends heavily on accumulated conversation context
 
-**Compound tasks** — break them up:
-- Research then implement → `Agent(scout)` → wait → `Agent(worker)`
-- Research then plan → `Agent(scout)` → wait → `Agent(planner)`
-- Multiple independent searches → 3x `Agent(explore, background: true)`
-- Complex pipeline → `TaskCreate` chain with `agentType` + `TaskExecute`
+## Worker Distrust Protocol
+
+Subagent self-reports are not sufficient evidence. After any subagent reports success:
+
+1. Read changed files directly
+2. Run relevant verification on the modified files or affected surface
+3. Check acceptance criteria against the original task, not the summary
+4. Confirm the agent stayed within scope
+5. Only then accept the result
+
+```
+✅ Agent reports success → Read diff → Verify → Check criteria → Accept
+❌ Agent reports success → Trust it immediately
+```
+
+## Structured Termination Contract
+
+When dispatching a subagent, require this exact result shape:
+
+```md
+## Result
+- **Status:** completed | blocked | failed
+- **Files Modified:** [list of file paths]
+- **Files Read:** [list of file paths consulted]
+
+## Verification
+- [what was verified and how]
+- [command output or evidence]
+
+## Summary
+[2-5 sentences: what changed, key decisions, anything unexpected]
+
+## Blockers (if status is blocked/failed)
+- [what is blocking]
+- [what was tried]
+- [recommended next step]
+```
+
+Treat unstructured subagent reports with extra skepticism.
+
+## Final Status Spec
+
+When the parent agent reports completion to the user:
+
+- **Length:** 2-10 lines total
+- **Structure:** what changed and why → `file:line` citations → verification evidence → next action
+- **Avoid:** restating requirements, narrating the whole process, or padding
+
+Example:
+
+```text
+Fixed auth crash in `src/auth.ts:42` by guarding undefined user.
+`npm test` passes 148/148. Build clean.
+Ready to merge — run `/pr` to create PR.
+```
+
+## Context File Pattern
+
+For complex delegation, write large context once and point subagents at the file instead of inlining it in every prompt.
+
+```ts
+// ❌ Token-heavy
+Agent({ prompt: `Full plan:\n${longPlan}\n\nImplement task 3.` })
+
+// ✅ Token-efficient
+write(".beads/artifacts/<id>/worker-context.md", contextContent)
+Agent({ prompt: "Read .beads/artifacts/<id>/worker-context.md and implement task 3." })
+```
+
+Use this pattern when:
+
+- shared context exceeds ~500 tokens
+- multiple subagents need the same background
+- plans, specs, or research need to be passed around without duplication

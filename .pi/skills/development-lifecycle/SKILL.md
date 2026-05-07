@@ -26,7 +26,7 @@ tools: []
 
 This skill orchestrates the complete feature development workflow, guiding you through each phase and loading the appropriate sub-skills automatically.
 
-**Note:** For quick skill routing by intent, see the Intent → Skill Mapping table in `AGENTS.md`. This skill is for full end-to-end orchestration when you need phase-by-phase guidance.
+**Note:** For quick skill routing by intent, use `docs/skills-registry.md`, `skills/registry.json`, or the `using-pi-skills` skill. This skill is for full end-to-end orchestration when you need phase-by-phase guidance.
 
 **Use when:** Starting any new feature, migration, refactor, or significant change.
 

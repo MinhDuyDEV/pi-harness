@@ -1,27 +1,25 @@
 {
-  "defaultProvider": "openai-codex",
+  "defaultProvider": "github-copilot",
   "defaultModel": "gpt-5.4",
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "medium",
   "theme": "catppuccin",
-  "editorPaddingX": 0,
+  "editorPaddingX": 1,
   "images": {
     "blockImages": false
   },
   "packages": [
+    "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@tintinweb/pi-subagents",
     "npm:@tintinweb/pi-tasks",
     "npm:pi-teams",
     "npm:pi-mcp-adapter",
-    "git:github.com/ghoseb/pi-askuserquestion",
-    "npm:@aliou/pi-guardrails",
-    "https://github.com/badlogic/pi-diff-review",
-    "npm:pi-image-preview",
     "npm:@marckrenn/pi-sub-bar",
     "npm:pi-rewind",
     "npm:pi-notify",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
-    "npm:@heyhuynhgiabuu/pi-search"
+    "npm:@heyhuynhgiabuu/pi-search",
+    "npm:pi-powerline-footer"
   ],
   "compaction": {
     "enabled": true,
@@ -35,7 +33,9 @@
     "enabled": true,
     "maxRetries": 3,
     "baseDelayMs": 2000,
-    "maxDelayMs": 60000
+    "provider": {
+      "maxRetryDelayMs": 60000
+    }
   },
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
@@ -49,8 +49,17 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.67.68",
+  "lastChangelogVersion": "0.73.0",
   "treeFilterMode": "default",
   "transport": "sse",
-  "hideThinkingBlock": false
+  "hideThinkingBlock": false,
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "collapseChangelog": false,
+  "enableInstallTelemetry": false,
+  "powerline": {
+    "preset": "default",
+    "fixedEditor": true
+  }
 }

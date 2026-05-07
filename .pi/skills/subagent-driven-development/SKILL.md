@@ -85,12 +85,12 @@ Task tool (worker or general-purpose):
     2. Write or update tests only when the task requires it
     3. Run the required verification commands
     4. Do NOT commit unless explicitly instructed by the parent agent
-    5. Return the structured termination contract from AGENTS.md
+    5. Return the structured termination contract from `.pi/APPEND_SYSTEM.md`
 
     Work from: [directory]
 ```
 
-**After subagent reports back** — follow the **Worker Distrust Protocol** from AGENTS.md:
+**After subagent reports back** — follow the **Worker Distrust Protocol** from `.pi/APPEND_SYSTEM.md`:
 
 1. Read changed files directly (don't trust the report)
 2. Run verification on modified files (typecheck + lint minimum)
