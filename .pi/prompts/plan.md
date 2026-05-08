@@ -18,9 +18,9 @@ Create a detailed implementation plan with TDD steps. Optional deep-planning bet
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
+skill({ name: "memory-system" });
 skill({ name: "behavioral-kernel" });
-skill({ name: "writing-plans" }); // TDD plan format
+skill({ name: "planning-and-task-breakdown" }); // TDD plan format
 ```
 
 ## Parse Arguments
@@ -47,7 +47,7 @@ Before touching the PRD or planning anything, load what the codebase already kno
 
 ### Step 1: Search institutional memory
 
-Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: bugfixes, existing plans (ask user before overwriting).
+Follow the `memory-system` skill protocol. Focus on bugfixes and existing plans; ask before overwriting existing plan artifacts.
 
 If relevant observations found: incorporate them directly into the plan. Don't re-solve solved problems.
 
@@ -58,7 +58,7 @@ If relevant observations found: incorporate them directly into the plan. Don't r
 git log --oneline -20
 
 # Who wrote the relevant code and when?
-git log --oneline --follow -- <relevant-file-path>
+git log --oneline --follow -- src/auth/login.ts
 
 # What patterns appear in recent commits?
 git log --oneline --all | head -30
@@ -74,7 +74,7 @@ Look for:
 ### Step 3: Spawn learnings-researcher (if Level 2-3 work)
 
 ```typescript
-task({
+Agent({
   subagent_type: "explore",
   description: "Search codebase for patterns related to this work",
   prompt: `Search the codebase for patterns, conventions, and existing implementations related to: [FEATURE].
@@ -113,8 +113,8 @@ Before research, determine discovery level based on PRD:
 | ----- | -------------------- | ----------------------------------------------------------------- | ------------------------------------------- |
 | **0** | Skip                 | Pure internal work, existing patterns only (grep confirms)        | Skip research, proceed to decomposition     |
 | **1** | Quick (2-5 min)      | Single known library, confirming syntax/version                   | `context7 resolve-library-id + query-docs`  |
-| **2** | Standard (15-30 min) | Choosing between 2-3 options, new external integration            | Spawn `@scout` for research                 |
-| **3** | Deep (1+ hour)       | Architectural decision, novel problem, multiple external services | Full research with parallel `@scout` agents |
+| **2** | Standard (15-30 min) | Choosing between 2-3 options, new external integration            | Spawn a `scout` agent for research          |
+| **3** | Deep (1+ hour)       | Architectural decision, novel problem, multiple external services | Full research with parallel `scout` agents  |
 
 **Depth indicators:**
 
@@ -124,7 +124,7 @@ Before research, determine discovery level based on PRD:
 **Decision:** Ask user to confirm or adjust:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Discovery Level",
@@ -137,6 +137,7 @@ question({
         { label: "Standard", description: "Level 1: quick doc lookup" },
         { label: "Skip research", description: "Level 0: I know the codebase" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -255,14 +256,14 @@ Wave 3: C (depends on B)
 
 ## Phase 7: Write Plan
 
-Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill format:
+Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `planning-and-task-breakdown` skill format:
 
 ### Required Plan Header
 
 ```markdown
 # [Feature] Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use skill({ name: "executing-plans" }) to implement this plan task-by-task.
+> **Execution handoff:** Implement this plan with `subagent-driven-development` or `incremental-implementation`, task by task, after fresh code reading.
 
 **Goal:** [Outcome-shaped goal from PRD]
 
@@ -286,7 +287,7 @@ Write `.beads/artifacts/$ARGUMENTS/plan.md` following the `writing-plans` skill 
 
 | Artifact         | Provides       | Path                  |
 | ---------------- | -------------- | --------------------- |
-| [File/component] | [What it does] | `src/path/to/file.ts` |
+| [File/component] | [What it does] | `src/auth/login.ts` |
 
 ### Key Links
 

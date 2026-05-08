@@ -10,7 +10,7 @@ model: proxypal/gemini-3-pro-preview
 ## Load Skills
 
 ```typescript
-skill({ name: "visual-analysis" }); // Analysis framework
+skill({ name: "mockup-to-code" }); // Analysis framework
 skill({ name: "accessibility-audit" }); // WCAG checklists
 skill({ name: "frontend-design" }); // Anti-patterns, design quality
 ```
@@ -27,7 +27,7 @@ Parse `$ARGUMENTS`:
 
 ### 1. Analyze the Input
 
-Use the `visual-analysis` skill to perform deep analysis:
+Use the `mockup-to-code` skill to perform deep analysis:
 
 - Content inventory (elements, text, icons)
 - Visual properties (colors, typography, spacing, layout)

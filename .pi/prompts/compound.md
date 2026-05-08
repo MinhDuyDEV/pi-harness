@@ -71,7 +71,7 @@ observation({
   narrative: "[What happened, why it matters, how to apply it]",
   facts: "[comma, separated, key, facts]",
   concepts: "[searchable, keywords, for, future, retrieval]",
-  files_modified: "[relevant/file.ts if applicable]",
+  files_modified: "src/auth/login.ts,src/auth/session.ts",
   confidence: "high", // high=verified, medium=likely, low=speculative
   // ByteRover-inspired quality fields:
   subtitle: "[One-line semantic summary — WHY this matters for future work]",
@@ -91,7 +91,7 @@ When superseding an older observation, prevent accidental knowledge loss.
 ### Step 1: Read the old observation
 
 ```typescript
-const old = memory_get({ ids: "<superseded-id>" });
+const old = memory-get({ ids: "<superseded-id>" });
 ```
 
 ### Step 2: Detect structural loss
@@ -151,9 +151,9 @@ Check if the shipped work changed architecture, APIs, conventions, or tech stack
 ```typescript
 // Check what changed
 // If tech stack changed:
-memory_update({ file: "project/tech-stack", content: "...", mode: "append" });
+memory-update({ file: "project/tech-stack", content: "...", mode: "append" });
 // If new gotcha:
-memory_update({ file: "project/gotchas", content: "...", mode: "append" });
+memory-update({ file: "project/gotchas", content: "...", mode: "append" });
 ```
 
 **Rule:** Only update docs when the change is structural (new pattern, new dep, new constraint). Don't update for routine bug fixes or small features. Ask user before modifying `AGENTS.md`.
@@ -162,7 +162,7 @@ memory_update({ file: "project/gotchas", content: "...", mode: "append" });
 
 ```typescript
 // Check if this updates or supersedes an older observation
-memory_search({ query: "[key concept from the finding]", limit: 3 });
+memory-search({ query: "[key concept from the finding]", limit: 3 });
 ```
 
 If a newer finding contradicts or updates an older one, note it:
@@ -194,16 +194,17 @@ Present extracted learnings for user review before finalizing:
 ```
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
-      header: "Approve Learnings",
+      header: "Learnings",
       question: "Review extracted learnings. Store all approved observations?",
       options: [
         { label: "Store all (Recommended)", description: "Persist all marked ✅" },
         { label: "Let me adjust", description: "I'll modify before storing" },
         { label: "Skip compound", description: "Nothing worth persisting" },
       ],
+      multiSelect: false,
     },
   ],
 });

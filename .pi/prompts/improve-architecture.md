@@ -78,32 +78,35 @@ For each selected shallow module, spawn **3 parallel sub-agents** to propose
 radically different interface designs:
 
 ```typescript
-// Spawn 3 explore agents with different design constraints
+// Spawn 3 planner agents with different design constraints
 Agent({
-  type: "planner",
+  subagent_type: "planner",
+  description: "Design minimal interface",
   prompt: `Design a MINIMAL interface for [module]. 
     Constraint: maximum 3 public functions. 
     Hide all complexity behind those 3 functions.
     Show the interface (function signatures + types) and explain what each hides.`,
-  run_in_background: true
+  run_in_background: true,
 });
 
 Agent({
-  type: "planner", 
+  subagent_type: "planner",
+  description: "Design composable interface",
   prompt: `Design a COMPOSABLE interface for [module].
     Constraint: small, orthogonal building blocks that compose.
     Think Unix pipes — each piece does one thing.
     Show the interface and example composition patterns.`,
-  run_in_background: true
+  run_in_background: true,
 });
 
 Agent({
-  type: "planner",
+  subagent_type: "planner",
+  description: "Design domain-driven interface",
   prompt: `Design a DOMAIN-DRIVEN interface for [module].
     Constraint: interface reflects the business domain, not the implementation.
     Callers should never see database, HTTP, or framework concepts.
     Show the interface and how it maps to domain concepts.`,
-  run_in_background: true
+  run_in_background: true,
 });
 ```
 

@@ -18,9 +18,11 @@ skill({ name: "verification-before-completion" });
 Delegate to the reviewer subagent for comprehensive analysis:
 
 ```typescript
-subagent({
-  agent: "reviewer",
-  task: "Review the following code/changes: $ARGUMENTS\n\nProvide severity-ranked findings (P0-P3). Every finding must cite file:line evidence and impact scenario. Focus on: correctness, security, performance, and maintainability."
+Agent({
+  subagent_type: "reviewer",
+  description: "Review code changes",
+  prompt:
+    "Review the following code/changes: $ARGUMENTS\n\nProvide severity-ranked findings (P0-P3). Every finding must cite file:line evidence and impact scenario. Focus on: correctness, security, performance, and maintainability.",
 });
 ```
 

@@ -91,7 +91,7 @@ Extract all requirements/tasks from the PRD and verify each is implemented:
 
 ## Phase 3: Correctness
 
-Follow the [Verification Protocol](../skill/verification-before-completion/references/VERIFICATION_PROTOCOL.md):
+Follow the `verification-before-completion` skill protocol:
 
 **Default: incremental mode** (changed files only, parallel gates).
 

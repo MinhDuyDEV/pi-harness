@@ -10,7 +10,7 @@ Systematically debug and fix the reported issue.
 ## Load Skills
 
 ```typescript
-skill({ name: "systematic-debugging" });
+skill({ name: "debugging-and-error-recovery" });
 skill({ name: "root-cause-tracing" });
 skill({ name: "behavioral-kernel" });
 skill({ name: "verification-before-completion" });

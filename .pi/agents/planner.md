@@ -5,7 +5,7 @@ thinking: high
 max_turns: 40
 disallowed_tools: edit, write
 prompt_mode: append
-skills: writing-plans
+skills: planning-and-task-breakdown
 ---
 
 # Plan Agent

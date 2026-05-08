@@ -6,7 +6,7 @@ agentType: reviewer
 
 # Verify Harness: $ARGUMENTS
 
-Run the local harness verification checks for Pi/Pikit configuration, prompts, agents, and eval fixtures.
+Run the local harness verification checks for Pi/Pikit configuration, prompts, agents, skill wiring, and eval fixtures.
 
 ## Purpose
 

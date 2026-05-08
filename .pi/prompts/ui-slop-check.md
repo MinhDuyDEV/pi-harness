@@ -13,7 +13,7 @@ Run a focused anti-slop audit against changed UI files using the frontend-design
 
 ```typescript
 skill({ name: "frontend-design" }); // Anti-pattern taxonomy + design references
-skill({ name: "visual-analysis" }); // Structured visual/code analysis workflow
+skill({ name: "mockup-to-code" }); // Structured visual/code analysis workflow
 skill({ name: "accessibility-audit" }); // Keyboard/focus/contrast checks
 ```
 

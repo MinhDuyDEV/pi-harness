@@ -14,10 +14,10 @@ Gather information before implementation. Find answers, document findings, stop 
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
+skill({ name: "memory-system" });
 skill({ name: "behavioral-kernel" });
 // For --thorough mode:
-skill({ name: "deep-research" });
+skill({ name: "source-driven-development" });
 ```
 
 ## Parse Arguments
@@ -69,7 +69,7 @@ Read PRD if it exists and extract questions that need answering.
 
 ### Memory Search (Required)
 
-Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Use findings to: skip already-answered questions, narrow scope to gaps only, avoid contradicting prior decisions without justification.
+Follow the `memory-system` skill protocol. Use findings to skip already-answered questions, narrow scope to gaps only, and avoid contradicting prior decisions without justification.
 
 ## Phase 2: Research
 

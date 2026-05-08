@@ -24,7 +24,7 @@ Initialize project planning context files from templates.
 ## Load Skills
 
 ```typescript
-skill({ name: "context-initialization" });
+skill({ name: "context-engineering" });
 skill({ name: "brainstorming" });
 skill({ name: "verification-before-completion" });
 ```
@@ -46,8 +46,8 @@ const args = {
 Use tilth or Read to check for existing files:
 
 ```typescript
-tilth_tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
-// Or: Read({ filePath: ".pi/memory/project/project.md", limit: 20 });
+tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
+// Or: tilth_read({ path: ".pi/memory/project/project.md" });
 ```
 
 **If planning context exists:**
@@ -71,10 +71,10 @@ Wait for user selection.
 If `--brownfield` flag is set:
 
 ```typescript
-skill({ name: "swarm-coordination" });
+skill({ name: "agent-teams" });
 
 // Agent 1: Map tech stack
-task({
+Agent({
   subagent_type: "explore",
   description: "Analyze tech stack",
   prompt:
@@ -82,7 +82,7 @@ task({
 });
 
 // Agent 2: Map architecture
-task({
+Agent({
   subagent_type: "explore",
   description: "Analyze architecture",
   prompt:
@@ -124,7 +124,7 @@ This file is auto-injected into every prompt. Keep it concise.
 **Load template:**
 
 ```typescript
-Read({ filePath: ".pi/memory/_templates/project.md" });
+tilth_read({ path: ".pi/memory/_templates/project.md" });
 ```
 
 **Fill with gathered data:**
@@ -202,11 +202,11 @@ If `--brownfield` analysis was run:
 ### 4.1 Verify Documents Created
 
 ```typescript
-tilth_tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
+tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
 // Verify each file exists and has content
-Read({ filePath: ".pi/memory/project/project.md", limit: 5 });
-Read({ filePath: ".pi/memory/project/roadmap.md", limit: 5 });
-Read({ filePath: ".pi/memory/project/state.md", limit: 5 });
+tilth_read({ path: ".pi/memory/project/project.md" });
+tilth_read({ path: ".pi/memory/project/roadmap.md" });
+tilth_read({ path: ".pi/memory/project/state.md" });
 ```
 
 **Check:**
@@ -290,7 +290,7 @@ After init-context completes:
 
 | Skill                            | When Used                         | Purpose                        |
 | -------------------------------- | --------------------------------- | ------------------------------ |
-| `context-initialization`         | Phase 1                           | Template verification          |
+| `context-engineering`            | Phase 1                           | Template and context discipline |
 | `brainstorming`                  | Phase 2 (if not --skip-questions) | Refine vision and requirements |
-| `swarm-coordination`             | Phase 1.2 (if --brownfield)       | Parallel codebase analysis     |
+| `agent-teams`                    | Phase 1.2 (if --brownfield)       | Parallel codebase analysis     |
 | `verification-before-completion` | Phase 4                           | Validate created files         |

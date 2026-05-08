@@ -15,7 +15,7 @@ Claim a task and prepare workspace. Bridge between specification (`/create`) and
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "prd-task" }); // PRD → executable tasks
+skill({ name: "beads" }); // PRD → executable tasks
 ```
 
 ## Parse Arguments
@@ -71,7 +71,7 @@ br update $ARGUMENTS --status in_progress
 Ask user how to handle workspace:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Workspace",
@@ -90,6 +90,7 @@ question({
           description: "Isolated git worktree for this bead",
         },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -111,7 +112,7 @@ skill({ name: "using-git-worktrees" });
 
 ## Phase 4: Convert PRD to Tasks
 
-If `prd.json` doesn't exist yet, use `prd-task` skill to convert PRD markdown → executable JSON.
+If `prd.json` doesn't exist yet, use the `beads` workflow to convert PRD markdown → executable JSON.
 
 If `prd.json` already exists, show progress (completed/total tasks).
 

@@ -12,7 +12,7 @@ Core project setup. Creates AGENTS.md and detects tech stack. Run once per proje
 ## Load Skills
 
 ```typescript
-skill({ name: "index-knowledge" });
+skill({ name: "context-engineering" });
 ```
 
 ## Options
@@ -38,7 +38,7 @@ With `--deep`: Also analyze git history, source patterns, subsystem candidates.
 After detecting project, show summary and ask for confirmation:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Preview",
@@ -48,6 +48,7 @@ question({
         { label: "Show me what you'll write first" },
         { label: "Cancel" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -57,7 +58,7 @@ question({
 
 ## Phase 3: Create AGENTS.md
 
-Create `./AGENTS.md` — **target <60 lines** (max 150). Follow the `index-knowledge` skill format:
+Create `./AGENTS.md` — **target <60 lines** (max 150). Keep it index-style and concise:
 
 - Tech stack with versions
 - File structure

@@ -42,15 +42,16 @@ Read `.beads/artifacts/$ARGUMENTS/` to check existing artifacts.
 If `git status` shows uncommitted changes, ask the user:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
-      header: "Uncommitted work",
+      header: "Uncommitted",
       question: "You have uncommitted changes. What should we do?",
       options: [
         { label: "Commit as WIP (Recommended)", description: "git commit -m 'WIP: $ARGUMENTS'" },
         { label: "Leave uncommitted", description: "Skip commit, just write handoff" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -59,7 +60,7 @@ question({
 If user chooses commit:
 
 ```bash
-git add <specific-files-you-modified>
+git add src/auth/login.ts
 git commit -m "WIP: $ARGUMENTS - [brief description of where you stopped]"
 ```
 
@@ -72,7 +73,7 @@ git commit -m "WIP: $ARGUMENTS - [brief description of where you stopped]"
 Write the handoff to the memory system:
 
 ```typescript
-memory_update({
+memory-update({
   file: "handoffs/$ARGUMENTS",
   content: `# Handoff: $ARGUMENTS
 
@@ -90,7 +91,7 @@ memory_update({
 - [next steps]
 
 ## Files Touched
-- \`path/to/file.ts\` — [what changed]
+- `src/auth/login.ts` — [what changed]
 
 ## Decisions
 - [decision]: [why]

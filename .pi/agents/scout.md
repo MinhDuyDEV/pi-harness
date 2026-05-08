@@ -5,7 +5,7 @@ thinking: high
 max_turns: 30
 disallowed_tools: edit, write
 prompt_mode: append
-skills: source-code-research, lightpanda
+skills: source-driven-development, webclaw
 ---
 
 # Scout Agent

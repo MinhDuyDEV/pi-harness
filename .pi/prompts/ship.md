@@ -15,11 +15,11 @@ Execute PRD tasks, verify each passes, run review, close the bead.
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
+skill({ name: "memory-system" });
 skill({ name: "behavioral-kernel" });
-skill({ name: "workspace-setup" });
+skill({ name: "using-git-worktrees" });
 skill({ name: "verification-before-completion" });
-skill({ name: "reflection-checkpoints" }); // Mid-point + completion checks during execution
+skill({ name: "development-lifecycle" }); // Mid-point + completion checks during execution
 ```
 
 ## Determine Input Type
@@ -34,7 +34,7 @@ skill({ name: "reflection-checkpoints" }); // Mid-point + completion checks duri
 
 - **Be certain**: Only ship if all tasks pass verification
 - **Don't skip gates**: Build, test, lint, typecheck are non-negotiable
-- **Run the review**: Always spawn review agent before closing
+- **Run the review**: Always spawn a reviewer agent before closing
 - **Verify goals**: Tasks completing ≠ goals achieved (use goal-backward verification)
 - **Commit before close**: Per-task commits required, don't ship without git history
 - **Ask before closing**: Never close bead without user confirmation
@@ -47,14 +47,14 @@ skill({ name: "reflection-checkpoints" }); // Mid-point + completion checks duri
 | `explore`            | Finding patterns in codebase, prior art   |
 | `scout`              | External research, best practices         |
 | `lsp`                | Finding symbol definitions, references    |
-| `tilth_tilth_search` | Finding code patterns                     |
-| `task`               | Spawning subagents for parallel execution |
+| `tilth_search`       | Finding code patterns                     |
+| `Agent`              | Spawning subagents for parallel execution |
 
 ## Phase 1: Guards
 
 ### Memory Grounding
 
-Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: failed approaches to avoid repeating.
+Follow the `memory-system` skill protocol. Focus on failed approaches to avoid repeating.
 
 ### Bead Validation
 
@@ -96,7 +96,7 @@ Then ask about workspace:
 
 ### Workspace Setup
 
-Follow the [workspace-setup](../skill/workspace-setup/SKILL.md) skill protocol.
+Follow the `using-git-worktrees` skill protocol when you need an isolated workspace.
 
 **If bead is already `in_progress`:** Skip this phase entirely.
 
@@ -104,19 +104,19 @@ Follow the [workspace-setup](../skill/workspace-setup/SKILL.md) skill protocol.
 
 | Artifact exists | Action                                                   |
 | --------------- | -------------------------------------------------------- |
-| `plan.md`       | Load `executing-plans` skill, follow its batch process   |
+| `plan.md`       | Load `subagent-driven-development`, follow its batch process |
 | `prd.json`      | Proceed to PRD task loop below                           |
-| Only `prd.md`   | Load `prd-task` skill to create `prd.json`, then proceed |
+| Only `prd.md`   | Use the `beads` skill to create `prd.json`, then proceed |
 
 ## Phase 3: Wave-Based Execution
 
 If `plan.md` exists with dependency graph:
 
-1. **Load skill:** `skill({ name: "executing-plans" })`
+1. **Load skill:** `skill({ name: "subagent-driven-development" })`
 2. **Parse waves** from dependency graph section
 3. **Execute wave-by-wave:**
    - Single-task wave → execute directly (no subagent overhead)
-   - Multi-task wave → dispatch parallel `task({ subagent_type: "worker" })` subagents, one per task
+   - Multi-task wave → dispatch parallel worker subagents with the `Agent` tool, one per task
 4. **Review after each wave** — run verification gates, report, wait for feedback
 5. **Continue** until all waves complete
 
@@ -203,8 +203,8 @@ After each task completes (verification passed):
 1. **Check modified files:** `git status --short`
 2. **Stage individually** (NEVER `git add .`):
    ```bash
-   git add src/specific/file.ts
-   git add tests/file.test.ts
+   git add src/auth/login.ts
+   git add src/auth/login.test.ts
    ```
 3. **Commit with type prefix:**
 
@@ -235,7 +235,7 @@ After each task completes (verification passed):
 
 ## Phase 4: Verification
 
-Follow the [Verification Protocol](../skill/verification-before-completion/references/VERIFICATION_PROTOCOL.md):
+Follow the `verification-before-completion` skill protocol in full mode:
 
 - Use **full mode** (shipping requires all gates)
 - All 4 gates must pass before proceeding to commit/push
@@ -246,7 +246,7 @@ Follow the [Verification Protocol](../skill/verification-before-completion/refer
 Load and run the review skill:
 
 ```typescript
-skill({ name: "requesting-code-review" });
+skill({ name: "code-review-and-quality" });
 ```
 
 Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
@@ -280,8 +280,8 @@ Verify that tasks completed ≠ goals achieved:
 
 | Level              | Check                  | Command/Action                                                    |
 | ------------------ | ---------------------- | ----------------------------------------------------------------- |
-| **1: Exists**      | File is present        | `ls path/to/file.ts`                                              |
-| **2: Substantive** | Not a stub/placeholder | `grep -v "TODO\|FIXME\|return null\|placeholder" path/to/file.ts` |
+| **1: Exists**      | File is present        | `ls src/auth/login.ts`                                              |
+| **2: Substantive** | Not a stub/placeholder | `grep -v "TODO\|FIXME\|return null\|placeholder" src/auth/login.ts` |
 | **3: Wired**       | Connected and used     | `grep -r "import.*ComponentName" src/`                            |
 
 **Key Link Verification:**
@@ -324,7 +324,7 @@ Do not claim the bead is ready to close unless this report contains fresh verifi
 Ask user before closing:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Close",
@@ -333,6 +333,7 @@ question({
         { label: "Yes, close it (Recommended)", description: "All checks passed" },
         { label: "No, keep open", description: "Need more work" },
       ],
+      multiSelect: false,
     },
   ],
 });

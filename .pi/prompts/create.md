@@ -15,10 +15,10 @@ Create a bead, write its specification (PRD), claim it, set up the workspace, an
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
-skill({ name: "workspace-setup" });
-skill({ name: "prd" }); // PRD template guidance
-skill({ name: "prd-task" }); // PRD → executable tasks (Phase 8)
+skill({ name: "memory-system" });
+skill({ name: "using-git-worktrees" });
+skill({ name: "spec-driven-development" }); // PRD/spec guidance
+skill({ name: "beads" }); // PRD → executable tasks (Phase 8)
 ```
 
 ## Parse Arguments
@@ -58,7 +58,7 @@ skill({ name: "prd-task" }); // PRD → executable tasks (Phase 8)
 
 ### Memory Search
 
-Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: duplicate bead detection, prior decisions.
+Follow the `memory-system` skill protocol. Focus on duplicate bead detection and prior decisions.
 
 ### Bead List Check
 
@@ -82,7 +82,7 @@ If `--type` was provided, use it directly. Otherwise, suggest a type based on th
 Ask user before spawning agents:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Research Depth",
@@ -105,6 +105,7 @@ question({
           description: "I know the codebase, use existing knowledge",
         },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -175,14 +176,14 @@ For simple, well-scoped work (bugs, small tasks):
 [1-2 sentences: what to do]
 
 ## Affected Files
-- `src/path/to/file.ts`
+- `src/auth/login.ts`
 
 ## Tasks
-- [ ] [Task description] → Verify: `[command]`
+- [ ] Add input validation in `src/auth/login.ts` → Verify: `npm run lint && npm run typecheck`
 
 ## Success Criteria
-- Verify: `npm run typecheck && npm run lint`
-- Verify: `[specific test or check]`
+- Verify: `npm run lint && npm run typecheck`
+- Verify: `npm run test -- login`
 ```
 
 ### Full PRD Format
@@ -213,7 +214,7 @@ Copy and fill the PRD template (lite or full) using context from Phase 4.
 
 ### Task Format
 
-Tasks must follow the `prd-task` skill format:
+Tasks must follow the Beads PRD task format:
 
 - Title with `[category]` tag
 - One-sentence **end state** description (not step-by-step)
@@ -260,7 +261,7 @@ br update $BEAD_ID --status in_progress
 
 ### Workspace Setup
 
-Follow the [workspace-setup](../skill/workspace-setup/SKILL.md) skill protocol.
+Follow the `using-git-worktrees` skill protocol when you need an isolated workspace.
 
 Additionally offer a "Create worktree" option:
 
@@ -270,7 +271,7 @@ skill({ name: "using-git-worktrees" });
 
 ## Phase 10: Convert PRD to Tasks
 
-Use `prd-task` skill to convert PRD markdown → executable JSON (`prd.json`).
+Use the `beads` skill to convert PRD markdown → executable JSON (`prd.json`).
 
 ## Phase 11: Report
 

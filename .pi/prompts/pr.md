@@ -9,8 +9,8 @@ argument-hint: "[bead-id] [--draft]"
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
-skill({ name: "verification-gates" });
+skill({ name: "memory-system" });
+skill({ name: "code-review-and-quality" });
 skill({ name: "verification-before-completion" });
 ```
 
@@ -29,7 +29,7 @@ git status --porcelain
 
 If uncommitted changes exist, ask whether to commit first.
 
-Follow the [verification-gates](../skill/verification-gates/SKILL.md) skill protocol. All gates must pass before creating the PR.
+Follow the `verification-before-completion` and `code-review-and-quality` skill protocols. All gates must pass before creating the PR.
 
 Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
 
@@ -39,7 +39,7 @@ If any gate fails, stop. Fix errors first, then run `/pr` again.
 
 ### Memory Grounding
 
-Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Include relevant findings in the PR description.
+Follow the `memory-system` skill protocol. Include relevant findings in the PR description.
 
 ### Git Context
 
@@ -66,7 +66,7 @@ This is the last gate before code hits GitHub. Run it every time.
 Load the review skill:
 
 ```typescript
-skill({ name: "requesting-code-review" });
+skill({ name: "code-review-and-quality" });
 ```
 
 Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
@@ -92,7 +92,7 @@ After fixing issues, re-run verification gates from Phase 1 if code was changed.
 Show what will be pushed and ask the user:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Push",
@@ -102,6 +102,7 @@ question({
         { label: "Push & draft PR", description: "Create as draft for review" },
         { label: "Show diff first", description: "Review changes before pushing" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -126,8 +127,8 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 
 ## Changes
 
-- `file.ts`: [what changed]
-- `other.ts`: [what changed]
+- `src/auth/login.ts`: [what changed]
+- `src/auth/session.ts`: [what changed]
 
 ## Testing
 

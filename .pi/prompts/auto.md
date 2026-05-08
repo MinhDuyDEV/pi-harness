@@ -21,10 +21,10 @@ This command is intentionally opinionated:
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "prd" });
-skill({ name: "writing-plans" });
+skill({ name: "spec-driven-development" });
+skill({ name: "planning-and-task-breakdown" });
 skill({ name: "verification-before-completion" });
-skill({ name: "requesting-code-review" });
+skill({ name: "code-review-and-quality" });
 ```
 
 ## Parse Arguments
@@ -104,8 +104,8 @@ Run `/plan` phase structure internally with defaults.
 ### 2.1 Institutional research (mandatory)
 
 ```typescript
-memory_search({ query: "$ARGUMENTS", limit: 5 });
-memory_search({ query: "$BEAD_ID", type: "all", limit: 10 });
+memory-search({ query: "$ARGUMENTS", limit: 5 });
+memory-search({ query: "$BEAD_ID", type: "all", limit: 10 });
 ```
 
 ```bash
@@ -187,7 +187,7 @@ Run full gates automatically (project-aware commands):
 Then run structured review equivalent to `/ship` Phase 6:
 
 ```typescript
-skill({ name: "requesting-code-review" });
+skill({ name: "code-review-and-quality" });
 ```
 
 ```bash
@@ -197,7 +197,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 
 Review protocol (mandatory):
 
-- run **5 parallel review agents** covering:
+- run **5 parallel reviewer agents** covering:
   1. security + correctness
   2. performance + architecture
   3. type-safety + tests

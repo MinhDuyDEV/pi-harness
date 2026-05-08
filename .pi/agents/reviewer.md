@@ -82,8 +82,8 @@ A task "create chat component" can be marked complete when the component is a pl
 
 | Level           | Check                                     | How                                          |
 | --------------- | ----------------------------------------- | -------------------------------------------- |
-| **Exists**      | File is present at expected path          | `ls path/to/file.ts`                         |
-| **Substantive** | Contains actual implementation, not stubs | `grep -n "TODO\|FIXME\|return null" file.ts` |
+| **Exists**      | File is present at expected path          | `ls src/auth/login.ts`                         |
+| **Substantive** | Contains actual implementation, not stubs | `grep -n "TODO\|FIXME\|return null" src/auth/login.ts` |
 | **Wired**       | Connected and used by other code          | `grep -r "import.*ComponentName" src/`       |
 
 ### Artifact Status Matrix
@@ -181,7 +181,7 @@ If caller requests a strict schema:
     {
       "title": "...",
       "priority": "P1",
-      "evidence": "path/to/file.ts:42",
+      "evidence": "src/auth/login.ts:42",
       "impact": "...",
       "confidence": 0.82
     }

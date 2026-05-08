@@ -30,8 +30,8 @@ skill({ name: "verification-before-completion" });
 Take stock of current memory state:
 
 ```typescript
-memory_admin({ operation: "status" });
-memory_admin({ operation: "capture-stats" });
+memory-admin({ operation: "status" });
+memory-admin({ operation: "capture-stats" });
 ```
 
 Report:
@@ -53,12 +53,12 @@ Analyze observations to extract semantic domains — groups of related knowledge
 
 ```typescript
 // Get memory status for inventory
-memory_admin({ operation: "status" });
+memory-admin({ operation: "status" });
 
 // Search by common concept categories to build domain map
 const domains = [];
 for (const concept of ["build", "test", "memory", "git", "agent", "auth", "ui", "config"]) {
-  const results = memory_search({ query: concept, limit: 20 });
+  const results = memory-search({ query: concept, limit: 20 });
   // Group results by concept affinity
 }
 ```
@@ -84,7 +84,7 @@ Categorize observations into domains based on their `concepts` and `title` field
 ### 3a. Exact Duplicates
 
 ```typescript
-memory_admin({ operation: "lint" });
+memory-admin({ operation: "lint" });
 ```
 
 Flag observations with identical or near-identical titles and narratives. Present for merge:
@@ -150,16 +150,17 @@ Compile all findings into a review table:
 ```
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
-      header: "Curation Plan",
+      header: "Curate",
       question: "Review the curation plan. Proceed with all actions?",
       options: [
         { label: "Execute all (Recommended)", description: "Apply all actions above" },
         { label: "Let me cherry-pick", description: "I'll approve individually" },
         { label: "Skip curation", description: "No changes to memory" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -173,8 +174,8 @@ For each approved action:
 
 ```typescript
 // Read both observations
-const older = memory_get({ ids: "<older-id>" });
-const newer = memory_get({ ids: "<newer-id>" });
+const older = memory-get({ ids: "<older-id>" });
+const newer = memory-get({ ids: "<newer-id>" });
 
 // Union-merge: combine comma-separated lists, deduplicate (case-insensitive), existing items first
 // Example: older.facts="auth, jwt" + newer.facts="jwt, session" → "auth, jwt, session"
@@ -213,16 +214,17 @@ Which is the current truth?
 ```
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
-      header: "Resolve Conflict",
+      header: "Resolve",
       question: "Which observation reflects the current codebase reality?",
       options: [
         { label: "#5 (older) is correct", description: "Archive #29, keep #5" },
         { label: "#29 (newer) is correct", description: "Supersede #5 with #29" },
         { label: "Both partially correct", description: "I'll write a reconciled version" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -255,8 +257,8 @@ observation({
 After curation, regenerate the knowledge index:
 
 ```typescript
-memory_admin({ operation: "compile" });
-memory_admin({ operation: "index" });
+memory-admin({ operation: "compile" });
+memory-admin({ operation: "index" });
 ```
 
 ## Phase 7: Report
@@ -292,7 +294,7 @@ Don't force curation. Quality memory means less curation needed.
 
 | Need                    | Command                        |
 | ----------------------- | ------------------------------ |
-| Extract learnings first | `/compound`                    |
-| Full chain              | `/lfg`                         |
-| Check memory health     | `/health`                      |
-| Search memory           | Use `memory-search()` directly |
+| Extract learnings first | `/compound`                               |
+| Full chain              | `/lfg`                                    |
+| Check memory status     | Use `memory-admin({ operation: "status" })` |
+| Search memory           | Use `memory-search()` directly            |

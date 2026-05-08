@@ -1,7 +1,7 @@
 {
   "defaultProvider": "github-copilot",
-  "defaultModel": "gpt-5.4",
-  "defaultThinkingLevel": "medium",
+  "defaultModel": "gpt-5.3-codex",
+  "defaultThinkingLevel": "high",
   "theme": "catppuccin",
   "editorPaddingX": 1,
   "images": {
@@ -49,7 +49,7 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.73.0",
+  "lastChangelogVersion": "0.74.0",
   "treeFilterMode": "default",
   "transport": "sse",
   "hideThinkingBlock": false,

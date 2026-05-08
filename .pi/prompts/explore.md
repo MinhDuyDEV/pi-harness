@@ -18,7 +18,7 @@ Think through an idea, problem, or approach with structured alternatives and tra
 
 ```typescript
 skill({ name: "brainstorming" }); // Collaborative refinement
-skill({ name: "memory-grounding" }); // Load past decisions
+skill({ name: "memory-system" }); // Load past decisions
 ```
 
 ## Phase 1: Ground
@@ -26,7 +26,7 @@ skill({ name: "memory-grounding" }); // Load past decisions
 Search for prior art and past decisions:
 
 ```typescript
-memory_search({ query: "<topic keywords>", limit: 5 });
+memory-search({ query: "<topic keywords>", limit: 5 });
 ```
 
 ```bash
@@ -37,7 +37,7 @@ git log --oneline -20 | grep -i "<keyword>"
 Spawn an explore agent to understand the current state:
 
 ```typescript
-task({
+Agent({
   subagent_type: "explore",
   description: "Map existing patterns for this area",
   prompt: `Search the codebase for existing implementations, patterns, and conventions related to: $ARGUMENTS
@@ -142,7 +142,7 @@ Write the proposal as a structured document:
 Present the proposal and ask:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Approach",
@@ -153,13 +153,14 @@ question({
         { label: "Option C", description: "[brief]" },
         { label: "None — need more research", description: "Spawn scout agents" },
       ],
+      multiSelect: false,
     },
   ],
 });
 ```
 
 If user picks an approach → suggest `/create "[description]"` with the chosen approach baked in.
-If user wants more research → spawn `@scout` for the specific unknowns.
+If user wants more research → spawn a `scout` agent for the specific unknowns.
 
 ## Related Commands
 

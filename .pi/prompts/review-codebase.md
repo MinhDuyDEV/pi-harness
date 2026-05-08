@@ -10,8 +10,8 @@ agentType: reviewer
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "requesting-code-review" });
-skill({ name: "verification-gates" });
+skill({ name: "code-review-and-quality" });
+skill({ name: "verification-before-completion" });
 ```
 
 ## Determine Input Type
@@ -19,7 +19,7 @@ skill({ name: "verification-gates" });
 | Input Type            | Detection                    | Action                     |
 | --------------------- | ---------------------------- | -------------------------- |
 | No arguments          | Default                      | Review uncommitted changes |
-| Commit hash (40-char) | SHA pattern                  | `git show <hash>`          |
+| Commit hash (40-char) | SHA pattern                  | `git show a1b2c3d4`        |
 | Branch name           | String, not matching above   | `git diff main...HEAD`     |
 | PR URL/number         | Contains "github.com" or "#" | `gh pr diff`               |
 
@@ -38,7 +38,7 @@ skill({ name: "verification-gates" });
 | `explore`            | Finding patterns in codebase, prior art |
 | `scout`              | External research, best practices       |
 | `lsp`                | Finding symbol definitions, references  |
-| `tilth_tilth_search` | Finding code patterns                   |
+| `tilth_search`       | Finding code patterns                   |
 | `codesearch`         | Real-world usage examples               |
 
 ## Phase 1: Gather Context
@@ -69,7 +69,7 @@ If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
 
 ## Phase 3: Automated Checks
 
-Follow the [verification-gates](../skill/verification-gates/SKILL.md) skill protocol.
+Follow the `verification-before-completion` skill protocol.
 
 Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
 

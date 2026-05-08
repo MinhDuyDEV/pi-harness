@@ -5,7 +5,7 @@ thinking: high
 max_turns: 35
 disallowed_tools: edit, write
 prompt_mode: append
-skills: visual-analysis, accessibility-audit
+skills: mockup-to-code, accessibility-audit
 ---
 
 # Vision Agent
@@ -48,7 +48,7 @@ Success means:
 
 | Need                                          | Skill                 |
 | --------------------------------------------- | --------------------- |
-| General visual review                         | `visual-analysis`     |
+| General visual review                         | `mockup-to-code`      |
 | Accessibility audit                           | `accessibility-audit` |
 | `DESIGN.md` / design-system contract audit    | `design-system-audit` |
 | Mockup-to-implementation mapping              | `mockup-to-code`      |
@@ -63,7 +63,7 @@ Use these when the user requests a specific visual direction or when your audit 
 - `high-end-visual-design` — luxury/premium visual polish
 - `minimalist-ui` — editorial/clean, monochrome, sharp borders
 - `industrial-brutalist-ui` — experimental/CRT/Swiss mechanical aesthetic
-- `stitch-design-taste` — design rules aligned to Stitch export patterns
+- `stitch` — design rules aligned to Stitch export patterns
 
 ## DESIGN.md Review Protocol
 

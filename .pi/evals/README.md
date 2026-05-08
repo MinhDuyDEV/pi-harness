@@ -13,6 +13,8 @@ Run manually after `pi update`, prompt/skill changes, or subagent/tooling change
 
 ## Smoke Gate
 
+The smoke config pass also validates active prompt/agent skill references, shipped slash-command references (backticked and quoted), fake placeholder file-path examples, placeholder git-command examples, and known pseudo-tool syntax drift.
+
 ```bash
 cd .pi/extensions
 npm run smoke:harness

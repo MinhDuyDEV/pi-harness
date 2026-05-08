@@ -12,7 +12,7 @@ Reduce ambiguity before planning or implementation. Use this when the request is
 ```typescript
 skill({ name: "beads" });
 skill({ name: "brainstorming" });
-skill({ name: "source-code-research" });
+skill({ name: "source-driven-development" });
 ```
 
 ## Parse Arguments

@@ -15,9 +15,9 @@ Refine a bead's PRD during active implementation. Two-phase process: define what
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
-skill({ name: "prd" });
-skill({ name: "prd-task" });
+skill({ name: "memory-system" });
+skill({ name: "spec-driven-development" });
+skill({ name: "beads" });
 ```
 
 ## Parse Arguments
@@ -64,7 +64,7 @@ If `--scope` was not provided, determine the change type:
 Ask user to confirm:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Change Type",
@@ -74,6 +74,7 @@ question({
         { label: "Reduce", description: "Removing scope — dropping unnecessary work" },
         { label: "Pivot", description: "Changing approach — different solution path" },
       ],
+      multiSelect: false,
     },
   ],
 });
@@ -86,12 +87,17 @@ question({
 If `--reason` was not provided, ask:
 
 ```typescript
-question({
+ask_user_question({
   questions: [
     {
       header: "Reason",
-      question: "What triggered this change? (Be specific — this goes into the PRD changelog)",
-      options: [],
+      question: "What best describes what triggered this change? Use Other in the UI if none fit, and include specifics in free text.",
+      options: [
+        { label: "Technical constraint", description: "Implementation discovery changed the plan" },
+        { label: "User request", description: "Scope or priorities changed" },
+        { label: "External dependency", description: "API, library, or system constraint changed" },
+      ],
+      multiSelect: false,
     },
   ],
 });
@@ -140,13 +146,13 @@ Write a change record to `.beads/artifacts/$ARGUMENTS/iterations.md`:
 1. Add new sections/requirements to `prd.md`
 2. Add new tasks at the end of the Tasks section
 3. Mark new tasks with `depends_on` referencing completed tasks if needed
-4. Re-run `prd-task` skill to regenerate `prd.json` with merged task state
+4. Re-run the `beads` skill workflow to regenerate `prd.json` with merged task state
 
 ### For Reduce:
 
 1. Move removed scope items to "Out-of-Scope" in `prd.md` with note: `[Removed in Iteration N: reason]`
-2. Mark affected tasks by changing their heading from `### Task Title [category]` to `### ~~Task Title~~ [OBSOLETE — Iteration N]` in `prd.md` (don't delete — preserve history). The `prd-task` skill skips headings containing `OBSOLETE` or `INVALIDATED` markers.
-3. Re-run `prd-task` to regenerate `prd.json` (obsolete tasks excluded)
+2. Mark affected tasks by changing their heading from `### Task Title [category]` to `### ~~Task Title~~ [OBSOLETE — Iteration N]` in `prd.md` (don't delete — preserve history). The Beads PRD-to-task workflow skips headings containing `OBSOLETE` or `INVALIDATED` markers.
+3. Re-run the Beads PRD-to-task workflow to regenerate `prd.json` (obsolete tasks excluded)
 
 ### For Pivot:
 
@@ -154,7 +160,7 @@ Write a change record to `.beads/artifacts/$ARGUMENTS/iterations.md`:
 2. Rewrite affected sections (Proposed Solution, Requirements, Tasks)
 3. Preserve completed tasks that are still valid
 4. Mark invalidated completed tasks by changing their heading to `### ~~Task Title~~ [INVALIDATED — Iteration N: reason]`
-5. Re-run `prd-task` to regenerate `prd.json`
+5. Re-run the Beads PRD-to-task workflow to regenerate `prd.json`
 
 ### Update plan.md (if exists):
 

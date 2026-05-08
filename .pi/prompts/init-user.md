@@ -93,9 +93,9 @@ observation({
 });
 ```
 
-## Phase 3: Update opencode.json
+## Phase 3: Update `.pi/settings.json`
 
-Ensure `user.md` is loaded in `instructions` (bare paths, no `file://` prefix).
+Ensure `user.md` is loaded in `.pi/settings.json` `instructions` (bare paths, no `file://` prefix).
 
 The default `instructions[]` includes 4 auto-injected files:
 

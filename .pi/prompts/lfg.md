@@ -47,7 +47,7 @@ Plan: [create new / use existing]
 Load and execute the `/plan` command for this bead:
 
 ```typescript
-skill({ name: "writing-plans" });
+skill({ name: "planning-and-task-breakdown" });
 // Run full /plan flow including Phase 0 institutional research
 // Output: .beads/artifacts/$BEAD_ID/plan.md
 ```
@@ -59,13 +59,13 @@ Checkpoint if plan has major unknowns or architecture questions. Otherwise proce
 Execute the plan:
 
 ```typescript
-skill({ name: "executing-plans" });
-skill({ name: "reflection-checkpoints" }); // Phase transition + mid-point checks
+skill({ name: "subagent-driven-development" });
+skill({ name: "development-lifecycle" }); // Phase transition + mid-point checks
 // Load plan.md, execute wave-by-wave
 // Per-task commits after each task passes verification
 ```
 
-Follow the [Verification Protocol](../skill/verification-before-completion/references/VERIFICATION_PROTOCOL.md):
+Follow the `verification-before-completion` skill protocol:
 
 - Use **full mode** for final verification
 - Use **incremental mode** between implementation waves
@@ -82,7 +82,7 @@ HEAD_SHA=$(git rev-parse HEAD)
 Load and run the review skill:
 
 ```typescript
-skill({ name: "requesting-code-review" });
+skill({ name: "code-review-and-quality" });
 ```
 
 Dispatch 5 specialized agents in parallel.
@@ -154,7 +154,7 @@ Load and run the compound command:
 For large plans with 6+ independent tasks, run Work step in swarm mode:
 
 ```typescript
-skill({ name: "swarm-coordination" });
+skill({ name: "agent-teams" });
 // Dispatch parallel worker agents per wave
 // Leader monitors and synthesizes
 ```

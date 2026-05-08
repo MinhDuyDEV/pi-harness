@@ -11,7 +11,7 @@ Pick up where a previous session left off. Recover context, verify state, contin
 
 ```typescript
 skill({ name: "beads" });
-skill({ name: "memory-grounding" });
+skill({ name: "memory-system" });
 ```
 
 ## Phase 1: Verify Task
@@ -33,7 +33,7 @@ If not on the right branch, check out the feature branch. If uncommitted changes
 
 ## Phase 3: Find Handoff
 
-Follow the [memory-grounding](../skill/memory-grounding/SKILL.md) skill protocol. Focus on: handoff file by bead ID, session history.
+Follow the `memory-system` skill protocol. Focus on handoff files by bead ID and session history.
 
 If a handoff exists, it tells you:
 

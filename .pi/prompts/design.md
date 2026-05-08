@@ -32,9 +32,9 @@ skill({ name: "frontend-design" }); // Design system guidance, anti-patterns, re
 ## Phase 1: Detect Existing Design System
 
 ```typescript
-tilth_tilth_files({ pattern: "**/tailwind.config.{js,ts,mjs}" });
-tilth_tilth_files({ pattern: "**/globals.css" });
-tilth_tilth_files({ pattern: "**/components.json" }); // shadcn
+tilth_files({ pattern: "**/tailwind.config.{js,ts,mjs}" });
+tilth_files({ pattern: "**/globals.css" });
+tilth_files({ pattern: "**/components.json" }); // shadcn
 ```
 
 Read what exists. Don't design in a vacuum — build on the project's current system.
@@ -44,8 +44,8 @@ Read what exists. Don't design in a vacuum — build on the project's current sy
 ## Phase 2: Check Memory
 
 ```typescript
-memory_search({ query: "[topic] design UI", limit: 3 });
-memory_search({ query: "design system colors typography", limit: 3 });
+memory-search({ query: "[topic] design UI", limit: 3 });
+memory-search({ query: "design system colors typography", limit: 3 });
 ```
 
 Reuse existing aesthetic decisions. Don't contradict previous design choices unless the user asks.
