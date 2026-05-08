@@ -97,6 +97,24 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
 - Include effort signal when proposing work: **S** (<1h), **M** (1-3h), **L** (1-2d), **XL** (>2d)
 - Stop when "good enough"; note what signal would justify revisiting
 
+### Code Quality Standard
+
+A change is high quality when it solves the requested problem with the smallest clear, verified, maintainable diff.
+
+Required:
+
+- Correct behavior for the stated requirement and relevant edge cases
+- Minimal scope: no speculative abstractions, drive-by refactors, or unrelated cleanup
+- Readable structure and names; comments explain why, not obvious what
+- Reuse existing patterns, helpers, and components before creating new ones
+- One home per concept; no duplicated utilities or wrapper-only files
+- Meaningful tests when behavior changes; tests must fail if the behavior breaks
+- Fresh verification evidence before claiming completion
+- No regressions to security, reliability, performance, accessibility, or developer workflow
+- Documentation or changelog updates when user-facing behavior, commands, APIs, or release process changes
+
+Reject changes that worsen overall code health even if they appear to work. Coverage, scanners, and metrics are diagnostics, not proof of quality.
+
 ### GPT-5 Prompting Mode
 
 For GPT-5.x agents, keep prompts outcome-first and compact:

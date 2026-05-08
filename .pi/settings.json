@@ -1,6 +1,6 @@
 {
-  "defaultProvider": "github-copilot",
-  "defaultModel": "gpt-5.3-codex",
+  "defaultProvider": "ktv",
+  "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "high",
   "theme": "catppuccin",
   "editorPaddingX": 1,
