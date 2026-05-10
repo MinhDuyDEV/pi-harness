@@ -87,7 +87,7 @@ Higher-ranked sources win on conflicts.
    | Extract page links                    | `lightpanda_links` (all URLs)                                 |
    | Page metadata/SEO                     | `lightpanda_structuredData`                                   |
    | Package source code                   | `source-code-research` skill                                  |
-   | Codebase patterns                     | `tilth_search`                                                |
+   | Codebase patterns                     | `srcwalk_search`                                                |
 
 3. In pi-search v0.2.2 workflows, use `websearch` / `codesearch` to find candidate links, then `web_fetch` to read the chosen URL.
 4. Prefer `webclaw_scrape` over browser tools for direct URL reads when `web_fetch` is blocked/protected; use `lightpanda_*` only if JavaScript rendering or interaction is required.

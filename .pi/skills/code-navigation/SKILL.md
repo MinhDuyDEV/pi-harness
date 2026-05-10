@@ -26,11 +26,11 @@ tools: []
 
 > Collapse multiple tool calls into fewer, smarter ones. Every unnecessary read or search wastes tokens and turns.
 
-## Choose The Right Navigation Layer
+## Choose The Right Navigation Tool
 
-- Use the `tilth` skill when you want project-stable Pi tools: `tilth_search`, `tilth_read`, `tilth_files`, `tilth_deps`
-- Use the `srcwalk` skill when you need native CLI-only commands such as `srcwalk map`, `srcwalk callees`, `srcwalk flow`, `srcwalk impact`, or `srcwalk guide`
-- Prefer `tilth` for existing project prompts and compatibility workflows; escalate to `srcwalk` for richer native analysis
+- Use `srcwalk_search`, `srcwalk_read`, `srcwalk_files`, `srcwalk_deps` for symbol search, file reading, glob finds, and blast-radius checks
+- Use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_flow`, `srcwalk_impact`, `srcwalk_map` for call graphs, orientation slices, impact triage, and repo maps — these are first-class Pi tools, no separate skill load needed
+- All tools are backed by the installed `srcwalk` binary via the `srcwalk.ts` extension
 
 ## Navigation Patterns
 
@@ -46,7 +46,7 @@ glob("*.ts") → read(file1) → "too big" → grep("functionName") → read(fil
 grep("functionName", path: "src/") → read(exact_file, offset: line-10, limit: 30)
 ```
 
-Start with search (`tilth_search` or grep fallback) to locate, then read only what you need.
+Start with search (`srcwalk_search` or grep fallback) to locate, then read only what you need.
 
 ### Pattern 2: Multi-Symbol Search
 
@@ -55,7 +55,7 @@ When tracing a call chain (A calls B calls C), search for all symbols together:
 grep({ pattern: "functionA|functionB|functionC", path: "src/" })
 ```
 
-Or use `tilth_search(kind: "callers")` plus expanded definitions to trace the call tree.
+Or use `srcwalk_callers` for structural caller detection, or `srcwalk_flow` for a combined callers+callees+resolves slice.
 
 ### Pattern 3: Don't Re-Read What You've Already Seen
 
@@ -72,8 +72,8 @@ If search results already show the code you need, work from that output. Only re
 **SKIP**: When adding new code, fixing internal bugs, or reading.
 
 Steps:
-1. `tilth_deps(path: "src/file.ts")` — find importers and downstream users
-2. `tilth_search(query: "symbolName", kind: "callers")` — find call sites
+1. `srcwalk_deps(path: "src/file.ts")` — find importers and downstream users
+2. `srcwalk_callers({ symbol: "symbolName", scope: "src" })` — find call sites with optional depth/filter
 3. Review each caller to assess impact
 4. Plan edits from leaf callers inward (furthest dependencies first)
 
@@ -81,13 +81,13 @@ Steps:
 
 When editing a file, search results from the same directory/package are more likely relevant. Pass context when available:
 - In grep: use `path: "src/same-module/"` to scope
-- In tilth: pass `context` param to boost nearby results
+- In srcwalk_search: pass `context` param to boost nearby results
 
 ### Pattern 6: Outline Before Deep Read
 
 For large files (>200 lines), get the structure first:
 ```
-tilth_read(path: "src/large-file.ts")
+srcwalk_read(path: "src/large-file.ts")
 ```
 
 This gives you structure and line ranges. Then read only the section you need.
@@ -98,26 +98,29 @@ This gives you structure and line ranges. Then read only the section you need.
 **Right**: Start from the entry point, follow function calls:
 
 ```
-1. `tilth_search(query: "entryPoint")` → find where it is defined
-2. Read expanded `── calls ──` output or use `tilth_search(kind: "callers")`
-3. `tilth_read(section: "line-range")` → follow the interesting callee
+1. `srcwalk_search(query: "entryPoint")` → find where it is defined
+2. `srcwalk_callees({ symbol: "entryPoint", scope: "src" })` or `srcwalk_flow` for call graph orientation
+3. `srcwalk_read(section: "line-range")` → drill into the interesting callee
 ```
 
-## With tilth MCP Or Srcwalk Backend
+## With Srcwalk Backend
 
-When the `tilth_*` compatibility tools are available, they provide superior navigation for existing project workflows:
+All navigation tools are native srcwalk_* tools. Available tools:
 
-| Built-in Tool | tilth Equivalent | Advantage |
+| Task | Tool | Notes |
 |---|---|---|
-| `grep` + `read` | `tilth_search` (expand: 2) | Returns definitions with inline source — no second read needed |
-| `glob` | `tilth_files` | Adds token estimates per file |
-| `read` (large file) | `tilth_read` | Auto-outlines large files, shows structure |
-| Manual caller grep | `tilth_search(kind: "callers")` | Cross-language structural caller detection |
-| Manual tracing | `tilth_deps` | Shows imports + downstream callers before breaking changes |
+| `grep` + `read` | `srcwalk_search(expand: 2)` | Returns definitions with inline source — no second read needed |
+| `glob` | `srcwalk_files` | Adds token estimates per file |
+| Large file read | `srcwalk_read` | Auto-outlines, shows structure |
+| Direct callers | `srcwalk_callers` | Structural call-site evidence |
+| Transitive callers | `srcwalk_callers(depth: N)` | Multi-hop BFS up to 5 |
+| Forward call graph | `srcwalk_callees(detailed: true)` | Ordered sites with arg slots |
+| Function orientation | `srcwalk_flow` | Callers + callees + resolves |
+| Import + dependents | `srcwalk_deps` | File-scoped import evidence + heuristic |
+| Heuristic triage | `srcwalk_impact` | Follow up with callers for proof |
+| Repo shape | `srcwalk_map` | Token budgets + directory skeleton |
 
-**IMPORTANT**: If `tilth_*` tools are available, prefer them over built-in grep/glob/read for code navigation inside existing project workflows. Their expanded search results often include full source — do NOT re-read files already shown in search output.
-
-If a task needs native srcwalk-only commands (`map`, `callees`, `flow`, `impact`, `guide`), load the `srcwalk` skill and use the installed CLI directly instead of trying to force that workflow through `tilth_*`.
+**IMPORTANT**: Prefer `srcwalk_*` tools over built-in grep/glob/read for code navigation. Their expanded search results often include full source — do NOT re-read files already shown in search output.
 
 ## Cost Awareness
 
@@ -134,6 +137,6 @@ Every tool call has a token cost. Efficient navigation means:
 |---|---|
 | Read entire large file | Use outline first, then section read |
 | Search → read same code again | Work from search results directly |
-| Trace calls one-by-one | Multi-symbol search or `tilth_search(kind: "callers")` |
+| Trace calls one-by-one | `srcwalk_callers` / `srcwalk_callees` or multi-symbol `srcwalk_search` |
 | Explore randomly | Start from entry point, follow calls |
 | Forget to check blast radius | Always check before signature changes |

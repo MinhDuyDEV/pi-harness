@@ -70,8 +70,8 @@ Execute clear, low-complexity coding tasks quickly (typically 1-3 files) and rep
 
 ## Workflow
 
-1. Read relevant files (prefer `tilth_search` over grep)
-2. If you need native srcwalk-only commands (`map`, `callees`, `flow`, `impact`, `guide`), load the `srcwalk` skill and use the installed CLI directly instead of stretching `tilth_*`
+1. Read relevant files (prefer `srcwalk_search` over grep)
+2. For call graphs and repo maps, use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_flow`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools
 3. Confirm scope is small and clear
 4. Make surgical edits
 5. Run validation (lint/typecheck/tests as applicable)

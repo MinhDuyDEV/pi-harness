@@ -236,9 +236,9 @@ observation(type: "learning", title: "Pattern for decomposing X-type features", 
 
 ## Workflow
 
-1. **Ground**: Read existing artifacts, check memory for prior work; use `tilth_search` and `tilth_files` for codebase overview
+1. **Ground**: Read existing artifacts, check memory for prior work; use `srcwalk_search` and `srcwalk_files` for codebase overview
 2. **Calibrate**: Understand goal, constraints, and success criteria
-3. **Transform**: Decompose into phases/tasks with explicit dependencies; use `tilth_search` for fast codebase discovery
+3. **Transform**: Decompose into phases/tasks with explicit dependencies; use `srcwalk_search` for fast codebase discovery
 4. If planning requires native srcwalk-only commands (`map`, `callees`, `flow`, `impact`, `guide`), load the `srcwalk` skill and use the installed CLI directly
 5. **Release**: Write plan with exact file paths, commands, verification steps
 6. **Reset**: Save to memory, recommend next action

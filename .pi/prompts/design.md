@@ -32,9 +32,9 @@ skill({ name: "frontend-design" }); // Design system guidance, anti-patterns, re
 ## Phase 1: Detect Existing Design System
 
 ```typescript
-tilth_files({ pattern: "**/tailwind.config.{js,ts,mjs}" });
-tilth_files({ pattern: "**/globals.css" });
-tilth_files({ pattern: "**/components.json" }); // shadcn
+srcwalk_files({ pattern: "**/tailwind.config.{js,ts,mjs}" });
+srcwalk_files({ pattern: "**/globals.css" });
+srcwalk_files({ pattern: "**/components.json" }); // shadcn
 ```
 
 Read what exists. Don't design in a vacuum — build on the project's current system.

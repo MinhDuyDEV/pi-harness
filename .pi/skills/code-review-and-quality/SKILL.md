@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [review, code-quality, verification]
 dependencies: [verification-before-completion]
 agent_types: [reviewer]
-tools: [tilth_search, tilth_deps, bash]
+tools: [srcwalk_search, srcwalk_deps, bash]
 ---
 
 # Code Review & Quality

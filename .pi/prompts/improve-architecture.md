@@ -31,7 +31,7 @@ From John Ousterhout's *A Philosophy of Software Design*:
 
 ## Phase 1: Explore
 
-Scan the target area systematically. Use `explore` subagent or `tilth_search` for each:
+Scan the target area systematically. Use `explore` subagent or `srcwalk_search` for each:
 
 1. **Module boundaries** — Where are the natural boundaries?
    - Look at import graphs: which files import from which?
@@ -129,7 +129,7 @@ After all sub-agents return:
    - Migration path from current code (which changes are breaking?)
    - Estimated effort
 
-3. **Check blast radius** with `tilth_deps` — how many files would change?
+3. **Check blast radius** with `srcwalk_deps` — how many files would change?
 
 ## Phase 5: Report
 

@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [workflow, planning, agent-coordination]
 dependencies: [spec-driven-development]
 agent_types: [planner]
-tools: [TaskCreate, TaskUpdate, memory, tilth_search]
+tools: [TaskCreate, TaskUpdate, memory, srcwalk_search]
 ---
 
 # Planning & Task Breakdown

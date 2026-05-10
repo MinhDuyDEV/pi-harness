@@ -25,7 +25,8 @@ const BASE_ENV_ALLOWLIST = [
 
 const POLICY_ENV_ALLOWLIST = {
 	stitch: ["STITCH_API_KEY", "STITCH_ACCESS_TOKEN", "GOOGLE_CLOUD_PROJECT"] as const,
-	tilth: ["NODE_OPTIONS", "npm_config_cache", "npm_config_userconfig"] as const,
+	// srcwalk is a compiled binary — no npm env vars needed; binary path resolved from PATH or PI_SRCWALK_BIN
+	srcwalk: [] as const,
 	webclaw: ["WEBCLAW_BIN", "WEBCLAW_API_KEY", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"] as const,
 } as const;
 

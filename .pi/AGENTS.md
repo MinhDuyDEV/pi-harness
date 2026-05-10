@@ -324,7 +324,7 @@ Follow the structured edit flow:
 
 - Large single files are a maintenance smell; split or extract helpers before ~500 LOC when practical
 - Prefer structured edits for medium and large files
-- Use the `structured-edit` / `tilth` skills when edits become failure-prone
+- Use the `structured-edit` / `srcwalk` skills when edits become failure-prone
 
 ---
 

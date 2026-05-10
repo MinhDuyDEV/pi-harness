@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [debugging, workflow, verification]
 dependencies: [test-driven-development, verification-before-completion]
 agent_types: [worker, reviewer]
-tools: [bash, tilth_search, tilth_deps]
+tools: [bash, srcwalk_search, srcwalk_deps]
 ---
 
 # Debugging & Error Recovery

@@ -1,6 +1,6 @@
 # Tilth Tool Reference
 
-## tilth_search
+## srcwalk_search
 
 Search for symbols, text, or regex patterns in code. Replaces grep/rg.
 
@@ -36,12 +36,12 @@ Search for symbols, text, or regex patterns in code. Replaces grep/rg.
 ### Multi-Symbol
 
 ```
-tilth_search(query: "ServeHTTP, HandlersChain, Next")
+srcwalk_search(query: "ServeHTTP, HandlersChain, Next")
 ```
 
 Each symbol gets separate result block. Expand budget shared — at least 1 per symbol.
 
-## tilth_read
+## srcwalk_read
 
 Read a file with smart outlining. Replaces cat/head/tail.
 
@@ -75,10 +75,10 @@ Read a file with smart outlining. Replaces cat/head/tail.
 
 **Section mode**:
 ```
-tilth_read(path: "src/auth.ts", section: "44-89")
+srcwalk_read(path: "src/auth.ts", section: "44-89")
 ```
 
-## tilth_files
+## srcwalk_files
 
 Find files matching a glob pattern. Replaces find/ls/pwd.
 
@@ -98,7 +98,7 @@ Find files matching a glob pattern. Replaces find/ls/pwd.
   ...
 ```
 
-## tilth_deps
+## srcwalk_deps
 
 Blast-radius check before breaking changes.
 

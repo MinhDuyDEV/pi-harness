@@ -97,7 +97,7 @@ Pi covers the upstream 20 core workflows. Name differences are intentional: `bra
 - `augment-context-engine`
 - `gemini-large-context`
 - `opensrc`
-- `tilth`
+- `srcwalk` (was: tilth)
 - `webclaw`
 
 ## Removed Redundant Skills

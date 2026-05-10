@@ -32,8 +32,8 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 - **Never modify files** — read-only is a hard constraint
 - Return absolute paths in final output
 - Cite `file:line` evidence for every finding
-- Prefer `tilth_search` (AST-aware) for quick symbol lookup
-- Escalate to the native `srcwalk` skill only when you need CLI-only commands not exposed by `tilth_*` (for example `srcwalk map`, `srcwalk flow`, `srcwalk impact`, or `srcwalk callees`)
+- Use `srcwalk_search` (AST-aware) for quick symbol lookup and definitions
+- Use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_flow`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools, no separate skill load needed
 - Stop when you can answer with concrete evidence — don't over-explore
 - Target ≤3 tool calls per symbol: search → read section → done
 - Bash is enabled **only** for read-only operations — do not use bash to modify files
@@ -42,24 +42,31 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 
 | Need                        | Best Tool                        |
 | --------------------------- | -------------------------------- |
-| Find symbol definitions     | `tilth_search` (fast, AST-aware) |
-| Cross-file symbol tracing  | `tilth_search` / `tilth_deps`    |
-| Find all references         | `tilth_search` (usages/callers)  |
-| Type info / doc comments    | `tilth_read` near definitions    |
-| Call chain analysis         | `tilth_search(kind: "callers")` |
-| File structure              | `tilth_files`                    |
-| Blast radius before changes | `tilth_deps`                     |
-| Broad text search           | `grep` (fallback)                |
+| Find symbol definitions       | `srcwalk_search` (fast, AST-aware)              |
+| Cross-file symbol tracing     | `srcwalk_search` / `srcwalk_deps`                 |
+| Find all references           | `srcwalk_search` (usages/callers)               |
+| Type info / doc comments      | `srcwalk_read` near definitions                 |
+| Direct callers                | `srcwalk_callers`                             |
+| Transitive callers (N hops)   | `srcwalk_callers(depth: N)`                   |
+| What function calls           | `srcwalk_callees`                             |
+| Ordered call sites + args     | `srcwalk_callees(detailed: true)`             |
+| Quick function orientation    | `srcwalk_flow`                                |
+| Heuristic impact triage       | `srcwalk_impact` (verify with callers)        |
+| Repo shape / token budget     | `srcwalk_map`                                 |
+| File structure by glob        | `srcwalk_files`                                 |
+| File blast radius             | `srcwalk_deps`                                  |
+| Broad text search             | `grep` (fallback)                             |
 
 ## Workflow
 
-1. `tilth_search` for symbol definitions and usages (one call replaces multiple grep→read cycles)
-2. `tilth_deps` for dependency analysis when needed
-3. `tilth_files` to discover file structure
-4. `tilth_read` only for sections not already shown in expanded search results
-5. Use `grep` only as a fallback for plain-text searches Tilth cannot answer
-6. If a task requires native srcwalk-only commands, load the `srcwalk` skill and use the installed CLI directly
-7. Return findings with next steps
+1. `srcwalk_search` for symbol definitions and usages (one call replaces multiple grep→read cycles)
+2. `srcwalk_callers` / `srcwalk_callees` for call graph tracing (prefer over `srcwalk_search(kind: "callers")` when depth or filters are needed)
+3. `srcwalk_map` for repo shape when starting a large exploration
+4. `srcwalk_deps` for dependency analysis
+5. `srcwalk_files` to discover file structure
+6. `srcwalk_read` only for sections not already shown in expanded search results
+7. Use `grep` only as a fallback for plain-text searches srcwalk cannot answer
+8. Return findings with next steps
 
 ## Thoroughness Levels
 

@@ -4,7 +4,7 @@ These skills were removed from the active inventory because their useful behavio
 
 | Removed skill | Canonical home |
 | --- | --- |
-| `code-search-patterns` | Merged into code-navigation and tilth/tilth-cli. |
+| `code-search-patterns` | Merged into code-navigation and srcwalk. |
 | `code-simplification` | Merged into code-cleanup. |
 | `compaction` | Merged into context-engineering. |
 | `context-initialization` | Merged into context-engineering. |
@@ -57,5 +57,5 @@ These skills were removed from the active inventory because their useful behavio
 | `skill-creator` | Merged into writing-skills as canonical skill-authoring workflow. |
 | `index-knowledge` | Merged into context-engineering and documentation-and-adrs as knowledge-base generation. |
 | `finishing-a-development-branch` | Merged into shipping-and-launch as branch completion/release handoff. |
-| `tilth-cli` | Merged into tilth as CLI/subagent mode. |
+| `tilth-cli` | Merged into srcwalk as CLI/subagent mode. |
 | `tool-priority` | Removed as a standalone core skill; tool choice is now covered by AGENTS.md policy plus code-navigation, source-driven-development, context-engineering, and tool-specific skills. |

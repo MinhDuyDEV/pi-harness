@@ -33,7 +33,6 @@ const ALLOWLIST: RegExp[] = [
 	/\bnpm\s+ci\b/,
 	/\bnpm\s+run\b/,
 	/\bnpm\s+test\b/,
-	/\bnpx\s+tilth\b/,
 	/\bnpx\s+tsc\b/,
 	/\bnpx\s+vitest\b/,
 	/\bnpx\s+jest\b/,

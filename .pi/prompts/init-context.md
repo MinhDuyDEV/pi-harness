@@ -43,11 +43,11 @@ const args = {
 
 ### 1.1 Check Existing Context
 
-Use tilth or Read to check for existing files:
+Use srcwalk_read or built-in read to check for existing files:
 
 ```typescript
-tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
-// Or: tilth_read({ path: ".pi/memory/project/project.md" });
+srcwalk_files({ pattern: "*.md", scope: ".pi/memory/project" });
+// Or: srcwalk_read({ path: ".pi/memory/project/project.md" });
 ```
 
 **If planning context exists:**
@@ -124,7 +124,7 @@ This file is auto-injected into every prompt. Keep it concise.
 **Load template:**
 
 ```typescript
-tilth_read({ path: ".pi/memory/_templates/project.md" });
+srcwalk_read({ path: ".pi/memory/_templates/project.md" });
 ```
 
 **Fill with gathered data:**
@@ -202,11 +202,11 @@ If `--brownfield` analysis was run:
 ### 4.1 Verify Documents Created
 
 ```typescript
-tilth_files({ pattern: "*.md", scope: ".pi/memory/project" });
+srcwalk_files({ pattern: "*.md", scope: ".pi/memory/project" });
 // Verify each file exists and has content
-tilth_read({ path: ".pi/memory/project/project.md" });
-tilth_read({ path: ".pi/memory/project/roadmap.md" });
-tilth_read({ path: ".pi/memory/project/state.md" });
+srcwalk_read({ path: ".pi/memory/project/project.md" });
+srcwalk_read({ path: ".pi/memory/project/roadmap.md" });
+srcwalk_read({ path: ".pi/memory/project/state.md" });
 ```
 
 **Check:**

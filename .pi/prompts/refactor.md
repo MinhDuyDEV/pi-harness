@@ -20,7 +20,7 @@ skill({ name: "code-cleanup" });
 
 - Read the target code thoroughly
 - Identify specific issues (duplication, complexity, naming, coupling)
-- Check blast radius with `tilth_deps` before changing exports/signatures
+- Check blast radius with `srcwalk_deps` before changing exports/signatures
 - Run existing tests to establish baseline
 
 ### Phase 2: Plan

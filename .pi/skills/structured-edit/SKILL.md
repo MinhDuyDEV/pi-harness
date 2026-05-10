@@ -54,19 +54,19 @@ The `str_replace` edit tool is the #1 source of failures in LLM coding. Models r
 
 ### Step 1: LOCATE
 
-Use Tilth/search tools to find exact positions instead of guessing:
+Use srcwalk/search tools to find exact positions instead of guessing:
 
 ```typescript
 // Find where a function is defined or used
-tilth_search({ query: "functionName", kind: "symbol" });
+srcwalk_search({ query: "functionName", kind: "symbol" });
 
-// Find callers or references to a symbol
-tilth_search({ query: "functionName", kind: "callers" });
+// Find callers of a symbol (with depth support)
+srcwalk_callers({ symbol: "functionName", scope: "src" });
 
 // Get structure for a large file
-tilth_read({ path: "src/large-file.ts" });
+srcwalk_read({ path: "src/large-file.ts" });
 
-// Fallback when Tilth cannot answer
+// Fallback when srcwalk cannot answer
 grep({ pattern: "functionName", path: "src/" });
 ```
 
@@ -162,8 +162,9 @@ oldString: "  // Calculate final value\n  const result = compute(input);\n  retu
 
 | Scenario                  | Approach              |
 | ------------------------- | --------------------- |
-| Finding function/class    | `tilth_search`        |
-| Finding all usages        | `tilth_search` / `tilth_deps` |
+| Finding function/class    | `srcwalk_search`                        |
+| Finding all usages        | `srcwalk_search` / `srcwalk_deps`         |
+| Finding callers           | `srcwalk_callers` (with depth/filter) |
 | Modifying specific symbol | Locate + structured edit |
 | Large refactoring         | Consider full rewrite |
 | Simple one-line change    | Direct edit OK        |
@@ -179,10 +180,10 @@ oldString: "  // Calculate final value\n  const result = compute(input);\n  retu
 ## Quick Reference
 
 ```
-LOCATE  → tilth_search / tilth_deps / grep fallback
-READ    → read({ filePath, offset: line-10, limit: 30 })
+LOCATE  → srcwalk_search / srcwalk_callers / srcwalk_deps / grep fallback
+READ    → srcwalk_read({ path: "file", section: "line-range" })  or  read()
 VERIFY  → Check expected content exists
-EDIT    → edit({ oldString: "...unique context...", newString: "..." })
+EDIT    → edit({ oldText: "...unique context...", newText: "..." })
 CONFIRM → read() again to verify success
 ```
 

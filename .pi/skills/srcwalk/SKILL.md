@@ -1,127 +1,180 @@
 ---
 name: srcwalk
-description: Use when navigating code with srcwalk’s native CLI-first workflow — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.
-version: 1.0.0
+compatible_srcwalk: ">=0.4.0"
+description: Use when navigating code with srcwalk — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.
+version: 2.1.0
 tags: [code-intelligence, search, cli, srcwalk]
 dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: [bash]
+agent_types: [planner, worker, reviewer, explorer]
+tools: [bash, srcwalk_search, srcwalk_read, srcwalk_files, srcwalk_deps, srcwalk_map, srcwalk_callers, srcwalk_callees, srcwalk_flow, srcwalk_impact]
 ---
 
-# Srcwalk — Native CLI Workflow
+# Srcwalk — Code Navigation
 
-Use this skill when you want the installed `srcwalk` binary directly, not just the project’s `tilth_*` compatibility tools.
+Srcwalk is the project's code navigation engine (v0.4.0+). All Pi tools are backed by the installed `srcwalk` binary.
 
-## When to Use
-
-- You need native srcwalk commands not exposed by the compatibility layer
-- You want repo maps via `srcwalk map`
-- You want downstream call tracing via `srcwalk callees`
-- You want quick orientation slices via `srcwalk flow`
-- You want heuristic blast-radius triage via `srcwalk impact`
-- You are validating actual srcwalk CLI behavior or flags
-
-## When NOT to Use
-
-- You only need the project’s stable `tilth_*` tool contract
-- You are following existing project prompts that already assume `tilth_search`, `tilth_read`, `tilth_files`, or `tilth_deps`
-- You only need a small known-file read that built-in `read` already handles well
-
-## Relationship to the Tilth Skill
-
-- `tilth` skill = project-local compatibility layer exposed as Pi tools (`tilth_search`, `tilth_read`, `tilth_files`, `tilth_deps`)
-- `srcwalk` skill = native direct CLI workflow through the installed `srcwalk` binary
-
-Use `tilth` when you need compatibility with existing prompts and tooling.
-Use `srcwalk` when you need native commands such as `map`, `callees`, `flow`, `impact`, `guide`, or `version`.
-
-## Critical Rules
-
-**Run `srcwalk guide` before non-trivial use.** It is the installed binary’s source of truth for routing and caveats.
-
-**Do not assume the `tilth_*` compatibility layer exposes all srcwalk commands.** It currently does not.
-
-**Prefer direct path configuration for repeatability.** In this repo the most reliable setup is:
-
-```sh
-export PI_CODE_NAV_BACKEND=srcwalk
-export PI_SRCWALK_BIN="$HOME/.cargo/bin/srcwalk"
-```
-
-## Setup Checks
-
-Use the configured binary when available:
-
-```sh
-"${PI_SRCWALK_BIN:-srcwalk}" --help
-"${PI_SRCWALK_BIN:-srcwalk}" guide
-```
-
-If the binary path is wrong, fix `PI_SRCWALK_BIN` or ensure `srcwalk` is on `PATH`.
-
-## Core Command Routing
-
-| Intent | Command |
-|---|---|
-| Understand repo shape / entry points | `srcwalk map --scope .` |
-| Read a large known file | `srcwalk <path>` |
-| Jump to a known line | `srcwalk <path>:<line>` |
-| Read exact body/range | `srcwalk <path> --section <symbol|start-end>` |
-| Find definitions/usages/text | `srcwalk find <query> --scope <dir>` |
-| Find files by glob | `srcwalk files '<glob>' --scope <dir>` |
-| Find direct callers | `srcwalk callers <symbol> --scope <dir>` |
-| Find downstream callees | `srcwalk callees <symbol> --scope <dir>` |
-| Quick orientation slice | `srcwalk flow <symbol> --scope <dir>` |
-| Heuristic impact triage | `srcwalk impact <symbol> --scope <dir>` |
-| File imports/dependents | `srcwalk deps <file>` |
-
-## Default Workflow
-
-### Explore unfamiliar code
+Run the embedded guide before non-trivial use — it is the version-matched source of truth:
 
 ```bash
 srcwalk guide
-srcwalk map --scope .
-srcwalk map --scope src --depth 2
-srcwalk find <likely_symbol> --scope src
-srcwalk <path>:<line>
 ```
 
-### Read a large file safely
+Do not pipe, truncate, or summarize `srcwalk guide`.
 
-```bash
-srcwalk <path>
-srcwalk <path>:123
-srcwalk <path> --section <symbol|start-end>
+## When to Use
+
+- Any code navigation task: symbol search, large-file reading, repo maps
+- Tracing call graphs (callers, callees, transitive chains)
+- Checking blast radius before breaking changes
+- Understanding repo shape and token budgets
+- Quick function orientation (flow slice)
+- Heuristic impact triage
+
+## When NOT to Use
+
+- Non-code files where tree-sitter has no grammar → use `read` directly
+- Simple one-off reads of small known files → use built-in `read`
+
+## Pi Tool Surface
+
+### Core navigation tools
+
+| Tool | Srcwalk command | Purpose |
+|---|---|---|
+| `srcwalk_search` | `srcwalk find` / `srcwalk callers` | AST-aware symbol/content/regex/callers search |
+| `srcwalk_read` | `srcwalk <path>` | Smart file reading: outline or full with sections |
+| `srcwalk_files` | `srcwalk files` | Glob file finding with token estimates, grouped by dir |
+| `srcwalk_deps` | `srcwalk deps` + exact import scan | Blast-radius: importers + dep-aware dependents (v0.4.0) |
+
+### Extended analysis tools
+
+| Tool | Srcwalk command | Purpose |
+|---|---|---|
+| `srcwalk_map` | `srcwalk map` | Token-annotated directory skeleton + dep groups (v0.4.0) |
+| `srcwalk_callers` | `srcwalk callers` | Reverse call graph with BFS depth + filters |
+| `srcwalk_callees` | `srcwalk callees` | Forward call graph with `--detailed` ordered call sites |
+| `srcwalk_flow` | `srcwalk flow` | Compact orientation slice |
+| `srcwalk_impact` | `srcwalk impact` | Heuristic blast-radius triage |
+
+## Command Routing
+
+| Intent | Use first |
+|---|---|
+| Understand repo shape | `srcwalk_map` |
+| Read or inspect a large file | `srcwalk_read` |
+| Jump to exact line | `srcwalk_read({ path: "file:42" })` |
+| Read a line range | `srcwalk_read({ path: "file:44-89" })` — v0.4.0 shortcut |
+| Read by symbol name | `srcwalk_read({ section: "symbolName" })` |
+| Find definition/usages/text/glob | `srcwalk_search` |
+| Find files by glob | `srcwalk_files` |
+| Multi-symbol search | `srcwalk_search({ query: "A, B, C" })` |
+| Who directly calls this? | `srcwalk_callers` |
+| Who reaches this transitively? | `srcwalk_callers({ depth: 2 })` |
+| What does this call? | `srcwalk_callees` |
+| Ordered calls + arg slots | `srcwalk_callees({ detailed: true })` |
+| Quick orientation slice | `srcwalk_flow` |
+| File imports and dependents | `srcwalk_deps` |
+| Heuristic blast-radius | `srcwalk_impact` (verify with callers) |
+
+## Default Workflows
+
+### Explore unfamiliar code
+
+```
+srcwalk_map({ scope: "." })
+srcwalk_search({ query: "likely_symbol", scope: "src" })
+srcwalk_read({ path: "src/file.ts:42" })         // jump to line
+srcwalk_read({ path: "src/file.ts:44-89" })      // range shortcut (v0.4.0)
 ```
 
-Prefer outline/section reads before `--full`.
+### Read a large file
 
-### Trace behavior from a known symbol
-
-```bash
-srcwalk callers <symbol> --scope <dir>
-srcwalk callees <symbol> --detailed --scope <dir>
-srcwalk flow <symbol> --scope <dir>
+```
+srcwalk_read({ path: "src/file.ts" })                        // structural outline
+srcwalk_read({ path: "src/file.ts", section: "handleAuth" }) // drill into symbol
+srcwalk_read({ path: "src/file.ts", section: "44-89" })      // exact range
 ```
 
-### Check blast radius before changes
+Prefer outline/section reads before `full: true`.
 
-```bash
-srcwalk deps <file>
-srcwalk impact <symbol> --scope <dir>
+### Find and drill into symbols
+
+```
+srcwalk_search({ query: "handleAuth", scope: "src" })
+srcwalk_search({ query: "A, B, C", scope: "src" })           // multi-symbol
+srcwalk_search({ query: "handleAuth", expand: 2 })            // inline source
 ```
 
-Use `impact` as triage, then verify important claims with `callers`, `callees`, or exact file reads.
+### Trace call graph
 
-## Caveats
+```
+// upstream
+srcwalk_callers({ symbol: "handleAuth", scope: "src" })
+srcwalk_callers({ symbol: "handleAuth", depth: 2, scope: "src" })      // transitive
+srcwalk_callers({ symbol: "handleAuth", filter: "args:3", scope: "src" })
+srcwalk_callers({ symbol: "handleAuth", countBy: "file", scope: "src" })
 
-- `impact` is heuristic and not proof by itself
-- `find` can include text matches; use `callers` for actual call-site evidence
-- Some output is capped; follow `> Next:` suggestions with narrower reads or deeper commands
-- The native srcwalk workflow is broader than the current `tilth_*` compatibility layer
+// downstream
+srcwalk_callees({ symbol: "handleAuth", scope: "src" })
+srcwalk_callees({ symbol: "handleAuth", detailed: true, scope: "src" }) // ordered sites
+srcwalk_callees({ symbol: "handleAuth", depth: 2, scope: "src" })       // transitive
 
-## Recommended Use in This Repo
+// quick orientation
+srcwalk_flow({ symbol: "handleAuth", scope: "src" })
+```
 
-- Keep loading `tilth` for existing project-local prompts and compatibility workflows
-- Load `srcwalk` when a task benefits from native CLI-only capabilities or when validating upstream srcwalk behavior directly
+Use `srcwalk_search({ kind: "callers" })` for quick single-hop. Use `srcwalk_callers` when you need depth, filters, or aggregation.
+
+> Note: `--count-by` and `--depth` are mutually exclusive in `srcwalk_callers` — use one or the other, not both.
+
+### Check file blast radius
+
+```
+srcwalk_deps({ path: "src/auth.ts" })
+srcwalk_impact({ symbol: "handleAuth", scope: "src" })  // heuristic; follow up with callers
+```
+
+## v0.4.0 Features
+
+- **Path range shortcut**: `srcwalk_read({ path: "file:start-end" })` reads a line range directly — no need to pass `section` separately
+- **Dependency-aware map**: `srcwalk_map` now shows local relation groups and outbound dependency previews for narrowed scopes
+- **JS/TS artifact navigation**: bundle anchors, artifact reads, artifact search snippets, and artifact caller/callee support
+- **Improved UX**: more compact semantic rows, directory grouping, footer tips, and clearer scope/depth wording across all commands
+
+## Critical Rules
+
+- **Do NOT** use built-in `read`/`grep`/`find` when srcwalk_* tools can answer
+- **Do NOT** re-read files already shown in expanded `srcwalk_search` results
+- `srcwalk_impact` is heuristic, not proof — verify with `srcwalk_callers` or exact reads
+- `srcwalk_flow` may collapse nested/fluent chains — drill with `srcwalk_callees({ detailed: true })` when inner calls matter
+- Follow `> Next:` footers in output — they suggest the best next command
+- Scope paths are **relative to Pi's CWD** (`.pi/` in this project). Use `scope: "extensions"` not `scope: ".pi/extensions"`
+
+## Supported Languages
+
+Rust, TypeScript, TSX, JavaScript, Python, Go, Java, Scala, C, C++, Ruby, PHP, C#, Swift, Elixir, Kotlin. Unsupported files still get smart text/outline reads.
+
+## Setup
+
+```sh
+# verify binary and version
+srcwalk guide
+
+# install / upgrade
+npm install -g srcwalk          # npm
+cargo install srcwalk --locked  # crates.io
+
+# custom binary path if not on PATH
+export PI_SRCWALK_BIN="$HOME/.cargo/bin/srcwalk"
+```
+
+## CWD Note
+
+All scope paths are relative to the **current working directory** when Pi is running. In pikit, CWD is `.pi/`, so:
+
+```
+srcwalk_callers({ symbol: "foo", scope: "extensions" })      // ✓
+srcwalk_callers({ symbol: "foo", scope: ".pi/extensions" })  // ✗ resolves to .pi/.pi/extensions
+```
+
+Use absolute paths when crossing directories.

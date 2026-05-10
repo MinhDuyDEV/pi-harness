@@ -38,7 +38,7 @@ skill({ name: "verification-before-completion" });
 | `explore`            | Finding patterns in codebase, prior art |
 | `scout`              | External research, best practices       |
 | `lsp`                | Finding symbol definitions, references  |
-| `tilth_search`       | Finding code patterns                   |
+| `srcwalk_search`       | Finding code patterns                   |
 | `codesearch`         | Real-world usage examples               |
 
 ## Phase 1: Gather Context

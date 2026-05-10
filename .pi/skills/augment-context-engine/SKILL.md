@@ -99,13 +99,13 @@ Bad queries (use grep instead):
 
 - **Exact string matching** — Use `grep` instead (faster, free)
 - **Known file paths** — Use `read` directly
-- **Symbol definitions** — Use `tilth_search` locally first
+- **Symbol definitions** — Use `srcwalk_search` locally first
 - **Local-only work** — This searches GitHub-indexed repos, not local files
 
 ## Tool Priority Integration
 
 ```
-tilth_search (local symbols/text) → semantic search (meaning) → read (full file) → edit
+srcwalk_search (local symbols/text) → semantic search (meaning) → read (full file) → edit
 ```
 
 Use grep first for exact matches. Escalate to semantic search when grep results are noisy or you need conceptual understanding.

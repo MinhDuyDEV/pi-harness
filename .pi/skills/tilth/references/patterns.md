@@ -9,7 +9,7 @@ Always search before reading. One search replaces multiple grep → read → gre
 glob("src/**/*.ts") → read("src/auth.ts") → "too big" → grep("handleAuth") → read again
 
 # Good: 1 tool call
-tilth_search(query: "handleAuth", scope: "src/")
+srcwalk_search(query: "handleAuth", scope: "src/")
 → definitions + usages + expanded source + callees in one response
 ```
 
@@ -49,7 +49,7 @@ When a definition is inside a class/struct, expanded output includes `── sib
 Pass `context` parameter to boost results near the file you're editing:
 
 ```
-tilth_search(query: "resolveConfig", context: "src/config/loader.ts")
+srcwalk_search(query: "resolveConfig", context: "src/config/loader.ts")
 ```
 
 Matches in the same directory/package rank higher.
@@ -75,11 +75,11 @@ Large file outlined → use section to get exact lines:
 
 ```
 # Step 1: See the shape
-tilth_read(path: "src/server.rs")
+srcwalk_read(path: "src/server.rs")
 → [45-120]  fn handle_request(req: Request) -> Response
 
 # Step 2: Get the code
-tilth_read(path: "src/server.rs", section: "45-120")
+srcwalk_read(path: "src/server.rs", section: "45-120")
 → Full source with line numbers
 ```
 
@@ -88,7 +88,7 @@ tilth_read(path: "src/server.rs", section: "45-120")
 Read multiple files in one call:
 
 ```
-tilth_read(paths: ["src/auth.ts", "src/config.ts", "src/routes.ts"])
+srcwalk_read(paths: ["src/auth.ts", "src/config.ts", "src/routes.ts"])
 ```
 
 Each file gets independent smart handling. Max 20 files per batch.
@@ -98,7 +98,7 @@ Each file gets independent smart handling. Max 20 files per batch.
 Find all call sites of a symbol using structural tree-sitter matching:
 
 ```
-tilth_search(query: "isTrustedProxy", kind: "callers")
+srcwalk_search(query: "isTrustedProxy", kind: "callers")
 → Shows each call site with surrounding function context
 ```
 
@@ -107,18 +107,18 @@ tilth_search(query: "isTrustedProxy", kind: "callers")
 Find literal text (not symbol names):
 
 ```
-tilth_search(query: "TODO: fix", kind: "content")
+srcwalk_search(query: "TODO: fix", kind: "content")
 ```
 
 ## Regex Search
 
 ```
-tilth_search(query: "handle[A-Z]\\w+", kind: "regex")
+srcwalk_search(query: "handle[A-Z]\\w+", kind: "regex")
 ```
 
 ## Anti-Patterns
 
 - **Don't re-read expanded results** — search output already contains the source
 - **Don't use scope for cwd** — omit scope entirely to search current directory
-- **Don't skip tilth_deps before breaking changes** — blast radius matters
+- **Don't skip srcwalk_deps before breaking changes** — blast radius matters
 - **Don't use grep/cat/find** — tilth tools are always better for code

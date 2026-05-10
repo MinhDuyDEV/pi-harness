@@ -47,7 +47,7 @@ skill({ name: "development-lifecycle" }); // Mid-point + completion checks durin
 | `explore`            | Finding patterns in codebase, prior art   |
 | `scout`              | External research, best practices         |
 | `lsp`                | Finding symbol definitions, references    |
-| `tilth_search`       | Finding code patterns                     |
+| `srcwalk_search`       | Finding code patterns                     |
 | `Agent`              | Spawning subagents for parallel execution |
 
 ## Phase 1: Guards

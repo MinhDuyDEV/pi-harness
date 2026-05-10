@@ -624,7 +624,7 @@ function applySupersedeWrites(
 	const result: StrategyResult = { prunedTokens: 0, prunedCount: 0, actions: [] };
 
 	const writeTools = new Set(["write", "edit"]);
-	const readTools = new Set(["read", "tilth_read"]);
+	const readTools = new Set(["read", "srcwalk_read"]);
 
 	// Build map: filepath → message index of latest read
 	const fileReads = new Map<string, number>();
