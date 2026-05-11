@@ -23,7 +23,9 @@
  */
 
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { Type } from "@sinclair/typebox";
 import { buildSubprocessEnv } from "./security/env-policy.js";
@@ -98,7 +100,19 @@ function isAbortError(error: unknown): boolean {
 }
 
 function resolveSrcwalkBin(): string {
-	return process.env.PI_SRCWALK_BIN?.trim() || "srcwalk";
+	const configured = process.env.PI_SRCWALK_BIN?.trim();
+	if (configured) return configured;
+
+	const home = os.homedir();
+	const fallbackBins = [
+		path.join(home, ".cargo/bin/srcwalk"),
+		path.join(home, ".local/bin/srcwalk"),
+		path.join(home, ".nvm/versions/node", `v${process.versions.node}`, "bin/srcwalk"),
+		"/opt/homebrew/bin/srcwalk",
+		"/usr/local/bin/srcwalk",
+	];
+
+	return fallbackBins.find((candidate) => existsSync(candidate)) || "srcwalk";
 }
 
 function toPosixPath(filePath: string): string {
@@ -370,11 +384,9 @@ async function depsCompat(args: ToolArgs, signal?: AbortSignal): Promise<string>
 async function nativeMap(args: ToolArgs, signal?: AbortSignal): Promise<string> {
 	const scope = optionalString(args.scope);
 	const depth = optionalNumber(args.depth);
-	const budget = optionalNumber(args.budget);
 	const cmdArgs = ["map"];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (depth !== undefined) cmdArgs.push("--depth", String(depth));
-	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
 	return run(cmdArgs, signal);
 }
 
