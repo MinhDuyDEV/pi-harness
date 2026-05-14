@@ -339,6 +339,6 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		enabled: true,
 		thresholdPercent: 80,
 		customInstructions: "Focus on preserving: key decisions, file paths modified, current task state, and next steps. Be thorough but concise.",
-		cancelNativeCompaction: "always",
+		cancelNativeCompaction: "when-managed",
 	},
 };

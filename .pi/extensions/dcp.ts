@@ -475,14 +475,16 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		// Resolve current model and auth credentials
 		const model = ctx.model;
 		if (!model) {
-			if (config.debug) console.log("[dcp] No model for enriched compaction, cancelling native");
-			return { cancel: true } as SessionBeforeCompactResult;
+			// No model → fall through to Pi native compaction (don't cancel without replacement)
+			if (config.debug) console.log("[dcp] No model for enriched compaction, deferring to Pi native");
+			return undefined;
 		}
 
 		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 		if (!auth.ok || !auth.apiKey) {
-			if (config.debug) console.log(`[dcp] Auth failed for enriched compaction, cancelling native`);
-			return { cancel: true } as SessionBeforeCompactResult;
+			// Auth unavailable → fall through to Pi native compaction
+			if (config.debug) console.log(`[dcp] Auth unavailable for enriched compaction, deferring to Pi native`);
+			return undefined;
 		}
 
 		// Generate DCP-enriched custom compaction summary
@@ -517,8 +519,11 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			}
 		}
 
-		// Fall back to cancel if enriched compaction could not complete
-		return { cancel: true } as SessionBeforeCompactResult;
+		// Enriched compaction failed — fall through to Pi native compaction
+		// IMPORTANT: never return { cancel: true } without a compaction object;
+		// that tells Pi to abort the compaction entirely, leaving context unbounded.
+		if (config.debug) console.log("[dcp] Enriched compaction unavailable, deferring to Pi native");
+		return undefined;
 	});
 
 	// -----------------------------------------------------------------------
@@ -710,6 +715,12 @@ function registerExpandTool(pi: ExtensionAPI, config: DCPConfig): void {
 			_onUpdate: unknown,
 			ctx: ExtensionContext,
 		) {
+			if (!Number.isInteger(params.blockId) || params.blockId < 1) {
+				return {
+					content: [{ type: "text" as const, text: `Invalid blockId: ${params.blockId}. Must be a positive integer (e.g. 3 for block b3).` }],
+					details: undefined,
+				};
+			}
 			const sessionId = getSessionId(ctx);
 			const expanded = expandCompressedBlock(
 				sessionId,

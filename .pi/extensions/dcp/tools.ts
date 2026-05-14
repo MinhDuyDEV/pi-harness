@@ -122,7 +122,7 @@ export function registerCompressTool(
 			),
 		}),
 		async execute(
-			toolCallId: string,
+			_toolCallId: string,
 			params: {
 				topic: string;
 				startId: string;
