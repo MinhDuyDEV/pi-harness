@@ -333,7 +333,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	// next before_agent_start, guiding the agent to use `compress` manually.
 	// -----------------------------------------------------------------------
 
-	pi.on("turn_end", (event: TurnEndEvent, ctx: ExtensionContext) => {
+	pi.on("turn_end", (_event: TurnEndEvent, ctx: ExtensionContext) => {
 		try {
 			ensureInitialized(ctx);
 			const usage = ctx.getContextUsage();
@@ -385,7 +385,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	// EVENT: before_agent_start — Inject nudges and facts into context
 	// -----------------------------------------------------------------------
 
-	pi.on("before_agent_start", (event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
+	pi.on("before_agent_start", (_event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
 		try {
 			ensureInitialized(ctx);
 			const sessionId = getSessionId(ctx);
@@ -579,8 +579,11 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 				}
 			}
 
-			// Reset session state (tool calls, tags, drop queue)
-			resetSessionState(sessionId);
+			// Reset session state (tool calls, tags, drop queue).
+			// Only deactivate DCP blocks when DCP provided the compaction (fromExtension: true).
+			// Pi-native compaction does NOT include DCP block summaries, so blocks must stay
+			// active and continue being re-injected via before_agent_start.
+			resetSessionState(sessionId, event.fromExtension);
 			currentTurn = 0;
 
 			// Reset managers

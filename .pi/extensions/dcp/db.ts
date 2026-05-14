@@ -720,16 +720,21 @@ export function getAllRawTranscripts(sessionId: string): RawTranscript[] {
 // Post-compact state reset (v2 — extended)
 // ---------------------------------------------------------------------------
 
-export function resetSessionState(sessionId: string): void {
+export function resetSessionState(sessionId: string, deactivateBlocks: boolean = true): void {
 	const db = getDCPDB();
 
 	// Clear tool call cache — compacted messages invalidate dedup signatures
 	db.prepare("DELETE FROM tool_calls WHERE session_id = ?").run(sessionId);
 
-	// Deactivate all compression blocks — their ranges no longer exist
-	db.prepare(
-		"UPDATE compression_blocks SET active = 0, deactivated_at = ? WHERE session_id = ? AND active = 1",
-	).run(Date.now(), sessionId);
+	if (deactivateBlocks) {
+		// Deactivate all compression blocks — their summaries are now encoded in the
+		// compaction entry so they no longer need to be re-injected separately.
+		// ONLY do this when DCP provided the compaction (fromExtension: true).
+		// For Pi-native compaction, blocks are NOT in the summary and must stay active.
+		db.prepare(
+			"UPDATE compression_blocks SET active = 0, deactivated_at = ? WHERE session_id = ? AND active = 1",
+		).run(Date.now(), sessionId);
+	}
 
 	// Clear message tags — old tags reference pre-compaction messages
 	db.prepare("DELETE FROM message_tags WHERE session_id = ?").run(sessionId);
@@ -737,17 +742,22 @@ export function resetSessionState(sessionId: string): void {
 	// Mark all pending drops as executed — no longer relevant
 	markAllDropsExecuted(sessionId);
 
-	// Reset session stats — preserve cumulative totals for /dcp display
-	// Only reset turn counter and summary tokens (blocks were just deactivated)
+	// Reset per-window session stats
 	const existing = getSessionStats(sessionId);
 	if (existing) {
 		db.prepare(
 			`UPDATE session_stats SET
-        total_summary_tokens = 0,
+        total_summary_tokens = ?,
         current_turn = 0,
         updated_at = ?
        WHERE session_id = ?`,
-		).run(Date.now(), sessionId);
+		).run(
+			// Keep summary token count if blocks remain active (Pi-native compaction);
+			// reset to 0 when blocks are deactivated (DCP compaction).
+			deactivateBlocks ? 0 : existing.total_summary_tokens,
+			Date.now(),
+			sessionId,
+		);
 	}
 }
 
