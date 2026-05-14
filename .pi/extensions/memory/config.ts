@@ -113,6 +113,11 @@ export interface TemporalMessageRow {
 	time_created: number;
 	distillation_id: number | null;
 	created_at: string;
+	tool_name: string | null;
+	tool_call_id: string | null;
+	status: string | null;
+	is_error: number;
+	raw_json: string | null;
 }
 
 export interface TemporalMessageInput {
@@ -122,6 +127,11 @@ export interface TemporalMessageInput {
 	content: string;
 	token_estimate: number;
 	time_created: number;
+	tool_name?: string | null;
+	tool_call_id?: string | null;
+	status?: string | null;
+	is_error?: boolean | number | null;
+	raw_json?: string | null;
 }
 
 export interface DistillationRow {
@@ -183,6 +193,8 @@ export const MEMORY_CONFIG = {
 	capture: {
 		enabled: true,
 		maxContentLength: 4000,
+		maxRawJsonLength: 8000,
+		maxMessages: 1000,
 		maxAgeDays: 180,
 	},
 	distillation: {
@@ -225,6 +237,9 @@ export const MEMORY_CONFIG = {
 	},
 	sanitization: {
 		enabled: true,
+	},
+	maintenance: {
+		minIntervalMs: 5 * 60 * 1000,
 	},
 	fts: {
 		tokenizer: "porter unicode61",

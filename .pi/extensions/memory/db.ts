@@ -117,11 +117,18 @@ CREATE TABLE IF NOT EXISTS temporal_messages (
   time_created INTEGER NOT NULL,
   distillation_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  tool_name TEXT,
+  tool_call_id TEXT,
+  status TEXT,
+  is_error INTEGER NOT NULL DEFAULT 0,
+  raw_json TEXT,
   FOREIGN KEY(distillation_id) REFERENCES distillations(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_temporal_session ON temporal_messages(session_id, time_created);
 CREATE INDEX IF NOT EXISTS idx_temporal_undistilled ON temporal_messages(session_id) WHERE distillation_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_temporal_time ON temporal_messages(time_created DESC);
+CREATE INDEX IF NOT EXISTS idx_temporal_tool ON temporal_messages(tool_name, tool_call_id);
+CREATE INDEX IF NOT EXISTS idx_temporal_status ON temporal_messages(status, is_error);
 
 -- Distillations
 CREATE TABLE IF NOT EXISTS distillations (
@@ -243,16 +250,23 @@ function initializeSchema(db: Database.Database): void {
 			)
 			.get() as { version: number } | undefined;
 
-		if (row && row.version >= 4) return; // Already at v4
+		if (row && row.version >= 5) return; // Already at v5
+
+		if (row && row.version === 4) {
+			migrateV4ToV5(db);
+			return;
+		}
 
 		if (row && row.version === 3) {
 			migrateV3ToV4(db);
+			migrateV4ToV5(db);
 			return;
 		}
 
 		if (row && row.version === 2) {
 			migrateV2ToV3(db);
 			migrateV3ToV4(db);
+			migrateV4ToV5(db);
 			return;
 		}
 
@@ -260,15 +274,19 @@ function initializeSchema(db: Database.Database): void {
 			migrateV1ToV2(db);
 			migrateV2ToV3(db);
 			migrateV3ToV4(db);
+			migrateV4ToV5(db);
 			return;
 		}
 	} catch {
 		// schema_versions doesn't exist yet — fresh install
 	}
 
-	// Fresh install: apply full v4 schema
+	// Fresh install: apply full v5 schema. Also run the additive v5
+	// migration for older databases that predate schema_versions but already
+	// have temporal_messages without the v5 columns.
 	db.exec(SCHEMA_SQL);
 	db.exec(FTS_TRIGGERS_SQL);
+	migrateV4ToV5(db);
 
 	// Create vec0 virtual table if sqlite-vec is available
 	if (sqliteVecAvailable) {
@@ -287,7 +305,7 @@ function initializeSchema(db: Database.Database): void {
 	// Record version
 	db.prepare(
 		"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
-	).run(4, new Date().toISOString());
+	).run(5, new Date().toISOString());
 }
 
 function migrateV1ToV2(db: Database.Database): void {
@@ -316,11 +334,18 @@ function migrateV1ToV2(db: Database.Database): void {
         time_created INTEGER NOT NULL,
         distillation_id INTEGER,
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        tool_name TEXT,
+        tool_call_id TEXT,
+        status TEXT,
+        is_error INTEGER NOT NULL DEFAULT 0,
+        raw_json TEXT,
         FOREIGN KEY(distillation_id) REFERENCES distillations(id) ON DELETE SET NULL
       );
       CREATE INDEX IF NOT EXISTS idx_temporal_session ON temporal_messages(session_id, time_created);
       CREATE INDEX IF NOT EXISTS idx_temporal_undistilled ON temporal_messages(session_id) WHERE distillation_id IS NULL;
       CREATE INDEX IF NOT EXISTS idx_temporal_time ON temporal_messages(time_created DESC);
+      CREATE INDEX IF NOT EXISTS idx_temporal_tool ON temporal_messages(tool_name, tool_call_id);
+      CREATE INDEX IF NOT EXISTS idx_temporal_status ON temporal_messages(status, is_error);
 
       CREATE TABLE IF NOT EXISTS distillations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -452,6 +477,35 @@ function migrateV3ToV4(db: Database.Database): void {
 		db.prepare(
 			"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
 		).run(4, new Date().toISOString());
+	});
+
+	migration();
+}
+
+function migrateV4ToV5(db: Database.Database): void {
+	const migration = db.transaction(() => {
+		const columns = [
+			["tool_name", "TEXT"],
+			["tool_call_id", "TEXT"],
+			["status", "TEXT"],
+			["is_error", "INTEGER NOT NULL DEFAULT 0"],
+			["raw_json", "TEXT"],
+		];
+
+		for (const [name, definition] of columns) {
+			try {
+				db.exec(`ALTER TABLE temporal_messages ADD COLUMN ${name} ${definition}`);
+			} catch {
+				// Column may already exist
+			}
+		}
+
+		db.exec("CREATE INDEX IF NOT EXISTS idx_temporal_tool ON temporal_messages(tool_name, tool_call_id)");
+		db.exec("CREATE INDEX IF NOT EXISTS idx_temporal_status ON temporal_messages(status, is_error)");
+
+		db.prepare(
+			"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
+		).run(5, new Date().toISOString());
 	});
 
 	migration();

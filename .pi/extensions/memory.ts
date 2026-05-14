@@ -37,6 +37,16 @@ import { refreshAllScores } from "./memory/scoring.js";
 import { registerMemoryTools } from "./memory/tools.js";
 import { getSessionId } from "./dcp/context.js";
 
+function stringifyForCapture(value: unknown, maxLength: number): string | null {
+	try {
+		const json = JSON.stringify(value);
+		if (!json) return null;
+		return json.length > maxLength ? json.slice(0, maxLength) : json;
+	} catch {
+		return null;
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Extension factory (Pi entry point)
 // ---------------------------------------------------------------------------
@@ -57,6 +67,7 @@ export default function memoryExtension(pi: any): void {
 	backfillEmbeddings().catch(() => {});
 
 	// 3. Register event handlers
+	let lastMaintenanceAt = 0;
 
 	// --- Capture user messages ---
 	pi.on("input", (event: any, ctx: any) => {
@@ -99,6 +110,14 @@ export default function memoryExtension(pi: any): void {
 		if (!MEMORY_CONFIG.capture.enabled) return;
 
 		try {
+			const toolName = event?.name ?? event?.toolName ?? "tool";
+			const toolCallId = event?.toolCallId ?? event?.id ?? null;
+			const isError = Boolean(event?.isError ?? event?.error);
+			const status = isError ? "error" : "completed";
+			let rawJson = stringifyForCapture(event, MEMORY_CONFIG.capture.maxRawJsonLength);
+			if (rawJson && MEMORY_CONFIG.sanitization.enabled) {
+				rawJson = sanitize(rawJson).text;
+			}
 			const textParts = Array.isArray(event?.content)
 				? event.content
 					.filter((c: any) => c?.type === "text" && typeof c.text === "string")
@@ -129,16 +148,20 @@ export default function memoryExtension(pi: any): void {
 
 			const tokenEstimate = Math.ceil(content.length / 4);
 			const now = Date.now();
-			const toolName = event?.name ?? event?.toolName ?? "tool";
 			const sessionId = getSessionId(ctx, event);
 
 			storeTemporalMessage({
 				session_id: sessionId,
 				message_id: `tool-${toolName}-${now}-${Math.random().toString(36).slice(2, 8)}`,
-				role: "assistant",
+				role: "tool",
 				content: `[${toolName}] ${content}`,
 				token_estimate: tokenEstimate,
 				time_created: now,
+				tool_name: toolName,
+				tool_call_id: toolCallId,
+				status,
+				is_error: isError,
+				raw_json: rawJson,
 			});
 		} catch {
 			// Capture is best-effort
@@ -157,15 +180,20 @@ export default function memoryExtension(pi: any): void {
 				curateFromDistillations(sessionId);
 			}
 
-			// Refresh time-decay scores periodically
-			refreshAllScores();
+			const now = Date.now();
+			if (now - lastMaintenanceAt >= MEMORY_CONFIG.maintenance.minIntervalMs) {
+				lastMaintenanceAt = now;
 
-			// Periodic maintenance
-			optimizeFTS5();
-			checkpointWAL();
+				// Refresh time-decay scores periodically
+				refreshAllScores();
 
-			// Warm up embedding model in background for next search
-			warmupEmbeddings().catch(() => {});
+				// Periodic maintenance
+				optimizeFTS5();
+				checkpointWAL();
+
+				// Warm up embedding model in background for next search
+				warmupEmbeddings().catch(() => {});
+			}
 		} catch {
 			// Pipeline is best-effort
 		}

@@ -6,8 +6,7 @@ import {
 import {
 	getUndistilledMessageCount,
 	getUndistilledMessages,
-	markMessagesDistilled,
-	storeDistillation,
+	storeDistillationAndMarkMessages,
 } from "./pipeline.js";
 
 const STOP_WORDS = new Set([
@@ -286,9 +285,6 @@ export function distillSession(sessionId: string): number | null {
 		time_end: messages[messages.length - 1].time_created,
 	};
 
-	const distillationId = storeDistillation(input);
 	const messageIds = messages.map((m) => m.id);
-	markMessagesDistilled(messageIds, distillationId);
-
-	return distillationId;
+	return storeDistillationAndMarkMessages(input, messageIds);
 }

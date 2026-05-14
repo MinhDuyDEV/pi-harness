@@ -15,22 +15,63 @@ import { markObservationsRetrieved, searchObservationsVector } from "./observati
 
 export function storeTemporalMessage(input: TemporalMessageInput): number {
 	const db = getMemoryDB();
+	const write = db.transaction(() => {
+		const result = db
+			.prepare(
+				`INSERT OR IGNORE INTO temporal_messages
+         (session_id, message_id, role, content, token_estimate, time_created, created_at,
+          tool_name, tool_call_id, status, is_error, raw_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			)
+			.run(
+				input.session_id,
+				input.message_id,
+				input.role,
+				input.content,
+				input.token_estimate ?? null,
+				input.time_created,
+				new Date().toISOString(),
+				input.tool_name ?? null,
+				input.tool_call_id ?? null,
+				input.status ?? null,
+				input.is_error ? 1 : 0,
+				input.raw_json ?? null,
+			);
+		pruneTemporalMessagesLocked(db);
+		return Number(result.lastInsertRowid);
+	});
+	return write();
+}
+
+function pruneTemporalMessagesLocked(db: ReturnType<typeof getMemoryDB>): number {
+	const maxMessages = Math.max(0, Number(MEMORY_CONFIG.capture.maxMessages ?? 0));
+	if (maxMessages <= 0) return 0;
 	const result = db
 		.prepare(
-			`INSERT OR IGNORE INTO temporal_messages
-         (session_id, message_id, role, content, token_estimate, time_created, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			`DELETE FROM temporal_messages
+       WHERE id NOT IN (
+         SELECT id FROM temporal_messages
+         ORDER BY time_created DESC, id DESC
+         LIMIT ?
+       )`,
 		)
-		.run(
-			input.session_id,
-			input.message_id,
-			input.role,
-			input.content,
-			input.token_estimate ?? null,
-			input.time_created,
-			new Date().toISOString(),
-		);
-	return Number(result.lastInsertRowid);
+		.run(maxMessages);
+	return result.changes;
+}
+
+export function pruneTemporalMessages(maxMessages?: number): number {
+	const db = getMemoryDB();
+	const originalMax = MEMORY_CONFIG.capture.maxMessages;
+	if (maxMessages != null) {
+		(MEMORY_CONFIG.capture as { maxMessages: number }).maxMessages = maxMessages;
+	}
+	try {
+		return pruneTemporalMessagesLocked(db);
+	} finally {
+		if (maxMessages != null) {
+			(MEMORY_CONFIG.capture as { maxMessages: number }).maxMessages = originalMax;
+		}
+	}
 }
 
 export function getUndistilledMessages(
@@ -124,7 +165,10 @@ export function getCaptureStats(): {
 // ---------------------------------------------------------------------------
 
 export function storeDistillation(input: DistillationInput): number {
-	const db = getMemoryDB();
+	return insertDistillation(getMemoryDB(), input);
+}
+
+function insertDistillation(db: ReturnType<typeof getMemoryDB>, input: DistillationInput): number {
 	const result = db
 		.prepare(
 			`INSERT INTO distillations
@@ -145,6 +189,24 @@ export function storeDistillation(input: DistillationInput): number {
 			new Date().toISOString(),
 		);
 	return Number(result.lastInsertRowid);
+}
+
+export function storeDistillationAndMarkMessages(
+	input: DistillationInput,
+	messageIds: number[],
+): number {
+	const db = getMemoryDB();
+	const write = db.transaction(() => {
+		const distillationId = insertDistillation(db, input);
+		if (messageIds.length > 0) {
+			const placeholders = messageIds.map(() => "?").join(", ");
+			db.prepare(
+				`UPDATE temporal_messages SET distillation_id = ? WHERE id IN (${placeholders})`,
+			).run(distillationId, ...messageIds);
+		}
+		return distillationId;
+	});
+	return write();
 }
 
 export function getDistillationById(id: number): DistillationRow | null {
