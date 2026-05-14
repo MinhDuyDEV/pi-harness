@@ -7,8 +7,12 @@
  *   3. Extract durable facts from compaction summary
  *
  * Uses convertToLlm() + serializeConversation() from Pi SDK for message serialization.
+ * Uses complete() from @mariozechner/pi-ai for DCP-enriched custom compaction.
  */
 
+import { complete } from "@mariozechner/pi-ai";
+import type { Model } from "@mariozechner/pi-ai";
+import { convertToLlm, serializeConversation } from "@mariozechner/pi-coding-agent";
 import type { DCPConfig, FactCategory } from "./config.js";
 import {
 	getActiveBlocks,
@@ -24,14 +28,29 @@ import {
 // Types — structural matching for Pi SDK compaction types
 // ---------------------------------------------------------------------------
 
+/** Matches Pi's CompactionPreparation exactly (from compaction.d.ts) */
 interface CompactionPreparation {
-	messagesToSummarize: unknown[];
-	turnPrefixMessages: unknown[];
-	previousSummary: string | null;
-	fileOps: { readFiles: string[]; modifiedFiles: string[] };
-	tokensBefore: number;
+	/** UUID of first entry to keep */
 	firstKeptEntryId: string;
-	settings: unknown;
+	/** Messages that will be summarized and discarded */
+	messagesToSummarize: unknown[];
+	/** Messages for turn prefix summary (split-turn case) */
+	turnPrefixMessages: unknown[];
+	/** Whether cut point lands mid-turn (one huge turn exceeds keepRecentTokens) */
+	isSplitTurn: boolean;
+	tokensBefore: number;
+	/** Summary from previous compaction, for iterative update */
+	previousSummary?: string;
+	fileOps: { readFiles: string[]; modifiedFiles: string[] };
+	settings: { enabled: boolean; reserveTokens: number; keepRecentTokens: number };
+}
+
+/** Minimal CompactionResult shape returned to Pi's session_before_compact handler */
+export interface DCPCompactionResult {
+	summary: string;
+	firstKeptEntryId: string;
+	tokensBefore: number;
+	details?: unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +208,151 @@ export function expandCompressedBlock(
 	if (raw.length <= maxChars) return raw;
 
 	return raw.slice(0, maxChars) + `\n\n[Truncated — ${Math.round((raw.length - maxChars) / 4)} more tokens available]`;
+}
+
+// ---------------------------------------------------------------------------
+// DCP-enriched custom compaction
+// ---------------------------------------------------------------------------
+
+/** Pi's structured compaction summary format (must match Pi's expected output) */
+const COMPACTION_FORMAT = [
+	"Format your summary using this exact structure:",
+	"## Goal",
+	"[What the user is trying to accomplish]",
+	"## Constraints & Preferences",
+	"- [Requirements mentioned by user]",
+	"## Progress",
+	"### Done",
+	"- [x] [Completed tasks]",
+	"### In Progress",
+	"- [ ] [Current work]",
+	"### Blocked",
+	"- [Issues, if any]",
+	"## Key Decisions",
+	"- **[Decision]**: [Rationale]",
+	"## Next Steps",
+	"1. [What should happen next]",
+	"## Critical Context",
+	"- [Data needed to continue]",
+	"<read-files>",
+	"path/to/file1.ts",
+	"</read-files>",
+	"<modified-files>",
+	"path/to/changed.ts",
+	"</modified-files>",
+].join("\n");
+
+/**
+ * Generate a DCP-enriched compaction summary using Pi's SDK helpers.
+ *
+ * This replaces Pi's native compaction when DCP intercepts `session_before_compact`.
+ * Injects active DCP compression blocks and extracted facts as authoritative context
+ * so the LLM summarizer is aware of earlier compressed phases.
+ *
+ * @returns CompactionResult-compatible object, or null if generation fails (caller should cancel).
+ */
+export async function generateDCPEnrichedCompaction(
+	sessionId: string,
+	preparation: CompactionPreparation,
+	customInstructions: string | undefined,
+	signal: AbortSignal,
+	model: Model<any>,
+	apiKey: string,
+	headers: Record<string, string> | undefined,
+	_config: DCPConfig,
+): Promise<DCPCompactionResult | null> {
+	const { messagesToSummarize, turnPrefixMessages, firstKeptEntryId, tokensBefore, previousSummary } = preparation;
+
+	// Combine all messages (handles split-turn: turnPrefixMessages is the early part of the split turn)
+	const allMessages = [...(messagesToSummarize as any[]), ...(turnPrefixMessages as any[])];
+	if (allMessages.length === 0) return null;
+
+	// Serialize messages to readable text using Pi SDK (truncates tool results to 2000 chars)
+	const conversationText = serializeConversation(convertToLlm(allMessages));
+
+	// Build DCP-enriched preamble
+	const preambleParts: string[] = [];
+
+	// Active DCP blocks are authoritative summaries of earlier completed phases — inject first
+	const activeBlocks = getActiveBlocks(sessionId);
+	if (activeBlocks.length > 0) {
+		const blockLines = activeBlocks
+			.map((b) => `### [b${b.block_id}: ${b.topic}]\n${b.summary}`)
+			.join("\n\n");
+		preambleParts.push(
+			`## Active DCP Compression Blocks\nThe following are authoritative summaries of earlier work phases — include them in your summary:\n\n${blockLines}`,
+		);
+	}
+
+	// Extracted facts (architecture decisions, constraints, naming conventions, etc.)
+	const factsSummary = getFactsSummary(sessionId, 3000);
+	if (factsSummary) preambleParts.push(factsSummary);
+
+	// Previous compaction summary for iterative update context
+	if (previousSummary) {
+		preambleParts.push(`## Previous Compaction Summary\n${previousSummary}`);
+	}
+
+	const dcpPreamble = preambleParts.length > 0
+		? preambleParts.join("\n\n") + "\n\n---\n\n"
+		: "";
+
+	const focusSection = customInstructions
+		? `\n\nAdditional focus for this summary: ${customInstructions}`
+		: "";
+
+	const userPrompt = [
+		`You are a conversation summarizer for a coding session. Create a comprehensive summary that captures all information needed to continue the work effectively.${focusSection}`,
+		"",
+		COMPACTION_FORMAT,
+		"",
+		"Be thorough but concise. The summary replaces the entire conversation history.",
+		"",
+		"---",
+		"",
+		dcpPreamble,
+		"<conversation>",
+		conversationText,
+		"</conversation>",
+	].join("\n");
+
+	const response = await complete(
+		model,
+		{
+			messages: [
+				{
+					role: "user" as const,
+					content: [{ type: "text" as const, text: userPrompt }],
+					timestamp: Date.now(),
+				},
+			],
+		},
+		{
+			apiKey,
+			headers,
+			maxTokens: 8192,
+			signal,
+		},
+	);
+
+	const summary = response.content
+		.filter((c): c is { type: "text"; text: string } => c.type === "text")
+		.map((c) => c.text)
+		.join("\n");
+
+	if (!summary.trim()) return null;
+
+	return {
+		summary,
+		firstKeptEntryId,
+		tokensBefore,
+		details: {
+			mode: "dcp-enriched",
+			activeBlocks: activeBlocks.length,
+			factsInjected: factsSummary !== null,
+			isSplitTurn: preparation.isSplitTurn,
+		},
+	};
 }
 
 // ---------------------------------------------------------------------------

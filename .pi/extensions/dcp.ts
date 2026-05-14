@@ -48,6 +48,7 @@ import type {
 	TurnEndEvent,
 	BeforeAgentStartEvent,
 	SessionBeforeCompactEvent,
+	SessionBeforeTreeEvent,
 	ContextEvent,
 } from "@mariozechner/pi-coding-agent";
 
@@ -66,6 +67,14 @@ interface BeforeAgentStartEventResult {
 interface SessionBeforeCompactResult {
 	cancel?: boolean;
 	compaction?: unknown;
+}
+
+interface SessionBeforeTreeResult {
+	cancel?: boolean;
+	summary?: { summary: string; details?: unknown };
+	customInstructions?: string;
+	replaceInstructions?: boolean;
+	label?: string;
 }
 
 import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
@@ -93,6 +102,7 @@ import {
 	extractFacts,
 	getFactsSummary,
 	expandCompressedBlock,
+	generateDCPEnrichedCompaction,
 } from "./dcp/compaction.js";
 import { hashParams } from "./dcp/utils.js";
 import { Type } from "@sinclair/typebox";
@@ -425,49 +435,126 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	});
 
 	// -----------------------------------------------------------------------
-	// EVENT: session_before_compact — Cancel Pi's native compaction when DCP manages context
+	// EVENT: session_before_compact — DCP-enriched compaction
 	//
-	// Pi's _checkCompaction() runs after every assistant message and triggers
-	// compaction when contextTokens > contextWindow - reserveTokens.
-	// But DCP's compress tool stores blocks that are stripped on the NEXT
-	// context event — Pi sees stale sizes and compacts prematurely.
+	// When DCP intercepts native compaction, it generates a richer summary by:
+	//   1. Injecting active DCP compression blocks (authoritative earlier-phase summaries)
+	//   2. Injecting extracted facts (architecture decisions, constraints, etc.)
+	//   3. Using serializeConversation(convertToLlm()) for proper message serialization
+	//   4. Respecting event.customInstructions from /compact <instructions>
+	//   5. Storing details.mode="dcp-enriched" so session_compact can detect it
 	//
-	// When cancelNativeCompaction is set, we return { cancel: true } to
-	// prevent Pi's native compaction from clobbering manually managed context.
-	// Pi's overflow recovery (reason: "overflow") is still allowed through.
+	// Falls back to { cancel: true } if enriched compaction fails (model/auth unavailable
+	// or generation error). Pi's overflow recovery still works correctly.
+	//
+	// IMPORTANT: We never call ctx.compact() from event handlers — it races with the
+	// agent loop and causes crashes. This hook is the safe interception point.
 	// -----------------------------------------------------------------------
 
-	pi.on("session_before_compact", (_event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
+	pi.on("session_before_compact", async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
 		const cancelPolicy = config.autoCompact.cancelNativeCompaction;
 
 		if (cancelPolicy === "never") {
 			return undefined;
 		}
 
-		if (cancelPolicy === "always") {
-			if (config.debug) {
-				console.log("[dcp] Cancelling Pi native compaction (policy: always)");
-			}
-			return { cancel: true } as SessionBeforeCompactResult;
-		}
-
+		// Determine whether DCP should intercept based on policy + active blocks
+		let shouldIntercept = cancelPolicy === "always";
 		if (cancelPolicy === "when-managed") {
-			// Only cancel if DCP has active compression blocks
 			try {
 				const sessionId = getSessionId(ctx);
 				const activeBlocks = getActiveBlocks(sessionId);
-				if (activeBlocks.length > 0) {
-					if (config.debug) {
-						console.log(`[dcp] Cancelling Pi native compaction (policy: when-managed, ${activeBlocks.length} active blocks)`);
-					}
-					return { cancel: true } as SessionBeforeCompactResult;
-				}
+				shouldIntercept = activeBlocks.length > 0;
 			} catch {
-				// On error, let native compaction proceed
+				shouldIntercept = false;
 			}
 		}
 
-		return undefined;
+		if (!shouldIntercept) return undefined;
+
+		// Resolve current model and auth credentials
+		const model = ctx.model;
+		if (!model) {
+			if (config.debug) console.log("[dcp] No model for enriched compaction, cancelling native");
+			return { cancel: true } as SessionBeforeCompactResult;
+		}
+
+		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+		if (!auth.ok || !auth.apiKey) {
+			if (config.debug) console.log(`[dcp] Auth failed for enriched compaction, cancelling native`);
+			return { cancel: true } as SessionBeforeCompactResult;
+		}
+
+		// Generate DCP-enriched custom compaction summary
+		try {
+			const sessionId = getSessionId(ctx);
+			if (ctx.hasUI) {
+				try { ctx.ui.notify("DCP: generating enriched compaction summary...", "info"); } catch {}
+			}
+
+			const result = await generateDCPEnrichedCompaction(
+				sessionId,
+				event.preparation as any,
+				event.customInstructions,
+				event.signal,
+				model,
+				auth.apiKey,
+				auth.headers,
+				config,
+			);
+
+			if (result) {
+				if (config.debug) console.log("[dcp] Enriched compaction succeeded");
+				if (ctx.hasUI) {
+					try { ctx.ui.notify("DCP: enriched compaction complete", "info"); } catch {}
+				}
+				return { compaction: result } as SessionBeforeCompactResult;
+			}
+		} catch (err) {
+			if (config.debug) console.error("[dcp] Enriched compaction error:", err);
+			if (ctx.hasUI) {
+				try { ctx.ui.notify(`DCP: enriched compaction failed, cancelling — ${err}`, "warning"); } catch {}
+			}
+		}
+
+		// Fall back to cancel if enriched compaction could not complete
+		return { cancel: true } as SessionBeforeCompactResult;
+	});
+
+	// -----------------------------------------------------------------------
+	// EVENT: session_before_tree — Inject DCP block context into branch summaries
+	//
+	// When user navigates with /tree and chooses to summarize the abandoned branch,
+	// inject active DCP compression blocks as additional context so the branch
+	// summary is aware of earlier compressed phases.
+	// -----------------------------------------------------------------------
+
+	pi.on("session_before_tree", async (event: SessionBeforeTreeEvent, ctx: ExtensionContext) => {
+		try {
+			const { preparation } = event;
+
+			// Only inject when user actually wants a branch summary
+			if (!preparation.userWantsSummary) return undefined;
+
+			ensureInitialized(ctx);
+			const sessionId = getSessionId(ctx);
+			const activeBlocks = getActiveBlocks(sessionId);
+			if (activeBlocks.length === 0) return undefined;
+
+			// Append DCP block summaries to existing customInstructions (if any)
+			const blockLines = activeBlocks
+				.map((b) => `[b${b.block_id}: ${b.topic}]\n${b.summary}`)
+				.join("\n\n");
+			const dcpContext = `Include these DCP compression blocks in your summary (authoritative summaries of completed work phases):\n\n${blockLines}`;
+
+			const combined = preparation.customInstructions
+				? `${preparation.customInstructions}\n\n${dcpContext}`
+				: dcpContext;
+
+			return { customInstructions: combined } as SessionBeforeTreeResult;
+		} catch {
+			return undefined;
+		}
 	});
 
 	// -----------------------------------------------------------------------
