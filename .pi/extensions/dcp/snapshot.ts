@@ -434,7 +434,8 @@ export function registerSnapshotTool(pi: ExtensionAPI): void {
 				}),
 			),
 			limit: Type.Optional(
-				Type.Number({
+				Type.Integer({
+					minimum: 1,
 					description:
 						`Maximum source entries to summarize (default ${DEFAULT_LIMIT}, max ${MAX_LIMIT}).`,
 				}),
@@ -449,10 +450,7 @@ export function registerSnapshotTool(pi: ExtensionAPI): void {
 		) {
 			const sessionFile = ctx.sessionManager.getSessionFile();
 			if (!sessionFile) {
-				return {
-					content: [{ type: "text" as const, text: "No session file available." }],
-					details: undefined,
-				};
+				throw new Error("No session file available for this session.");
 			}
 
 			let rows: SessionRow[];
@@ -460,10 +458,7 @@ export function registerSnapshotTool(pi: ExtensionAPI): void {
 				rows = parseSessionRows(sessionFile);
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
-				return {
-					content: [{ type: "text" as const, text: `Failed to read session file: ${message}` }],
-					details: undefined,
-				};
+				throw new Error(`Failed to read session file: ${message}`);
 			}
 
 			const query = params.query?.trim();

@@ -704,7 +704,8 @@ function registerExpandTool(pi: ExtensionAPI, config: DCPConfig): void {
 		].join("\n"),
 		promptSnippet: "Decompress a DCP block to see raw transcript.",
 		parameters: Type.Object({
-			blockId: Type.Number({
+			blockId: Type.Integer({
+				minimum: 1,
 				description: "Block ID to expand (e.g., 3 for block b3)",
 			}),
 		}),
@@ -716,10 +717,7 @@ function registerExpandTool(pi: ExtensionAPI, config: DCPConfig): void {
 			ctx: ExtensionContext,
 		) {
 			if (!Number.isInteger(params.blockId) || params.blockId < 1) {
-				return {
-					content: [{ type: "text" as const, text: `Invalid blockId: ${params.blockId}. Must be a positive integer (e.g. 3 for block b3).` }],
-					details: undefined,
-				};
+				throw new Error(`Invalid blockId: ${params.blockId}. Must be a positive integer ≥ 1 (e.g. 3 for block b3).`);
 			}
 			const sessionId = getSessionId(ctx);
 			const expanded = expandCompressedBlock(

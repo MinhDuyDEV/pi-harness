@@ -174,7 +174,7 @@ export function registerRecallTool(pi: ExtensionAPI): void {
 				}),
 			),
 			expand: Type.Optional(
-				Type.Array(Type.Number(), {
+				Type.Array(Type.Integer({ minimum: 0 }), {
 					description: "Entry indices to return full content for.",
 				}),
 			),
@@ -188,10 +188,7 @@ export function registerRecallTool(pi: ExtensionAPI): void {
 		) {
 			const sessionFile = ctx.sessionManager.getSessionFile();
 			if (!sessionFile) {
-				return {
-					content: [{ type: "text" as const, text: "No session file available." }],
-					details: undefined,
-				};
+				throw new Error("No session file available for this session.");
 			}
 
 			let rows: MessageRow[];
@@ -199,10 +196,7 @@ export function registerRecallTool(pi: ExtensionAPI): void {
 				rows = parseSessionMessages(sessionFile);
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
-				return {
-					content: [{ type: "text" as const, text: `Failed to read session file: ${message}` }],
-					details: undefined,
-				};
+				throw new Error(`Failed to read session file: ${message}`);
 			}
 
 			const expand = (params.expand ?? []).filter((n) => Number.isInteger(n) && n >= 0);
