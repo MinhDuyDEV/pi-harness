@@ -6,7 +6,7 @@ import {
 	type TemporalMessageInput,
 	type TemporalMessageRow,
 } from "./config.js";
-import { getMemoryDB, isSqliteVecAvailable } from "./db.js";
+import { getMemoryDB, isSqliteVecAvailable, runInTransaction } from "./db.js";
 import { markObservationsRetrieved, searchObservationsVector } from "./observations.js";
 
 // ---------------------------------------------------------------------------
@@ -15,7 +15,7 @@ import { markObservationsRetrieved, searchObservationsVector } from "./observati
 
 export function storeTemporalMessage(input: TemporalMessageInput): number {
 	const db = getMemoryDB();
-	const write = db.transaction(() => {
+	return runInTransaction(db, () => {
 		const result = db
 			.prepare(
 				`INSERT OR IGNORE INTO temporal_messages
@@ -40,7 +40,6 @@ export function storeTemporalMessage(input: TemporalMessageInput): number {
 		pruneTemporalMessagesLocked(db);
 		return Number(result.lastInsertRowid);
 	});
-	return write();
 }
 
 function pruneTemporalMessagesLocked(db: ReturnType<typeof getMemoryDB>): number {
@@ -196,7 +195,7 @@ export function storeDistillationAndMarkMessages(
 	messageIds: number[],
 ): number {
 	const db = getMemoryDB();
-	const write = db.transaction(() => {
+	return runInTransaction(db, () => {
 		const distillationId = insertDistillation(db, input);
 		if (messageIds.length > 0) {
 			const placeholders = messageIds.map(() => "?").join(", ");
@@ -206,7 +205,6 @@ export function storeDistillationAndMarkMessages(
 		}
 		return distillationId;
 	});
-	return write();
 }
 
 export function getDistillationById(id: number): DistillationRow | null {

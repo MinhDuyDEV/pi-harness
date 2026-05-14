@@ -34,7 +34,7 @@
  * DCP only provides nudge messages to guide the agent to compress proactively.
  *
  * DEPENDENCIES:
- *   better-sqlite3 (via .pi/extensions/package.json)
+ *   node:sqlite (built into Node.js v22.5+, no native compilation)
  *   @sinclair/typebox (bundled by Pi runtime)
  *   @mariozechner/pi-coding-agent (bundled by Pi runtime — types only)
  */

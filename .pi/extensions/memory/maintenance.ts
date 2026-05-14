@@ -145,7 +145,7 @@ export function archiveOldObservations(options?: ArchiveOptions): number {
 export function checkpointWAL(): { walSize: number; checkpointed: boolean } {
 	const db = getMemoryDB();
 	try {
-		const row = db.pragma("wal_checkpoint(TRUNCATE)") as Array<{
+		const row = db.prepare("PRAGMA wal_checkpoint(TRUNCATE)").all() as Array<{
 			log: number;
 			checkpointed: number;
 		}>;

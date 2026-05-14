@@ -4,8 +4,8 @@
  * 4-tier persistent memory system: capture → distill → curate → recall.
  *
  * DEPENDENCIES:
- *   npm install better-sqlite3
- *   npm install -D @types/better-sqlite3
+ *   node:sqlite (built into Node.js v22.5+, no native compilation)
+ *   sqlite-vec (optional: npm install sqlite-vec) — for vector similarity search
  *
  * WHAT THIS EXTENSION DOES:
  *   - Registers 8 memory tools (observation, search, get, read, update, timeline, admin, feedback)

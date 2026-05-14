@@ -1,14 +1,14 @@
 /**
  * SQLite database layer for the memory system.
- * Uses better-sqlite3 (synchronous, native bindings).
+ * Uses node:sqlite (built into Node.js v22.5+, no native compilation).
  *
- * DEPENDENCY: npm install better-sqlite3 @types/better-sqlite3
+ * DEPENDENCY: none — node:sqlite is bundled with Node.js v22+
  */
 
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { MEMORY_CONFIG } from "./config.js";
 
 // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ import { MEMORY_CONFIG } from "./config.js";
 
 let sqliteVecAvailable = false;
 
-function tryLoadSqliteVec(db: Database.Database): boolean {
+function tryLoadSqliteVec(db: DatabaseSync): boolean {
 	try {
 		// require() used intentionally — sqlite-vec is CJS-only and this must be synchronous
 		const sqliteVec = require("sqlite-vec");
@@ -200,10 +200,26 @@ END;
 `;
 
 // ---------------------------------------------------------------------------
+// Transaction helper (node:sqlite has no db.transaction())
+// ---------------------------------------------------------------------------
+
+export function runInTransaction<T>(db: DatabaseSync, fn: () => T): T {
+	db.exec("BEGIN");
+	try {
+		const result = fn();
+		db.exec("COMMIT");
+		return result;
+	} catch (err) {
+		db.exec("ROLLBACK");
+		throw err;
+	}
+}
+
+// ---------------------------------------------------------------------------
 // DB Singleton
 // ---------------------------------------------------------------------------
 
-let dbInstance: Database.Database | null = null;
+let dbInstance: DatabaseSync | null = null;
 
 function getMemoryDataDir(): string {
 	const dir = path.join(homedir(), ".config", "pi", "memory");
@@ -213,18 +229,19 @@ function getMemoryDataDir(): string {
 	return dir;
 }
 
-export function getMemoryDB(): Database.Database {
+export function getMemoryDB(): DatabaseSync {
 	if (dbInstance) return dbInstance;
 
 	const dbPath = process.env.PI_MEMORY_DB_PATH?.trim() || path.join(getMemoryDataDir(), "memory.db");
-	dbInstance = new Database(dbPath);
+	dbInstance = new DatabaseSync(dbPath, { allowExtension: true });
 
 	// Enable WAL mode + foreign keys
-	dbInstance.pragma("journal_mode = WAL");
-	dbInstance.pragma("foreign_keys = ON");
+	dbInstance.exec("PRAGMA journal_mode = WAL");
+	dbInstance.exec("PRAGMA foreign_keys = ON");
 
-	// Try to load sqlite-vec extension (optional)
+	// Try to load sqlite-vec extension (optional), then lock down extension loading
 	tryLoadSqliteVec(dbInstance);
+	dbInstance.enableLoadExtension(false);
 
 	initializeSchema(dbInstance);
 	return dbInstance;
@@ -241,7 +258,7 @@ export function closeMemoryDB(): void {
 // Schema initialization
 // ---------------------------------------------------------------------------
 
-function initializeSchema(db: Database.Database): void {
+function initializeSchema(db: DatabaseSync): void {
 	// Check current version
 	try {
 		const row = db
@@ -308,8 +325,8 @@ function initializeSchema(db: Database.Database): void {
 	).run(5, new Date().toISOString());
 }
 
-function migrateV1ToV2(db: Database.Database): void {
-	const migration = db.transaction(() => {
+function migrateV1ToV2(db: DatabaseSync): void {
+	runInTransaction(db, () => {
 		// Add source column if missing
 		try {
 			db.exec(
@@ -392,11 +409,10 @@ function migrateV1ToV2(db: Database.Database): void {
 		).run(2, new Date().toISOString());
 	});
 
-	migration();
 }
 
-function migrateV2ToV3(db: Database.Database): void {
-	const migration = db.transaction(() => {
+function migrateV2ToV3(db: DatabaseSync): void {
+	runInTransaction(db, () => {
 		// Add maturity, feedback, and scoring columns
 		const columns = [
 			[
@@ -433,11 +449,10 @@ function migrateV2ToV3(db: Database.Database): void {
 		).run(3, new Date().toISOString());
 	});
 
-	migration();
 }
 
-function migrateV3ToV4(db: Database.Database): void {
-	const migration = db.transaction(() => {
+function migrateV3ToV4(db: DatabaseSync): void {
+	runInTransaction(db, () => {
 		// Add retrieval tracking columns
 		const columns = [
 			["retrieval_count", "INTEGER NOT NULL DEFAULT 0"],
@@ -479,11 +494,10 @@ function migrateV3ToV4(db: Database.Database): void {
 		).run(4, new Date().toISOString());
 	});
 
-	migration();
 }
 
-function migrateV4ToV5(db: Database.Database): void {
-	const migration = db.transaction(() => {
+function migrateV4ToV5(db: DatabaseSync): void {
+	runInTransaction(db, () => {
 		const columns = [
 			["tool_name", "TEXT"],
 			["tool_call_id", "TEXT"],
@@ -508,7 +522,6 @@ function migrateV4ToV5(db: Database.Database): void {
 		).run(5, new Date().toISOString());
 	});
 
-	migration();
 }
 
 // ---------------------------------------------------------------------------
