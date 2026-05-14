@@ -444,8 +444,9 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	//   4. Respecting event.customInstructions from /compact <instructions>
 	//   5. Storing details.mode="dcp-enriched" so session_compact can detect it
 	//
-	// Falls back to { cancel: true } if enriched compaction fails (model/auth unavailable
-	// or generation error). Pi's overflow recovery still works correctly.
+	// Falls back to undefined (defers to Pi native compaction) if enriched compaction fails
+	// (no model, auth unavailable, or generation error). NEVER returns { cancel: true }
+	// without a compaction — that aborts compaction entirely, leaving context unbounded.
 	//
 	// IMPORTANT: We never call ctx.compact() from event handlers — it races with the
 	// agent loop and causes crashes. This hook is the safe interception point.
