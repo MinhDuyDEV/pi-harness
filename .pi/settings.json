@@ -1,8 +1,7 @@
 {
-  "defaultProvider": "ktv",
-  "defaultModel": "gpt-5.5",
+  "defaultProvider": "github-copilot",
+  "defaultModel": "claude-sonnet-4.6",
   "defaultThinkingLevel": "high",
-  "theme": "catppuccin",
   "editorPaddingX": 1,
   "images": {
     "blockImages": false
@@ -15,7 +14,6 @@
     "npm:pi-mcp-adapter",
     "npm:@marckrenn/pi-sub-bar",
     "npm:pi-rewind",
-    "npm:pi-notify",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
@@ -61,5 +59,6 @@
   "powerline": {
     "preset": "default",
     "fixedEditor": true
-  }
+  },
+  "theme": "catppuccin"
 }
