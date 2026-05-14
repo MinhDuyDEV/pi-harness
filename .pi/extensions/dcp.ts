@@ -482,9 +482,11 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		}
 
 		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (!auth.ok || !auth.apiKey) {
-			// Auth unavailable → fall through to Pi native compaction
-			if (config.debug) console.log(`[dcp] Auth unavailable for enriched compaction, deferring to Pi native`);
+		if (!auth.ok) {
+			// Auth resolution failed → fall through to Pi native compaction.
+			// Note: auth.ok === true with apiKey === undefined is valid for OAuth/Pi-subscription
+			// models that authenticate via headers instead of a bare API key.
+			if (config.debug) console.log(`[dcp] Auth unavailable for enriched compaction: ${auth.error}`);
 			return undefined;
 		}
 

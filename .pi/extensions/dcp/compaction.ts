@@ -257,7 +257,7 @@ export async function generateDCPEnrichedCompaction(
 	customInstructions: string | undefined,
 	signal: AbortSignal,
 	model: Model<any>,
-	apiKey: string,
+	apiKey: string | undefined,
 	headers: Record<string, string> | undefined,
 	_config: DCPConfig,
 ): Promise<DCPCompactionResult | null> {
