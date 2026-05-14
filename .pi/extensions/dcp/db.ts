@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { DatabaseSync } from "node:sqlite";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -103,7 +104,7 @@ export interface RawTranscript {
 // Database initialization
 // ---------------------------------------------------------------------------
 
-let _db: any = null;
+let _db: DatabaseSync | null = null;
 
 function getDCPDataDir(): string {
 	const dir = join(homedir(), ".config", "pi", "dcp");
@@ -113,15 +114,14 @@ function getDCPDataDir(): string {
 	return dir;
 }
 
-export function getDCPDB(): any {
+export function getDCPDB(): DatabaseSync {
 	if (_db) return _db;
 
 	try {
-		const Database = require("better-sqlite3");
 		const dbPath = join(getDCPDataDir(), "dcp.db");
-		_db = new Database(dbPath);
-		_db.pragma("journal_mode = WAL");
-		_db.pragma("synchronous = NORMAL");
+		_db = new DatabaseSync(dbPath);
+		_db.exec("PRAGMA journal_mode = WAL");
+		_db.exec("PRAGMA synchronous = NORMAL");
 		initSchema(_db);
 		return _db;
 	} catch (err) {

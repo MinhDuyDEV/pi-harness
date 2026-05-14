@@ -12,18 +12,19 @@
  *   - Persists to SQLite (~/.config/pi/usage/usage.db)
  *
  * DEPENDENCIES:
- *   better-sqlite3 (shared with DCP/memory)
+ *   node:sqlite (built into Node.js v22.5+, no native compilation)
  */
 
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { DatabaseSync } from "node:sqlite";
 
 // ---------------------------------------------------------------------------
 // Database
 // ---------------------------------------------------------------------------
 
-let _db: any = null;
+let _db: DatabaseSync | null = null;
 
 function getDataDir(): string {
 	const dir = join(homedir(), ".config", "pi", "usage");
@@ -33,14 +34,13 @@ function getDataDir(): string {
 	return dir;
 }
 
-function getDB(): any {
+function getDB(): DatabaseSync {
 	if (_db) return _db;
 
-	const Database = require("better-sqlite3");
 	const dbPath = join(getDataDir(), "usage.db");
-	_db = new Database(dbPath);
-	_db.pragma("journal_mode = WAL");
-	_db.pragma("synchronous = NORMAL");
+	_db = new DatabaseSync(dbPath);
+	_db.exec("PRAGMA journal_mode = WAL");
+	_db.exec("PRAGMA synchronous = NORMAL");
 
 	_db.exec(`
 		CREATE TABLE IF NOT EXISTS usage_events (
