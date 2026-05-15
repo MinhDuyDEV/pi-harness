@@ -455,11 +455,12 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	pi.on("session_before_compact", async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
 		const cancelPolicy = config.autoCompact.cancelNativeCompaction;
 
+		// "never" means hands-off completely — skip fallbacks too.
 		if (cancelPolicy === "never") {
 			return undefined;
 		}
 
-		// Determine whether DCP should intercept based on policy + active blocks
+		// Determine whether DCP should intercept with the *primary* model.
 		let shouldIntercept = cancelPolicy === "always";
 		if (cancelPolicy === "when-managed") {
 			try {
@@ -471,61 +472,98 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			}
 		}
 
-		if (!shouldIntercept) return undefined;
-
-		// Resolve current model and auth credentials
-		const model = ctx.model;
-		if (!model) {
-			// No model → fall through to Pi native compaction (don't cancel without replacement)
-			if (config.debug) console.log("[dcp] No model for enriched compaction, deferring to Pi native");
-			return undefined;
-		}
-
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (!auth.ok) {
-			// Auth resolution failed → fall through to Pi native compaction.
-			// Note: auth.ok === true with apiKey === undefined is valid for OAuth/Pi-subscription
-			// models that authenticate via headers instead of a bare API key.
-			if (config.debug) console.log(`[dcp] Auth unavailable for enriched compaction: ${auth.error}`);
-			return undefined;
-		}
-
-		// Generate DCP-enriched custom compaction summary
-		try {
+		// Inner helper: run generateDCPEnrichedCompaction for any resolved model+auth.
+		// Returns the compaction result on success, null when the generator returns
+		// nothing, or throws on hard error (caller decides whether to continue).
+		const tryWith = async (
+			m: Parameters<typeof generateDCPEnrichedCompaction>[4],
+			a: { apiKey: string | undefined; headers: Record<string, string> | undefined },
+		) => {
 			const sessionId = getSessionId(ctx);
-			if (ctx.hasUI) {
-				try { ctx.ui.notify("DCP: generating enriched compaction summary...", "info"); } catch {}
-			}
-
-			const result = await generateDCPEnrichedCompaction(
+			return generateDCPEnrichedCompaction(
 				sessionId,
 				event.preparation as any,
 				event.customInstructions,
 				event.signal,
-				model,
-				auth.apiKey,
-				auth.headers,
+				m,
+				a.apiKey,
+				a.headers,
 				config,
 			);
+		};
 
-			if (result) {
-				if (config.debug) console.log("[dcp] Enriched compaction succeeded");
-				if (ctx.hasUI) {
-					try { ctx.ui.notify("DCP: enriched compaction complete", "info"); } catch {}
+		// --- 1. Primary model (only when policy says we should intercept) ---
+		if (shouldIntercept) {
+			const model = ctx.model;
+			if (!model) {
+				if (config.debug) console.log("[dcp] No primary model — will try fallbacks");
+			} else {
+				const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+				if (!auth.ok) {
+					if (config.debug) console.log(`[dcp] Primary model auth unavailable (${auth.error}) — will try fallbacks`);
+				} else {
+					try {
+						if (ctx.hasUI) {
+							try { ctx.ui.notify("DCP: generating enriched compaction summary...", "info"); } catch {}
+						}
+						const result = await tryWith(model, auth);
+						if (result) {
+							if (config.debug) console.log("[dcp] Enriched compaction succeeded (primary)");
+							if (ctx.hasUI) {
+								try { ctx.ui.notify("DCP: enriched compaction complete", "info"); } catch {}
+							}
+							return { compaction: result } as SessionBeforeCompactResult;
+						}
+						if (config.debug) console.log("[dcp] Primary model returned null — will try fallbacks");
+					} catch (err) {
+						if (config.debug) console.error("[dcp] Enriched compaction error (primary):", err);
+						if (ctx.hasUI) {
+							try { ctx.ui.notify(`DCP: enriched compaction failed (primary) — trying fallback models`, "warning"); } catch {}
+						}
+					}
 				}
-				return { compaction: result } as SessionBeforeCompactResult;
-			}
-		} catch (err) {
-			if (config.debug) console.error("[dcp] Enriched compaction error:", err);
-			if (ctx.hasUI) {
-				try { ctx.ui.notify(`DCP: enriched compaction failed, cancelling — ${err}`, "warning"); } catch {}
 			}
 		}
 
-		// Enriched compaction failed — fall through to Pi native compaction
+		// --- 2. Fallback models ---
+		// Runs even when shouldIntercept=false so a rate-limited primary quota
+		// (the scenario that triggered this code path) still gets a usable
+		// compaction rather than handing off to Pi native which would hit the
+		// same exhausted model and fail identically.
+		const fallbacks = config.autoCompact.fallbackModels ?? [];
+		for (const fb of fallbacks) {
+			try {
+				const fbModel = ctx.modelRegistry.find(fb.provider, fb.modelId);
+				if (!fbModel) {
+					if (config.debug) console.log(`[dcp] Fallback model not found: ${fb.provider}/${fb.modelId}`);
+					continue;
+				}
+				const fbAuth = await ctx.modelRegistry.getApiKeyAndHeaders(fbModel);
+				if (!fbAuth.ok) {
+					if (config.debug) console.log(`[dcp] Fallback ${fb.provider}/${fb.modelId} auth unavailable: ${fbAuth.error}`);
+					continue;
+				}
+				if (ctx.hasUI) {
+					try { ctx.ui.notify(`DCP: retrying compaction with fallback model (${fb.modelId})...`, "info"); } catch {}
+				}
+				const result = await tryWith(fbModel, fbAuth);
+				if (result) {
+					if (config.debug) console.log(`[dcp] Enriched compaction succeeded (fallback: ${fb.provider}/${fb.modelId})`);
+					if (ctx.hasUI) {
+						try { ctx.ui.notify(`DCP: enriched compaction complete (fallback: ${fb.modelId})`, "info"); } catch {}
+					}
+					return { compaction: result } as SessionBeforeCompactResult;
+				}
+				if (config.debug) console.log(`[dcp] Fallback ${fb.provider}/${fb.modelId} returned null`);
+			} catch (err) {
+				if (config.debug) console.error(`[dcp] Enriched compaction error (fallback: ${fb.provider}/${fb.modelId}):`, err);
+			}
+		}
+
+		// All options exhausted — fall through to Pi native compaction.
 		// IMPORTANT: never return { cancel: true } without a compaction object;
 		// that tells Pi to abort the compaction entirely, leaving context unbounded.
-		if (config.debug) console.log("[dcp] Enriched compaction unavailable, deferring to Pi native");
+		if (config.debug) console.log("[dcp] All enriched compaction options exhausted, deferring to Pi native");
 		return undefined;
 	});
 

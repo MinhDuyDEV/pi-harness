@@ -164,6 +164,17 @@ export interface AutoCompactConfig {
 	 *   - "never": Never cancel (current default behavior)
 	 */
 	cancelNativeCompaction: "always" | "when-managed" | "never";
+	/**
+	 * Fallback models to try for enriched compaction when the primary model
+	 * fails (e.g. rate-limited / 429). Tried in order before deferring to
+	 * Pi native compaction. Activated even when `cancelNativeCompaction` is
+	 * "when-managed" and there are no active DCP blocks, so context overflow
+	 * recovery has a fighting chance when the primary quota is exhausted.
+	 *
+	 * Each entry must match a provider+model registered in the Pi model
+	 * registry (ctx.modelRegistry.find). Set to [] to disable.
+	 */
+	fallbackModels?: Array<{ provider: string; modelId: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,5 +351,8 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		thresholdPercent: 80,
 		customInstructions: "Focus on preserving: key decisions, file paths modified, current task state, and next steps. Be thorough but concise.",
 		cancelNativeCompaction: "when-managed",
+		// Try Haiku on Copilot as the first fallback — cheaper quota bucket than Sonnet,
+		// so a Sonnet 429 does not cascade into a total compaction failure.
+		fallbackModels: [{ provider: "github-copilot", modelId: "claude-haiku-4.5" }],
 	},
 };
