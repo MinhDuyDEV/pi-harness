@@ -1,6 +1,6 @@
 {
   "defaultProvider": "github-copilot",
-  "defaultModel": "claude-sonnet-4.6",
+  "defaultModel": "gpt-5.4",
   "defaultThinkingLevel": "high",
   "editorPaddingX": 1,
   "images": {

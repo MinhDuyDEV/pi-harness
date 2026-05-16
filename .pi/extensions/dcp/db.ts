@@ -729,8 +729,8 @@ export function resetSessionState(sessionId: string, deactivateBlocks: boolean =
 	if (deactivateBlocks) {
 		// Deactivate all compression blocks — their summaries are now encoded in the
 		// compaction entry so they no longer need to be re-injected separately.
-		// ONLY do this when DCP provided the compaction (fromExtension: true).
-		// For Pi-native compaction, blocks are NOT in the summary and must stay active.
+		// ONLY do this when DCP provided the enriched compaction. Pi-native and
+		// other extension compactions are not guaranteed to include DCP blocks.
 		db.prepare(
 			"UPDATE compression_blocks SET active = 0, deactivated_at = ? WHERE session_id = ? AND active = 1",
 		).run(Date.now(), sessionId);

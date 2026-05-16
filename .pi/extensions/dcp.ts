@@ -92,7 +92,6 @@ import {
 	storeRawTranscript,
 } from "./dcp/db.js";
 import { registerCompressTool } from "./dcp/tools.js";
-import { registerRecallTool } from "./dcp/recall.js";
 import { registerSnapshotTool } from "./dcp/snapshot.js";
 import { applyStrategies, applyDeferredDrops, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
 import { TagManager } from "./dcp/tags.js";
@@ -168,11 +167,11 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		initialized = true;
 	}
 
-	// 3. Register tools (compress + ctx_expand + vcc_recall + vcc_snapshot)
+	// 3. Register tools (compress + ctx_expand + vcc_snapshot)
+	// pi-vcc owns vcc_recall; DCP stays focused on runtime pruning and DCP-specific context tools.
 	// Pass getPriorityMap callback so compress tool can show priority suggestions in message mode
 	registerCompressTool(pi, config, () => nudgeManager.getPriorityMap());
 	registerExpandTool(pi, config);
-	registerRecallTool(pi);
 	registerSnapshotTool(pi);
 
 	// -----------------------------------------------------------------------
@@ -621,10 +620,12 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			}
 
 			// Reset session state (tool calls, tags, drop queue).
-			// Only deactivate DCP blocks when DCP provided the compaction (fromExtension: true).
-			// Pi-native compaction does NOT include DCP block summaries, so blocks must stay
-			// active and continue being re-injected via before_agent_start.
-			resetSessionState(sessionId, event.fromExtension);
+			// Only deactivate DCP blocks when DCP itself provided the enriched compaction.
+			// Other extension compactions (notably pi-vcc) do NOT include DCP block summaries,
+			// so blocks must stay active and continue being re-injected via before_agent_start.
+			const details = event.compactionEntry?.details as { mode?: string } | undefined;
+			const wasDcpEnrichedCompaction = details?.mode === "dcp-enriched";
+			resetSessionState(sessionId, wasDcpEnrichedCompaction);
 			currentTurn = 0;
 
 			// Reset managers

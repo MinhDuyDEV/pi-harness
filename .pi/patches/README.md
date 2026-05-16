@@ -1,6 +1,16 @@
 # Pikit Runtime Overrides
 
-No active patches or forks. Runtime uses upstream packages directly:
+Active runtime patch:
+
+- `pi-vcc-tui-safe-lines.patch` — wraps long `@sting8k/pi-vcc` compaction summary lines at 120 chars so Pi's compaction TUI does not render huge mostly-empty blocks with scattered text.
+
+Reapply after reinstalling Pi npm packages:
+
+```bash
+bash .pi/patches/apply-runtime-patches.sh
+```
+
+Runtime otherwise uses upstream packages directly:
 
 - `@tintinweb/pi-subagents` — agent spawning, RPC handlers
 - `@tintinweb/pi-tasks` — task DAG, TaskExecute, cascade

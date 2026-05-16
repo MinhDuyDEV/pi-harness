@@ -4,21 +4,7 @@ This extension owns compaction policy and adds session context tools.
 
 ## Tools
 
-### `vcc_recall`
-Search or inspect raw session message history.
-
-- Params:
-  - `query?: string` — regex-first search, fallback OR-ranked word matching
-  - `expand?: number[]` — return full content for selected entry indices
-- Behavior:
-  - No query: returns recent indexed entries
-  - Query: returns ranked matches
-  - Expand: returns full payload for specific entries
-
-Examples:
-- `vcc_recall()`
-- `vcc_recall({"query":"vcc_snapshot|snapshot.ts"})`
-- `vcc_recall({"expand":[185]})`
+`vcc_recall` is intentionally owned by `@sting8k/pi-vcc` in this project so deterministic pi-vcc recall can coexist with DCP runtime pruning.
 
 ### `vcc_snapshot`
 Build deterministic summary sections from session JSONL (no LLM calls).
