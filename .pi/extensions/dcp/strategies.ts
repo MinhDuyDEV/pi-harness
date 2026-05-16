@@ -13,11 +13,74 @@
  *   - Custom: { role: "custom", customType, content: string | ContentPart[] }
  *   - Compaction: { role: "compactionSummary", summary }
  * NOT the Anthropic API format (tool_use/tool_result).
+ *
+ * SCHEMA-SAFETY RULE:
+ * Never replace the entire `arguments` object with DCP-only metadata. Different tools
+ * have different required properties and some use `additionalProperties: false` (notably
+ * the `edit` tool). Always preserve ALL original keys. Only truncate known-large value
+ * fields (`content` for write, `edits` for edit) to short markers. This keeps token
+ * savings while ensuring tool schema validation never fails.
  */
 
 import type { DCPConfig } from "./config.js";
 import { hashParams, estimateTokens } from "./utils.js";
 import { getTagsForSession, type MessageTag } from "./db.js";
+
+// ---------------------------------------------------------------------------
+// Schema-safe argument truncation
+//
+// DCP strategies need to save tokens by stripping large content from tool call
+// arguments. But replacing the entire `arguments` object breaks tool schemas
+// that require specific properties or use `additionalProperties: false`.
+//
+// The fix: preserve ALL original keys, only truncate known-large value fields
+// to short markers. This keeps token savings while maintaining schema validity.
+// ---------------------------------------------------------------------------
+
+/**
+ * Known tool schemas with their large value fields:
+ * - write: { path: string, content: string } — content can be huge
+ * - edit: { path: string, edits: [{ oldText, newText }] } — edits can be large
+ *
+ * Other tool schemas are left completely unchanged.
+ */
+function truncateToolArguments(tc: ToolCallContent, shortMarker: string): { prunedTokens: number } {
+	if (!tc.arguments || typeof tc.arguments !== "object") {
+		return { prunedTokens: 0 };
+	}
+
+	const beforeTokens = estimateTokens(JSON.stringify(tc.arguments));
+
+	// Preserve ALL original keys — never drop them
+	const preserved: Record<string, unknown> = { ...tc.arguments };
+
+	// Truncate known-large value fields to short markers
+	switch (tc.name) {
+		case "write": {
+			if (typeof preserved.content === "string") {
+				preserved.content = `[DCP: ${shortMarker}]`;
+			}
+			break;
+		}
+		case "edit": {
+			if (Array.isArray(preserved.edits)) {
+				// Keep `edits` as a valid array so schema validation (required + additionalProperties)
+				// doesn't reject the tool call. A single dummy entry with non-matching oldText
+				// is harmless in the conversation history.
+				preserved.edits = [{ oldText: `[DCP: ${shortMarker}]`, newText: "" }];
+			}
+			break;
+		}
+		// For all other tools, keep arguments completely unchanged.
+		// Adding metadata properties (_dcp_*, _note) would violate
+		// additionalProperties: false on some tool schemas.
+	}
+
+	const afterTokens = estimateTokens(JSON.stringify(preserved));
+	tc.arguments = preserved;
+
+	return { prunedTokens: Math.max(0, beforeTokens - afterTokens) };
+}
 
 // ---------------------------------------------------------------------------
 // AgentMessage type shapes (from @mariozechner/pi-agent-core + pi-ai)
@@ -107,7 +170,7 @@ export interface StrategyResult {
 
 /** Raw messages from a compressed range, for ctx_expand storage */
 export interface CompressedRange {
-	/** Compression block ID (from the compress tool result, e.g. b3 → 3) */
+	/** Compression block ID (from the compress tool result, e.g. b3 -> 3) */
 	blockId: number;
 	/** Raw messages in the compressed range (before stripping) */
 	rawMessages: AgentMessage[];
@@ -579,12 +642,12 @@ function applyDeduplication(
 			const oldCall = calls[i];
 
 			// Strip the toolCall arguments in the assistant message
+			// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
 			const msg = messages[oldCall.messageIndex] as AssistantMessage;
 			if (Array.isArray(msg.content)) {
 				const tc = msg.content[oldCall.contentIndex] as ToolCallContent;
-				const savedTokens = estimateTokens(JSON.stringify(tc.arguments));
-				tc.arguments = { _dcp_deduped: true, _note: `Duplicate of later call at msg ${latestCall.messageIndex}` };
-				result.prunedTokens += savedTokens;
+				const { prunedTokens } = truncateToolArguments(tc, "deduplicated");
+				result.prunedTokens += prunedTokens;
 				result.prunedCount++;
 			}
 
@@ -626,7 +689,7 @@ function applySupersedeWrites(
 	const writeTools = new Set(["write", "edit"]);
 	const readTools = new Set(["read", "srcwalk_read"]);
 
-	// Build map: filepath → message index of latest read
+	// Build map: filepath -> message index of latest read
 	const fileReads = new Map<string, number>();
 	for (const op of ops) {
 		if (op.type !== "call") continue;
@@ -654,15 +717,9 @@ function applySupersedeWrites(
 		if (latestReadIdx === undefined || latestReadIdx <= op.messageIndex) continue;
 
 		// Write is superseded by later read
-		const contentStr = (tc.arguments?.content as string) ?? JSON.stringify(tc.arguments);
-		const savedTokens = estimateTokens(contentStr);
-
-		tc.arguments = {
-			path: filePath,
-			_dcp_superseded: true,
-			_note: `Content superseded by later read at msg ${latestReadIdx}`,
-		};
-		result.prunedTokens += savedTokens;
+		// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
+		const { prunedTokens } = truncateToolArguments(tc, "superseded");
+		result.prunedTokens += prunedTokens;
 		result.prunedCount++;
 		result.actions.push(`supersede: ${op.toolName}(${filePath}) at msg ${op.messageIndex}`);
 	}
@@ -714,23 +771,19 @@ function applyPurgeErrors(
 		if (estimatedTurnAge < turnsThreshold) continue;
 
 		// Strip the tool call arguments
+		// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
 		const msg = messages[op.messageIndex] as AssistantMessage;
 		if (Array.isArray(msg.content)) {
 			const tc = msg.content[op.contentIndex] as ToolCallContent;
 			const inputStr = JSON.stringify(tc.arguments);
-			const savedTokens = estimateTokens(inputStr);
 
 			// Only strip substantial inputs (> 200 chars / ~50 tokens)
 			if (inputStr.length < 200) continue;
 
-			tc.arguments = {
-				_dcp_error_purged: true,
-				_tool: op.toolName,
-				_note: `Errored input purged after ~${estimatedTurnAge} turns (~${savedTokens} tokens saved)`,
-			};
-			result.prunedTokens += savedTokens;
+			const { prunedTokens } = truncateToolArguments(tc, "error-purged");
+			result.prunedTokens += prunedTokens;
 			result.prunedCount++;
-			result.actions.push(`purge-error: ${op.toolName} at msg ${op.messageIndex} (~${savedTokens} tokens)`);
+			result.actions.push(`purge-error: ${op.toolName} at msg ${op.messageIndex} (~${prunedTokens} tokens)`);
 		}
 	}
 
@@ -789,7 +842,7 @@ export function computePriorityMap(messages: AgentMessage[]): PriorityMap {
 		(e) => `${e.toolName} (${e.count}x, ~${Math.round(e.totalTokens / 1000)}k tokens)`,
 	);
 
-	return { high, medium, low, totalTokens, topTargets };
+	return { high, medium, low, topTargets, totalTokens };
 }
 
 // ---------------------------------------------------------------------------
@@ -904,15 +957,12 @@ export function applyDeferredDrops(
 		if (!signaturesForDrop.has(sig)) continue;
 
 		// Strip the tool call arguments
+		// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
 		const msg = messages[op.messageIndex] as AssistantMessage;
 		if (Array.isArray(msg.content)) {
 			const tc = msg.content[op.contentIndex] as ToolCallContent;
-			const savedTokens = estimateTokens(JSON.stringify(tc.arguments));
-			tc.arguments = {
-				_dcp_deferred_drop: true,
-				_note: `Dropped by deferred queue (cache TTL expired)`,
-			};
-			result.prunedTokens += savedTokens;
+			const { prunedTokens } = truncateToolArguments(tc, "deferred-drop");
+			result.prunedTokens += prunedTokens;
 			result.prunedCount++;
 			result.actions.push(`deferred-drop: ${op.toolName} at msg ${op.messageIndex}`);
 		}
