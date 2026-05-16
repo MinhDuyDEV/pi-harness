@@ -201,8 +201,8 @@ export function registerCompressTool(
 						throw new Error(
 							`Cannot compress: only ${userTurnsSinceBoundary} user turn(s) ${context}. ` +
 							`At least ${protectedTurns + 1} user turns are required before compression ` +
-							`to preserve recent working context. Continue working and compress later ` +
-							`when there are more completed phases to crystallize.`
+							`to ensure there is completed work worth crystallizing. ` +
+							`Complete the current phase first, then compress it.`
 						);
 					}
 				} catch (err) {

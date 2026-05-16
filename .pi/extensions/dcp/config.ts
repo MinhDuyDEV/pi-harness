@@ -288,7 +288,7 @@ export const DEFAULT_CONFIG: DCPConfig = {
 	},
 	turnProtection: {
 		enabled: true,
-		turns: 3,
+		turns: 1,
 	},
 	experimental: {
 		customPrompts: false,
