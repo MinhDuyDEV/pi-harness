@@ -10,14 +10,14 @@
     "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@tintinweb/pi-subagents",
     "npm:@tintinweb/pi-tasks",
-    "npm:pi-teams",
     "npm:pi-mcp-adapter",
     "npm:@marckrenn/pi-sub-bar",
     "npm:pi-rewind",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
-    "npm:pi-powerline-footer"
+    "npm:pi-powerline-footer",
+    "npm:@sting8k/pi-vcc@0.3.13"
   ],
   "compaction": {
     "enabled": true,

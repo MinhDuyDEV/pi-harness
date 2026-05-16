@@ -1,4 +1,4 @@
-# Delegation — Three-Layer Model
+# Delegation — Two-Layer Model
 
 **Purpose**: Delegation mechanics only.
 **Boundary**: Global safety, honesty, verification, and edit discipline live in `AGENTS.md`. This file owns routing, delegation patterns, and subagent execution contracts.
@@ -7,12 +7,11 @@
 **Prefer it when**: the instruction can layer on top of Pi's default prompt instead of replacing it.
 **Do not use it for**: copying the whole `AGENTS.md`, restating local project conventions that belong in `AGENTS.md`, echoing `SYSTEM.md`, or full prompt replacement. If you truly need prompt replacement, use `.pi/SYSTEM.md` intentionally and keep it minimal.
 
-Three integrated systems for delegating work, each optimized for different scales:
+Two integrated systems for delegating work, each optimized for different scales:
 
 ```
 Layer 1: @tintinweb/pi-subagents  →  Fast in-process agents (seconds to minutes)
 Layer 2: @tintinweb/pi-tasks      →  DAG orchestration + auto-cascade execution
-Layer 3: pi-teams                  →  Multi-process coordination (full context per agent)
 ```
 
 ## Layer 1: Subagents (`@tintinweb/pi-subagents`)
@@ -25,7 +24,7 @@ Lightweight in-process delegation. Results flow back into the conversation.
 | `get_subagent_result` | Fetch output from a background agent |
 | `steer_subagent` | Redirect a running background agent |
 
-**Use for:** quick tasks, single-shot delegation, and parallel batches under ~5 minutes each.
+**Use for:** quick tasks, single-shot delegation, and parallel batches of any duration.
 
 ```
 Agent(type: "explore", prompt: "find all API routes", run_in_background: true)
@@ -57,28 +56,6 @@ TaskUpdate(taskId: "3", addBlockedBy: ["2"])
 TaskExecute(task_ids: ["1"])  → auto-cascades through #2 → #3
 ```
 
-## Layer 3: Teams (`pi-teams`)
-
-Separate Pi processes in tmux panes/windows. Each teammate gets its own context window, task board, and inbox.
-
-| Tool | Purpose |
-|---|---|
-| `team_create` | Create a team |
-| `spawn_teammate` | Launch an agent with a role prompt |
-| `send_message` / `broadcast_message` | Coordinate teammates |
-| `read_inbox` / `check_teammate` | Inspect teammate status |
-| `task_create` / `task_update` / `task_list` | Shared team task board |
-| `team_shutdown` | Clean up panes/windows and coordination files |
-
-**Use for:** long-running parallel work, multiple specialists needing deep context, or human-overseen coordination.
-
-```
-team_create("feature-x")
-spawn_teammate("feature-x", "researcher", "Research X", cwd: ".")
-spawn_teammate("feature-x", "implementer", "Build X", cwd: ".")
-spawn_teammate("feature-x", "tester", "Test X", cwd: ".")
-```
-
 ## Decision Flowchart
 
 ```
@@ -88,14 +65,7 @@ Is it < 3 independent tasks?
 
 Do tasks have dependencies (A must finish before B)?
   YES → TaskCreate + TaskExecute
-  NO ↓
-
-Do tasks need sustained context (> 15 min each)?
-  YES → pi-teams
   NO → background Agents in parallel
-
-Need human approval before code changes?
-  YES → pi-teams with plan gating
 ```
 
 ## Context Continuity (DCP/VCC)
@@ -123,15 +93,7 @@ TaskCreate(#3: "Implement", agentType: "worker", blockedBy: [#2])
 TaskExecute([#1])
 ```
 
-**Pattern 3: Big Feature**
-```
-team_create("feature-x")
-spawn_teammate("feature-x", "researcher", "Deep research on X", cwd: ".")
-spawn_teammate("feature-x", "implementer", "Build X after research", cwd: ".")
-spawn_teammate("feature-x", "tester", "Write tests for X", cwd: ".")
-```
-
-**Pattern 4: Hybrid**
+**Pattern 3: Hybrid (parallel + gate)**
 ```
 TaskCreate(#1: "Fix auth bug", agentType: "worker")
 TaskCreate(#2: "Fix payment bug", agentType: "worker")
