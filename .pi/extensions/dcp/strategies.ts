@@ -43,6 +43,10 @@ import { getTagsForSession, type MessageTag } from "./db.js";
  * - edit: { path: string, edits: [{ oldText, newText }] } — edits can be large
  *
  * Other tool schemas are left completely unchanged.
+ *
+ * NOTE: The placeholder format should not use DCP-internal prefixes like `[DCP: ...]`
+ * because that leaks implementation details into visible conversation history.
+ * Use `[truncated: ...]` instead — it's self-explanatory and doesn't reference internals.
  */
 function truncateToolArguments(tc: ToolCallContent, shortMarker: string): { prunedTokens: number } {
 	if (!tc.arguments || typeof tc.arguments !== "object") {
@@ -58,7 +62,7 @@ function truncateToolArguments(tc: ToolCallContent, shortMarker: string): { prun
 	switch (tc.name) {
 		case "write": {
 			if (typeof preserved.content === "string") {
-				preserved.content = `[DCP: ${shortMarker}]`;
+				preserved.content = `[truncated: ${shortMarker}]`;
 			}
 			break;
 		}
@@ -67,7 +71,7 @@ function truncateToolArguments(tc: ToolCallContent, shortMarker: string): { prun
 				// Keep `edits` as a valid array so schema validation (required + additionalProperties)
 				// doesn't reject the tool call. A single dummy entry with non-matching oldText
 				// is harmless in the conversation history.
-				preserved.edits = [{ oldText: `[DCP: ${shortMarker}]`, newText: "" }];
+				preserved.edits = [{ oldText: `[truncated: ${shortMarker}]`, newText: "" }];
 			}
 			break;
 		}
@@ -656,7 +660,7 @@ function applyDeduplication(
 				if (op.type === "result" && op.toolCallId === oldCall.toolCallId) {
 					const rmsg = messages[op.messageIndex] as ToolResultMessage;
 					const savedResultTokens = op.tokenEstimate;
-					rmsg.content = [{ type: "text", text: "[DCP: deduplicated — see latest call]" }];
+					rmsg.content = [{ type: "text", text: "[truncated: deduplicated — see latest call]" }];
 					result.prunedTokens += savedResultTokens;
 				}
 			}
@@ -671,8 +675,12 @@ function applyDeduplication(
 // ---------------------------------------------------------------------------
 // Strategy 2: Supersede-Writes
 //
-// When a file is written (write/edit) then later read, the write's input
-// content is redundant — the read has the current state.
+// When a file is written (write/edit) then later WRITTEN again to the same
+// path, the earlier write's content is truly superseded — intent has moved
+// to the later write. A read after write is NOT supersession; it's the
+// standard verification pattern (write → read-back to confirm). The read
+// result shows current state, but the write content carries the agent's
+// intent in the reasoning chain. Only prune when a later write replaces it.
 // ---------------------------------------------------------------------------
 
 function applySupersedeWrites(
@@ -687,23 +695,22 @@ function applySupersedeWrites(
 	const result: StrategyResult = { prunedTokens: 0, prunedCount: 0, actions: [] };
 
 	const writeTools = new Set(["write", "edit"]);
-	const readTools = new Set(["read", "srcwalk_read"]);
 
-	// Build map: filepath -> message index of latest read
-	const fileReads = new Map<string, number>();
+	// Build map: filepath -> message index of latest WRITE (same superseding concept)
+	const fileWrites = new Map<string, number>();
 	for (const op of ops) {
 		if (op.type !== "call") continue;
-		if (!readTools.has(op.toolName)) continue;
+		if (!writeTools.has(op.toolName)) continue;
 
 		const msg = messages[op.messageIndex] as AssistantMessage;
 		const tc = msg.content[op.contentIndex] as ToolCallContent;
 		const filePath = (tc.arguments?.path as string) ?? "";
 		if (filePath) {
-			fileReads.set(filePath, op.messageIndex);
+			fileWrites.set(filePath, op.messageIndex);
 		}
 	}
 
-	// Find writes where a later read exists
+	// Find writes where a later WRITE to the same file exists
 	for (const op of ops) {
 		if (op.type !== "call") continue;
 		if (!writeTools.has(op.toolName)) continue;
@@ -713,15 +720,16 @@ function applySupersedeWrites(
 		const filePath = (tc.arguments?.path as string) ?? "";
 		if (!filePath) continue;
 
-		const latestReadIdx = fileReads.get(filePath);
-		if (latestReadIdx === undefined || latestReadIdx <= op.messageIndex) continue;
+		const latestWriteIdx = fileWrites.get(filePath);
+		// Must be a later write (strictly greater index) — same op is not a superseder
+		if (latestWriteIdx === undefined || latestWriteIdx <= op.messageIndex) continue;
 
-		// Write is superseded by later read
+		// Write is superseded by a later write — the first write's content is stale
 		// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
 		const { prunedTokens } = truncateToolArguments(tc, "superseded");
 		result.prunedTokens += prunedTokens;
 		result.prunedCount++;
-		result.actions.push(`supersede: ${op.toolName}(${filePath}) at msg ${op.messageIndex}`);
+		result.actions.push(`supersede: ${op.toolName}(${filePath}) at msg ${op.messageIndex} superseded by later write at msg ${latestWriteIdx}`);
 	}
 
 	return result;
@@ -972,7 +980,7 @@ export function applyDeferredDrops(
 			if (resultOp.type === "result" && resultOp.toolCallId === op.toolCallId) {
 				const rmsg = messages[resultOp.messageIndex] as ToolResultMessage;
 				const savedResultTokens = resultOp.tokenEstimate;
-				rmsg.content = [{ type: "text", text: "[DCP: deferred drop — cache expired]" }];
+				rmsg.content = [{ type: "text", text: "[truncated: cache expired]" }];
 				result.prunedTokens += savedResultTokens;
 			}
 		}
