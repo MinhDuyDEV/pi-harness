@@ -50,10 +50,6 @@ export interface DeduplicationConfig {
 	protectedTools: string[];
 }
 
-export interface SupersedeWritesConfig {
-	enabled: boolean;
-}
-
 export interface PurgeErrorsConfig {
 	enabled: boolean;
 	/** Number of turns to wait before purging errored tool inputs */
@@ -63,7 +59,6 @@ export interface PurgeErrorsConfig {
 
 export interface StrategiesConfig {
 	deduplication: DeduplicationConfig;
-	supersedeWrites: SupersedeWritesConfig;
 	purgeErrors: PurgeErrorsConfig;
 }
 
@@ -272,9 +267,6 @@ export const DEFAULT_CONFIG: DCPConfig = {
 			// write/edit protected from dedup (file mutations are unique operations)
 			// but NOT in compress.protectedTools (their diff outputs are too large for auto-preserve)
 			protectedTools: ["write", "edit"],
-		},
-		supersedeWrites: {
-			enabled: true,
 		},
 		purgeErrors: {
 			enabled: true,

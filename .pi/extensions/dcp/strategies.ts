@@ -1,8 +1,8 @@
 /**
  * DCP Extension — Runtime Auto-Pruning Strategies (v2)
  *
- * Implements deduplication, supersede-writes, purge-errors, and compress-range
- * stripping as runtime message filters via Pi's `context` event hook.
+ * Implements deduplication, purge-errors, and compress-range stripping as
+ * runtime message filters via Pi's `context` event hook.
  *
  * These strategies operate on AgentMessage[] deep copies — safe to mutate.
  * The `context` event fires before EVERY LLM call, so these run automatically.
@@ -673,69 +673,6 @@ function applyDeduplication(
 }
 
 // ---------------------------------------------------------------------------
-// Strategy 2: Supersede-Writes
-//
-// When a file is written (write/edit) then later WRITTEN again to the same
-// path, the earlier write's content is truly superseded — intent has moved
-// to the later write. A read after write is NOT supersession; it's the
-// standard verification pattern (write → read-back to confirm). The read
-// result shows current state, but the write content carries the agent's
-// intent in the reasoning chain. Only prune when a later write replaces it.
-// ---------------------------------------------------------------------------
-
-function applySupersedeWrites(
-	messages: AgentMessage[],
-	config: DCPConfig,
-	ops: ToolOp[],
-): StrategyResult {
-	if (!config.strategies.supersedeWrites.enabled) {
-		return { prunedTokens: 0, prunedCount: 0, actions: [] };
-	}
-
-	const result: StrategyResult = { prunedTokens: 0, prunedCount: 0, actions: [] };
-
-	const writeTools = new Set(["write", "edit"]);
-
-	// Build map: filepath -> message index of latest WRITE (same superseding concept)
-	const fileWrites = new Map<string, number>();
-	for (const op of ops) {
-		if (op.type !== "call") continue;
-		if (!writeTools.has(op.toolName)) continue;
-
-		const msg = messages[op.messageIndex] as AssistantMessage;
-		const tc = msg.content[op.contentIndex] as ToolCallContent;
-		const filePath = (tc.arguments?.path as string) ?? "";
-		if (filePath) {
-			fileWrites.set(filePath, op.messageIndex);
-		}
-	}
-
-	// Find writes where a later WRITE to the same file exists
-	for (const op of ops) {
-		if (op.type !== "call") continue;
-		if (!writeTools.has(op.toolName)) continue;
-
-		const msg = messages[op.messageIndex] as AssistantMessage;
-		const tc = msg.content[op.contentIndex] as ToolCallContent;
-		const filePath = (tc.arguments?.path as string) ?? "";
-		if (!filePath) continue;
-
-		const latestWriteIdx = fileWrites.get(filePath);
-		// Must be a later write (strictly greater index) — same op is not a superseder
-		if (latestWriteIdx === undefined || latestWriteIdx <= op.messageIndex) continue;
-
-		// Write is superseded by a later write — the first write's content is stale
-		// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
-		const { prunedTokens } = truncateToolArguments(tc, "superseded");
-		result.prunedTokens += prunedTokens;
-		result.prunedCount++;
-		result.actions.push(`supersede: ${op.toolName}(${filePath}) at msg ${op.messageIndex} superseded by later write at msg ${latestWriteIdx}`);
-	}
-
-	return result;
-}
-
-// ---------------------------------------------------------------------------
 // Strategy 3: Purge Errors
 //
 // After N turns, strip large input content from errored tool calls.
@@ -864,8 +801,7 @@ export function computePriorityMap(messages: AgentMessage[]): PriorityMap {
  * Order matters:
  * 1. compress-strip (removes whole ranges, changes indices)
  * 2. dedup (strips duplicate tool calls within remaining messages)
- * 3. supersede-writes (strips write inputs superseded by reads)
- * 4. purge-errors (strips old errored tool inputs)
+ * 3. purge-errors (strips old errored tool inputs)
  *
  * @param messages - Deep-cloned AgentMessage[] from the context event (safe to mutate)
  * @param sessionId - Current session ID for DB lookups
@@ -903,13 +839,7 @@ export function applyStrategies(
 	totalResult.prunedCount += dedupResult.prunedCount;
 	totalResult.actions.push(...dedupResult.actions);
 
-	// Strategy 2: Supersede-writes
-	const supersedeResult = applySupersedeWrites(messages, config, ops);
-	totalResult.prunedTokens += supersedeResult.prunedTokens;
-	totalResult.prunedCount += supersedeResult.prunedCount;
-	totalResult.actions.push(...supersedeResult.actions);
-
-	// Strategy 3: Purge-errors
+	// Strategy 2: Purge-errors
 	const purgeResult = applyPurgeErrors(messages, config, currentTurn, ops, protectedToolSet);
 	totalResult.prunedTokens += purgeResult.prunedTokens;
 	totalResult.prunedCount += purgeResult.prunedCount;

@@ -6,7 +6,7 @@
  *
  * WHAT THIS EXTENSION DOES:
  *   Phase 1 — Runtime-enforced context management:
- *     - `context` event: Auto-prunes duplicates, superseded writes, and old errors
+ *     - `context` event: Auto-prunes duplicates and old errors
  *     - `turn_end` event: Real nudge system with ctx.getContextUsage()
  *     - `session_before_compact`: Enriched compaction with DCP block summaries
  *     - `before_agent_start`: Injects nudge messages and facts summary
@@ -230,7 +230,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			ensureInitialized(ctx);
 			const sessionId = getSessionId(ctx);
 
-			// Apply runtime strategies (dedup, supersede-writes, purge-errors)
+			// Apply runtime strategies (dedup, purge-errors)
 			// Note: strategies.ts uses structural AgentMessage types that are
 			// compatible with pi-agent-core's AgentMessage at runtime (jiti skips typechecks)
 			const { messages, totalResult, rawRanges } = applyStrategies(
