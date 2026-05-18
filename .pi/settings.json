@@ -1,6 +1,6 @@
 {
-  "defaultProvider": "github-copilot",
-  "defaultModel": "gpt-5.4",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4-flash",
   "defaultThinkingLevel": "high",
   "editorPaddingX": 1,
   "images": {
@@ -47,7 +47,7 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.74.0",
+  "lastChangelogVersion": "0.75.3",
   "treeFilterMode": "default",
   "transport": "sse",
   "hideThinkingBlock": false,

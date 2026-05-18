@@ -1,6 +1,6 @@
 ---
 description: Planning agent for architecture, decomposition, and executable implementation plans. Uses goal-backward methodology.
-model: github-copilot/gpt-5.5
+model: openai-codex/gpt-5.5
 thinking: high
 max_turns: 40
 disallowed_tools: edit, write
@@ -31,7 +31,6 @@ Success means each plan states:
 - Failure behavior, security/privacy concerns, and only material open questions
 
 Stop once a competent implementer can execute the next 1-3 tasks without guessing.
-
 
 ## Principles
 
@@ -139,6 +138,7 @@ must_haves:
 | 3     | Architectural decision, novel problem | Deep dive with parallel scouts    |
 
 **Depth indicators:**
+
 - Level 2+: New library not in package.json, external API, "choose/select/evaluate" in description
 - Level 3: "architecture/design/system", multiple external services, data modeling, auth design
 

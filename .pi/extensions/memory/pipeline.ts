@@ -8,6 +8,7 @@ import {
 } from "./config.js";
 import { getMemoryDB, isSqliteVecAvailable, runInTransaction } from "./db.js";
 import { markObservationsRetrieved, searchObservationsVector } from "./observations.js";
+import { listScenes } from "./scene.js";
 
 // ---------------------------------------------------------------------------
 // Temporal Message Operations
@@ -55,7 +56,7 @@ function pruneTemporalMessagesLocked(db: ReturnType<typeof getMemoryDB>): number
        )`,
 		)
 		.run(maxMessages);
-	return result.changes;
+	return Number(result.changes);
 }
 
 export function pruneTemporalMessages(maxMessages?: number): number {
@@ -86,7 +87,7 @@ export function getUndistilledMessages(
        ORDER BY time_created ASC
        LIMIT ?`,
 		)
-		.all(sessionId, maxRows) as TemporalMessageRow[];
+		.all(sessionId, maxRows) as unknown as TemporalMessageRow[];
 }
 
 export function getUndistilledMessageCount(sessionId?: string): number {
@@ -109,7 +110,7 @@ export function getUndistilledMessageCount(sessionId?: string): number {
 	return row.count;
 }
 
-export function markMessagesDistilled(
+function markMessagesDistilled(
 	messageIds: number[],
 	distillationId: number,
 ): void {
@@ -128,7 +129,7 @@ export function purgeOldTemporalMessages(olderThanDays?: number): number {
 	const result = db
 		.prepare(`DELETE FROM temporal_messages WHERE time_created < ?`)
 		.run(threshold);
-	return result.changes;
+	return Number(result.changes);
 }
 
 export function getCaptureStats(): {
@@ -163,7 +164,7 @@ export function getCaptureStats(): {
 // Distillation Operations
 // ---------------------------------------------------------------------------
 
-export function storeDistillation(input: DistillationInput): number {
+function storeDistillation(input: DistillationInput): number {
 	return insertDistillation(getMemoryDB(), input);
 }
 
@@ -207,9 +208,9 @@ export function storeDistillationAndMarkMessages(
 	});
 }
 
-export function getDistillationById(id: number): DistillationRow | null {
+function getDistillationById(id: number): DistillationRow | null {
 	const db = getMemoryDB();
-	const row = db.prepare(`SELECT * FROM distillations WHERE id = ?`).get(id) as
+	const row = db.prepare(`SELECT * FROM distillations WHERE id = ?`).get(id) as unknown as
 		| DistillationRow
 		| undefined;
 	return row ?? null;
@@ -229,7 +230,7 @@ export function getRecentDistillations(
          ORDER BY time_created DESC
          LIMIT ?`,
 			)
-			.all(sessionId, maxRows) as DistillationRow[];
+			.all(sessionId, maxRows) as unknown as DistillationRow[];
 	}
 	return db
 		.prepare(
@@ -237,10 +238,10 @@ export function getRecentDistillations(
        ORDER BY time_created DESC
        LIMIT ?`,
 		)
-		.all(maxRows) as DistillationRow[];
+		.all(maxRows) as unknown as DistillationRow[];
 }
 
-export function searchDistillationsFTS(
+function searchDistillationsFTS(
 	query: string,
 	limit?: number,
 ): DistillationSearchResult[] {
@@ -269,7 +270,7 @@ export function searchDistillationsFTS(
          ORDER BY relevance_score
          LIMIT ?`,
 			)
-			.all(ftsQuery, maxRows) as DistillationSearchResult[];
+			.all(ftsQuery, maxRows) as unknown as DistillationSearchResult[];
 	} catch {
 		return [];
 	}
@@ -526,6 +527,51 @@ export function getRelevantKnowledge(
 				created_at: dist.created_at,
 			});
 		}
+	}
+
+	// --- Search scenes by concept overlap with query terms ---
+	try {
+		const scenes = listScenes();
+		if (scenes.length > 0) {
+			const queryLower = new Set(queryTerms.filter(t => t.length > 2).map(t => t.toLowerCase()));
+
+			for (const scene of scenes) {
+				// Compute concept overlap: what fraction of scene concepts match query terms?
+				if (scene.name.length === 0) continue;
+
+				const nameWords = new Set(
+					scene.name
+						.toLowerCase()
+						.split(/\s+/)
+						.filter((w) => w.length > 2)
+						.map((w) => w.replace(/[^a-z0-9]/g, "")),
+				);
+
+				let matchCount = 0;
+				for (const q of queryLower) {
+					if (nameWords.has(q)) matchCount++;
+				}
+
+				const overlapScore =
+					queryLower.size === 0
+						? 0
+						: matchCount / Math.max(queryLower.size, nameWords.size);
+
+				if (overlapScore > 0) {
+					results.push({
+						id: 0,
+						type: "scene",
+						title: scene.name,
+						content: `${scene.count} observations spanning ${scene.span}`,
+						score: overlapScore * 0.8, // scenes ranked lower than exact obs matches
+						source: "scene",
+						created_at: new Date().toISOString(),
+					});
+				}
+			}
+		}
+	} catch {
+		// Scene search is best-effort
 	}
 
 	// Sort by score descending (higher is better)

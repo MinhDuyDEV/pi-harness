@@ -11,7 +11,7 @@
 interface SanitizationRule {
 	name: string;
 	pattern: RegExp;
-	replacement: string;
+	replacement: string | ((match: string) => string);
 }
 
 const RULES: SanitizationRule[] = [

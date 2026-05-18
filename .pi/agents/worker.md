@@ -1,6 +1,6 @@
 ---
 description: Surgical implementer for small, well-defined tasks (1-3 files). Executes fast with auto-fix deviation rules and verification.
-model: github-copilot/gpt-5.3-codex
+model: openai-codex/gpt-5.3-codex
 thinking: high
 prompt_mode: append
 ---

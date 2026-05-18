@@ -94,6 +94,7 @@ import {
 import { registerCompressTool } from "./dcp/tools.js";
 import { registerSnapshotTool } from "./dcp/snapshot.js";
 import { applyStrategies, applyDeferredDrops, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
+import { offloadLargeToolResults } from "./dcp/offload.js";
 import { TagManager } from "./dcp/tags.js";
 import { DropQueue } from "./dcp/queue.js";
 import { NudgeManager } from "./dcp/nudge.js";
@@ -297,6 +298,27 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					if (config.debug) {
 						console.log(`[dcp] Deferred drops executed: ${droppableTagIds.size} tags, ${dropResult.prunedCount} items stripped`);
 					}
+				}
+			}
+
+			// Tool output offloading (v3): replace large tool results with ref markers
+			if (config.offload.enabled) {
+				try {
+					const offloadResult = offloadLargeToolResults(messages, sessionId, {
+						minTokens: config.offload.minTokens,
+						maxRefsPerSession: config.offload.maxRefsPerSession,
+						protectedTools: config.offload.protectedTools,
+					});
+					if (offloadResult.offloadedCount > 0) {
+						totalResult.prunedTokens += offloadResult.savedTokens;
+						totalResult.prunedCount += offloadResult.offloadedCount;
+						totalResult.actions.push(`offloaded ${offloadResult.offloadedCount} large tool results to refs/ (~${offloadResult.savedTokens} tokens)`);
+						if (config.debug) {
+							console.log(`[dcp] Offloaded ${offloadResult.offloadedCount} large tool results (~${offloadResult.savedTokens} tokens):`, offloadResult.refs);
+						}
+					}
+				} catch {
+					// Offloading is best-effort
 				}
 			}
 

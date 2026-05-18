@@ -23,6 +23,7 @@ import {
 	updateSessionStats,
 	getSessionStats,
 } from "./db.js";
+import { mermaidPrefixSummary } from "./mmd.js";
 
 // ---------------------------------------------------------------------------
 // Types — structural matching for Pi SDK compaction types
@@ -342,8 +343,11 @@ export async function generateDCPEnrichedCompaction(
 
 	if (!summary.trim()) return null;
 
+	// Prepend Mermaid task canvas (5-10x denser overview)
+	const mermaidPrefixed = mermaidPrefixSummary(sessionId, summary, _config);
+
 	return {
-		summary,
+		summary: mermaidPrefixed,
 		firstKeptEntryId,
 		tokensBefore,
 		details: {

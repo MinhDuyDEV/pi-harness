@@ -204,10 +204,32 @@ export const MEMORY_CONFIG = {
 		compressionTarget: 0.2,
 		topTerms: 30,
 	},
+	pipeline: {
+		/** Run distillation every N conversation turns. 0 = every turn. */
+		everyNConversations: 5,
+		/** Trigger L1 after user has been idle for this many seconds. 0 = disabled. */
+		l1IdleTimeoutSeconds: 600,
+		/** Warm-up: triggers from turn 1, doubling each time up to everyNConversations. */
+		enableWarmup: true,
+		/** Min interval between pipeline passes within same session. */
+		l1MinIntervalSeconds: 300,
+	},
 	curator: {
 		enabled: true,
 		minDistillations: 3,
 		defaultConfidence: "medium" as ConfidenceLevel,
+	},
+	scene: {
+		/** Enable L2 scene detection (clustering observations into work patterns) */
+		enabled: true,
+		/** Minimum Jaccard similarity to merge observations */
+		minJaccard: 0.3,
+		/** Max days between observations in the same scene */
+		maxDaysBetween: 7,
+		/** Minimum observations to form a scene */
+		minClusterSize: 2,
+		/** Max scenes to persist */
+		maxScenes: 20,
 	},
 	injection: {
 		enabled: true,
@@ -215,11 +237,6 @@ export const MEMORY_CONFIG = {
 		recencyDecay: 0.95,
 		minScore: 0.1,
 		topTerms: 30,
-	},
-	context: {
-		enabled: true,
-		maxContextTokens: 100_000,
-		protectedMessages: 5,
 	},
 	scoring: {
 		/** Half-life in days for feedback decay */
@@ -260,4 +277,8 @@ export const MEMORY_CONFIG = {
 		/** Weight for FTS5 text search in hybrid search (0.0-1.0) */
 		textWeight: 0.6,
 	},
+	telemetry: {
+		/** Emit health telemetry every N maintenance cycles (0 = disabled) */
+		everyNCycles: 10,
+	}
 } as const;

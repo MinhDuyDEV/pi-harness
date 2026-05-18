@@ -126,7 +126,7 @@ export function recordFeedback(
 
 	const row = db
 		.prepare("SELECT * FROM observations WHERE id = ?")
-		.get(observationId) as ObservationRow | undefined;
+		.get(observationId) as unknown as ObservationRow | undefined;
 
 	if (!row) {
 		return {

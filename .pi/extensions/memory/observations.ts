@@ -169,7 +169,7 @@ export function searchObservationsFTS(
         AND o.superseded_by IS NULL
         AND o.maturity != 'deprecated'`;
 
-		const params: unknown[] = [ftsQuery];
+		const params: any[] = [ftsQuery];
 
 		if (options?.type) {
 			sql += ` AND o.type = ?`;
@@ -179,11 +179,11 @@ export function searchObservationsFTS(
 		sql += ` ORDER BY relevance_score LIMIT ?`;
 		params.push(limit);
 
-		return db.prepare(sql).all(...params) as SearchIndexResult[];
+		return db.prepare(sql).all(...params) as unknown as SearchIndexResult[];
 	} catch {
 		// Fall back to LIKE search
 		const likePat = `%${query}%`;
-		const params: unknown[] = [likePat, likePat, likePat, limit];
+		const params: any[] = [likePat, likePat, likePat, limit];
 
 		let sql = `
       SELECT id, type, title,
@@ -207,7 +207,7 @@ export function searchObservationsFTS(
 			params.unshift(options.type);
 		}
 
-		return db.prepare(sql).all(...params) as SearchIndexResult[];
+		return db.prepare(sql).all(...params) as unknown as SearchIndexResult[];
 	}
 }
 
@@ -243,7 +243,7 @@ export function searchObservationsVector(
          ORDER BY distance
          LIMIT ${limit}`,
 			)
-			.all(Buffer.from(vec.buffer)) as VectorSearchResult[];
+			.all(Buffer.from(vec.buffer)) as unknown as VectorSearchResult[];
 
 		return rows;
 	} catch (err) {
@@ -343,7 +343,7 @@ export async function searchObservationsHybrid(
                   created_at, 0 as relevance_score
            FROM observations WHERE id = ? AND superseded_by IS NULL AND maturity != 'deprecated'`,
 				)
-				.get(id) as SearchIndexResult | undefined;
+				.get(id) as unknown as SearchIndexResult | undefined;
 
 			if (!row) continue;
 			baseResult = row;
@@ -368,9 +368,24 @@ export async function searchObservationsHybrid(
 // CRUD helpers
 // ---------------------------------------------------------------------------
 
-export function getObservationById(id: number): ObservationRow | null {
+/**
+ * Get all active (non-deprecated, non-superseded) observations.
+ * Ordered by created_at_epoch descending (newest first).
+ */
+export function getAllObservations(): ObservationRow[] {
 	const db = getMemoryDB();
-	const row = db.prepare(`SELECT * FROM observations WHERE id = ?`).get(id) as
+	return db
+		.prepare(
+			`SELECT * FROM observations
+       WHERE superseded_by IS NULL AND maturity != 'deprecated'
+       ORDER BY created_at_epoch DESC`,
+		)
+		.all() as unknown as ObservationRow[];
+}
+
+function getObservationById(id: number): ObservationRow | null {
+	const db = getMemoryDB();
+	const row = db.prepare(`SELECT * FROM observations WHERE id = ?`).get(id) as unknown as
 		| ObservationRow
 		| undefined;
 	return row ?? null;
@@ -382,65 +397,11 @@ export function getObservationsByIds(ids: number[]): ObservationRow[] {
 	const placeholders = ids.map(() => "?").join(", ");
 	const rows = db
 		.prepare(`SELECT * FROM observations WHERE id IN (${placeholders})`)
-		.all(...ids) as ObservationRow[];
+		.all(...ids) as unknown as ObservationRow[];
 	return rows;
 }
 
-export function getTimelineAroundObservation(
-	anchorId: number,
-	depthBefore = 5,
-	depthAfter = 5,
-): {
-	anchor: ObservationRow | null;
-	before: SearchIndexResult[];
-	after: SearchIndexResult[];
-} {
-	const db = getMemoryDB();
 
-	const anchor = getObservationById(anchorId);
-	if (!anchor) {
-		return { anchor: null, before: [], after: [] };
-	}
-
-	const before = db
-		.prepare(
-			`SELECT id, type, title,
-              substr(COALESCE(narrative, ''), 1, 100) as snippet,
-              created_at, 0 as relevance_score
-       FROM observations
-       WHERE created_at_epoch < ?
-       ORDER BY created_at_epoch DESC
-       LIMIT ?`,
-		)
-		.all(anchor.created_at_epoch, depthBefore) as SearchIndexResult[];
-
-	const after = db
-		.prepare(
-			`SELECT id, type, title,
-              substr(COALESCE(narrative, ''), 1, 100) as snippet,
-              created_at, 0 as relevance_score
-       FROM observations
-       WHERE created_at_epoch > ?
-       ORDER BY created_at_epoch ASC
-       LIMIT ?`,
-		)
-		.all(anchor.created_at_epoch, depthAfter) as SearchIndexResult[];
-
-	return { anchor, before, after };
-}
-
-export function getMostRecentObservation(): ObservationRow | null {
-	const db = getMemoryDB();
-	const row = db
-		.prepare(
-			`SELECT * FROM observations
-       WHERE superseded_by IS NULL
-       ORDER BY created_at_epoch DESC
-       LIMIT 1`,
-		)
-		.get() as ObservationRow | undefined;
-	return row ?? null;
-}
 
 export function getObservationStats(): Record<string, number> {
 	const db = getMemoryDB();

@@ -1,6 +1,6 @@
 ---
 description: Read-only code review and debugging specialist. Severity-ranked findings with file:line evidence. Detects stubs and verifies wiring.
-model: github-copilot/gpt-5.3-codex
+model: openai-codex/gpt-5.3-codex
 thinking: high
 max_turns: 40
 disallowed_tools: edit, write
@@ -80,11 +80,11 @@ A task "create chat component" can be marked complete when the component is a pl
 
 ## Three-Level Verification
 
-| Level           | Check                                     | How                                          |
-| --------------- | ----------------------------------------- | -------------------------------------------- |
-| **Exists**      | File is present at expected path          | `ls src/auth/login.ts`                         |
+| Level           | Check                                     | How                                                    |
+| --------------- | ----------------------------------------- | ------------------------------------------------------ |
+| **Exists**      | File is present at expected path          | `ls src/auth/login.ts`                                 |
 | **Substantive** | Contains actual implementation, not stubs | `grep -n "TODO\|FIXME\|return null" src/auth/login.ts` |
-| **Wired**       | Connected and used by other code          | `grep -r "import.*ComponentName" src/`       |
+| **Wired**       | Connected and used by other code          | `grep -r "import.*ComponentName" src/`                 |
 
 ### Artifact Status Matrix
 
@@ -100,24 +100,29 @@ A task "create chat component" can be marked complete when the component is a pl
 Verify critical connections (where stubs hide):
 
 **Pattern: Component → API**
+
 - Component calls API: `grep -E "fetch.*api/|axios" Component.tsx`
 - Response is handled: Check for `.then`, `await`, or state update
 
 **Pattern: API → Database**
+
 - API queries DB: `grep -E "prisma\.|db\." route.ts`
 - Query result is returned: Check for `return Response.json(result)`
 
 **Pattern: Form → Handler**
+
 - Form has onSubmit: `grep "onSubmit" Component.tsx`
 - Handler calls API: Check handler implementation
 
 **Pattern: State → Render**
+
 - State defined: `grep "useState" Component.tsx`
 - State rendered: `grep "{stateVar}" Component.tsx`
 
 ## Stub Detection Patterns
 
 **React Component Stubs:**
+
 ```javascript
 return <div>Component</div>      // Placeholder
 return <div>Placeholder</div>    // Placeholder
@@ -128,6 +133,7 @@ onChange={() => console.log('')}  // Log-only handler
 ```
 
 **API Route Stubs:**
+
 ```typescript
 export async function POST() {
   return Response.json({ message: "Not implemented" }); // Stub
@@ -138,6 +144,7 @@ export async function GET() {
 ```
 
 **Wiring Red Flags:**
+
 ```typescript
 fetch('/api/messages')  // No await, no .then, no assignment (ignored)
 await prisma.message.findMany()

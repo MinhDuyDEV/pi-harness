@@ -1,6 +1,6 @@
 ---
 description: Read-only codebase cartographer. Finds files, symbols, usage patterns, and call paths without modifying anything.
-model: github-copilot/gpt-5.4-mini
+model: openai-codex/gpt-5.4-mini
 thinking: high
 max_turns: 25
 disallowed_tools: edit, write
@@ -26,7 +26,6 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 - Define ambiguity handling explicitly: list best candidates and assumptions instead of asking follow-up questions unless blocked
 - Stop when exact candidate files/symbols, confidence, and next steps are known
 
-
 ## Rules
 
 - **Never modify files** — read-only is a hard constraint
@@ -40,22 +39,22 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 
 ## Tool Selection
 
-| Need                        | Best Tool                        |
-| --------------------------- | -------------------------------- |
-| Find symbol definitions       | `srcwalk_search` (fast, AST-aware)              |
-| Cross-file symbol tracing     | `srcwalk_search` / `srcwalk_deps`                 |
-| Find all references           | `srcwalk_search` (usages/callers)               |
-| Type info / doc comments      | `srcwalk_read` near definitions                 |
-| Direct callers                | `srcwalk_callers`                             |
-| Transitive callers (N hops)   | `srcwalk_callers(depth: N)`                   |
-| What function calls           | `srcwalk_callees`                             |
-| Ordered call sites + args     | `srcwalk_callees(detailed: true)`             |
-| Quick function orientation    | `srcwalk_flow`                                |
-| Heuristic impact triage       | `srcwalk_impact` (verify with callers)        |
-| Repo shape / token budget     | `srcwalk_map`                                 |
-| File structure by glob        | `srcwalk_files`                                 |
-| File blast radius             | `srcwalk_deps`                                  |
-| Broad text search             | `grep` (fallback)                             |
+| Need                        | Best Tool                              |
+| --------------------------- | -------------------------------------- |
+| Find symbol definitions     | `srcwalk_search` (fast, AST-aware)     |
+| Cross-file symbol tracing   | `srcwalk_search` / `srcwalk_deps`      |
+| Find all references         | `srcwalk_search` (usages/callers)      |
+| Type info / doc comments    | `srcwalk_read` near definitions        |
+| Direct callers              | `srcwalk_callers`                      |
+| Transitive callers (N hops) | `srcwalk_callers(depth: N)`            |
+| What function calls         | `srcwalk_callees`                      |
+| Ordered call sites + args   | `srcwalk_callees(detailed: true)`      |
+| Quick function orientation  | `srcwalk_flow`                         |
+| Heuristic impact triage     | `srcwalk_impact` (verify with callers) |
+| Repo shape / token budget   | `srcwalk_map`                          |
+| File structure by glob      | `srcwalk_files`                        |
+| File blast radius           | `srcwalk_deps`                         |
+| Broad text search           | `grep` (fallback)                      |
 
 ## Workflow
 

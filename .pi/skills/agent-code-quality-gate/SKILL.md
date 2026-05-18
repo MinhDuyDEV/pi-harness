@@ -1,6 +1,7 @@
 ---
 name: agent-code-quality-gate
 description: Use before a coding agent claims implementation work is complete, especially after bugfixes, feature edits, refactors, or subagent changes - converts code quality into an operational gate for scope, duplication, behavior tests, verification evidence, and regressions.
+version: 1.0.0
 ---
 
 # Agent Code Quality Gate

@@ -1,6 +1,6 @@
 ---
 description: External research specialist. Finds trustworthy references, synthesizes docs, and returns cited guidance. Memory-first.
-model: github-copilot/gpt-5.5
+model: openai-codex/gpt-5.4
 thinking: high
 max_turns: 30
 disallowed_tools: edit, write
@@ -74,20 +74,20 @@ Higher-ranked sources win on conflicts.
 1. **Memory first**: `memory-search` for prior research before going external
 2. **Choose tools by need**:
 
-   | Need                                  | Tool                                                          |
-   | ------------------------------------- | ------------------------------------------------------------- |
-   | Library docs/API                      | `context7` (resolve → query)                                  |
-   | Production examples                   | `grepsearch` (literal code patterns)                          |
-   | Discover current web info             | `websearch` (Exa AI, real-time)                               |
-   | Discover code docs & examples         | `codesearch` (Exa AI, code-specific)                          |
-   | Read a selected search result URL     | `web_fetch` (follow-up after `websearch` / `codesearch`)      |
-   | Read a specific static/protected URL  | `webclaw_scrape` (fast, token-efficient, bot-bypass)          |
-   | Compare several known URLs            | `webclaw_batch`                                               |
-   | Read a JS-heavy or interactive URL    | `lightpanda_markdown` (rendered page)                         |
-   | Extract page links                    | `lightpanda_links` (all URLs)                                 |
-   | Page metadata/SEO                     | `lightpanda_structuredData`                                   |
-   | Package source code                   | `source-code-research` skill                                  |
-   | Codebase patterns                     | `srcwalk_search`                                                |
+   | Need                                 | Tool                                                     |
+   | ------------------------------------ | -------------------------------------------------------- |
+   | Library docs/API                     | `context7` (resolve → query)                             |
+   | Production examples                  | `grepsearch` (literal code patterns)                     |
+   | Discover current web info            | `websearch` (Exa AI, real-time)                          |
+   | Discover code docs & examples        | `codesearch` (Exa AI, code-specific)                     |
+   | Read a selected search result URL    | `web_fetch` (follow-up after `websearch` / `codesearch`) |
+   | Read a specific static/protected URL | `webclaw_scrape` (fast, token-efficient, bot-bypass)     |
+   | Compare several known URLs           | `webclaw_batch`                                          |
+   | Read a JS-heavy or interactive URL   | `lightpanda_markdown` (rendered page)                    |
+   | Extract page links                   | `lightpanda_links` (all URLs)                            |
+   | Page metadata/SEO                    | `lightpanda_structuredData`                              |
+   | Package source code                  | `source-code-research` skill                             |
+   | Codebase patterns                    | `srcwalk_search`                                         |
 
 3. In pi-search v0.2.2 workflows, use `websearch` / `codesearch` to find candidate links, then `web_fetch` to read the chosen URL.
 4. Prefer `webclaw_scrape` over browser tools for direct URL reads when `web_fetch` is blocked/protected; use `lightpanda_*` only if JavaScript rendering or interaction is required.

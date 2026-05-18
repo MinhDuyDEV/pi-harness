@@ -31,6 +31,8 @@ export function upsertMemoryFile(
        updated_at = ?,
        updated_at_epoch = ?`,
 	).run(filePath, content, mode, now, nowEpoch, now, nowEpoch);
+
+	// SQLite is the canonical store. No filesystem mirror.
 }
 
 export function getMemoryFile(filePath: string): MemoryFileRow | null {
@@ -38,7 +40,7 @@ export function getMemoryFile(filePath: string): MemoryFileRow | null {
 	return (
 		(db
 			.prepare("SELECT * FROM memory_files WHERE file_path = ?")
-			.get(filePath) as MemoryFileRow | undefined) ?? null
+			.get(filePath) as unknown as MemoryFileRow | undefined) ?? null
 	);
 }
 
@@ -139,7 +141,7 @@ export function archiveOldObservations(options?: ArchiveOptions): number {
 	db.prepare(insertSql).run(threshold);
 	const result = db.prepare(deleteSql).run(threshold);
 
-	return result.changes;
+	return Number(result.changes);
 }
 
 export function checkpointWAL(): { walSize: number; checkpointed: boolean } {
@@ -157,7 +159,7 @@ export function checkpointWAL(): { walSize: number; checkpointed: boolean } {
 	}
 }
 
-export function vacuumDatabase(): boolean {
+function vacuumDatabase(): boolean {
 	const db = getMemoryDB();
 	try {
 		db.exec("VACUUM");

@@ -11,7 +11,13 @@
 	"scripts": {
 		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec",
 		"sync:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs",
-		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check"
+		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check",
+		"install:hooks": "node scripts/install-git-hooks.mjs",
+		"validate:skills": "node scripts/validate-skills.mjs",
+		"validate:skills:strict": "node scripts/validate-skills.mjs --strict",
+		"validate:skills:ci": "node scripts/validate-skills.mjs --check",
+		"validate": "npm run validate:skills",
+		"setup": "npm run install:hooks && echo 'Ready.'"
 	},
 	"pi": {
 		"extensions": [".pi/extensions"],

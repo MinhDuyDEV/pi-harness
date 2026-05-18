@@ -173,6 +173,20 @@ export interface AutoCompactConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Tool output offloading config (v3, TencentDB-inspired)
+// ---------------------------------------------------------------------------
+
+export interface OffloadConfig {
+	enabled: boolean;
+	/** Minimum token count to trigger offloading (default: 1000 ≈ 4KB text) */
+	minTokens: number;
+	/** Max ref files per session (oldest purged) */
+	maxRefsPerSession: number;
+	/** Tools whose results should NOT be offloaded */
+	protectedTools: string[];
+}
+
+// ---------------------------------------------------------------------------
 // Main config type
 // ---------------------------------------------------------------------------
 
@@ -194,6 +208,9 @@ export interface DCPConfig {
 	expand: ExpandConfig;
 	historian: HistorianConfig;
 	autoCompact: AutoCompactConfig;
+
+	// v3: Tool output offloading
+	offload: OffloadConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -346,5 +363,13 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		// Try Haiku on Copilot as the first fallback — cheaper quota bucket than Sonnet,
 		// so a Sonnet 429 does not cascade into a total compaction failure.
 		fallbackModels: [{ provider: "github-copilot", modelId: "claude-haiku-4.5" }],
+	},
+
+	// v3: Tool output offloading (inspired by TencentDB-Agent-Memory short-term offload)
+	offload: {
+		enabled: true,
+		minTokens: 1000,
+		maxRefsPerSession: 50,
+		protectedTools: ["compress", "write", "edit", "observation", "memory-update"],
 	},
 };

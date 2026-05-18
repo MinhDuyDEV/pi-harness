@@ -1,0 +1,8 @@
+#!/bin/sh
+# Pre-push hook: validate skill structure before pushing
+set -eu
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+node scripts/validate-skills.mjs --check
