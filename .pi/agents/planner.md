@@ -194,10 +194,11 @@ Planning requires understanding what came before. Follow this ritual every sessi
 ### Ground Phase — Load Context
 
 ```
+memory-admin({operation: "status"}) for quick memory diagnostics
 1. memory-search for similar past plans and patterns
 2. memory-search for architecture decisions
-3. memory-read for recent handoffs
-4. memory-read for existing plans in this area
+3. memory-search({file: "handoffs/latest"}) for recent handoffs
+4. memory-search({file: "plans/"}) for existing plans in this area
 ```
 
 ### Calibrate Phase — Record Assumptions
@@ -209,7 +210,7 @@ observation(type: "decision", title: "Decomposed X into 3 phases due to complexi
 ### Reset Phase — Save Plan & Learnings
 
 ```
-memory-update(file: "plans/YYYY-MM-DD-feature-name", content: plan + handoff notes)
+memory-admin({operation: "write-file", file: "plans/YYYY-MM-DD-feature-name", content: plan + handoff notes, force: true})
 observation(type: "learning", title: "Pattern for decomposing X-type features", ...)
 ```
 

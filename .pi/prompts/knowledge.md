@@ -33,7 +33,7 @@ Set:
 
 ## Phase 1: Pull Observations from Memory Tools
 
-Use `memory-search` + `memory-get` only (no direct DB access, no raw SQL, no shell DB CLI usage).
+Use `memory-search` + `memory-search` (exact `#id` resolve) only (no direct DB access, no raw SQL, no shell DB CLI usage).
 
 ### 1.1 Required grouping types
 
@@ -68,12 +68,12 @@ for (const t of TYPES) {
 }
 ```
 
-Then fetch full details via `memory-get` (comma-separated IDs).
+Then fetch full details via `memory-search` (exact `#id` resolve) (comma-separated IDs).
 
 ```typescript
 const allIds = [...new Set(Object.values(idsByType).flat())];
-const memoryGetResult = allIds.length
-  ? await memory-get({ ids: allIds.join(",") })
+const memorySearchResult = allIds.length
+  ? await memory-search({ query: allIds.map(id => "#"+id).join(",") })
   : [];
 
 const fullObservations = Array.isArray(memoryGetResult)
@@ -104,7 +104,7 @@ Build one export block in this shape:
 ```markdown
 ## Knowledge Export — YYYY-MM-DD
 - Scope: [project-wide | bead <id>]
-- Source: memory tools (`memory-search` + `memory-get`)
+- Source: memory tools (`memory-search` + `memory-search` (exact `#id` resolve))
 - Count: <N>
 
 ### Decisions
@@ -161,7 +161,7 @@ If zero observations found (or all matches were skipped by dedupe), still append
 ```markdown
 ## Knowledge Export — YYYY-MM-DD
 - Scope: ...
-- Source: memory tools (`memory-search` + `memory-get`)
+- Source: memory tools (`memory-search` + `memory-search` (exact `#id` resolve))
 - Count: 0
 
 _No matching observations found._

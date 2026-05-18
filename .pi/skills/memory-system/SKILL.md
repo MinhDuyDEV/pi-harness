@@ -34,20 +34,20 @@ tools: []
    - Check recent handoffs when resuming interrupted work.
 2. **Calibrate (progressive disclosure)**
    - Use search results as index.
-   - Fetch full entries only for relevant IDs (`memory-get`).
-   - Pull timeline context only when sequencing matters (`memory-timeline`).
+   - Fetch full entries only for relevant IDs (`memory-search` (exact #id)).
+   - Pull timeline context only when sequencing matters (`memory-search` (time-ordered)).
 3. **Record (high-signal only)**
    - Create `observation` for decisions, bugfixes, patterns, warnings, or durable learnings.
    - Include searchable concepts and concrete file references.
 4. **Handoff (if session boundary)**
-   - Write a concise status note with completed work, blockers, and next steps using `memory-update` under `handoffs/`.
+   - Write a concise status note with completed work, blockers, and next steps using memory-admin write-file under `handoffs/`.
 
 ## What Goes Where
 
 | Store | Put Here | Avoid Here |
 | --- | --- | --- |
 | `observation` (SQLite) | Events: decisions, bugfixes, reusable patterns, warnings | Temporary notes, speculative ideas without evidence |
-| `memory-update` files | Durable docs: handoffs, research, project notes | Every minor runtime detail from a single debug run |
+| `memory-admin write-file` files | Durable docs: handoffs, research, project notes | Every minor runtime detail from a single debug run |
 | Auto pipeline | Captured messages + distillations (automatic) | Manual copying of full transcripts |
 
 ## Observation Quality Bar
@@ -68,7 +68,7 @@ If most answers are "no", skip creating the observation.
 | Storing transient debugging info as permanent observations | Pollutes search results with low-value noise | Keep transient info in session context; record only durable findings |
 | Creating observations for every small finding (signal-to-noise) | Important items get buried and retrieval quality drops | Batch minor notes; publish one distilled observation per meaningful outcome |
 | Not searching memory before creating duplicate observations | Produces conflicting/duplicated records | Run `memory-search` first; update/supersede existing records when appropriate |
-| Using `memory-update` for data that should be an observation | Durable events become hard to discover and rank | Use `observation` for events; reserve `memory-update` for document-style files |
+| Using `memory-admin write-file` for data that should be an observation | Durable events become hard to discover and rank | Use `observation` for events; reserve `memory-admin write-file` for document-style files |
 
 ## Verification
 

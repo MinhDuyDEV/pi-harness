@@ -73,9 +73,7 @@ git commit -m "WIP: $ARGUMENTS - [brief description of where you stopped]"
 Write the handoff to the memory system:
 
 ```typescript
-memory-update({
-  file: "handoffs/$ARGUMENTS",
-  content: `# Handoff: $ARGUMENTS
+memory-admin({ operation: "write-file", file: "handoffs/$ARGUMENTS", content: `# Handoff: $ARGUMENTS
 
 **Date:** [timestamp]
 **Branch:** [from git branch]

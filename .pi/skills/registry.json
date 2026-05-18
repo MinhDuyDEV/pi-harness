@@ -327,7 +327,7 @@
         "srcwalk_read",
         "srcwalk_search",
         "memory-search",
-        "memory-read",
+        "memory-search",
         "compress"
       ],
       "status": "core",

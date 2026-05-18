@@ -91,7 +91,7 @@ When superseding an older observation, prevent accidental knowledge loss.
 ### Step 1: Read the old observation
 
 ```typescript
-const old = memory-get({ ids: "<superseded-id>" });
+const old = memory-search({ query: "<superseded-id>" });
 ```
 
 ### Step 2: Detect structural loss
@@ -151,9 +151,9 @@ Check if the shipped work changed architecture, APIs, conventions, or tech stack
 ```typescript
 // Check what changed
 // If tech stack changed:
-memory-update({ file: "project/tech-stack", content: "...", mode: "append" });
+memory-admin({ operation: "write-file", file: "project/tech-stack", content: "...", mode: "append", force: true });
 // If new gotcha:
-memory-update({ file: "project/gotchas", content: "...", mode: "append" });
+memory-admin({ operation: "write-file", file: "project/gotchas", content: "...", mode: "append", force: true });
 ```
 
 **Rule:** Only update docs when the change is structural (new pattern, new dep, new constraint). Don't update for routine bug fixes or small features. Ask user before modifying `AGENTS.md`.

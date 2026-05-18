@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [context, workflow, agent-coordination]
 dependencies: [using-pi-skills]
 agent_types: [planner, worker, reviewer, scout]
-tools: [srcwalk_read, srcwalk_search, memory-search, memory-read, compress]
+tools: [srcwalk_read, srcwalk_search, memory-search, memory-search, compress]
 ---
 
 # Context Engineering

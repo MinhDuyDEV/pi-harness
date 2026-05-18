@@ -240,7 +240,7 @@ Do **not** call `/knowledge` as a sub-command. Execute the knowledge export logi
 
 ### 4.1 Fetch bead-scoped observations from memory tools
 
-Use `memory-search` to discover observation IDs, then `memory-get` to hydrate full records:
+Use `memory-search` to discover observation IDs, then `memory-search` (exact `#id` resolve) to hydrate full records:
 
 ```typescript
 const TYPES = ["decision", "pattern", "learning", "warning", "bugfix"] as const;
@@ -262,7 +262,7 @@ for (const t of TYPES) {
 }
 
 const allIds = [...new Set(Object.values(idsByType).flat())];
-const memoryGetResult = allIds.length ? await memory-get({ ids: allIds.join(",") }) : [];
+const memorySearchResult = allIds.length ? await memory-search({ query: allIds.map(id => "#"+id).join(",") }) : [];
 const fullObservations = Array.isArray(memoryGetResult)
   ? memoryGetResult
   : (memoryGetResult?.observations ?? []);
@@ -291,7 +291,7 @@ Render one appendable block:
 ```markdown
 ## Knowledge Export — YYYY-MM-DD
 - Scope: bead $BEAD_ID
-- Source: memory observations (`memory-search` + `memory-get`)
+- Source: memory observations (`memory-search` + `memory-search` (exact `#id` resolve))
 - Count: <N>
 
 ### Decisions

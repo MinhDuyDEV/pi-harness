@@ -15,11 +15,11 @@ Initialize project planning context files from templates.
 - `project.md` — vision, success criteria, principles
 - `git-context.md` — spatial awareness
 
-**On-demand files** (created by this command, loaded via `memory-read` when needed):
+**On-demand files** (created by this command, loaded via `memory-search` when needed):
 - `roadmap.md` — phases, milestones, bead planning
 - `state.md` — current position, blockers, next actions
 
-> **Warning:** Do NOT add roadmap.md or state.md to `instructions[]`. Per-prompt injection of too many files causes session OOM crashes. Use `memory-read({ file: "project/roadmap" })` or `memory-read({ file: "project/state" })` when needed.
+> **Warning:** Do NOT add roadmap.md or state.md to `instructions[]`. Per-prompt injection of too many files causes session OOM crashes. Use `memory-search({ file: "project/roadmap" })` or `memory-search({ file: "project/state" })` when needed.
 
 ## Load Skills
 
@@ -138,12 +138,12 @@ srcwalk_read({ path: ".pi/memory/_templates/project.md" });
 **Write using memory tools:**
 
 ```typescript
-memory-update({ file: "project/project", content: filledContent, mode: "replace" });
+memory-admin({ operation: "write-file", file: "project/project", content: filledContent, force: true });
 ```
 
 ### 3.2 Create roadmap.md (on-demand)
 
-This file is NOT auto-injected. Access via `memory-read({ file: "project/roadmap" })`.
+This file is NOT auto-injected. Access via `memory-search({ file: "project/roadmap" })`.
 
 **Parse phases from input:**
 
@@ -163,12 +163,12 @@ This file is NOT auto-injected. Access via `memory-read({ file: "project/roadmap
 **Write using memory tools:**
 
 ```typescript
-memory-update({ file: "project/roadmap", content: roadmapContent, mode: "replace" });
+memory-admin({ operation: "write-file", file: "project/roadmap", content: roadmapContent, force: true });
 ```
 
 ### 3.3 Create state.md (on-demand)
 
-This file is NOT auto-injected. Access via `memory-read({ file: "project/state" })`.
+This file is NOT auto-injected. Access via `memory-search({ file: "project/state" })`.
 
 **Initialize with:**
 
@@ -185,7 +185,7 @@ This file is NOT auto-injected. Access via `memory-read({ file: "project/state" 
 **Write using memory tools:**
 
 ```typescript
-memory-update({ file: "project/state", content: stateContent, mode: "replace" });
+memory-admin({ operation: "write-file", file: "project/state", content: stateContent, force: true });
 ```
 
 ### 3.4 Brownfield Analysis Integration (if applicable)
@@ -244,8 +244,8 @@ Creates planning context in `.pi/memory/project/`:
 | File         | Purpose                                  | Injection   | Access                                       |
 | ------------ | ---------------------------------------- | ----------- | -------------------------------------------- |
 | `project.md` | Vision, success criteria, principles     | Auto-injected | Updated in-place (already in `instructions[]`) |
-| `roadmap.md` | Phases, milestones, bead planning        | On-demand   | `memory-read({ file: "project/roadmap" })`   |
-| `state.md`   | Current position, blockers, next actions | On-demand   | `memory-read({ file: "project/state" })`     |
+| `roadmap.md` | Phases, milestones, bead planning        | On-demand   | `memory-search({ file: "project/roadmap" })`   |
+| `state.md`   | Current position, blockers, next actions | On-demand   | `memory-search({ file: "project/state" })`     |
 
 **If `--brownfield`:**
 Additional files in `.pi/memory/project/codebase/`:
@@ -272,7 +272,7 @@ Custom context folder available at .pi/context/
 
 ⚠️  Only add files to instructions[] if they are essential for EVERY prompt.
     Per-prompt injection adds ~2-4KB each. Too many files cause session OOM.
-    Prefer memory-read() for on-demand access instead.
+    Prefer memory-search() for on-demand access instead.
 ```
 
 ## Next Steps

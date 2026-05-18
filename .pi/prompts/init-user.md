@@ -110,7 +110,7 @@ The default `instructions[]` includes 4 auto-injected files:
 }
 ```
 
-> **Warning:** Do not add more files to `instructions[]` unless they are essential for every prompt. Per-prompt injection of too many files causes session OOM crashes. Use `memory-read()` for on-demand access instead.
+> **Warning:** Do not add more files to `instructions[]` unless they are essential for every prompt. Per-prompt injection of too many files causes session OOM crashes. Use `memory-search({ file: "..." })`` for on-demand access instead.
 
 ## Phase 4: Report
 

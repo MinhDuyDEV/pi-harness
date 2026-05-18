@@ -174,8 +174,8 @@ For each approved action:
 
 ```typescript
 // Read both observations
-const older = memory-get({ ids: "<older-id>" });
-const newer = memory-get({ ids: "<newer-id>" });
+const older = memory-search({ query: "<older-id>" });
+const newer = memory-search({ query: "<newer-id>" });
 
 // Union-merge: combine comma-separated lists, deduplicate (case-insensitive), existing items first
 // Example: older.facts="auth, jwt" + newer.facts="jwt, session" → "auth, jwt, session"
