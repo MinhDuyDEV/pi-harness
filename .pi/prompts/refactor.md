@@ -12,6 +12,7 @@ Improve code quality without changing external behavior.
 ```typescript
 skill({ name: "verification-before-completion" });
 skill({ name: "code-cleanup" });
+skill({ name: "deep-module-design" });
 ```
 
 ## Process

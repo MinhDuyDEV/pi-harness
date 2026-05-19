@@ -10,6 +10,8 @@ Create a bead, write its specification (PRD), claim it, set up the workspace, an
 > **Workflow:** **`/create`** → `/ship <id>`
 >
 > Use `--spec-only` to create the specification without claiming or setting up workspace.
+>
+> `/create` handles everything: pre-flight validation, spec creation, bead claiming, workspace setup, and task breakdown.
 
 ## Load Skills
 
@@ -41,7 +43,8 @@ skill({ name: "beads" }); // PRD → executable tasks (Phase 8)
 
 - **Be certain**: Only create beads you're confident have clear scope
 - **Don't over-spec**: If the description is vague, ask clarifying questions first
-- **Check duplicates**: Always run Phase 1 duplicate check
+- **Check workspace**: Don't create if uncommitted changes exist in the active branch
+- **One task at a time**: Warn if other beads are already in progress
 - **No implementation**: This command creates specs and workspace — don't write implementation code
 - **Verify PRD**: Before saving, verify all sections are filled (no placeholders)
 - **Flag uncertainty**: Use `[NEEDS CLARIFICATION]` markers for unknowns — never guess silently
@@ -54,7 +57,23 @@ skill({ name: "beads" }); // PRD → executable tasks (Phase 8)
 | `scout`   | External research, best practices            |
 | `br`      | Creating and managing beads                  |
 
-## Phase 1: Duplicate Check
+## Phase 1: Pre-flight Checks
+
+Check workspace state before creating. Don't start if there are uncommitted changes or overlapping work.
+
+```bash
+git status --porcelain
+git branch --show-current
+br list --status=in_progress
+```
+
+- If uncommitted changes exist: ask user to stash, commit, or continue.
+- If other beads are in progress: warn and confirm before claiming another.
+- If current branch is `main` or `master`: recommend creating a feature branch.
+
+**Exit criteria:** Workspace is clean and user is ready to proceed.
+
+## Phase 2: Duplicate Check
 
 ### Memory Search
 
@@ -68,7 +87,7 @@ br list --status=open --status=in_progress
 
 If a matching bead exists, stop and tell the user to use `/ship <id>` instead.
 
-## Phase 2: Classify Type
+## Phase 3: Classify Type
 
 If `--type` was provided, use it directly. Otherwise, suggest a type based on the description and ask the user to confirm:
 
@@ -77,7 +96,7 @@ If `--type` was provided, use it directly. Otherwise, suggest a type based on th
 - **bug**: Something broken (fix, error, crash, not working)
 - **task**: Tactical change, clear scope (everything else)
 
-## Phase 3: Choose Research Depth
+## Phase 4: Choose Research Depth
 
 Ask user before spawning agents:
 
@@ -111,7 +130,7 @@ ask_user_question({
 });
 ```
 
-## Phase 4: Gather Context
+## Phase 5: Gather Context
 
 Based on research depth choice, spawn agents:
 
@@ -136,7 +155,7 @@ Based on research depth choice, spawn agents:
 
 **While agents run**, ask clarifying questions if the description lacks scope or expected outcome. For bugs, also ask for reproduction steps and expected vs actual behavior.
 
-## Phase 5: Create Bead
+## Phase 6: Create Bead
 
 Extract bead title and description from `$ARGUMENTS` before creating the bead.
 
@@ -148,7 +167,7 @@ BEAD_ID=$(br create --title "$TITLE" --description "$DESCRIPTION" --type $BEAD_T
 mkdir -p ".beads/artifacts/$BEAD_ID"
 ```
 
-## Phase 6: Determine PRD Rigor
+## Phase 7: Determine PRD Rigor
 
 Not every change needs a full spec. Assess complexity to choose the right PRD level:
 
@@ -192,7 +211,7 @@ For features and complex work, use the full template:
 
 Read the PRD template from `.pi/memory/_templates/prd.md` and write it to `.beads/artifacts/$BEAD_ID/prd.md`.
 
-## Phase 7: Write PRD
+## Phase 8: Write PRD
 
 Copy and fill the PRD template (lite or full) using context from Phase 4.
 
@@ -221,7 +240,7 @@ Tasks must follow the Beads PRD task format:
 - Metadata block: `depends_on`, `parallel`, `conflicts_with`, `files`
 - At least one verification command per task
 
-## Phase 8: Validate PRD
+## Phase 9: Validate PRD
 
 Before saving, verify:
 
@@ -236,7 +255,7 @@ Before saving, verify:
 
 If any check fails, fix it — don't ask the user.
 
-## Phase 9: Claim and Prepare Workspace
+## Phase 10: Claim and Prepare Workspace
 
 **If `--spec-only` was passed, skip to Phase 12 (Report).**
 
@@ -257,31 +276,72 @@ br list --status=in_progress
 br update $BEAD_ID --status in_progress
 ```
 
-### Create Branch
+### Choose Workspace Mode
 
-### Workspace Setup
+```typescript
+ask_user_question({
+  questions: [
+    {
+      header: "Workspace",
+      question: "How do you want to set up the workspace?",
+      options: [
+        {
+          label: "Create feature branch (Recommended)",
+          description: "git checkout -b feat/<bead-id>-<title>",
+        },
+        {
+          label: "Use current branch",
+          description: "Work on current branch",
+        },
+        {
+          label: "Create worktree",
+          description: "Isolated git worktree for this bead",
+        },
+      ],
+      multiSelect: false,
+    },
+  ],
+});
+```
 
-Follow the `using-git-worktrees` skill protocol when you need an isolated workspace.
+**If feature branch selected:**
 
-Additionally offer a "Create worktree" option:
+```bash
+git checkout -b feat/$BEAD_ID-$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+```
+
+**If worktree selected:**
 
 ```typescript
 skill({ name: "using-git-worktrees" });
 ```
 
-## Phase 10: Convert PRD to Tasks
+**If current branch:** Continue without branch creation.
+
+## Phase 11: Convert PRD to Tasks
 
 Use the `beads` skill to convert PRD markdown → executable JSON (`prd.json`).
 
-## Phase 11: Report
+If `prd.json` already exists (from partial run), show progress (completed/total tasks).
+
+## Phase 12: Report and Route
 
 Output:
 
-1. Bead ID and type
-2. PRD location (`.beads/artifacts/$BEAD_ID/prd.md`)
-3. Summary: task count, success criteria count, affected files count
-4. Branch name and workspace (if claimed)
-5. Next step: `/ship $BEAD_ID` (or `/plan $BEAD_ID` for complex work)
+1. Bead ID, type, and status
+2. Pre-flight result (workspace status)
+3. PRD location (`.beads/artifacts/$BEAD_ID/prd.md`)
+4. PRD validation result
+5. Summary: task count, success criteria count, affected files count
+6. Branch name and workspace (worktree if applicable)
+7. Next action recommendation
+
+| State | Next Command |
+| --- | --- |
+| Has tasks and workspace | `/ship $BEAD_ID` |
+| Epic with subtasks | Start with first subtask |
+| Spec-only mode | `/start` (create tasks first) then `/ship` |
+| Complex, needs planning | `/plan $BEAD_ID` |
 
 ```bash
 br comments add $BEAD_ID "Created prd.md with [N] tasks, [M] success criteria"

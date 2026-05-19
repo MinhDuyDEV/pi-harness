@@ -12,7 +12,11 @@ tools: [srcwalk_search, bash, edit, write]
 
 ## Overview
 
-Build one complete slice, verify it, then continue. Large unverified patches compound mistakes and make rollback painful.
+Build one **vertical slice** — a thin, end-to-end, independently verifiable piece of behavior — verify it, then continue. Large unverified patches compound mistakes and make rollback painful.
+
+**Why vertical, not horizontal**: Horizontal slicing (do all of layer X first, then all of layer Y) leaves every layer half-wired and unverifiable until the last piece lands. Vertical slicing (one complete path through all layers) makes each increment independently testable. For AI agents, vertical slices are critical: a shallow horizontal slice gives the AI no feedback signal until the entire layer is done, by which point errors have compounded. A thin vertical slice gives immediate feedback — type errors, test failures, wiring gaps — within minutes.
+
+**Tracer bullet approach**: Start with the thinnest possible end-to-end slice that proves the path works. It can be hardcoded, minimal, or use stub data — as long as it touches every layer and can be verified. Once the tracer bullet flies, expand it in safe increments rather than building from scratch.
 
 Core principle: each increment leaves the repo in a working, testable state.
 
@@ -48,7 +52,7 @@ If verification fails, fix within the current slice before continuing. Do not st
 
 | Strategy | Use When | Example |
 | --- | --- | --- |
-| Vertical | Normal features | One API path plus minimal UI wiring |
+| Vertical (tracer bullet) | Default — normal features | One API path + DB query + minimal UI — the thinnest complete path |
 | Contract-first | Frontend/backend can split | Types/schema first, then implementations |
 | Risk-first | Unknown integration | Prove external API or migration path first |
 | Additive | Risky refactors | Add new path, wire, then remove old path later |
@@ -85,8 +89,9 @@ If you notice adjacent issues, report them as follow-ups.
 
 | Rationalization | Rebuttal |
 | --- | --- |
-| "It's faster to do it all at once" | It feels faster until debugging a 500-line diff. |
-| "I'll test at the end" | Bugs in early slices poison later work. |
+| "It's faster to do it all at once" | It feels faster until debugging a 500-line diff. Complexity compounds from unverified code. |
+| "I'll test at the end" | Bugs in early slices poison later work. AI agents amplify this: a wrong assumption in slice 1 gets reinforced in slices 2-5 before anyone notices. |
+| "Horizontal layering is more efficient" | Horizontal leaves every layer half-wired. You can't verify anything until every layer is done — that's a batch, not an increment. |
 | "This refactor is small enough to include" | Mixed concerns make review and rollback harder. |
 | "The feature is incomplete, but hidden enough" | Incomplete user-visible behavior needs a flag or must not merge. |
 

@@ -1,7 +1,7 @@
 {
-  "defaultProvider": "opencode-go",
-  "defaultModel": "deepseek-v4-flash",
-  "defaultThinkingLevel": "high",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
+  "defaultThinkingLevel": "medium",
   "editorPaddingX": 1,
   "images": {
     "blockImages": false
@@ -12,12 +12,11 @@
     "npm:@tintinweb/pi-tasks",
     "npm:pi-mcp-adapter",
     "npm:@marckrenn/pi-sub-bar",
-    "npm:pi-rewind",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:pi-powerline-footer",
-    "npm:@sting8k/pi-vcc@0.3.13"
+    "npm:@sting8k/pi-vcc"
   ],
   "compaction": {
     "enabled": true,
@@ -38,15 +37,9 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [
-    ".pi/skills/"
-  ],
-  "prompts": [
-    ".pi/prompts/"
-  ],
-  "extensions": [
-    ".pi/extensions/"
-  ],
+  "skills": [".pi/skills/"],
+  "prompts": [".pi/prompts/"],
+  "extensions": [".pi/extensions/"],
   "lastChangelogVersion": "0.75.3",
   "treeFilterMode": "default",
   "transport": "sse",
@@ -62,3 +55,4 @@
   },
   "theme": "catppuccin"
 }
+

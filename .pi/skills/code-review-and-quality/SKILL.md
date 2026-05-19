@@ -16,12 +16,20 @@ Review is a bug-finding activity, not a compliment sandwich. The reviewer verifi
 
 Core principle: findings first, with file:line evidence and impact.
 
+**Complexity is a correctness issue.** A change that works but adds structural complexity introduces risk: it makes future changes harder, slower, and more error-prone. The reviewer must assess structural quality alongside behavioral correctness.
+
+Use the **three complexity symptoms** as review lenses:
+- **Change amplification**: does a small future change require touching many places?
+- **Cognitive load**: does the reviewer (or AI agent) need to understand too much of the system to assess one change?
+- **Unknown unknowns**: is it obvious what needs to change for a new requirement, or are there hidden dependencies?
+
 ## When to Use
 
 - User asks for review.
 - Before merge/ship.
 - After a worker or subagent reports completion.
 - Refactors, security-sensitive changes, API changes, migrations, concurrency, or auth.
+- Any change where complexity may have been introduced (always suspect).
 
 ## When NOT to Use
 
@@ -35,10 +43,15 @@ Core principle: findings first, with file:line evidence and impact.
 2. Read the diff and nearby context.
 3. Verify goal completion: exists, substantive, wired.
 4. Check key links: UI -> API, API -> database, form -> handler, state -> render, command -> effect.
-5. Look for correctness, security, performance, compatibility, and maintainability issues.
-6. Run or inspect relevant verification when allowed.
-7. Report only actionable findings that the author should fix.
-8. If no findings, say so and list residual testing gaps.
+5. **Assess for complexity symptoms**:
+   - Is the interface of each new module as complex as its implementation? (shallow module — Ousterhout)
+   - Does a change leak information between unrelated modules?
+   - Would a future developer (or AI agent) know where to make the next change?
+6. Look for correctness, security, performance, compatibility, and maintainability issues.
+7. Run or inspect relevant verification when allowed.
+8. **Scan for broken windows** — does the change introduce or fix code that normalizes decay? Messy imports, inconsistent patterns, TODO rot, dead code?
+9. Report only actionable findings that the author should fix.
+10. If no findings, say so and list residual testing gaps.
 
 ## Severity
 
@@ -75,6 +88,15 @@ Confidence: 0.0-1.0
 - Created files are not imported or invoked anywhere.
 - Static placeholder responses or no-op handlers satisfy superficial tests.
 - Reviewer modifies files.
+
+## Complexity Red Flags
+
+- **New module with shallow interface**: lots of public methods/props for small implementation — it's not hiding complexity, it's exposing it.
+- **Information leakage**: one module exposes internal implementation details another module depends on.
+- **Change amplification signal**: a simple conceptual change would touch many files — the structure is fighting the domain.
+- **Cognitive load spike**: the diff requires understanding 5+ unrelated files to verify one change.
+- **Pass-through methods**: methods that do nothing but delegate with the same signature — a sign the abstraction boundary is wrong.
+- **Broken windows introduced**: messy formatting, dead imports, TODOs without tickets, inconsistent conventions within the same file.
 
 ## Verification
 

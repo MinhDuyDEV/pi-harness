@@ -268,7 +268,7 @@ Wait for all 5 agents to return. Synthesize findings.
 
 - Critical issues → fix inline, re-run Phase 4 verification, continue
 - Important issues → fix inline, continue
-- Minor issues → add to bead comments, note for `/compound` step
+- Minor issues → add to bead comments
 
 If review finds critical issues that require architectural decisions → stop → present options to user.
 
@@ -346,7 +346,7 @@ br close $ARGUMENTS --reason "Shipped: all PRD tasks pass, verification + review
 br sync --flush-only
 ```
 
-Record significant learnings with `/compound $ARGUMENTS` after closing.
+Record significant learnings with `/knowledge $ARGUMENTS` after closing.
 
 ## Output
 

@@ -167,4 +167,4 @@ observation({
 | ----------------- | ------------------ |
 | Ship after verify | `/ship <id>`       |
 | Review code       | `/review-codebase` |
-| Check status      | `/status`          |
+| Check bead status  | `br list`          |

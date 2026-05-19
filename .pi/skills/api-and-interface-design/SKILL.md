@@ -29,6 +29,10 @@ APIs are contracts. Once published, they're hard to change without breaking cons
 
 **Core principle:** Define the contract (types, errors, versioning) before writing implementation. Make breaking changes impossible through careful interface design.
 
+**Aim for deep endpoints.** A "deep endpoint" has a small, stable interface (few params, consistent response shape, simple error model) that hides significant backend complexity. A "shallow endpoint" requires callers to understand database structure, job scheduling, or domain internals to use it correctly. Every API endpoint should hide more than it reveals.
+
+**Pull complexity downward** — if an operation is complex, handle it server-side, not in the client. The API should absorb complexity so callers don't have to.
+
 ## Contract-First Process
 
 ```

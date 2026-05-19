@@ -15,6 +15,7 @@ tools: []
 - Tests/build/typecheck already pass, but the changed code is clumsy
 - A feature works, but the diff contains duplication, over-nesting, dead code, or awkward naming
 - You want a final simplification pass before review or merge
+- You encountered a "broken window" (messy code, bad pattern, dead comment) that needs boarding up
 
 ## When NOT to Use
 
@@ -29,6 +30,14 @@ tools: []
 
 No cleanup claim counts unless the same verification still passes after the cleanup edits.
 
+## Why Cleanup Matters: Software Entropy
+
+Left unrepaired, every messy piece of code gives permission for the next one. This is the "broken windows" theory from *The Pragmatic Programmer*: a bad design, wrong decision, or poor code left in place signals that quality doesn't matter — and more broken windows follow.
+
+AI agents accelerate this. A messy module invites the next AI to add more mess. A clean module with clear patterns invites the next AI to follow those patterns. Cleanup is not cosmetic — it's **entropy containment**. It's the difference between a codebase that decays with each AI pass and one that stabilizes.
+
+**When full cleanup is impossible, board it up.** Add a comment marking the issue, stub out the dead path, isolate the bad code behind a clear boundary. The goal is to contain the damage so it doesn't spread, even if you can't fix it right now.
+
 ## Cleanup Targets
 
 Prefer cleanup that removes friction without changing behavior:
@@ -38,6 +47,7 @@ Prefer cleanup that removes friction without changing behavior:
 - simplify conditionals and nesting
 - improve names where the blast radius is small and verified
 - remove AI-ish filler comments, duplicated guards, or ceremony
+- **fix broken windows**: inconsistent patterns, dead TODOs, misnamed functions, formatting rot
 
 Avoid:
 

@@ -132,4 +132,4 @@ observation({
 | ------------------- | -------------- |
 | Ship after review   | `/ship <id>`   |
 | Verify completeness | `/verify <id>` |
-| Check status        | `/status`      |
+| Check bead status    | `br list`         |

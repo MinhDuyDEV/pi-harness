@@ -1,6 +1,6 @@
 {
   "generated_by": "manual skill pruning registry generator",
-  "active_skill_count": 69,
+  "active_skill_count": 70,
   "core_skill_count": 33,
   "optional_skill_count": 36,
   "skills": [
@@ -1249,25 +1249,7 @@
       "status": "core",
       "pack": "core"
     },
-    {
-      "name": "tilth",
-      "path": "skills/tilth/SKILL.md",
-      "description": "DEPRECATED \u2014 use the srcwalk skill. All tilth_* tools are now backed by srcwalk.",
-      "version": "1.0.0",
-      "tags": [
-        "code-intelligence",
-        "deprecated"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "deprecated",
-      "pack": "research-tools"
-    },
+
     {
       "name": "using-git-worktrees",
       "path": "skills/using-git-worktrees/SKILL.md",
@@ -1407,6 +1389,52 @@
       "tools": [],
       "status": "optional",
       "pack": "agent-coordination"
+    },
+    {
+      "name": "deep-module-design",
+      "path": "skills/deep-module-design/SKILL.md",
+      "description": "Applies Ousterhout's deep module principles to code design \u2014 small interfaces, information hiding, pull complexity downward.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "code-quality",
+        "ousterhout"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "srcwalk_search",
+        "srcwalk_deps"
+      ],
+      "status": "core",
+      "pack": "core"
+    },
+    {
+      "name": "ubiquitous-language",
+      "path": "skills/ubiquitous-language/SKILL.md",
+      "description": "Establishes shared vocabulary across codebase, context files, and team conversation \u2014 from Evans' DDD and Pocock's AI glossary technique.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "domain-driven-design",
+        "ai-workflow"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "scout"
+      ],
+      "tools": [
+        "srcwalk_search",
+        "grep",
+        "memory"
+      ],
+      "status": "core",
+      "pack": "core"
     }
   ]
 }

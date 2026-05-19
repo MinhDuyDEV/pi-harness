@@ -16,6 +16,10 @@ A spec converts intent into testable truth. Code written before the target is cl
 
 Core principle: define observable outcomes, constraints, non-goals, and verification before planning implementation.
 
+**Define the vocabulary first.** Every concept in the spec should have one name — that name must match what the code will call it. This is Evans' "ubiquitous language": a shared vocabulary between developers, domain experts, code, and AI context files. Ambiguous language in the spec causes the "AI does the wrong thing" failure mode: the LLM implements what the words say, not what you meant.
+
+After writing the spec, extract a glossary of terms. Every capitalized concept in the spec should correspond to exactly one code symbol (type, class, module, function, file). If two terms mean the same thing, pick one. If one term means two things, split it.
+
 ## When to Use
 
 - User asks for a new feature or significant behavior change.
@@ -32,13 +36,15 @@ Core principle: define observable outcomes, constraints, non-goals, and verifica
 ## Workflow
 
 1. State the goal as an outcome, not a task.
-2. Derive 3-7 observable truths from the user's perspective.
-3. Identify constraints: technical, UX, security, performance, compatibility.
-4. Define non-goals to prevent scope creep.
-5. List affected surfaces: files, APIs, commands, UI screens, data models.
-6. Define acceptance criteria with verification methods.
-7. Ask at most 1-4 focused questions only if missing information changes the design.
-8. Hand off to `planning-and-task-breakdown` when the spec is stable.
+2. **Establish vocabulary**: define the key terms and map them to code concepts.
+3. Derive 3-7 observable truths from the user's perspective.
+4. Identify constraints: technical, UX, security, performance, compatibility.
+5. Define non-goals to prevent scope creep.
+6. List affected surfaces: files, APIs, commands, UI screens, data models.
+7. Define acceptance criteria with verification methods.
+8. **Check vocabulary consistency**: does every spec term map to exactly one code symbol? Are any terms overloaded?
+9. Ask at most 1-4 focused questions only if missing information changes the design.
+10. Hand off to `planning-and-task-breakdown` when the spec is stable.
 
 ## Spec Template
 
@@ -47,6 +53,13 @@ Core principle: define observable outcomes, constraints, non-goals, and verifica
 
 ## Goal
 [Outcome in one sentence]
+
+## Vocabulary
+| Term | Definition | Code symbol |
+|------|------------|-------------|
+| ...  | ...        | ...         |
+
+Every concept should have one name. If two terms mean the same thing, consolidate. If one term means two things, split it.
 
 ## Observable Truths
 - [User/system can observe X]
@@ -74,6 +87,7 @@ Core principle: define observable outcomes, constraints, non-goals, and verifica
 | "The user already explained it" | Explanation is not acceptance criteria. Write the target down. |
 | "I'll discover requirements while coding" | Discovery during coding causes churn and hidden scope expansion. |
 | "This is obvious" | Obvious to you is not a contract for the next agent or reviewer. |
+| "The AI will figure out what I mean" | The AI will implement exactly what the spec says. Ambiguous language = wrong implementation. |
 | "Questions slow us down" | One precise question is cheaper than implementing the wrong behavior. |
 
 ## Red Flags
@@ -83,6 +97,9 @@ Core principle: define observable outcomes, constraints, non-goals, and verifica
 - Edge cases are deferred without user agreement.
 - The plan starts before observable truths are defined.
 - User-visible behavior has no verification method.
+- **No vocabulary section** — missing ubiquitous language means AI will guess term meanings.
+- **Same term used for different concepts** — e.g. "Order" means creation flow in one place and fulfillment in another.
+- **Different terms for the same concept** — e.g. "User" vs "Account" vs "Profile" used interchangeably.
 
 ## Verification
 

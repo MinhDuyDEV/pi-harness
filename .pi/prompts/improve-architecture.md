@@ -16,6 +16,8 @@ and proposing better interfaces.
 
 ```typescript
 skill({ name: "verification-before-completion" });
+skill({ name: "deep-module-design" });
+skill({ name: "api-and-interface-design" });
 ```
 
 ## Core Concept: Deep vs Shallow Modules

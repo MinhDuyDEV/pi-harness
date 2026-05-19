@@ -7,6 +7,12 @@ argument-hint: "[--all] [--amend] [message override]"
 
 Create a well-structured conventional commit from current changes.
 
+## Load Skills
+
+```typescript
+skill({ name: "git-workflow-and-versioning" });
+```
+
 ## Process
 
 ### Phase 1: Inspect Changes
