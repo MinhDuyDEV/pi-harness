@@ -93,10 +93,8 @@ import {
 } from "./dcp/db.js";
 import { registerCompressTool } from "./dcp/tools.js";
 import { registerSnapshotTool } from "./dcp/snapshot.js";
-import { applyStrategies, applyDeferredDrops, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
+import { applyStrategies, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
 import { offloadLargeToolResults } from "./dcp/offload.js";
-import { TagManager } from "./dcp/tags.js";
-import { DropQueue } from "./dcp/queue.js";
 import { NudgeManager } from "./dcp/nudge.js";
 import {
 	extractFacts,
@@ -146,8 +144,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	}
 
 	// 2. Per-session state (lazily initialized on first event with ctx)
-	let tagManager: TagManager | null = null;
-	let dropQueue: DropQueue | null = null;
 	let nudgeManager: NudgeManager = new NudgeManager(config);
 	let currentTurn = 0;
 	let lastStrategyResult: StrategyResult | null = null;
@@ -163,8 +159,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	function ensureInitialized(ctx: ExtensionContext): void {
 		if (initialized) return;
 		const sessionId = getSessionId(ctx);
-		tagManager = new TagManager(sessionId, config);
-		dropQueue = new DropQueue(sessionId, config);
 		initialized = true;
 	}
 
@@ -181,7 +175,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
 	pi.on("input", () => {
 		currentTurn++;
-		nudgeManager.recordUserInput();
 	});
 
 	// -----------------------------------------------------------------------
@@ -209,11 +202,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
 			// Record for dedup analysis
 			recordToolCall(sessionId, toolCallId, toolName, paramsHash, status, currentTurn, tokenEstimate);
-
-			// Assign a monotonic tag
-			if (tagManager) {
-				tagManager.assign(currentTurn, toolName, paramsHash);
-			}
 		} catch {
 			// Best-effort tracking
 		}
@@ -271,33 +259,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 						`[dcp] Auto-pruned ${totalResult.prunedCount} items (~${totalResult.prunedTokens} tokens):`,
 						totalResult.actions,
 					);
-				}
-			}
-
-			// Process deferred drop queue — strip content from dropped tags
-			if (dropQueue) {
-				const usage = ctx.getContextUsage();
-				const maxTagId = tagManager?.getCount() ?? 0;
-				const droppableTagIds = dropQueue.processQueue(usage?.percent ?? null, maxTagId);
-
-				if (droppableTagIds.size > 0) {
-					const dropResult = applyDeferredDrops(messages, sessionId, droppableTagIds);
-					if (dropResult.prunedCount > 0) {
-						totalResult.prunedTokens += dropResult.prunedTokens;
-						totalResult.prunedCount += dropResult.prunedCount;
-						totalResult.actions.push(...dropResult.actions);
-
-						const stats = getSessionStats(sessionId);
-						if (stats) {
-							updateSessionStats(sessionId, {
-								total_deferred_drops: stats.total_deferred_drops + dropResult.prunedCount,
-							});
-						}
-					}
-
-					if (config.debug) {
-						console.log(`[dcp] Deferred drops executed: ${droppableTagIds.size} tags, ${dropResult.prunedCount} items stripped`);
-					}
 				}
 			}
 
@@ -650,9 +611,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 			resetSessionState(sessionId, wasDcpEnrichedCompaction);
 			currentTurn = 0;
 
-			// Reset managers
-			if (tagManager) tagManager.reset();
-			if (dropQueue) dropQueue.reset();
+			// Reset nudge state
 			nudgeManager.reset();
 			lastStrategyResult = null;
 		} catch {
@@ -675,8 +634,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 				const summaryBufferPct = Math.round((summaryTokens / config.compress.summaryBuffer) * 100);
 				const usage = ctx.getContextUsage();
 				const nudgeState = nudgeManager.getState();
-				const pendingDrops = dropQueue?.getPendingCount() ?? 0;
-				const tagCount = tagManager?.getCount() ?? 0;
+
 				const priorityMap = nudgeManager.getPriorityMap();
 				const summaryExtension = Math.min(summaryTokens, config.compress.summaryBuffer);
 				const effectiveMax = config.compress.maxContextLimit + summaryExtension;
@@ -694,18 +652,14 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					"### Runtime Strategies",
 					`**Auto-prunes total**: ${stats.totalAutoPrunes}`,
 					`**Tokens saved by auto-prune**: ~${stats.totalPrunedTokens}`,
+					`**Supersede writes**: ${config.strategies.supersedeWrites.enabled ? `active (${config.strategies.supersedeWrites.turns} turn min age)` : "off"}`,
 					`**Last pass**: ${lastStrategyResult ? `${lastStrategyResult.prunedCount} items (~${lastStrategyResult.prunedTokens} tokens)` : "none"}`,
 					"",
-					"### Tagging & Queue",
-					`**Tags assigned**: ${tagCount}`,
-					`**Pending drops**: ${pendingDrops}`,
-					`**Deferred drops executed**: ${stats.totalDeferredDrops}`,
-					"",
+
 					"### Facts",
 					`**Facts extracted**: ${stats.totalFactsExtracted}`,
 					"",
 					"### Nudge System",
-					`**Consecutive turns**: ${nudgeState.consecutiveAssistantTurns}`,
 					`**Last context**: ${nudgeState.lastContextTokens != null ? `~${Math.round(nudgeState.lastContextTokens / 1000)}k (${Math.round(nudgeState.lastContextPercent ?? 0)}%)` : "no data"}`,
 					`**Summary buffer used**: ${nudgeState.summaryTokens > 0 ? `~${Math.round(nudgeState.summaryTokens / 1000)}k (extends effective max)` : "0"}`,
 					"",
@@ -726,7 +680,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 					),
 					"",
 					"### Config Highlights",
-					`**Drop queue**: ${config.dropQueue.enabled ? `TTL ${config.dropQueue.cacheTTL.defaultMs / 1000}s` : "disabled"}`,
+
 					`**Fact extraction**: ${config.factExtraction.enabled ? "enabled" : "disabled"}`,
 					`**Expand (reversible)**: ${config.expand.enabled ? "enabled" : "disabled"}`,
 					`**Pi native compaction**: ${config.autoCompact.cancelNativeCompaction === "always" ? "BLOCKED by DCP (manual compress only)" : config.autoCompact.cancelNativeCompaction === "when-managed" ? "blocked when DCP has active blocks" : "handles auto-compact (DCP provides nudges only)"}`,

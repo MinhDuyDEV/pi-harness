@@ -20,7 +20,6 @@ export interface CompressConfig {
 	maxContextLimit: number;
 	minContextLimit: number;
 	nudgeFrequency: number;
-	iterationNudgeThreshold: number;
 	nudgeForce: NudgeForce;
 	protectedTools: string[];
 	protectUserMessages: boolean;
@@ -57,38 +56,16 @@ export interface PurgeErrorsConfig {
 	protectedTools: string[];
 }
 
+export interface SupersedeWritesConfig {
+	enabled: boolean;
+	/** Minimum estimated turn age before a write can be superseded */
+	turns: number;
+}
+
 export interface StrategiesConfig {
 	deduplication: DeduplicationConfig;
 	purgeErrors: PurgeErrorsConfig;
-}
-
-// ---------------------------------------------------------------------------
-// Phase 2: Cache-aware drop queue config
-// ---------------------------------------------------------------------------
-
-export interface CacheTTLConfig {
-	/** Default cache TTL in milliseconds (default: 5 minutes) */
-	defaultMs: number;
-	/** Per-model overrides: model name/pattern → TTL in ms */
-	perModel: Record<string, number>;
-}
-
-export interface DropQueueConfig {
-	enabled: boolean;
-	/** Cache TTL settings — drops are deferred until TTL expires */
-	cacheTTL: CacheTTLConfig;
-	/** Context usage % that forces queue execution regardless of TTL */
-	executeThresholdPercent: number;
-	/** Last N tags immune from immediate drop */
-	protectedTags: number;
-}
-
-// ---------------------------------------------------------------------------
-// Phase 2: Tagging config
-// ---------------------------------------------------------------------------
-
-export interface TaggingConfig {
-	enabled: boolean;
+	supersedeWrites: SupersedeWritesConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,8 +179,6 @@ export interface DCPConfig {
 	experimental: ExperimentalConfig;
 
 	// v2 additions
-	dropQueue: DropQueueConfig;
-	tagging: TaggingConfig;
 	factExtraction: FactExtractionConfig;
 	expand: ExpandConfig;
 	historian: HistorianConfig;
@@ -270,7 +245,6 @@ export const DEFAULT_CONFIG: DCPConfig = {
 		maxContextLimit: 150_000,
 		minContextLimit: 50_000,
 		nudgeFrequency: 5,
-		iterationNudgeThreshold: 15,
 		nudgeForce: "soft",
 		protectedTools: [...COMPRESS_PROTECTED_TOOLS],
 		protectUserMessages: false,
@@ -290,6 +264,10 @@ export const DEFAULT_CONFIG: DCPConfig = {
 			turns: 4,
 			protectedTools: [],
 		},
+		supersedeWrites: {
+			enabled: true,
+			turns: 3,
+		},
 	},
 	manualMode: {
 		enabled: false,
@@ -305,26 +283,7 @@ export const DEFAULT_CONFIG: DCPConfig = {
 	},
 
 	// v2: Cache-aware deferred drop queue
-	dropQueue: {
-		enabled: true,
-		cacheTTL: {
-			defaultMs: 5 * 60 * 1000, // 5 minutes
-			perModel: {
-				// Claude Max has longer cache windows
-				"claude-sonnet-4-0": 10 * 60 * 1000,
-				"claude-opus-4-0": 10 * 60 * 1000,
-			},
-		},
-		executeThresholdPercent: 65,
-		protectedTags: 20,
-	},
-
-	// v2: Monotonic message tagging
-	tagging: {
-		enabled: true,
-	},
-
-	// v2: Fact extraction from compaction
+// v2: Fact extraction from compaction
 	factExtraction: {
 		enabled: true,
 		categories: [

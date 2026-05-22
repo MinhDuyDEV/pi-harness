@@ -22,8 +22,7 @@ export interface NudgeState {
 	pendingNudge: string | null;
 	/** Last turn a nudge was injected (for debounce) */
 	lastNudgeTurn: number;
-	/** Consecutive assistant turns without user input */
-	consecutiveAssistantTurns: number;
+
 	/** Whether auto-compact was triggered this cycle */
 	autoCompactTriggered: boolean;
 	/** Last known context usage for display */
@@ -62,7 +61,6 @@ export class NudgeManager {
 		this.state = {
 			pendingNudge: null,
 			lastNudgeTurn: 0,
-			consecutiveAssistantTurns: 0,
 			autoCompactTriggered: false,
 			lastContextPercent: null,
 			lastContextTokens: null,
@@ -71,12 +69,7 @@ export class NudgeManager {
 		};
 	}
 
-	/**
-	 * Record a user input — resets consecutive assistant turn counter.
-	 */
-	recordUserInput(): void {
-		this.state.consecutiveAssistantTurns = 0;
-	}
+
 
 	/**
 	 * Record that the agent recently called compress — suppress nudges briefly.
@@ -108,7 +101,7 @@ export class NudgeManager {
 		currentTurn: number,
 		summaryTokens: number = 0,
 	): NudgeCheckResult {
-		this.state.consecutiveAssistantTurns++;
+
 		this.state.lastContextPercent = contextPercent;
 		this.state.lastContextTokens = contextTokens;
 		this.state.summaryTokens = summaryTokens;
@@ -126,7 +119,7 @@ export class NudgeManager {
 			return result;
 		}
 
-		const { minContextLimit, maxContextLimit, iterationNudgeThreshold, nudgeForce, summaryBuffer } = this.config.compress;
+		const { minContextLimit, maxContextLimit, nudgeForce, summaryBuffer } = this.config.compress;
 		const { autoCompact } = this.config;
 
 		// summaryBuffer: extend effective max by active summary tokens
@@ -156,15 +149,9 @@ export class NudgeManager {
 		}
 
 		// Phase 2: Between min and effective max — gentle nudges
-		// Check if enough turns since last nudge (frequency control)
+		// Don't nudge if we recently sent one (frequency control)
 		const turnsSinceLastNudge = currentTurn - this.state.lastNudgeTurn;
 		if (turnsSinceLastNudge < this.config.compress.nudgeFrequency) {
-			// Check iteration nudge separately
-			if (this.state.consecutiveAssistantTurns >= iterationNudgeThreshold) {
-				result.shouldNudge = true;
-				result.nudgeMessage = this.buildIterationNudge(this.state.consecutiveAssistantTurns, contextTokens, contextPercent);
-				this.state.lastNudgeTurn = currentTurn;
-			}
 			return result;
 		}
 
@@ -215,7 +202,6 @@ export class NudgeManager {
 		this.state = {
 			pendingNudge: null,
 			lastNudgeTurn: 0,
-			consecutiveAssistantTurns: 0,
 			autoCompactTriggered: false,
 			lastContextPercent: null,
 			lastContextTokens: null,
@@ -295,14 +281,5 @@ export class NudgeManager {
 		].filter(Boolean).join(" ");
 	}
 
-	private buildIterationNudge(consecutiveTurns: number, tokens: number, percent: number): string {
-		const tokensK = Math.round(tokens / 1000);
-		const priority = this.buildPrioritySection();
-		return [
-			`[DCP Iteration] ${consecutiveTurns} consecutive turns without user input.`,
-			`Context at ${tokensK}k tokens (${Math.round(percent)}%).`,
-			"Check if any phases are complete and can be compressed.",
-			priority,
-		].filter(Boolean).join(" ");
-	}
+
 }

@@ -24,7 +24,7 @@
 
 import type { DCPConfig } from "./config.js";
 import { hashParams, estimateTokens } from "./utils.js";
-import { getTagsForSession, type MessageTag } from "./db.js";
+
 
 // ---------------------------------------------------------------------------
 // Schema-safe argument truncation
@@ -845,74 +845,85 @@ export function applyStrategies(
 	totalResult.prunedCount += purgeResult.prunedCount;
 	totalResult.actions.push(...purgeResult.actions);
 
+	// Strategy 3: Supersede writes (write→read = prune write payload)
+	const supersedeResult = applySupersedeWrites(messages, config, ops);
+	totalResult.prunedTokens += supersedeResult.prunedTokens;
+	totalResult.prunedCount += supersedeResult.prunedCount;
+	totalResult.actions.push(...supersedeResult.actions);
+
 	return { messages, totalResult, rawRanges: compressResult.rawRanges };
 }
 
 // ---------------------------------------------------------------------------
-// Deferred Drop Application
+// Strategy 3: Supersede Writes
 //
-// Called separately from the main strategies, after the drop queue has
-// resolved which tag IDs should be dropped. Looks up tag metadata from DB,
-// finds matching tool operations in the current messages, and strips content.
+// If a file is written (write/edit) then later read (read), the write payload
+// is redundant — the read result already contains the current state.
+// Strip the write payload to save tokens.
 // ---------------------------------------------------------------------------
 
-/**
- * Apply deferred drops to messages by stripping content from tool calls/results
- * that match the dropped tag signatures (tool_name + params_hash).
- *
- * @param messages - Message array (mutated in place)
- * @param sessionId - Current session ID for tag lookups
- * @param tagIds - Set of tag IDs to drop (from DropQueue.processQueue)
- */
-export function applyDeferredDrops(
+function applySupersedeWrites(
 	messages: AgentMessage[],
-	sessionId: string,
-	tagIds: Set<number>,
+	config: DCPConfig,
+	ops: ToolOp[],
 ): StrategyResult {
+	const cfg = config.strategies.supersedeWrites;
+	if (!cfg?.enabled) {
+		return { prunedTokens: 0, prunedCount: 0, actions: [] };
+	}
+
 	const result: StrategyResult = { prunedTokens: 0, prunedCount: 0, actions: [] };
 
-	if (tagIds.size === 0) return result;
-
-	// Look up the tags to get their tool_name + params_hash
-	const allTags = getTagsForSession(sessionId);
-
-	// Build a set of (tool_name, params_hash) signatures to drop
-	const signaturesForDrop = new Set<string>();
-	for (const tag of allTags) {
-		if (tagIds.has(tag.tag_id) && tag.tool_name && tag.params_hash) {
-			signaturesForDrop.add(`${tag.tool_name}:${tag.params_hash}`);
+	// Build set of file paths read (walk backward, track newest reads)
+	const readPaths = new Set<string>();
+	for (const op of ops) {
+		if (op.type === "result" && op.toolName === "read") {
+			const msg = messages[op.messageIndex] as ToolResultMessage;
+			if (msg.toolName === "read") {
+				// Extract path from the corresponding tool call arguments
+				for (const callOp of ops) {
+					if (callOp.type === "call" && callOp.toolCallId === op.toolCallId) {
+						const callMsg = messages[callOp.messageIndex] as AssistantMessage;
+						if (Array.isArray(callMsg.content)) {
+							const tc = callMsg.content[callOp.contentIndex] as ToolCallContent;
+							const path = tc?.arguments?.path as string | undefined;
+							if (path) readPaths.add(path);
+						}
+						break;
+					}
+				}
+			}
 		}
 	}
 
-	if (signaturesForDrop.size === 0) return result;
+	if (readPaths.size === 0) return result;
 
-	// Find matching tool operations and strip their content
-	const ops = extractToolOps(messages);
-
+	// Walk backward: find write/edit calls for paths that were later read
+	// Skip recent/protected writes
 	for (const op of ops) {
 		if (op.type !== "call") continue;
-		const sig = `${op.toolName}:${op.paramsHash}`;
-		if (!signaturesForDrop.has(sig)) continue;
+		if (op.toolName !== "write" && op.toolName !== "edit") continue;
 
-		// Strip the tool call arguments
-		// SCHEMA-SAFE: preserve all original keys, only truncate known-large values
+		// Extract path from the tool call
 		const msg = messages[op.messageIndex] as AssistantMessage;
-		if (Array.isArray(msg.content)) {
-			const tc = msg.content[op.contentIndex] as ToolCallContent;
-			const { prunedTokens } = truncateToolArguments(tc, "deferred-drop");
+		if (!Array.isArray(msg.content)) continue;
+		const tc = msg.content[op.contentIndex] as ToolCallContent;
+		const path = tc?.arguments?.path as string | undefined;
+		if (!path || !readPaths.has(path)) continue;
+
+		// Estimate age: use message position as proxy
+		const relativeAge = messages.length - op.messageIndex;
+		const estimatedTurnAge = Math.max(1, Math.floor(relativeAge / 3));
+
+		// Only supersede writes that are old enough (at least cfg.turns old)
+		if (estimatedTurnAge < cfg.turns) continue;
+
+		// Strip the write payload — content will be truncated by truncateToolArguments
+		const { prunedTokens } = truncateToolArguments(tc, "superseded-by-read");
+		if (prunedTokens > 0) {
 			result.prunedTokens += prunedTokens;
 			result.prunedCount++;
-			result.actions.push(`deferred-drop: ${op.toolName} at msg ${op.messageIndex}`);
-		}
-
-		// Strip the corresponding tool result
-		for (const resultOp of ops) {
-			if (resultOp.type === "result" && resultOp.toolCallId === op.toolCallId) {
-				const rmsg = messages[resultOp.messageIndex] as ToolResultMessage;
-				const savedResultTokens = resultOp.tokenEstimate;
-				rmsg.content = [{ type: "text", text: "[truncated: cache expired]" }];
-				result.prunedTokens += savedResultTokens;
-			}
+			result.actions.push(`supersede-write: ${op.toolName} ${path} at msg ${op.messageIndex} (~${prunedTokens} tokens)`);
 		}
 	}
 
