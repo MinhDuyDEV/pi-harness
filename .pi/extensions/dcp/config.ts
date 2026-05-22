@@ -242,8 +242,8 @@ export const DEFAULT_CONFIG: DCPConfig = {
 	],
 	compress: {
 		permission: "allow",
-		maxContextLimit: 150_000,
-		minContextLimit: 50_000,
+		maxContextLimit: 280_000,
+		minContextLimit: 140_000,
 		nudgeFrequency: 5,
 		nudgeForce: "soft",
 		protectedTools: [...COMPRESS_PROTECTED_TOOLS],
