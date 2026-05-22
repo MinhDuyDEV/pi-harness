@@ -75,6 +75,7 @@ export default function (pi: ExtensionAPI) {
   let lastHeartbeatMs = 0
   let liveAssistantText = ''
   let pollTimer: ReturnType<typeof setInterval> | undefined
+  let mirrorEpoch = 0
   let lastMirrorKey = ''
   let lastNotifiedRunKey = ''
   let lastNotifiedMessageId = ''
@@ -111,7 +112,12 @@ export default function (pi: ExtensionAPI) {
     })
   }
 
-  function clearMirror(ctx: ExtensionContext) {
+  function isActiveMirrorEpoch(epoch: number) {
+    return epoch === mirrorEpoch
+  }
+
+  function clearMirror(ctx: ExtensionContext, epoch?: number) {
+    if (epoch !== undefined && !isActiveMirrorEpoch(epoch)) return
     if (!ctx.hasUI) return
     ctx.ui.setStatus(STATUS_KEY, undefined)
     ctx.ui.setWidget(WIDGET_KEY, undefined)
@@ -122,14 +128,21 @@ export default function (pi: ExtensionAPI) {
 
   function startMirror(ctx: ExtensionContext) {
     if (!mirrorsOpenPi || !ctx.hasUI || pollTimer) return
-    pollTimer = setInterval(() => renderOpenPiMirror(ctx), POLL_MS)
-    renderOpenPiMirror(ctx)
+    const epoch = ++mirrorEpoch
+    const renderCurrentMirror = () => {
+      if (!isActiveMirrorEpoch(epoch)) return
+      renderOpenPiMirror(ctx, epoch)
+    }
+    pollTimer = setInterval(renderCurrentMirror, POLL_MS)
+    renderCurrentMirror()
   }
 
-  function renderOpenPiMirror(ctx: ExtensionContext) {
+  function renderOpenPiMirror(ctx: ExtensionContext, epoch: number) {
+    if (!isActiveMirrorEpoch(epoch)) return
     const state = readSyncPayload()
+    if (!isActiveMirrorEpoch(epoch)) return
     if (!state || state.app !== 'openpi' || state.pid === process.pid) {
-      clearMirror(ctx)
+      clearMirror(ctx, epoch)
       return
     }
 
@@ -146,7 +159,7 @@ export default function (pi: ExtensionAPI) {
     lastMirrorKey = mirrorKey
 
     if (stale && state.status !== 'running') {
-      clearMirror(ctx)
+      clearMirror(ctx, epoch)
       return
     }
 
@@ -160,6 +173,7 @@ export default function (pi: ExtensionAPI) {
       needsOpenPiRestart: state.app === 'openpi' && !hasLivePreviewPayload,
     }
 
+    if (!isActiveMirrorEpoch(epoch)) return
     ctx.ui.setStatus(
       STATUS_KEY,
       snapshot.needsOpenPiRestart
@@ -168,19 +182,21 @@ export default function (pi: ExtensionAPI) {
           ? '↔ OpenPi live'
           : '↔ OpenPi synced'
     )
-    ensureMirrorWidget(ctx, snapshot)
+    ensureMirrorWidget(ctx, snapshot, epoch)
     mirrorWidget?.update(snapshot)
     requestMirrorRender?.()
-    notifyLatestMirrorMessage(ctx, snapshot)
+    notifyLatestMirrorMessage(ctx, snapshot, epoch)
 
     const runKey = `${state.startedAt ?? timestamp}:${sessionFile ?? ''}`
     if (snapshot.live && runKey && runKey !== lastNotifiedRunKey) {
       lastNotifiedRunKey = runKey
+      if (!isActiveMirrorEpoch(epoch)) return
       ctx.ui.notify(`OpenPi is running${snapshot.workspace ? ` in ${snapshot.workspace}` : ''}`, 'info')
     }
   }
 
-  function notifyLatestMirrorMessage(ctx: ExtensionContext, snapshot: MirrorSnapshot) {
+  function notifyLatestMirrorMessage(ctx: ExtensionContext, snapshot: MirrorSnapshot, epoch?: number) {
+    if (epoch !== undefined && !isActiveMirrorEpoch(epoch)) return
     if (!snapshot.live || snapshot.needsOpenPiRestart) return
     const latest = snapshot.messages.at(-1)
     if (!latest?.text || latest.id === lastNotifiedMessageId) return
@@ -189,7 +205,8 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.notify(`${label}: ${oneLine(latest.text).slice(0, 180)}`, 'info')
   }
 
-  function ensureMirrorWidget(ctx: ExtensionContext, snapshot: MirrorSnapshot) {
+  function ensureMirrorWidget(ctx: ExtensionContext, snapshot: MirrorSnapshot, epoch?: number) {
+    if (epoch !== undefined && !isActiveMirrorEpoch(epoch)) return
     if (mirrorWidget) return
     ctx.ui.setWidget(
       WIDGET_KEY,
@@ -244,6 +261,7 @@ export default function (pi: ExtensionAPI) {
   })
 
   pi.on('session_shutdown', (_event: unknown, ctx: ExtensionContext) => {
+    mirrorEpoch += 1
     if (pollTimer) clearInterval(pollTimer)
     pollTimer = undefined
     clearMirror(ctx)
