@@ -38,17 +38,17 @@ Use `vcc_snapshot()` / `vcc_recall()` for session state persistence.
 
 ## Auto-Delegation
 
-| When user asks... | Delegate to |
+| When user asks... | Use |
 |---|---|
-| research / investigate / compare | `scout` |
-| find code / trace usage / locate symbols | `explore` |
-| review / check for bugs | `reviewer` |
-| plan implementation | `planner` |
-| inspect UI / screenshot / accessibility | `vision` |
-| generate image | `painter` |
-| small implementation (1-3 files) | `worker` |
+| research / investigate / compare / what is / how does / look up | `scout` |
+| find code / trace usage / locate / where is / search code | `explore` |
+| review / check for bugs / audit / is this correct / does this work | `reviewer` |
+| plan / design / architecture / how should I / outline | `planner` |
+| inspect UI / screenshot / visual / accessibility / design review | `vision` |
+| small implementation / fix / add / modify / update | `worker` |
+| anything else | do it yourself |
 
-**Do it yourself** only when: trivial one-tool lookup, tight follow-up with existing context, or task depends heavily on accumulated conversation state.
+Do it yourself when it's a trivial one-tool lookup, a tight follow-up with existing context, or depends on accumulated conversation history.
 
 ## Worker Distrust
 
