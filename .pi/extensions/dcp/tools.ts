@@ -386,11 +386,11 @@ export function registerResolveRefTool(
 		label: "Resolve Ref",
 		description:
 			"Read back the original content of a reference marker in the conversation, " +
-			"e.g. "[offloaded to refs/abc.md]". The ref marker contains tool output that was " +
+			"e.g. \"[offloaded to refs/abc.md]\". The ref marker contains tool output that was " +
 			"offloaded to save context space. Pass the exact marker text or the ref filename.",
 		parameters: Type.Object({
 			ref: Type.String({
-				description: "The ref filename (e.g. "read_tc-001.md") or marker text to resolve",
+				description: "The ref filename (e.g. \"read_tc-001.md\") or marker text to resolve",
 			}),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
