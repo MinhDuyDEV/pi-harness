@@ -660,7 +660,11 @@ function applyDeduplication(
 				if (op.type === "result" && op.toolCallId === oldCall.toolCallId) {
 					const rmsg = messages[op.messageIndex] as ToolResultMessage;
 					const savedResultTokens = op.tokenEstimate;
-					rmsg.content = [{ type: "text", text: "[truncated: deduplicated — see latest call]" }];
+									// Extract a snippet from the original result for context
+					const textBlock = (rmsg.content as any[]).find((c: any) => c.type === "text");
+					const snippet = textBlock?.text?.slice(0, 100).replace(/\n/g, " ").trim() ?? "";
+					const preview = snippet ? " \u2014 " + snippet + "\u2026" : "";
+					rmsg.content = [{ type: "text", text: "[dup: " + oldCall.toolName + preview + "]" }];
 					result.prunedTokens += savedResultTokens;
 				}
 			}

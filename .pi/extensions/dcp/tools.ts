@@ -11,6 +11,10 @@
  * every subsequent LLM call. The summary replaces the original messages.
  */
 
+import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
+
 import type {
 	AgentToolUpdateCallback,
 	ExtensionAPI,
@@ -102,22 +106,26 @@ export function registerCompressTool(
 				description:
 					"Short label (3-5 words) for display — e.g., 'Auth System Exploration'",
 			}),
-			startId: Type.String({
-				description:
-					"Description of where the range starts — e.g., 'beginning of auth research'",
-			}),
-			endId: Type.String({
-				description:
-					"Description of where the range ends — e.g., 'auth implementation verified'",
-			}),
+			startId: Type.Optional(
+				Type.String({
+					description:
+						"Description of where the range starts — e.g., 'beginning of auth research'. Omit in batch mode.",
+				}),
+			),
+			endId: Type.Optional(
+				Type.String({
+					description:
+						"Description of where the range ends — e.g., 'auth implementation verified'. Omit in batch mode.",
+				}),
+			),
 			summary: Type.String({
 				description:
 					"Complete technical summary replacing all content in range. Must be exhaustive.",
 			}),
 			mode: Type.Optional(
-				Type.Union([Type.Literal("range"), Type.Literal("message")], {
+				Type.Union([Type.Literal("range"), Type.Literal("message"), Type.Literal("batch")], {
 					description:
-						'Compression mode: "range" (default) collapses a conversation range; "message" is advisory in the Pi port and records that the agent selected message-sized slices by priority before summarizing.',
+						'Compression mode: "range" (default) collapses a conversation range; "message" is advisory in the Pi port and records that the agent selected message-sized slices by priority before summarizing; "batch" auto-crystallizes everything since the last compression point — omit startId/endId in this mode.',
 				}),
 			),
 		}),
@@ -125,16 +133,16 @@ export function registerCompressTool(
 			_toolCallId: string,
 			params: {
 				topic: string;
-				startId: string;
-				endId: string;
+				startId?: string;
+				endId?: string;
 				summary: string;
-				mode?: "range" | "message";
+				mode?: "range" | "message" | "batch";
 			},
 			_signal: AbortSignal | undefined,
 			_onUpdate: AgentToolUpdateCallback<{
 				blockId: number;
 				topic: string;
-				mode: "range" | "message";
+				mode: "range" | "message" | "batch";
 				summaryTokens: number;
 				totalActive: number;
 				summaryBufferUsed: string;
@@ -212,6 +220,16 @@ export function registerCompressTool(
 					}
 					// Best-effort: if session access fails, allow compression
 				}
+			}
+
+			// Batch mode: auto-detect range from last compression point
+			if (compressMode === "batch" || !params.startId || !params.endId) {
+				// Auto-detect start from last active compression block
+				const lastBlock = getActiveBlocks(sessionId)
+					.sort((a: any, b: any) => b.block_id - a.block_id)[0];
+				params.startId = params.startId?.trim() || 
+					(lastBlock ? `after "${lastBlock.topic}" (block ${lastBlock.block_id})` : "beginning of session");
+				params.endId = params.endId?.trim() || "current conversation state";
 			}
 
 			if (config.compress.permission === "ask") {
@@ -351,3 +369,70 @@ export function registerCompressTool(
 // DCP stats tool
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Resolve Reference Tool — reads back offloaded ref files by marker
+// ---------------------------------------------------------------------------
+
+
+const REFS_BASE = join(homedir(), ".config", "pi", "dcp", "refs");
+
+export function registerResolveRefTool(
+	pi: ExtensionAPI,
+	config: DCPConfig,
+): void {
+	pi.registerTool({
+		name: "resolve_ref",
+		label: "Resolve Ref",
+		description:
+			"Read back the original content of a reference marker in the conversation, " +
+			"e.g. "[offloaded to refs/abc.md]". The ref marker contains tool output that was " +
+			"offloaded to save context space. Pass the exact marker text or the ref filename.",
+		parameters: Type.Object({
+			ref: Type.String({
+				description: "The ref filename (e.g. "read_tc-001.md") or marker text to resolve",
+			}),
+		}),
+		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+			try {
+				// Extract filename from marker text like "[offloaded to refs/filename.md]"
+				let filename = params.ref;
+				const markerMatch = filename.match(/\[offloaded to refs\/([^\]]+)\]/);
+				if (markerMatch) {
+					filename = markerMatch[1];
+				}
+				if (!filename.endsWith(".md")) {
+					filename += ".md";
+				}
+
+				// Search session refs dir first, then global
+				const sessionId = await ctx.sessionManager.getSessionFile?.() ?? "unknown";
+				const sessionName = sessionId.replace(/[^a-zA-Z0-9_-]/g, "_");
+				const searchPaths = [
+					join(REFS_BASE, sessionName, filename),
+					join(REFS_BASE, filename),
+				];
+
+				for (const refPath of searchPaths) {
+					if (existsSync(refPath)) {
+						const content = readFileSync(refPath, "utf-8");
+						return {
+							content: [{ type: "text", text: content }],
+							details: { source: refPath },
+						};
+					}
+				}
+
+				return {
+					content: [{ type: "text", text: `[Ref not found: ${filename}. Searched: ${searchPaths.join(", ")}]` }],
+					details: { found: false, searched: searchPaths },
+				};
+			} catch (err) {
+				return {
+					content: [{ type: "text", text: `[Error resolving ref: ${err instanceof Error ? err.message : String(err)}]` }],
+					details: { error: true },
+				};
+			}
+		},
+	});
+}

@@ -91,7 +91,7 @@ import {
 	updateSessionStats,
 	storeRawTranscript,
 } from "./dcp/db.js";
-import { registerCompressTool } from "./dcp/tools.js";
+import { registerCompressTool, registerResolveRefTool } from "./dcp/tools.js";
 import { registerSnapshotTool } from "./dcp/snapshot.js";
 import { applyStrategies, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
 import { offloadLargeToolResults } from "./dcp/offload.js";
@@ -168,6 +168,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	registerCompressTool(pi, config, () => nudgeManager.getPriorityMap());
 	registerExpandTool(pi, config);
 	registerSnapshotTool(pi);
+	registerResolveRefTool(pi, config);
 
 	// -----------------------------------------------------------------------
 	// EVENT: input — Track turn count + reset nudge consecutive counter
