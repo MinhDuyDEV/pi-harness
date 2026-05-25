@@ -1,8 +1,8 @@
 {
   "generated_by": "manual skill pruning registry generator",
-  "active_skill_count": 70,
-  "core_skill_count": 33,
-  "optional_skill_count": 36,
+  "active_skill_count": 71,
+  "core_skill_count": 37,
+  "optional_skill_count": 34,
   "skills": [
     {
       "name": "accessibility-audit",
@@ -463,7 +463,12 @@
         "workflow",
         "planning"
       ],
-      "dependencies": "",
+      "dependencies": [
+        "brainstorming",
+        "grill-me",
+        "documentation-and-adrs",
+        "spec-driven-development"
+      ],
       "agent_types": [
         "planner",
         "worker",
@@ -1249,7 +1254,6 @@
       "status": "core",
       "pack": "core"
     },
-
     {
       "name": "using-git-worktrees",
       "path": "skills/using-git-worktrees/SKILL.md",
@@ -1432,6 +1436,33 @@
         "srcwalk_search",
         "grep",
         "memory"
+      ],
+      "status": "core",
+      "pack": "core"
+    },
+    {
+      "name": "grill-me",
+      "path": "skills/grill-me/SKILL.md",
+      "description": "Adversarial interrogation of ideas before implementation \u2014 pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use after brainstorming, before ADR or spec writing.",
+      "version": "1.0.0",
+      "tags": [
+        "planning",
+        "review",
+        "decision",
+        "ai-workflow"
+      ],
+      "dependencies": [
+        "brainstorming",
+        "spec-driven-development"
+      ],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "srcwalk_search",
+        "grep"
       ],
       "status": "core",
       "pack": "core"

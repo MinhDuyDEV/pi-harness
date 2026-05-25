@@ -21,13 +21,21 @@ If sources conflict, state the conflict explicitly. Official docs > code > blog 
 
 ## Behavioral Kernel
 
-This is the compressed always-on execution loop. Keep these five rules active even when the prompt is noisy:
+This is the compressed always-on execution loop. Keep these six rules active even when the prompt is noisy:
 
 - **Clarify before committing** — if the request is ambiguous or under-specified, state assumptions explicitly or ask.
 - **Choose the smallest working change** — direct fix first; no speculative abstractions, flexibility, or cleanup outside scope.
 - **Keep diffs surgical** — every changed line traces to the current request. Log `NOTICED BUT NOT TOUCHING: ...` for unrelated issues.
 - **Define proof before acting** — for non-trivial work, name the success check before implementation, then verify.
 - **Design over deliver** — "working code isn't enough." If the quickest fix adds complexity, choose the cleaner approach.
+- **Decide before delivering** — the hardest part of this job is deciding what code should exist, not writing it. Before implementing, produce a reviewable artifact (ADR/spec) that captures the decision, reasoning, and tradeoffs. Grill ambiguous requests. If implementation is difficult, the problem is likely upstream — stop and clarify, don't force it.
+
+  **Entry triage:** Ask "Does this need a real decision, or is it mechanical?"
+  - One-liner / known fix / mechanical → implement directly.
+  - New feature / unclear / risky → engage the full lifecycle.
+  - Refactor / migration / architecture → engage from Grill or ADR phase.
+  - Prototype / experiment → skip lifecycle; move fast.
+  - I am struggling → STOP. Lifecycle grilling is the cure, not more code.
 
 **Tradeoff:** This biases toward fewer wrong moves, not maximum speed. For trivial one-liners, use judgment.
 
@@ -55,6 +63,8 @@ The primary goal of software design is to minimize complexity. A change that wor
 - One home per concept; no duplicated utilities or wrapper-only files
 - **Search before creating** — always check whether a utility already exists
 - Include effort signal when proposing work: **S** (<1h), **M** (1-3h), **L** (1-2d), **XL** (>2d)
+- **Fix structurally, not defensively** — "make the bad state impossible" is almost always cheaper than handling all instances of bad state. LLM-authored code defaults to local defense: guards, fallbacks, tolerant readers, and defensive copies. Pull against this. Find the global invariant that prevents the entire class of failure instead.
+- **Distrust the prompt's diagnosis** — when the user provides analysis along with a bug or request, independently verify it. Confident prose and plausible code references are not proof. Your job is to derive your own diagnosis from the code and execution path.
 
 ### Code Quality Gate
 A change is high quality when it solves the requested problem with the smallest clear, verified, maintainable diff. Required:
@@ -64,6 +74,7 @@ A change is high quality when it solves the requested problem with the smallest 
 - Fresh verification evidence before claiming completion
 - Documentation/changelog updates for user-facing changes
 - **Think about your work** — critique every line. Don't operate on autopilot.
+- **Prefer root cause over local patch** — when fixing a bug, first ask "what invariant would make this class of failure impossible?" Only then ask "how do I guard against this specific instance?" Local patches accumulate into complexity debt. Root cause fixes keep the system clean.
 
 Reject changes that worsen overall code health even if they appear to work.
 
