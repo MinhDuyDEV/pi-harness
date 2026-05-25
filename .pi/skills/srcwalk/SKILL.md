@@ -1,6 +1,6 @@
 ---
 name: srcwalk
-compatible_srcwalk: ">=0.4.0"
+compatible_srcwalk: ">=1.0.0"
 description: Use when navigating code with srcwalk — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.
 version: 2.1.0
 tags: [code-intelligence, search, cli, srcwalk]
@@ -11,7 +11,7 @@ tools: [bash, srcwalk_search, srcwalk_read, srcwalk_files, srcwalk_deps, srcwalk
 
 # Srcwalk — Code Navigation
 
-Srcwalk is the project's code navigation engine (v0.4.0+). All Pi tools are backed by the installed `srcwalk` binary.
+Srcwalk is the project's code navigation engine (v1.0.0+). All Pi tools are backed by the installed `srcwalk` binary.
 
 Run the embedded guide before non-trivial use — it is the version-matched source of truth:
 
@@ -41,20 +41,20 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 
 | Tool | Srcwalk command | Purpose |
 |---|---|---|
-| `srcwalk_search` | `srcwalk find` / `srcwalk callers` | AST-aware symbol/content/regex/callers search |
+| `srcwalk_search` | `srcwalk discover` / `srcwalk trace callers` | AST-aware symbol/content/regex/callers search |
 | `srcwalk_read` | `srcwalk <path>` | Smart file reading: outline or full with sections |
-| `srcwalk_files` | `srcwalk files` | Glob file finding with token estimates, grouped by dir |
-| `srcwalk_deps` | `srcwalk deps` + exact import scan | Blast-radius: importers + dep-aware dependents (v0.4.0) |
+| `srcwalk_files` | `srcwalk discover --as file` | Glob file finding with token estimates, grouped by dir |
+| `srcwalk_deps` | `srcwalk deps` + exact import scan | Blast-radius: importers + dep-aware dependents (v1.0.0) |
 
 ### Extended analysis tools
 
 | Tool | Srcwalk command | Purpose |
 |---|---|---|
-| `srcwalk_map` | `srcwalk map` | Token-annotated directory skeleton + dep groups (v0.4.0) |
-| `srcwalk_callers` | `srcwalk callers` | Reverse call graph with BFS depth + filters |
-| `srcwalk_callees` | `srcwalk callees` | Forward call graph with `--detailed` ordered call sites |
-| `srcwalk_flow` | `srcwalk flow` | Compact orientation slice |
-| `srcwalk_impact` | `srcwalk impact` | Heuristic blast-radius triage |
+| `srcwalk_map` | `srcwalk overview` | Token-annotated directory skeleton + dep groups (v1.0.0) |
+| `srcwalk_callers` | `srcwalk trace callers` | Reverse call graph with BFS depth + filters |
+| `srcwalk_callees` | `srcwalk trace callees` | Forward call graph with `--detailed` ordered call sites |
+| `srcwalk_flow` | `srcwalk context` | Compact orientation slice |
+| `srcwalk_impact` | `srcwalk assess` | Heuristic blast-radius triage |
 
 ## Command Routing
 
@@ -63,7 +63,7 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 | Understand repo shape | `srcwalk_map` |
 | Read or inspect a large file | `srcwalk_read` |
 | Jump to exact line | `srcwalk_read({ path: "file:42" })` |
-| Read a line range | `srcwalk_read({ path: "file:44-89" })` — v0.4.0 shortcut |
+| Read a line range | `srcwalk_read({ path: "file:44-89" })` — v1.0.0 shortcut |
 | Read by symbol name | `srcwalk_read({ section: "symbolName" })` |
 | Find definition/usages/text/glob | `srcwalk_search` |
 | Find files by glob | `srcwalk_files` |
@@ -84,7 +84,7 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 srcwalk_map({ scope: "." })
 srcwalk_search({ query: "likely_symbol", scope: "src" })
 srcwalk_read({ path: "src/file.ts:42" })         // jump to line
-srcwalk_read({ path: "src/file.ts:44-89" })      // range shortcut (v0.4.0)
+srcwalk_read({ path: "src/file.ts:44-89" })      // range shortcut (v1.0.0)
 ```
 
 ### Read a large file
@@ -134,7 +134,7 @@ srcwalk_deps({ path: "src/auth.ts" })
 srcwalk_impact({ symbol: "handleAuth", scope: "src" })  // heuristic; follow up with callers
 ```
 
-## v0.4.0 Features
+## v1.0.0 Features
 
 - **Path range shortcut**: `srcwalk_read({ path: "file:start-end" })` reads a line range directly — no need to pass `section` separately
 - **Dependency-aware map**: `srcwalk_map` now shows local relation groups and outbound dependency previews for narrowed scopes

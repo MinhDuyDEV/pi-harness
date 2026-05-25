@@ -326,7 +326,7 @@ async function searchCompat(args: ToolArgs, signal?: AbortSignal): Promise<strin
 	const expand = optionalNumber(args.expand);
 	const budget = optionalNumber(args.budget);
 	// context is accepted for API compat but not forwarded (srcwalk has no matching flag)
-	const cmdArgs = [kind === "callers" ? "callers" : "find", query];
+	const cmdArgs = kind === "callers" ? ["trace", "callers", query] : ["discover", query];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (expand !== undefined) cmdArgs.push(`--expand=${expand}`);
 	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
@@ -356,7 +356,7 @@ async function filesCompat(args: ToolArgs, signal?: AbortSignal): Promise<string
 	const pattern = requireString(args.pattern, "pattern");
 	const scope = optionalString(args.scope);
 	const budget = optionalNumber(args.budget);
-	const cmdArgs = ["files", pattern];
+	const cmdArgs = ["discover", "--as", "file", pattern];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
 	return run(cmdArgs, signal);
@@ -384,7 +384,7 @@ async function depsCompat(args: ToolArgs, signal?: AbortSignal): Promise<string>
 async function nativeMap(args: ToolArgs, signal?: AbortSignal): Promise<string> {
 	const scope = optionalString(args.scope);
 	const depth = optionalNumber(args.depth);
-	const cmdArgs = ["map"];
+	const cmdArgs = ["overview"];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (depth !== undefined) cmdArgs.push("--depth", String(depth));
 	return run(cmdArgs, signal);
@@ -397,7 +397,7 @@ async function nativeCallers(args: ToolArgs, signal?: AbortSignal): Promise<stri
 	const filter = optionalString(args.filter);
 	const countBy = optionalString(args.countBy);
 	const budget = optionalNumber(args.budget);
-	const cmdArgs = ["callers", symbol];
+	const cmdArgs = ["trace", "callers", symbol];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (depth !== undefined) cmdArgs.push("--depth", String(depth));
 	if (filter) cmdArgs.push("--filter", filter);
@@ -413,7 +413,7 @@ async function nativeCallees(args: ToolArgs, signal?: AbortSignal): Promise<stri
 	const detailed = optionalBoolean(args.detailed);
 	const filter = optionalString(args.filter);
 	const budget = optionalNumber(args.budget);
-	const cmdArgs = ["callees", symbol];
+	const cmdArgs = ["trace", "callees", symbol];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (depth !== undefined) cmdArgs.push("--depth", String(depth));
 	if (detailed) cmdArgs.push("--detailed");
@@ -427,7 +427,7 @@ async function nativeFlow(args: ToolArgs, signal?: AbortSignal): Promise<string>
 	const scope = optionalString(args.scope);
 	const filter = optionalString(args.filter);
 	const budget = optionalNumber(args.budget);
-	const cmdArgs = ["flow", symbol];
+	const cmdArgs = ["context", symbol];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (filter) cmdArgs.push("--filter", filter);
 	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
@@ -438,7 +438,7 @@ async function nativeImpact(args: ToolArgs, signal?: AbortSignal): Promise<strin
 	const symbol = requireString(args.symbol, "symbol");
 	const scope = optionalString(args.scope);
 	const budget = optionalNumber(args.budget);
-	const cmdArgs = ["impact", symbol];
+	const cmdArgs = ["assess", symbol];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
 	return run(cmdArgs, signal);
