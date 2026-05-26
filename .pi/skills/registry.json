@@ -45,7 +45,7 @@
     {
       "name": "api-and-interface-design",
       "path": "skills/api-and-interface-design/SKILL.md",
-      "description": "Use when designing REST/GraphQL APIs, SDK interfaces, or public module boundaries \u2014 covers contract-first design, versioning, error shapes, and backward compatibility",
+      "description": "Use when designing REST/GraphQL APIs, SDK interfaces, or public module boundaries — covers contract-first design, versioning, error shapes, and backward compatibility",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -165,7 +165,7 @@
     {
       "name": "chrome-devtools",
       "path": "skills/chrome-devtools/SKILL.md",
-      "description": "Use when debugging web apps in Chrome \u2014 performance profiling, network inspection, DOM debugging, or console automation. MUST load before any Chrome DevTools-based debugging session.",
+      "description": "Use when debugging web apps in Chrome — performance profiling, network inspection, DOM debugging, or console automation. MUST load before any Chrome DevTools-based debugging session.",
       "version": "1.0.0",
       "tags": [
         "automation",
@@ -184,7 +184,7 @@
     {
       "name": "ci-cd-and-automation",
       "path": "skills/ci-cd-and-automation/SKILL.md",
-      "description": "Use when setting up CI/CD pipelines, GitHub Actions workflows, automated testing in CI, or deployment automation \u2014 covers pipeline design, caching, secrets management, and release workflows",
+      "description": "Use when setting up CI/CD pipelines, GitHub Actions workflows, automated testing in CI, or deployment automation — covers pipeline design, caching, secrets management, and release workflows",
       "version": "1.0.0",
       "tags": [
         "devops",
@@ -203,7 +203,7 @@
     {
       "name": "cloudflare",
       "path": "skills/cloudflare/SKILL.md",
-      "description": "Use when deploying to or configuring ANY Cloudflare service \u2014 Workers, Pages, KV, D1, R2, AI, Tunnel, WAF. MUST load before writing Cloudflare Workers code, wrangler configs, or infrastructure-as-code for Cloudflare.",
+      "description": "Use when deploying to or configuring ANY Cloudflare service — Workers, Pages, KV, D1, R2, AI, Tunnel, WAF. MUST load before writing Cloudflare Workers code, wrangler configs, or infrastructure-as-code for Cloudflare.",
       "version": "1.0.0",
       "tags": [
         "integration",
@@ -244,7 +244,7 @@
     {
       "name": "code-navigation",
       "path": "skills/code-navigation/SKILL.md",
-      "description": "Use when navigating unfamiliar code, tracing cross-file dependencies, or before editing \u2014 efficient code reading patterns that minimize tool calls and token waste",
+      "description": "Use when navigating unfamiliar code, tracing cross-file dependencies, or before editing — efficient code reading patterns that minimize tool calls and token waste",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -336,7 +336,7 @@
     {
       "name": "core-data-expert",
       "path": "skills/core-data-expert/SKILL.md",
-      "description": "Use when writing, debugging, or optimizing Core Data code on iOS/macOS \u2014 fetch requests, migrations, merge conflicts, threading, CloudKit sync. MUST load before any Core Data schema changes or performance work.",
+      "description": "Use when writing, debugging, or optimizing Core Data code on iOS/macOS — fetch requests, migrations, merge conflicts, threading, CloudKit sync. MUST load before any Core Data schema changes or performance work.",
       "version": "1.0.0",
       "tags": [
         "apple",
@@ -400,7 +400,7 @@
     {
       "name": "deprecation-and-migration",
       "path": "skills/deprecation-and-migration/SKILL.md",
-      "description": "Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes \u2014 covers deprecation notices, migration guides, codemods, and staged rollout",
+      "description": "Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes — covers deprecation notices, migration guides, codemods, and staged rollout",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -419,7 +419,7 @@
     {
       "name": "design-system-audit",
       "path": "skills/design-system-audit/SKILL.md",
-      "description": "Use when auditing an existing design system for consistency \u2014 token audits, pattern analysis, visual comparison against design specs. Load AFTER implementation to review, not during initial build.",
+      "description": "Use when auditing an existing design system for consistency — token audits, pattern analysis, visual comparison against design specs. Load AFTER implementation to review, not during initial build.",
       "version": "2.0.0",
       "tags": [
         "design",
@@ -457,7 +457,7 @@
     {
       "name": "development-lifecycle",
       "path": "skills/development-lifecycle/SKILL.md",
-      "description": "Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm \u2192 design \u2192 specify \u2192 plan \u2192 implement \u2192 verify) and loads appropriate sub-skills at each stage.",
+      "description": "Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm → design → specify → plan → implement → verify) and loads appropriate sub-skills at each stage.",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -465,7 +465,7 @@
       ],
       "dependencies": [
         "brainstorming",
-        "grill-me",
+        "pikit-grill-me",
         "documentation-and-adrs",
         "spec-driven-development"
       ],
@@ -481,7 +481,7 @@
     {
       "name": "documentation-and-adrs",
       "path": "skills/documentation-and-adrs/SKILL.md",
-      "description": "Use when writing technical documentation, Architecture Decision Records (ADRs), API docs, or project READMEs \u2014 covers documentation structure, ADR format, and keeping docs in sync with code",
+      "description": "Use when writing technical documentation, Architecture Decision Records (ADRs), API docs, or project READMEs — covers documentation structure, ADR format, and keeping docs in sync with code",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -520,7 +520,7 @@
     {
       "name": "frontend-design",
       "path": "skills/frontend-design/SKILL.md",
-      "description": "MUST load when building any web UI with React-based frameworks \u2014 components, pages, or full applications. Covers Tailwind CSS v4, shadcn/ui, Motion animations. Base UI implementation skill; combine with aesthetic overlays (minimalist-ui, high-end-visual-design) for specific styles.",
+      "description": "MUST load when building any web UI with React-based frameworks — components, pages, or full applications. Covers Tailwind CSS v4, shadcn/ui, Motion animations. Base UI implementation skill; combine with aesthetic overlays (minimalist-ui, high-end-visual-design) for specific styles.",
       "version": "1.1.0",
       "tags": [
         "ui",
@@ -641,7 +641,7 @@
     {
       "name": "jira",
       "path": "skills/jira/SKILL.md",
-      "description": "Use when interacting with Jira issues or Confluence docs \u2014 searching tickets, creating issues, updating status, or reading wiki pages. MUST load before any Atlassian integration. Requires network access to Atlassian MCP.",
+      "description": "Use when interacting with Jira issues or Confluence docs — searching tickets, creating issues, updating status, or reading wiki pages. MUST load before any Atlassian integration. Requires network access to Atlassian MCP.",
       "version": "1.0.0",
       "tags": [
         "integration",
@@ -779,7 +779,7 @@
     {
       "name": "pdf-extract",
       "path": "skills/pdf-extract/SKILL.md",
-      "description": "Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction library based on PDF complexity \u2014 simple text vs structured data vs complex layouts.",
+      "description": "Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction library based on PDF complexity — simple text vs structured data vs complex layouts.",
       "version": "1.0.0",
       "tags": [
         "research",
@@ -798,7 +798,7 @@
     {
       "name": "performance-optimization",
       "path": "skills/performance-optimization/SKILL.md",
-      "description": "Use when profiling, optimizing, or adding performance budgets to applications \u2014 covers measure-first workflow, Core Web Vitals, common anti-patterns, and performance regression prevention",
+      "description": "Use when profiling, optimizing, or adding performance budgets to applications — covers measure-first workflow, Core Web Vitals, common anti-patterns, and performance regression prevention",
       "version": "1.0.0",
       "tags": [
         "performance",
@@ -881,7 +881,7 @@
     {
       "name": "react-best-practices",
       "path": "skills/react-best-practices/SKILL.md",
-      "description": "MUST load when writing, reviewing, or refactoring React/Next.js code for performance. Covers Vercel Engineering patterns \u2014 components, data fetching, bundle optimization, server components. Critical for any Next.js performance work.",
+      "description": "MUST load when writing, reviewing, or refactoring React/Next.js code for performance. Covers Vercel Engineering patterns — components, data fetching, bundle optimization, server components. Critical for any Next.js performance work.",
       "version": "1.0.0",
       "tags": [
         "ui",
@@ -956,7 +956,7 @@
     {
       "name": "security-and-hardening",
       "path": "skills/security-and-hardening/SKILL.md",
-      "description": "Use when auditing for security vulnerabilities, implementing auth/authz, handling secrets, or hardening against OWASP Top 10 \u2014 covers input validation, authentication, dependency auditing, and secure defaults",
+      "description": "Use when auditing for security vulnerabilities, implementing auth/authz, handling secrets, or hardening against OWASP Top 10 — covers input validation, authentication, dependency auditing, and secure defaults",
       "version": "1.0.0",
       "tags": [
         "security",
@@ -1051,7 +1051,7 @@
     {
       "name": "srcwalk",
       "path": "skills/srcwalk/SKILL.md",
-      "description": "Use when navigating code with srcwalk's native CLI-first workflow \u2014 repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.",
+      "description": "Use when navigating code with srcwalk's native CLI-first workflow — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.",
       "version": "2.0.0",
       "tags": [
         "code-intelligence",
@@ -1143,7 +1143,7 @@
     {
       "name": "supabase",
       "path": "skills/supabase/SKILL.md",
-      "description": "Use when working with any Supabase service \u2014 database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.",
+      "description": "Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.",
       "version": "1.0.0",
       "tags": [
         "integration",
@@ -1360,7 +1360,7 @@
     {
       "name": "webclaw",
       "path": "skills/webclaw/SKILL.md",
-      "description": "MUST load when webfetch returns 403 or bot protection errors, when crawling documentation sites, batch-extracting pages, or extracting brand identity. Primary web scraping tool \u2014 prefer over webfetch for all non-trivial scraping.",
+      "description": "MUST load when webfetch returns 403 or bot protection errors, when crawling documentation sites, batch-extracting pages, or extracting brand identity. Primary web scraping tool — prefer over webfetch for all non-trivial scraping.",
       "version": "1.0.0",
       "tags": [
         "workflow"
@@ -1395,9 +1395,9 @@
       "pack": "agent-coordination"
     },
     {
-      "name": "deep-module-design",
+      "name": "pikit-deep-module-design",
       "path": "skills/deep-module-design/SKILL.md",
-      "description": "Applies Ousterhout's deep module principles to code design \u2014 small interfaces, information hiding, pull complexity downward.",
+      "description": "Applies Ousterhout's deep module principles to code design — small interfaces, information hiding, pull complexity downward.",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -1418,9 +1418,9 @@
       "pack": "core"
     },
     {
-      "name": "ubiquitous-language",
+      "name": "pikit-ubiquitous-language",
       "path": "skills/ubiquitous-language/SKILL.md",
-      "description": "Establishes shared vocabulary across codebase, context files, and team conversation \u2014 from Evans' DDD and Pocock's AI glossary technique.",
+      "description": "Establishes shared vocabulary across codebase, context files, and team conversation — from Evans' DDD and Pocock's AI glossary technique.",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -1441,9 +1441,9 @@
       "pack": "core"
     },
     {
-      "name": "grill-me",
+      "name": "pikit-grill-me",
       "path": "skills/grill-me/SKILL.md",
-      "description": "Adversarial interrogation of ideas before implementation \u2014 pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use after brainstorming, before ADR or spec writing.",
+      "description": "Adversarial interrogation of ideas before implementation — pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use after brainstorming, before ADR or spec writing.",
       "version": "1.0.0",
       "tags": [
         "planning",
