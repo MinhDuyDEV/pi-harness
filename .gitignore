@@ -59,3 +59,4 @@ pnpm-debug.log*
 
 # bv (beads viewer) local config and caches
 .bv/
+.pi/.openpi-sync.json
