@@ -8,14 +8,13 @@
   },
   "packages": [
     "git:github.com/ghoseb/pi-askuserquestion",
+    "npm:pi-mcp-adapter",
     "npm:@tintinweb/pi-subagents",
     "npm:@tintinweb/pi-tasks",
-    "npm:pi-mcp-adapter",
     "npm:@marckrenn/pi-sub-bar",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
-    "npm:pi-powerline-footer",
     "npm:@sting8k/pi-vcc"
   ],
   "compaction": {
@@ -46,12 +45,13 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.75.4",
+  "lastChangelogVersion": "0.75.5",
   "treeFilterMode": "default",
   "transport": "sse",
   "hideThinkingBlock": false,
   "terminal": {
-    "showTerminalProgress": true
+    "showTerminalProgress": true,
+    "clearOnShrink": true
   },
   "collapseChangelog": false,
   "enableInstallTelemetry": false,
@@ -59,5 +59,9 @@
     "preset": "default",
     "fixedEditor": true
   },
-  "theme": "catppuccin"
+  "theme": "catppuccin",
+  "showHardwareCursor": false,
+  "autocompleteMaxVisible": 15,
+  "quietStartup": false,
+  "doubleEscapeAction": "tree"
 }
