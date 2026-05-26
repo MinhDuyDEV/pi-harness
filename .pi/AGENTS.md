@@ -157,6 +157,7 @@ Ask only when ambiguity materially changes the outcome or the action is destruct
 3. **VERIFY** — confirm expected content exists
 4. **EDIT** — precise replacements with unique surrounding context
 5. **CONFIRM** — read back the result
+**HARD CONSTRAINT:** Steps 2 (READ) and 3 (VERIFY) are never optional. Reading from memory, grep summary, or assumed content does not satisfy READ — you must read the actual file at the target location. Skipping READ before EDIT is a protocol violation.
 
 Prefer `edit` for modifications; reserve `write` for new files or deliberate full rewrites after read.
 
