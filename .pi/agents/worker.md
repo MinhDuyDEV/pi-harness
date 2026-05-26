@@ -1,7 +1,7 @@
 ---
 description: Surgical implementer for small, well-defined tasks (1-3 files). Executes fast with auto-fix deviation rules and verification.
-model: openai-codex/gpt-5.3-codex
-thinking: high
+model: opencode-go/deepseek-v4-flash
+thinking: xhigh
 prompt_mode: append
 ---
 

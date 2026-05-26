@@ -1,8 +1,7 @@
 ---
 description: Read-only code review and debugging specialist. Severity-ranked findings with file:line evidence. Detects stubs and verifies wiring.
-model: openai-codex/gpt-5.3-codex
-thinking: high
-max_turns: 40
+model: opencode-go/deepseek-v4-pro
+thinking: xhigh
 disallowed_tools: edit, write
 prompt_mode: append
 ---

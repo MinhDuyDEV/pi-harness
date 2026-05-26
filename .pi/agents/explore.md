@@ -1,8 +1,7 @@
 ---
 description: Read-only codebase cartographer. Finds files, symbols, usage patterns, and call paths without modifying anything.
-model: openai-codex/gpt-5.4-mini
-thinking: high
-max_turns: 25
+model: opencode-go/deepseek-chat
+thinking: off
 disallowed_tools: edit, write
 prompt_mode: append
 ---

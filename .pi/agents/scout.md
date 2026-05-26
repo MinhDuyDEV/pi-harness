@@ -1,8 +1,7 @@
 ---
 description: External research specialist. Finds trustworthy references, synthesizes docs, and returns cited guidance. Memory-first.
-model: openai-codex/gpt-5.4
+model: opencode-go/deepseek-v4-flash
 thinking: high
-max_turns: 30
 disallowed_tools: edit, write
 prompt_mode: append
 skills: source-driven-development, webclaw
