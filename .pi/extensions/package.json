@@ -1,23 +1,21 @@
 {
-	"private": true,
-	"scripts": {
-		"eval:harness": "node scripts/run-harness-evals.mjs",
-		"smoke:harness": "node scripts/smoke-harness.mjs && npm run eval:harness",
-		"smoke:harness:config": "node scripts/smoke-harness.mjs",
-		"smoke:harness:full": "node scripts/smoke-harness.mjs --with-dcp && npm run eval:harness",
-		"smoke:vcc-snapshot": "npx --yes esbuild dcp/scripts/smoke-snapshot.ts --bundle --platform=node --format=esm --alias:@sinclair/typebox=./dcp/scripts/typebox-shim.ts --outfile=/tmp/pikit-vcc-snapshot-smoke.mjs && node /tmp/pikit-vcc-snapshot-smoke.mjs",
-		"smoke:memory-lifecycle": "npx --yes esbuild memory/scripts/smoke-lifecycle.ts --bundle --platform=node --format=cjs --external:better-sqlite3 --external:sqlite-vec --external:onnxruntime-node --outfile=.tmp-memory-lifecycle-smoke.cjs && node .tmp-memory-lifecycle-smoke.cjs; status=$?; rm -f .tmp-memory-lifecycle-smoke.cjs; exit $status"
-	},
-	"dependencies": {
-		"@google/stitch-sdk": "^0.0.3",
-		"@huggingface/transformers": "^3.4.0",
-		"@shikijs/cli": "^4.0.2",
-		"better-sqlite3": "^11.0.0",
-		"diff": "^7.0.0",
-		"sqlite-vec": "^0.1.7"
-	},
-	"peerDependencies": {
-		"@mariozechner/pi-coding-agent": "^0.65.0",
-		"@sinclair/typebox": "*"
-	}
+  "private": true,
+  "scripts": {
+    "eval:harness": "node scripts/run-harness-evals.mjs",
+    "smoke:harness": "node scripts/smoke-harness.mjs && npm run eval:harness",
+    "smoke:harness:config": "node scripts/smoke-harness.mjs",
+    "smoke:harness:full": "node scripts/smoke-harness.mjs --with-dcp && npm run eval:harness",
+    "smoke:vcc-snapshot": "npx --yes esbuild dcp/scripts/smoke-snapshot.ts --bundle --platform=node --format=esm --alias:@sinclair/typebox=./dcp/scripts/typebox-shim.ts --outfile=/tmp/pikit-vcc-snapshot-smoke.mjs && node /tmp/pikit-vcc-snapshot-smoke.mjs",
+    "smoke:memory-lifecycle": "npx --yes esbuild memory/scripts/smoke-lifecycle.ts --bundle --platform=node --format=cjs --external:sqlite-vec --external:onnxruntime-node --outfile=.tmp-memory-lifecycle-smoke.cjs && node .tmp-memory-lifecycle-smoke.cjs; status=$?; rm -f .tmp-memory-lifecycle-smoke.cjs; exit $status"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.4.0",
+    "sqlite-vec": "^0.1.7"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "^0.75.5",
+    "@earendil-works/pi-coding-agent": "^0.75.5",
+    "@earendil-works/pi-tui": "^0.75.5",
+    "@sinclair/typebox": "*"
+  }
 }

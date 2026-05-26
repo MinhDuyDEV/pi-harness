@@ -15,7 +15,8 @@
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
-    "npm:@sting8k/pi-vcc"
+    "npm:@sting8k/pi-vcc",
+    "npm:pi-powerline-footer"
   ],
   "compaction": {
     "enabled": true,
@@ -51,7 +52,8 @@
   "hideThinkingBlock": false,
   "terminal": {
     "showTerminalProgress": true,
-    "clearOnShrink": true
+    "clearOnShrink": true,
+    "showImages": false
   },
   "collapseChangelog": false,
   "enableInstallTelemetry": false,
