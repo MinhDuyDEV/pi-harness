@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /**
  * Guard extension — blocks dangerous patterns before execution.
@@ -13,7 +13,8 @@ export default function (pi: ExtensionAPI) {
   pi.on("tool_call", async (event, _ctx) => {
     if (event.toolName !== "bash") return;
 
-    const cmd: string = event.input?.command ?? "";
+    const input = event.input as { command?: string } | undefined;
+    const cmd: string = input?.command ?? "";
 
     // --- curl | bash blocker ---
     if (/curl\s.*\|\s*(?:ba)?sh/i.test(cmd) || /wget\s.*\|\s*(?:ba)?sh/i.test(cmd)) {

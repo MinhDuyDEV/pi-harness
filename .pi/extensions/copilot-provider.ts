@@ -29,11 +29,11 @@ import {
   type OAuthCredentials,
   type OAuthLoginCallbacks,
   streamSimple as routeStreamSimple,
-} from "@mariozechner/pi-ai";
+} from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ProviderModelConfig,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 // ─── Constants ──────────────────────────────────────────────
 
