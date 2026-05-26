@@ -43,15 +43,14 @@ const MIMO_API_KEY_ENV = "XIAOMI_MIMO_API_KEY";
 
 // ─── Thinking level map ─────────────────────────────────────
 
-// MiMo only supports: "low", "medium", "high" — no "max"
-// (OpenAI-compatible reasoning_effort, same as OpenCode's OpenAIReasoningEfforts)
-// xhigh maps to "high" since "max" is not accepted.
+// MiMo only supports: "low", "medium", "high" reasoning effort.
+// No "max" level. xhigh is not supported (null = no effort sent).
 const THINKING_LEVEL_MAP = {
   minimal: null,
-  low: null,
-  medium: null,
+  low: "low",
+  medium: "medium",
   high: "high",
-  xhigh: "high",
+  xhigh: null,
 } as const;
 
 // ─── Models ─────────────────────────────────────────────────
