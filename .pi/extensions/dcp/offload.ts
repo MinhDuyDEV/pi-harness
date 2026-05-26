@@ -11,7 +11,7 @@
  * Design:
  *   - Threshold-based: only offload tool results above `minTokens`
  *   - Content stored in `~/.config/pi/dcp/refs/{sessionId}/{toolCallId}.md`
- *   - Inline replacement: short marker `[offloaded to refs/{toolCallId}.md]`
+ *   - Inline replacement: marker with full path `[offloaded to /abs/path/to/file.md]`
  *   - Recovery: agent can read the ref file when it needs the detail
  *   - LRU-capped: keeps only the most recent N refs per session
  *
@@ -147,7 +147,7 @@ export function offloadLargeToolResults(
 			const originalText = tr.content[ci].text ?? "";
 			const originalTokens = estimateTokens(originalText);
 
-			tr.content[ci].text = `[offloaded to refs/${refFileName}]`;
+			tr.content[ci].text = `[offloaded to ${refPath}]`;
 			savedTokens += originalTokens - estimateTokens(tr.content[ci].text);
 			offloadedCount++;
 		}

@@ -11,15 +11,12 @@
  * every subsequent LLM call. The summary replaces the original messages.
  */
 
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
-import { homedir } from "node:os";
 
 import type {
 	AgentToolUpdateCallback,
 	ExtensionAPI,
 	ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
 import { type DCPConfig } from "./config.js";
@@ -175,36 +172,54 @@ export function registerCompressTool(
 			// ---------------------------------------------------------------
 			if (config.turnProtection.enabled && config.turnProtection.turns > 0) {
 				try {
-					// getBranch() returns root → leaf order, no Map needed
 					const branch = ctx.sessionManager.getBranch();
 					const protectedTurns = config.turnProtection.turns;
 
-					// Walk the branch and count user turns since the last
-					// compaction boundary (or start of conversation).
-					// A compaction entry means prior history was already
-					// summarized — sufficient context exists beyond it.
+					// Walk the branch forward counting user turns since the
+					// most recent "boundary event": a compaction entry OR a
+					// previous compress tool call (skipping the current one).
+					// This prevents compress loops — after a compress call,
+					// enough user turns must pass before another is allowed.
+					//
+					// Without any boundary, check total user turns from start
+					// (original behavior: enough conversation must exist).
 					let userTurnsSinceBoundary = 0;
-					let hasCompactionBoundary = false;
+					let hasBoundary = false;
 
 					for (const entry of branch) {
 						if (entry.type === "compaction") {
-							// Reset: compaction summarizes prior context
 							userTurnsSinceBoundary = 0;
-							hasCompactionBoundary = true;
+							hasBoundary = true;
 						} else if (entry.type === "message") {
-							const msg = entry as { message?: { role?: string } };
-							if (msg.message?.role === "user") {
+							const msg = entry as { message?: { role?: string; content?: Array<Record<string, unknown>> } };
+							if (!msg.message) continue;
+
+							// A previous compress tool call acts as a boundary
+							// (skip the current call using its toolCallId)
+							if (msg.message.role === "assistant" && Array.isArray(msg.message.content)) {
+								for (const part of msg.message.content) {
+									if (
+										part && typeof part === "object" &&
+										(part as Record<string, unknown>).type === "tool_use" &&
+										(part as Record<string, unknown>).toolName === "compress" &&
+										(part as Record<string, unknown>).toolCallId !== _toolCallId
+									) {
+										userTurnsSinceBoundary = 0;
+										hasBoundary = true;
+										break;
+									}
+								}
+							}
+
+							if (msg.message.role === "user") {
 								userTurnsSinceBoundary++;
 							}
 						}
 					}
 
-					// If there's a compaction boundary, the conversation has
-					// sufficient prior history — only check turns since boundary.
-					// Without compaction, check total user turns from start.
 					if (userTurnsSinceBoundary <= protectedTurns) {
-						const context = hasCompactionBoundary
-							? "since the last compaction"
+						const context = hasBoundary
+							? "since the last compression boundary"
 							: "in this session";
 						throw new Error(
 							`Cannot compress: only ${userTurnsSinceBoundary} user turn(s) ${context}. ` +
@@ -214,7 +229,6 @@ export function registerCompressTool(
 						);
 					}
 				} catch (err) {
-					// Re-throw our own validation errors, swallow infrastructure errors
 					if (err instanceof Error && err.message.startsWith("Cannot compress:")) {
 						throw err;
 					}
@@ -365,74 +379,3 @@ export function registerCompressTool(
 	});
 }
 
-// ---------------------------------------------------------------------------
-// DCP stats tool
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// Resolve Reference Tool — reads back offloaded ref files by marker
-// ---------------------------------------------------------------------------
-
-
-const REFS_BASE = join(homedir(), ".config", "pi", "dcp", "refs");
-
-export function registerResolveRefTool(
-	pi: ExtensionAPI,
-	config: DCPConfig,
-): void {
-	pi.registerTool({
-		name: "resolve_ref",
-		label: "Resolve Ref",
-		description:
-			"Read back the original content of a reference marker in the conversation, " +
-			"e.g. \"[offloaded to refs/abc.md]\". The ref marker contains tool output that was " +
-			"offloaded to save context space. Pass the exact marker text or the ref filename.",
-		parameters: Type.Object({
-			ref: Type.String({
-				description: "The ref filename (e.g. \"read_tc-001.md\") or marker text to resolve",
-			}),
-		}),
-		async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
-			try {
-				// Extract filename from marker text like "[offloaded to refs/filename.md]"
-				let filename = params.ref;
-				const markerMatch = filename.match(/\[offloaded to refs\/([^\]]+)\]/);
-				if (markerMatch) {
-					filename = markerMatch[1];
-				}
-				if (!filename.endsWith(".md")) {
-					filename += ".md";
-				}
-
-				// Search session refs dir first, then global
-				const sessionId = await ctx.sessionManager.getSessionFile?.() ?? "unknown";
-				const sessionName = sessionId.replace(/[^a-zA-Z0-9_-]/g, "_");
-				const searchPaths = [
-					join(REFS_BASE, sessionName, filename),
-					join(REFS_BASE, filename),
-				];
-
-				for (const refPath of searchPaths) {
-					if (existsSync(refPath)) {
-						const content = readFileSync(refPath, "utf-8");
-						return {
-							content: [{ type: "text", text: content }],
-							details: { source: refPath },
-						};
-					}
-				}
-
-				return {
-					content: [{ type: "text", text: `[Ref not found: ${filename}. Searched: ${searchPaths.join(", ")}]` }],
-					details: { found: false, searched: searchPaths },
-				};
-			} catch (err) {
-				return {
-					content: [{ type: "text", text: `[Error resolving ref: ${err instanceof Error ? err.message : String(err)}]` }],
-					details: { error: true },
-				};
-			}
-		},
-	});
-}

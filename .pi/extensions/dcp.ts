@@ -36,7 +36,7 @@
  * DEPENDENCIES:
  *   node:sqlite (built into Node.js v22.5+, no native compilation)
  *   @sinclair/typebox (bundled by Pi runtime)
- *   @mariozechner/pi-coding-agent (bundled by Pi runtime — types only)
+ *   @earendil-works/pi-coding-agent (bundled by Pi runtime — types only)
  */
 
 import type {
@@ -50,7 +50,7 @@ import type {
 	SessionBeforeCompactEvent,
 	SessionBeforeTreeEvent,
 	ContextEvent,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 // These result types are defined in pi-coding-agent's internal extensions/types.d.ts
 // but not re-exported from the main package index. Define structurally here.
@@ -66,7 +66,12 @@ interface BeforeAgentStartEventResult {
 
 interface SessionBeforeCompactResult {
 	cancel?: boolean;
-	compaction?: unknown;
+	compaction?: {
+		summary: string;
+		firstKeptEntryId: string;
+		tokensBefore: number;
+		details?: unknown;
+	};
 }
 
 interface SessionBeforeTreeResult {
@@ -91,7 +96,7 @@ import {
 	updateSessionStats,
 	storeRawTranscript,
 } from "./dcp/db.js";
-import { registerCompressTool, registerResolveRefTool } from "./dcp/tools.js";
+import { registerCompressTool } from "./dcp/tools.js";
 import { registerSnapshotTool } from "./dcp/snapshot.js";
 import { applyStrategies, computePriorityMap, type StrategyResult, type CompressedRange } from "./dcp/strategies.js";
 import { offloadLargeToolResults } from "./dcp/offload.js";
@@ -168,7 +173,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	registerCompressTool(pi, config, () => nudgeManager.getPriorityMap());
 	registerExpandTool(pi, config);
 	registerSnapshotTool(pi);
-	registerResolveRefTool(pi, config);
 
 	// -----------------------------------------------------------------------
 	// EVENT: input — Track turn count + reset nudge consecutive counter
@@ -435,7 +439,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	// agent loop and causes crashes. This hook is the safe interception point.
 	// -----------------------------------------------------------------------
 
-	pi.on("session_before_compact", async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
+	pi.on("session_before_compact", async (event, ctx) => {
 		const cancelPolicy = config.autoCompact.cancelNativeCompaction;
 
 		// "never" means hands-off completely — skip fallbacks too.
@@ -460,7 +464,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 		// nothing, or throws on hard error (caller decides whether to continue).
 		const tryWith = async (
 			m: Parameters<typeof generateDCPEnrichedCompaction>[4],
-			a: { apiKey: string | undefined; headers: Record<string, string> | undefined },
+			a: { apiKey?: string; headers?: Record<string, string> },
 		) => {
 			const sessionId = getSessionId(ctx);
 			return generateDCPEnrichedCompaction(
