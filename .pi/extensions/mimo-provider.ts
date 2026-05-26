@@ -69,7 +69,7 @@ const MIMO_MODELS = [
       requiresReasoningContentOnAssistantMessages: true,
       thinkingFormat: "deepseek" as const,
     },
-    input: ["text"] as const,
+    input: ["text", "image"] as const,
     cost: {
       input: 0.14,
       output: 0.28,
@@ -91,7 +91,7 @@ const MIMO_MODELS = [
       requiresReasoningContentOnAssistantMessages: true,
       thinkingFormat: "deepseek" as const,
     },
-    input: ["text"] as const,
+    input: ["text", "image"] as const,
     cost: {
       input: 0.435,
       output: 0.87,
