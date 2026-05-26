@@ -7,12 +7,12 @@
  *   3. Extract durable facts from compaction summary
  *
  * Uses convertToLlm() + serializeConversation() from Pi SDK for message serialization.
- * Uses complete() from @mariozechner/pi-ai for DCP-enriched custom compaction.
+ * Uses complete() from @earendil-works/pi-ai for DCP-enriched custom compaction.
  */
 
-import { complete } from "@mariozechner/pi-ai";
-import type { Model } from "@mariozechner/pi-ai";
-import { convertToLlm, serializeConversation } from "@mariozechner/pi-coding-agent";
+import { complete } from "@earendil-works/pi-ai";
+import type { Model } from "@earendil-works/pi-ai";
+import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
 import type { DCPConfig, FactCategory } from "./config.js";
 import {
 	getActiveBlocks,

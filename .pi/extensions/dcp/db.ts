@@ -253,14 +253,14 @@ export function getActiveBlocks(sessionId: string): CompressionBlock[] {
 	const db = getDCPDB();
 	return db
 		.prepare("SELECT * FROM compression_blocks WHERE session_id = ? AND active = 1 ORDER BY block_id")
-		.all(sessionId);
+		.all(sessionId) as unknown as CompressionBlock[];
 }
 
 export function getAllBlocks(sessionId: string): CompressionBlock[] {
 	const db = getDCPDB();
 	return db
 		.prepare("SELECT * FROM compression_blocks WHERE session_id = ? ORDER BY block_id")
-		.all(sessionId);
+		.all(sessionId) as unknown as CompressionBlock[];
 }
 
 /** @internal Currently unused — available for future features */
@@ -277,7 +277,7 @@ export function getNextBlockId(sessionId: string): number {
 	const row = db
 		.prepare("SELECT MAX(block_id) as max_id FROM compression_blocks WHERE session_id = ?")
 		.get(sessionId);
-	return (row?.max_id ?? 0) + 1;
+	return ((row?.max_id ?? 0) as number) + 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ export function getNextBlockId(sessionId: string): number {
 
 export function getSessionStats(sessionId: string): SessionStats | null {
 	const db = getDCPDB();
-	return db.prepare("SELECT * FROM session_stats WHERE session_id = ?").get(sessionId) ?? null;
+	return (db.prepare("SELECT * FROM session_stats WHERE session_id = ?").get(sessionId) ?? null) as SessionStats | null;
 }
 
 export function updateSessionStats(
@@ -366,7 +366,16 @@ export function getGlobalStats(): {
        FROM session_stats`,
 		)
 		.get();
-	return row;
+	return row as {
+		totalSessions: number;
+		totalCompressions: number;
+		totalCompressedTokens: number;
+		totalPrunedTokens: number;
+		totalSummaryTokens: number;
+		totalAutoPrunes: number;
+		totalDeferredDrops: number;
+		totalFactsExtracted: number;
+	};
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +405,7 @@ export function recordToolCall(
 /** @internal Currently unused — available for future features */
 export function getToolCalls(sessionId: string): ToolCallRecord[] {
 	const db = getDCPDB();
-	return db.prepare("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY created_at").all(sessionId);
+	return db.prepare("SELECT * FROM tool_calls WHERE session_id = ? ORDER BY created_at").all(sessionId) as unknown as ToolCallRecord[];
 }
 
 // ---------------------------------------------------------------------------
@@ -417,7 +426,7 @@ export function getToolCallFrequency(sessionId?: string): { tool_name: string; c
        ORDER BY calls DESC
        LIMIT 20`,
 		)
-		.all(...params);
+		.all(...params) as { tool_name: string; calls: number }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +445,7 @@ export function storeFact(sessionId: string, category: string, content: string):
 	// Check if similar fact already exists (by content prefix match)
 	const existing = db
 		.prepare("SELECT id, seen_count FROM facts WHERE session_id = ? AND category = ? AND content = ?")
-		.get(sessionId, category, content);
+		.get(sessionId, category, content) as { id: number; seen_count: number } | undefined;
 
 	if (existing) {
 		db.prepare("UPDATE facts SET seen_count = seen_count + 1, updated_at = ? WHERE id = ?").run(now, existing.id);
@@ -456,19 +465,19 @@ export function incrementFactRetrieval(factId: number): void {
 
 export function getFactsBySession(sessionId: string): Fact[] {
 	const db = getDCPDB();
-	return db.prepare("SELECT * FROM facts WHERE session_id = ? ORDER BY seen_count DESC, created_at DESC").all(sessionId);
+	return db.prepare("SELECT * FROM facts WHERE session_id = ? ORDER BY seen_count DESC, created_at DESC").all(sessionId) as unknown as Fact[];
 }
 
 export function getFactsByCategory(sessionId: string, category: string): Fact[] {
 	const db = getDCPDB();
-	return db.prepare("SELECT * FROM facts WHERE session_id = ? AND category = ? ORDER BY seen_count DESC").all(sessionId, category);
+	return db.prepare("SELECT * FROM facts WHERE session_id = ? AND category = ? ORDER BY seen_count DESC").all(sessionId, category) as unknown as Fact[];
 }
 
 export function getPromotableFacts(sessionId: string, threshold: number): Fact[] {
 	const db = getDCPDB();
 	return db
 		.prepare("SELECT * FROM facts WHERE session_id = ? AND promoted = 0 AND retrieval_count >= ?")
-		.all(sessionId, threshold);
+		.all(sessionId, threshold) as unknown as Fact[];
 }
 
 export function markFactPromoted(factId: number): void {
@@ -489,7 +498,7 @@ export function getNextTranscriptBlockId(sessionId: string): number {
 	const row = db
 		.prepare("SELECT MAX(block_id) as max_id FROM raw_transcripts WHERE session_id = ?")
 		.get(sessionId);
-	return (row?.max_id ?? 0) + 1;
+	return ((row?.max_id ?? 0) as number) + 1;
 }
 
 export function storeRawTranscript(sessionId: string, blockId: number, rawMessages: string, tokenCount: number): number {
@@ -508,12 +517,12 @@ export function storeRawTranscript(sessionId: string, blockId: number, rawMessag
 
 export function getRawTranscript(sessionId: string, blockId: number): RawTranscript | null {
 	const db = getDCPDB();
-	return db.prepare("SELECT * FROM raw_transcripts WHERE session_id = ? AND block_id = ?").get(sessionId, blockId) ?? null;
+	return (db.prepare("SELECT * FROM raw_transcripts WHERE session_id = ? AND block_id = ?").get(sessionId, blockId) ?? null) as RawTranscript | null;
 }
 
 export function getAllRawTranscripts(sessionId: string): RawTranscript[] {
 	const db = getDCPDB();
-	return db.prepare("SELECT * FROM raw_transcripts WHERE session_id = ? ORDER BY block_id").all(sessionId);
+	return db.prepare("SELECT * FROM raw_transcripts WHERE session_id = ? ORDER BY block_id").all(sessionId) as unknown as RawTranscript[];
 }
 
 // ---------------------------------------------------------------------------
