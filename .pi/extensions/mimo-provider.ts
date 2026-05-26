@@ -23,21 +23,23 @@ const MIMO_BASE_URL = "https://api.xiaomimimo.com/v1";
 const MIMO_API_KEY_ENV = "XIAOMI_MIMO_API_KEY";
 
 // ─── Model Definitions ──────────────────────────────────────
-// Pricing as of May 26, 2026 (v2.5 permanent price cut, effective 6PM PDT)
-// Source: https://platform.xiaomimimo.com/docs/en-US/news/v2.5-price-update
-// Prices below are for <256K context. 256K-1M has different rates (see comments).
+// Pricing effective May 27, 2026 (v2.5 permanent price cut, up to 99% off)
+// Length-based tiers REMOVED — simplified flat pricing.
+// Source: Xiaomi MiMo official announcement email (May 2026)
+//         https://platform.xiaomimimo.com/docs/en-US/news/v2.5-price-update
 //
-// MiMo-V2.5 (<256K):
-//   Input (cache miss): $0.40/1M tokens
-//   Input (cache hit):  $0.08/1M tokens
-//   Output:             $2.00/1M tokens
-//   256K-1M: cache $0.80/$0.16, output $4.00
+// MiMo-V2.5 (Per 1M tokens):
+//   Input (cache miss): $0.14/1M tokens
+//   Input (cache hit):  $0.0028/1M tokens
+//   Output:             $0.28/1M tokens
 //
-// MiMo-V2.5-Pro (<256K):
-//   Input (cache miss): $1.00/1M tokens
-//   Input (cache hit):  $0.20/1M tokens
-//   Output:             $3.00/1M tokens
-//   256K-1M: cache $2.00/$0.40, output $6.00
+// MiMo-V2.5-Pro (Per 1M tokens):
+//   Input (cache miss): $0.435/1M tokens
+//   Input (cache hit):  $0.0036/1M tokens
+//   Output:             $0.87/1M tokens
+//
+// MiMo-V2.5-TTS: Free (limited time)
+// V2 models: pricing unchanged, will be deprecated soon
 
 // ─── Thinking level map ─────────────────────────────────────
 
@@ -69,9 +71,9 @@ const MIMO_MODELS = [
     },
     input: ["text"] as const,
     cost: {
-      input: 0.4,
-      output: 2.0,
-      cacheRead: 0.08,
+      input: 0.14,
+      output: 0.28,
+      cacheRead: 0.0028,
       cacheWrite: 0,
     },
     contextWindow: 1_000_000,
@@ -91,9 +93,9 @@ const MIMO_MODELS = [
     },
     input: ["text"] as const,
     cost: {
-      input: 1.0,
-      output: 3.0,
-      cacheRead: 0.2,
+      input: 0.435,
+      output: 0.87,
+      cacheRead: 0.0036,
       cacheWrite: 0,
     },
     contextWindow: 1_000_000,
