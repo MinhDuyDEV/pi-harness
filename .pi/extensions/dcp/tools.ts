@@ -222,6 +222,9 @@ export function registerCompressTool(
 				}
 			}
 
+			// Use a session ID (derive from context) — MUST be before any sessionId usage
+			const sessionId = getSessionId(ctx);
+
 			// Batch mode: auto-detect range from last compression point
 			if (compressMode === "batch" || !params.startId || !params.endId) {
 				// Auto-detect start from last active compression block
@@ -247,9 +250,6 @@ export function registerCompressTool(
 					throw new Error("Compression cancelled by user.");
 				}
 			}
-
-			// Use a session ID (derive from context)
-			const sessionId = getSessionId(ctx);
 
 			// Allocate block ID
 			const blockId = getNextBlockId(sessionId);
