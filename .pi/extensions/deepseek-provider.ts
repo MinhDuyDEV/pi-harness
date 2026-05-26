@@ -63,6 +63,7 @@ import {
 } from "./deepseek/shrink.js";
 import { fetchWithRetry } from "./deepseek/retry.js";
 import { readDeepSeekStream, type StreamAccumulator } from "./deepseek/sse.js";
+
 // ─── Constants ──────────────────────────────────────────────
 
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
@@ -339,6 +340,8 @@ async function runStream(
           });
           break;
         case "tool_call_delta":
+          // Tool calls are accumulated in sse.ts and finalized eagerly
+          // when finish_reason arrives (see sse.ts eager finalization).
           if (!hadToolCalls) {
             hadToolCalls = true;
             stream.push({
@@ -354,13 +357,30 @@ async function runStream(
             partial: emptyPartial(model),
           });
           break;
+        case "done":
+          // done is handled below, but we track hasToolCalls for
+          // finish reason mapping
+          break;
       }
     });
 
     // ── 5. Post-Process ──
     const cleanedContent = stripHallucinatedToolMarkup(acc.content);
-    const rawToolCalls = finalizeDeepSeekToolCalls(acc);
+    const { calls: rawToolCalls, errors: toolErrors } = finalizeDeepSeekToolCalls(acc);
     const suppressedCalls: string[] = [];
+
+    // Propagate tool call errors — OpenCode strict pattern
+    if (toolErrors.length > 0) {
+      stream.push({
+        type: "error",
+        reason: "error",
+        error: makeErrorMessage(
+          model,
+          `Tool call finalization errors:\n${toolErrors.join("\n")}`,
+        ),
+      });
+      return;
+    }
 
     // Storm breaker
     for (const call of rawToolCalls) {
@@ -387,7 +407,7 @@ async function runStream(
     for (const tc of validToolCalls) {
       contentParts.push({
         type: "toolCall",
-        id: tc.id ?? fallbackId(),
+        id: tc.id,
         name: tc.name,
         arguments: tc.args as Record<string, unknown>,
       });
@@ -426,7 +446,7 @@ async function runStream(
           contentIndex: 0,
           toolCall: {
             type: "toolCall" as const,
-            id: tc.id ?? fallbackId(),
+            id: tc.id,
             name: tc.name,
             arguments: tc.args as Record<string, unknown>,
           },
@@ -438,13 +458,17 @@ async function runStream(
     // ── 7. Emit Done ──
     const hasToolUse =
       validToolCalls.length > 0 && suppressedCalls.length < rawToolCalls.length;
+    // Map finish reason: if tool calls are present and finish_reason is "stop",
+    // remap to "tool-calls" — this is the OpenCode pattern.
+    const displayReason: "stop" | "toolUse" =
+      hasToolUse ? "toolUse" : "stop";
     stream.push({
       type: "done",
-      reason: hasToolUse ? "toolUse" : "stop",
+      reason: displayReason,
       message: makeDoneMessage(
         model,
         contentParts,
-        hasToolUse ? "toolUse" : "stop",
+        displayReason,
         usage,
       ),
     });
@@ -671,30 +695,45 @@ function buildRequestBody(
 }
 
 // ─── Tool Call Finalization ─────────────────────────────────
+// Follows OpenCode's strict approach: missing id/name or malformed JSON
+// is propagated as an error, not silently swallowed.
+// See opencode-ai/opencode packages/llm/src/protocols/utils/tool-stream.ts
+
+interface FinalizedToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
 
 function finalizeDeepSeekToolCalls(
   acc: StreamAccumulator,
-): Array<{ id?: string; name: string; args: Record<string, unknown> }> {
-  const calls: Array<{
-    id?: string;
-    name: string;
-    args: Record<string, unknown>;
-  }> = [];
+): { calls: FinalizedToolCall[]; errors: string[] } {
+  const calls: FinalizedToolCall[] = [];
+  const errors: string[] = [];
   for (const [, tc] of acc.toolCalls) {
-    if (!tc.name) continue;
+    // Strict: missing name → error (OpenCode pattern)
+    if (!tc.name) {
+      errors.push(`Tool call at index ${tc.index} missing name field`);
+      continue;
+    }
+    // Strict: missing id → error (OpenCode pattern)
+    if (!tc.id) {
+      errors.push(`Tool call "${tc.name}" missing id field`);
+      continue;
+    }
     try {
-      calls.push({
-        id: tc.id,
-        name: tc.name,
-        args: JSON.parse(
-          repairTruncatedJson(tc.arguments || "{}").repaired,
-        ) as Record<string, unknown>,
-      });
-    } catch {
-      calls.push({ id: tc.id, name: tc.name, args: {} });
+      const args = JSON.parse(
+        repairTruncatedJson(tc.arguments || "{}").repaired,
+      ) as Record<string, unknown>;
+      calls.push({ id: tc.id, name: tc.name, args });
+    } catch (parseErr) {
+      // Propagate parse error instead of falling back to {}
+      errors.push(
+        `Tool call "${tc.name}" has malformed JSON arguments: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
+      );
     }
   }
-  return calls;
+  return { calls, errors };
 }
 
 // ─── Usage ──────────────────────────────────────────────────
@@ -783,8 +822,4 @@ function makeDoneMessage(
     stopReason: reason,
     timestamp: Date.now(),
   };
-}
-
-function fallbackId(): string {
-  return `tc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }

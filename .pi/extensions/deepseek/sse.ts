@@ -52,6 +52,9 @@ export interface DeepSeekStreamChunk {
     total_tokens?: number;
     prompt_cache_hit_tokens?: number;
     prompt_cache_miss_tokens?: number;
+    completion_tokens_details?: {
+      reasoning_tokens?: number;
+    };
   };
 }
 
@@ -77,8 +80,9 @@ export type StreamEvent =
   | { type: "tool_call_delta"; index: number; id?: string; name?: string; arguments?: string }
   | { type: "tool_call_ready"; index: number }
   | { type: "usage"; usage: DeepSeekStreamChunk["usage"] }
-  | { type: "done"; finishReason: string | null }
-  | { type: "error"; error: string };
+  | { type: "done"; finishReason: string | null; hasToolCalls: boolean }
+  | { type: "error"; error: string }
+  | { type: "finalized_tool" };
 
 // ─── Parser ─────────────────────────────────────────────────
 
@@ -100,7 +104,8 @@ export function parseSSELine(
 
   // Stream terminator
   if (data === "[DONE]") {
-    emit({ type: "done", finishReason: acc.finishReason });
+    const hasToolCalls = acc.toolCalls.size > 0 && [...acc.toolCalls.values()].some(tc => !!tc.name);
+    emit({ type: "done", finishReason: acc.finishReason, hasToolCalls });
     return;
   }
 
@@ -126,9 +131,17 @@ export function parseSSELine(
   for (const choice of choices) {
     const delta = choice.delta;
 
-    // Finish reason
+    // Finish reason — eagerly finalize: tool calls are considered ready
+    // so JSON parse failures fail at the stream boundary, not at halt.
     if (choice.finish_reason) {
       acc.finishReason = choice.finish_reason;
+      // Mark all pending tool calls as ready for eager finalization
+      for (const [, tc] of acc.toolCalls) {
+        if (!tc.ready && tc.name) {
+          tc.ready = true;
+          emit({ type: "tool_call_ready", index: tc.index });
+        }
+      }
     }
 
     // Reasoning content (DeepSeek-specific)
@@ -232,7 +245,8 @@ export async function readDeepSeekStream(
   }
 
   // Emit final done if not already emitted
-  emit({ type: "done", finishReason: acc.finishReason });
+  const hasToolCalls = acc.toolCalls.size > 0 && [...acc.toolCalls.values()].some(tc => !!tc.name);
+  emit({ type: "done", finishReason: acc.finishReason, hasToolCalls });
 
   return acc;
 }
