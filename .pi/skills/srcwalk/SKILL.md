@@ -11,7 +11,7 @@ tools: [bash, srcwalk_search, srcwalk_read, srcwalk_files, srcwalk_deps, srcwalk
 
 # Srcwalk — Code Navigation
 
-Srcwalk is the project's code navigation engine (v1.0.0+). All Pi tools are backed by the installed `srcwalk` binary.
+Srcwalk is the project's code navigation engine (v1.0.1+). All Pi tools are backed by the installed `srcwalk` binary.
 
 Run the embedded guide before non-trivial use — it is the version-matched source of truth:
 
@@ -44,13 +44,13 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 | `srcwalk_search` | `srcwalk discover` / `srcwalk trace callers` | AST-aware symbol/content/regex/callers search |
 | `srcwalk_read` | `srcwalk <path>` | Smart file reading: outline or full with sections |
 | `srcwalk_files` | `srcwalk discover --as file` | Glob file finding with token estimates, grouped by dir |
-| `srcwalk_deps` | `srcwalk deps` + exact import scan | Blast-radius: importers + dep-aware dependents (v1.0.0) |
+| `srcwalk_deps` | `srcwalk deps` | Blast-radius: dependency analysis (v1.0.1) |
 
 ### Extended analysis tools
 
 | Tool | Srcwalk command | Purpose |
 |---|---|---|
-| `srcwalk_map` | `srcwalk overview` | Token-annotated directory skeleton + dep groups (v1.0.0) |
+| `srcwalk_map` | `srcwalk overview` | Token-annotated directory skeleton + dep groups + inline symbol anchors (v1.0.1) |
 | `srcwalk_callers` | `srcwalk trace callers` | Reverse call graph with BFS depth + filters |
 | `srcwalk_callees` | `srcwalk trace callees` | Forward call graph with `--detailed` ordered call sites |
 | `srcwalk_flow` | `srcwalk context` | Compact orientation slice |
@@ -64,7 +64,9 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 | Read or inspect a large file | `srcwalk_read` |
 | Jump to exact line | `srcwalk_read({ path: "file:42" })` |
 | Read a line range | `srcwalk_read({ path: "file:44-89" })` — v1.0.0 shortcut |
+| Read with context lines | `srcwalk_read({ section: "42", contextLines: 5 })` — v1.0.1 |
 | Read by symbol name | `srcwalk_read({ section: "symbolName" })` |
+| Multi-section read | `srcwalk_read({ section: "45-89, ## Config" })` — v1.0.1 comma-separated |
 | Find definition/usages/text/glob | `srcwalk_search` |
 | Find files by glob | `srcwalk_files` |
 | Multi-symbol search | `srcwalk_search({ query: "A, B, C" })` |
@@ -75,6 +77,20 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 | Quick orientation slice | `srcwalk_flow` |
 | File imports and dependents | `srcwalk_deps` |
 | Heuristic blast-radius | `srcwalk_impact` (verify with callers) |
+
+## Evidence Contract Routing
+
+Srcwalk v1.0.1 establishes an **evidence contract** — prefer srcwalk tools over grep/rg for code navigation:
+
+| Intent | Use first | Evidence contract |
+|---|---|---|
+| Search code | `srcwalk_search` | Prefer srcwalk before rg |
+| Read files | `srcwalk_read` | Smart outlining, section drill |
+| Find files | `srcwalk_files` | Prefer over find/ls |
+| Call graphs | `srcwalk_callers` / `srcwalk_callees` | Verify call graphs with context reads |
+| Orientation | `srcwalk_flow` | First-pass before deep dives |
+| Impact | `srcwalk_impact` | Triage first, then verify with callers |
+| Dependencies | `srcwalk_deps` | Native dependency analysis |
 
 ## Default Workflows
 
@@ -90,9 +106,11 @@ srcwalk_read({ path: "src/file.ts:44-89" })      // range shortcut (v1.0.0)
 ### Read a large file
 
 ```
-srcwalk_read({ path: "src/file.ts" })                        // structural outline
-srcwalk_read({ path: "src/file.ts", section: "handleAuth" }) // drill into symbol
-srcwalk_read({ path: "src/file.ts", section: "44-89" })      // exact range
+srcwalk_read({ path: "src/file.ts" })                                    // structural outline
+srcwalk_read({ path: "src/file.ts", section: "handleAuth" })             // drill into symbol
+srcwalk_read({ path: "src/file.ts", section: "44-89" })                  // exact range
+srcwalk_read({ path: "src/file.ts", section: "44-89", contextLines: 3 }) // range with context (v1.0.1)
+srcwalk_read({ path: "src/file.ts", section: "45-89, ## Config" })       // comma-separated sections (v1.0.1)
 ```
 
 Prefer outline/section reads before `full: true`.
@@ -134,12 +152,18 @@ srcwalk_deps({ path: "src/auth.ts" })
 srcwalk_impact({ symbol: "handleAuth", scope: "src" })  // heuristic; follow up with callers
 ```
 
-## v1.0.0 Features
+## v1.0.1 Features
 
-- **Path range shortcut**: `srcwalk_read({ path: "file:start-end" })` reads a line range directly — no need to pass `section` separately
-- **Dependency-aware map**: `srcwalk_map` now shows local relation groups and outbound dependency previews for narrowed scopes
-- **JS/TS artifact navigation**: bundle anchors, artifact reads, artifact search snippets, and artifact caller/callee support
-- **Improved UX**: more compact semantic rows, directory grouping, footer tips, and clearer scope/depth wording across all commands
+- **Context lines**: `srcwalk_read` now supports `contextLines` parameter (like `grep -C`). Pass `contextLines: 3` to show context around matched sections.
+- **Comma-separated sections**: `srcwalk_read` supports comma-separated section targets, e.g. `section: "45-89, ## Config"`. Multi-reads clamp each target to 10 context lines.
+- **Budget-adaptive symbol anchors**: `srcwalk_map` now supports `symbols: true` to emit inline `kind name@line-range` anchors in directory overviews.
+- **Evidence contract**: All tools now have evidence contract guidance in their descriptions — prefer srcwalk over grep/rg/find for code navigation.
+- **Enhanced dependency analysis**: `srcwalk_deps` now uses purely native analysis (simplified, no custom JS import scanning).
+- **Improved discover guidance**: Next-step footers prefer confirmed `context` targets and suggest raw reads with `-C 10` for text hits.
+
+### Migration from v1.0.0
+
+No breaking changes. All v1.0.0 workflows continue to work. New features are additive:
 
 ## Critical Rules
 
