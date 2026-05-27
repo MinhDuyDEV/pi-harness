@@ -1,5 +1,5 @@
 ---
-name: pikit-ubiquitous-language
+name: ubiquitous-language
 description: Establishes and maintains shared vocabulary across codebase, context files, and team conversation — inspired by Evans' Domain-Driven Design and Pocock's AI agent glossary technique. Use when terms are ambiguous, the AI does the wrong thing, or you need to align code with domain concepts.
 version: 1.0.0
 tags: [architecture, domain-driven-design, ai-workflow]

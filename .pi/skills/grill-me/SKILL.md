@@ -1,5 +1,5 @@
 ---
-name: pikit-grill-me
+name: grill-me
 description: Adversarial interrogation of ideas before implementation — pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use when you have a rough idea, ADR, PRD, or spec that needs to survive scrutiny before code is written.
 version: 1.0.0
 tags: [planning, review, decision]
