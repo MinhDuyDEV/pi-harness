@@ -2,13 +2,26 @@
 
 ## Layer 1: Subagents
 
+### Pi Native Tools (from pi-coding-agent)
+
 | Tool | Purpose |
 |---|---|
 | `Agent` | Spawn a specialized agent (foreground or background) |
 | `get_subagent_result` | Fetch output from a background agent |
 | `steer_subagent` | Redirect a running background agent |
 
-**Use for:** quick tasks, single-shot delegation, and parallel batches.
+### pikit-subagents Extension Tools (custom built-in)
+
+| Tool | Purpose |
+|---|---|
+| `agent_spawn` | Spawn sub-agents with tool allowlisting, depth tracking, model routing |
+| `agent_result` | Collect results from background/blocking sub-agents |
+| `agent_list` | List all sub-agents with status, depth, duration |
+| `agent_stop` | Abort running sub-agents |
+| `agent_steer` | Send steering messages to running sub-agents |
+| `agent_depth` | Check delegation depth hierarchy |
+
+**Use for:** quick tasks, single-shot delegation, and parallel batches. The pikit-subagents extension provides depth-aware delegation (max 3 levels) and tool allowlisting for security.
 
 ## Layer 2: Task Orchestration
 
@@ -95,6 +108,18 @@ Agent({ prompt: "Research X", subagent_type: "scout", run_in_background: true })
 Agent({ prompt: "Explore codebase for Y", subagent_type: "explore", run_in_background: true })
 // Continue conversation while agents work
 // get_subagent_result(agent_id, wait: true) when you need the output
+```
+
+Or use the pikit-subagents extension for depth-aware delegation:
+
+```
+agent_spawn({ task: "Research X", type: "scout", mode: "background" })
+agent_spawn({ task: "Explore codebase for Y", type: "explore", mode: "background" })
+agent_result({ agentId: "sa-1" })
+agent_list({})
+agent_steer({ agentId: "sa-1", message: "Focus on pricing" })
+agent_stop({ agentId: "sa-1" })
+agent_depth({})
 ```
 
 This is **always faster** than sequential execution.
