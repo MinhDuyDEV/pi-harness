@@ -24,7 +24,6 @@
 
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Type } from "@sinclair/typebox";
@@ -32,25 +31,6 @@ import { buildSubprocessEnv } from "./security/env-policy.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
-const SOURCE_FILE_EXTENSIONS = new Set([
-	".ts",
-	".tsx",
-	".js",
-	".jsx",
-	".mjs",
-	".cjs",
-	".mts",
-	".cts",
-]);
-const SKIP_SCAN_DIRS = new Set([
-	".git",
-	"node_modules",
-	"dist",
-	"build",
-	"coverage",
-	".next",
-]);
-const MAX_IMPORT_SCAN_FILES = 2_000;
 
 type ToolArgs = Record<string, unknown>;
 
@@ -113,135 +93,6 @@ function resolveSrcwalkBin(): string {
 	];
 
 	return fallbackBins.find((candidate) => existsSync(candidate)) || "srcwalk";
-}
-
-function toPosixPath(filePath: string): string {
-	return filePath.split(path.sep).join("/");
-}
-
-function stripSourceExtension(filePath: string): string {
-	const ext = path.extname(filePath);
-	return SOURCE_FILE_EXTENSIONS.has(ext) ? filePath.slice(0, -ext.length) : filePath;
-}
-
-function isSourceFile(filePath: string): boolean {
-	return SOURCE_FILE_EXTENSIONS.has(path.extname(filePath));
-}
-
-async function collectSourceFiles(
-	rootDir: string,
-	result: string[] = [],
-): Promise<string[]> {
-	if (result.length >= MAX_IMPORT_SCAN_FILES) return result;
-
-	let entries;
-	try {
-		entries = await readdir(rootDir, { withFileTypes: true });
-	} catch {
-		return result;
-	}
-
-	for (const entry of entries) {
-		if (result.length >= MAX_IMPORT_SCAN_FILES) break;
-		if (entry.name.startsWith(".") && entry.name !== ".pi") continue;
-
-		const entryPath = path.join(rootDir, entry.name);
-		if (entry.isDirectory()) {
-			if (!SKIP_SCAN_DIRS.has(entry.name)) {
-				await collectSourceFiles(entryPath, result);
-			}
-			continue;
-		}
-		if (entry.isFile() && isSourceFile(entry.name)) {
-			result.push(entryPath);
-		}
-	}
-
-	return result;
-}
-
-function extractImportSpecifiers(
-	source: string,
-): Array<{ specifier: string; line: number }> {
-	const results: Array<{ specifier: string; line: number }> = [];
-	const importPattern =
-		/\b(?:import|export)\s+(?:type\s+)?(?:[^"'()]*?\s+from\s*)?["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)|\brequire\s*\(\s*["']([^"']+)["']\s*\)/g;
-	let match: RegExpExecArray | null;
-	while ((match = importPattern.exec(source)) !== null) {
-		const specifier = match[1] ?? match[2] ?? match[3];
-		if (!specifier?.startsWith(".")) continue;
-		const line = source.slice(0, match.index).split("\n").length;
-		results.push({ specifier, line });
-	}
-	return results;
-}
-
-function resolvesToTarget(
-	importerPath: string,
-	specifier: string,
-	targetAbsPath: string,
-): boolean {
-	const resolved = path.resolve(path.dirname(importerPath), specifier);
-	return stripSourceExtension(resolved) === stripSourceExtension(targetAbsPath);
-}
-
-async function findExactImporters(
-	targetPath: string,
-	scope?: string,
-): Promise<Array<{ file: string; line: number; specifier: string }>> {
-	const cwd = process.cwd();
-	const targetAbsPath = path.resolve(cwd, targetPath);
-	const scanRoot = path.resolve(cwd, scope ?? ".");
-	const sourceFiles = await collectSourceFiles(scanRoot);
-	const results: Array<{ file: string; line: number; specifier: string }> = [];
-
-	for (const filePath of sourceFiles) {
-		if (stripSourceExtension(filePath) === stripSourceExtension(targetAbsPath)) {
-			continue;
-		}
-		let source: string;
-		try {
-			source = await readFile(filePath, "utf8");
-		} catch {
-			continue;
-		}
-		for (const { specifier, line } of extractImportSpecifiers(source)) {
-			if (resolvesToTarget(filePath, specifier, targetAbsPath)) {
-				results.push({
-					file: toPosixPath(path.relative(cwd, filePath)),
-					line,
-					specifier,
-				});
-			}
-		}
-	}
-
-	return results;
-}
-
-function formatDepsWithImporters(
-	targetPath: string,
-	rawDeps: string,
-	importers: Array<{ file: string; line: number; specifier: string }>,
-): string {
-	const importerLines = importers.length
-		? importers
-				.map((i) => `- ${i.file}:${i.line} imports ${JSON.stringify(i.specifier)}`)
-				.join("\n")
-		: "- No exact relative importers found in scope.";
-
-	return [
-		`# Blast radius: ${targetPath}`,
-		"",
-		"## Exact file importers",
-		importerLines,
-		"",
-		"## srcwalk heuristic dependencies",
-		"The section below is srcwalk's symbol-aware output. Treat `Used by` entries as " +
-			"heuristic call/export evidence; exact file importers above are file-scoped import evidence.",
-		"",
-		rawDeps,
-	].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -313,8 +164,10 @@ function buildReadArgs(filePath: string, args: ToolArgs): string[] {
 	const section = optionalString(args.section);
 	const full = optionalBoolean(args.full);
 	const budget = optionalNumber(args.budget);
+	const contextLines = optionalNumber(args.contextLines);
 	if (section) cmdArgs.push("--section", section);
 	if (full) cmdArgs.push("--full");
+	if (contextLines !== undefined) cmdArgs.push("--context-lines", String(contextLines));
 	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
 	return cmdArgs;
 }
@@ -370,11 +223,7 @@ async function depsCompat(args: ToolArgs, signal?: AbortSignal): Promise<string>
 	if (scope) cmdArgs.push("--scope", scope);
 	if (budget !== undefined) cmdArgs.push("--budget", String(budget));
 
-	const [rawDeps, importers] = await Promise.all([
-		run(cmdArgs, signal),
-		findExactImporters(targetPath, scope),
-	]);
-	return formatDepsWithImporters(targetPath, rawDeps, importers);
+	return run(cmdArgs, signal);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,9 +233,11 @@ async function depsCompat(args: ToolArgs, signal?: AbortSignal): Promise<string>
 async function nativeMap(args: ToolArgs, signal?: AbortSignal): Promise<string> {
 	const scope = optionalString(args.scope);
 	const depth = optionalNumber(args.depth);
+	const symbols = optionalBoolean(args.symbols);
 	const cmdArgs = ["overview"];
 	if (scope) cmdArgs.push("--scope", scope);
 	if (depth !== undefined) cmdArgs.push("--depth", String(depth));
+	if (symbols) cmdArgs.push("--symbols");
 	return run(cmdArgs, signal);
 }
 
@@ -498,7 +349,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Search for symbols, text, or regex patterns in code. Replaces grep/rg. " +
 			"Symbol search returns definitions first (via tree-sitter AST), then usages, " +
 			"with full source code inlined for top matches. " +
-			"For cross-file tracing, pass comma-separated symbol names (max 5).",
+			"For cross-file tracing, pass comma-separated symbol names (max 5). " +
+			"v1.0.1: Evidence contract — prefer srcwalk before rg for code navigation.",
 		Type.Object({
 			query: Type.String({
 				description:
@@ -521,13 +373,13 @@ export default function srcwalkExtension(pi: any): void {
 			),
 			context: Type.Optional(
 				Type.String({
-					description: "Path to file being edited — boosts nearby results.",
+					description: "Path to file being edited — boosts nearby results. v1.0.1: Enhanced to prefer confirmed context targets.",
 				}),
 			),
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		searchCompat,
-		"Search for symbols, text, or regex in code. AST-aware definitions-first results.",
+		"Search for symbols, text, or regex in code. AST-aware definitions-first results. Evidence contract: prefer srcwalk before rg.",
 	);
 
 	registerTool(
@@ -538,7 +390,8 @@ export default function srcwalkExtension(pi: any): void {
 			"Small files return full content. Large files return structural outline. " +
 			'Use section for line ranges ("45-89") or symbol names. ' +
 			'v0.4.0: path supports \"file:start-end\" shortcut for direct range reads. ' +
-			"Use paths for batch reading (max 20 files).",
+			"Use paths for batch reading (max 20 files). " +
+			"v1.0.1: Supports comma-separated section targets and context lines.",
 		Type.Object({
 			path: Type.Optional(Type.String({ description: "File path to read." })),
 			paths: Type.Optional(
@@ -548,16 +401,21 @@ export default function srcwalkExtension(pi: any): void {
 			),
 			section: Type.Optional(
 				Type.String({
-					description: 'Line range "45-89" or heading "## Architecture".',
+					description: 'Line range "45-89", heading "## Architecture", or comma-separated targets "45-89, ## Config".',
 				}),
 			),
 			full: Type.Optional(
 				Type.Boolean({ description: "Force full content, bypass outlining." }),
 			),
+			contextLines: Type.Optional(
+				Type.Number({
+					description: "Number of context lines to show around matches (like grep -C). v1.0.1 feature.",
+				}),
+			),
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		readCompat,
-		"Read files with smart outlining — full content for small files, structural outline for large.",
+		"Read files with smart outlining — full content for small files, structural outline for large. Supports comma-separated sections and context lines (v1.0.1).",
 	);
 
 	registerTool(
@@ -565,7 +423,8 @@ export default function srcwalkExtension(pi: any): void {
 		"srcwalk_files",
 		"Find Files",
 		"Find files matching a glob pattern. Replaces find/ls/pwd. " +
-			"Returns matched file paths with token size estimates, grouped by directory. Respects .gitignore.",
+			"Returns matched file paths with token size estimates, grouped by directory. Respects .gitignore. " +
+			"v1.0.1: Enhanced discovery with improved guidance.",
 		Type.Object({
 			pattern: Type.String({
 				description: 'Glob pattern: "*" (list dir), "*.rs", "src/**/*.ts".',
@@ -576,7 +435,7 @@ export default function srcwalkExtension(pi: any): void {
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		filesCompat,
-		"Find files by glob pattern with token size estimates. Respects .gitignore.",
+		"Find files by glob pattern with token size estimates. Respects .gitignore. Evidence contract: prefer srcwalk files over find/ls.",
 	);
 
 	registerTool(
@@ -586,7 +445,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Blast-radius check before breaking changes. Shows what imports a file " +
 			"and what calls its exports. v0.4.0: includes local relation groups and " +
 			"outbound dependency previews for narrowed scopes. Use before changing " +
-			"signatures, removing/renaming exports, or modifying behavior callers rely on.",
+			"signatures, removing/renaming exports, or modifying behavior callers rely on. " +
+			"v1.0.1: Enhanced dependency analysis with improved accuracy.",
 		Type.Object({
 			path: Type.String({
 				description: "File to check before making breaking changes.",
@@ -599,7 +459,7 @@ export default function srcwalkExtension(pi: any): void {
 			),
 		}),
 		depsCompat,
-		"Blast-radius check — shows what imports a file and calls its exports.",
+		"Blast-radius check — shows what imports a file and what calls its exports. v1.0.1: native dependency analysis.",
 	);
 
 	// ---- Native srcwalk tools -----------------------------------------------
@@ -611,7 +471,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Token-annotated directory skeleton with dependency-aware output (v0.4.0). " +
 			"Respects .gitignore, .ignore, git excludes, and parent ignores. " +
 			"Shows local relation groups and outbound dependency previews for narrowed scopes. " +
-			"Use to understand repo shape, token budgets, and entry points before deep dives.",
+			"Use to understand repo shape, token budgets, and entry points before deep dives. " +
+			"v1.0.1: Budget-adaptive inline symbol anchors.",
 		Type.Object({
 			scope: Type.Optional(
 				Type.String({ description: "Directory to map. Omit for cwd." }),
@@ -619,10 +480,15 @@ export default function srcwalkExtension(pi: any): void {
 			depth: Type.Optional(
 				Type.Number({ description: "Max directory depth (default 3)." }),
 			),
+			symbols: Type.Optional(
+				Type.Boolean({
+					description: "Show budget-adaptive inline symbol anchors (v1.0.1 feature).",
+				}),
+			),
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		nativeMap,
-		"Token-annotated repo map — understand codebase shape and token budgets at a glance.",
+		"Token-annotated repo map — understand codebase shape and token budgets at a glance. Supports budget-adaptive symbol anchors (v1.0.1).",
 	);
 
 	registerTool(
@@ -632,7 +498,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Reverse call graph for a symbol. Supports multi-hop BFS (depth up to 5), " +
 			"call-site filtering (e.g. 'args:3 receiver:mgr'), and aggregation by receiver or file. " +
 			"Use for concrete call-site evidence. Prefer over srcwalk_search(kind: 'callers') " +
-			"when you need depth, filters, or aggregation.",
+			"when you need depth, filters, or aggregation. " +
+			"v1.0.1: Enhanced evidence contract — verify call graphs with context reads.",
 		Type.Object({
 			symbol: Type.String({ description: "Symbol name to trace callers of." }),
 			scope: Type.Optional(
@@ -655,7 +522,7 @@ export default function srcwalkExtension(pi: any): void {
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		nativeCallers,
-		"Reverse call graph with multi-hop BFS, filters, and aggregation.",
+		"Reverse call graph with multi-hop BFS, filters, and aggregation. Evidence contract: verify call graphs with context reads.",
 	);
 
 	registerTool(
@@ -664,7 +531,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Callee Graph",
 		"Forward call graph for a symbol — what does this function call? " +
 			"Use --detailed for ordered call sites with argument slots and assignment context. " +
-			"Use --depth for transitive downstream calls (up to available depth).",
+			"Use --depth for transitive downstream calls (up to available depth). " +
+			"v1.0.1: Evidence contract — drill with detailed for argument-level context.",
 		Type.Object({
 			symbol: Type.String({ description: "Symbol name to trace callees of." }),
 			scope: Type.Optional(
@@ -686,7 +554,7 @@ export default function srcwalkExtension(pi: any): void {
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		nativeCallees,
-		"Forward call graph — what does this function call, and with what arguments?",
+		"Forward call graph — what does this function call, and with what arguments? Evidence contract: drill with detailed for argument context.",
 	);
 
 	registerTool(
@@ -695,7 +563,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Flow Slice",
 		"Compact orientation slice: ordered callees + selected local resolves + direct callers. " +
 			"Good for quick understanding of a function's role in the call graph. " +
-			"Nested/fluent chains may be collapsed — follow with srcwalk_callees or srcwalk_callers for depth.",
+			"Nested/fluent chains may be collapsed — follow with srcwalk_callees or srcwalk_callers for depth. " +
+			"v1.0.1: Evidence contract — first-pass orientation before deep dives.",
 		Type.Object({
 			symbol: Type.String({ description: "Symbol name to slice." }),
 			scope: Type.Optional(
@@ -707,7 +576,7 @@ export default function srcwalkExtension(pi: any): void {
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		nativeFlow,
-		"Compact function orientation slice — ordered calls + local resolves + callers.",
+		"Compact function orientation slice — ordered calls + local resolves + callers. Evidence contract: first-pass orientation before deep dives.",
 	);
 
 	registerTool(
@@ -716,7 +585,8 @@ export default function srcwalkExtension(pi: any): void {
 		"Impact Triage",
 		"Heuristic blast-radius triage for a symbol. Name-matched, not proof — " +
 			"use as a broad starting point before verifying with srcwalk_callers or exact reads. " +
-			"Common names like 'run', 'init', 'close' need follow-up with receiver/file groups.",
+			"Common names like 'run', 'init', 'close' need follow-up with receiver/file groups. " +
+			"v1.0.1: Evidence contract — triage first, then verify with callers.",
 		Type.Object({
 			symbol: Type.String({ description: "Symbol name to triage." }),
 			scope: Type.Optional(
@@ -725,6 +595,6 @@ export default function srcwalkExtension(pi: any): void {
 			budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),
 		}),
 		nativeImpact,
-		"Heuristic blast-radius triage — broad 'what might be affected?' starting point.",
+		"Heuristic blast-radius triage — broad 'what might be affected?' starting point. Evidence contract: triage first, then verify with callers.",
 	);
 }
