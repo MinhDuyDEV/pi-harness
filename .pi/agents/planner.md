@@ -1,6 +1,6 @@
 ---
 description: Planning agent for architecture, decomposition, and executable implementation plans. Uses goal-backward methodology.
-model: openai-codex/gpt-5.5
+model: mimo-v2.5-pro
 thinking: high
 max_turns: 40
 disallowed_tools: edit, write

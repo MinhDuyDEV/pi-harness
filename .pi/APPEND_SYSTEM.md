@@ -36,7 +36,7 @@ Use `/dcp` to inspect context pressure and active compression blocks.
 Use `vcc_snapshot()` / `vcc_recall()` for session state persistence.
 `compress` calls must be serialized — never run multiple in parallel.
 
-## Auto-Delegation
+## Auto-Delegation (Intent Mapping)
 
 | When user asks... | Use |
 |---|---|
@@ -48,7 +48,56 @@ Use `vcc_snapshot()` / `vcc_recall()` for session state persistence.
 | small implementation / fix / add / modify / update | `worker` |
 | anything else | do it yourself |
 
-Do it yourself when it's a trivial one-tool lookup, a tight follow-up with existing context, or depends on accumulated conversation history.
+## Orchestrator Self-Delegation Rules
+
+**Core principle:** Every tool call the orchestrator makes burns shared context. Subagents have fresh dedicated context. Delegate when the work doesn't need conversation history.
+
+### DELEGATE when:
+- Task requires **3+ tool calls** (search, fetch, read, grep, etc.)
+- Task is **independent of conversation context** (doesn't need prior messages)
+- Task matches a specialist role (scout, explore, reviewer, planner, vision, worker)
+- Task involves **web research** (websearch, web_fetch, webclaw)
+- Task involves **multi-file exploration** (find, grep across codebase)
+- Task is a **defined unit of work** with clear output (compare X vs Y, review file Z)
+
+### DO IT YOURSELF when:
+- **1-2 tool calls** (trivial lookup, single grep, read one file)
+- Task **requires conversation context** (follow-up questions, building on prior discussion)
+- Task is **ambiguous** and needs clarification before acting
+- Task is a **tight follow-up** where the orchestrator already has the context
+- Task is **tool-call routing** (deciding which agent gets what)
+
+### The 3-Call Rule
+
+If you predict the task needs **3 or more tool calls**, delegate it. Period.
+
+```
+1-2 calls → do it yourself (fast, no overhead)
+3+ calls  → delegate (saves orchestrator context, parallel execution)
+```
+
+### Context Cost Comparison
+
+| Approach | Orchestrator tokens | Subagent tokens | Total |
+|----------|--------------------:|----------------:|------:|
+| Do 15 tool calls yourself | ~75K | 0 | 75K |
+| Delegate to scout | ~2K | ~50K (isolated) | ~52K |
+| **Savings** | **73K** | | **31%** |
+
+Subagent context doesn't compete with orchestrator context. The orchestrator stays clean for user interaction.
+
+### Parallel Delegation
+
+When multiple independent tasks exist, launch them in parallel:
+
+```
+Agent({ prompt: "Research X", subagent_type: "scout", run_in_background: true })
+Agent({ prompt: "Explore codebase for Y", subagent_type: "explore", run_in_background: true })
+// Continue conversation while agents work
+// get_subagent_result(agent_id, wait: true) when you need the output
+```
+
+This is **always faster** than sequential execution.
 
 ## Worker Distrust
 
