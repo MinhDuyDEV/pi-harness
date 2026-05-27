@@ -57,8 +57,6 @@ const THINKING_LEVEL_MAP = {
 
 const MIMO_MODELS = [
   // --- V2.5 series (latest, best pricing, released Apr 23 2026) ---
-  // Note: "model API call method and model name remain unchanged" per Xiaomi.
-  // V2.5 replaced V2 Flash as the base model.
   {
     id: "xiaomi/mimo-v2.5",
     name: "MiMo V2.5",
@@ -78,8 +76,8 @@ const MIMO_MODELS = [
       cacheRead: 0.0028,
       cacheWrite: 0,
     },
-    contextWindow: 1_000_000,
-    maxTokens: 8_192,
+    contextWindow: 1_048_576,
+    maxTokens: 131_072,
   },
   {
     id: "xiaomi/mimo-v2.5-pro",
@@ -93,15 +91,15 @@ const MIMO_MODELS = [
       requiresReasoningContentOnAssistantMessages: true,
       thinkingFormat: "deepseek" as const,
     },
-    input: ["text", "image"] as const,
+    input: ["text"] as const,
     cost: {
       input: 0.435,
       output: 0.87,
       cacheRead: 0.0036,
       cacheWrite: 0,
     },
-    contextWindow: 1_000_000,
-    maxTokens: 8_192,
+    contextWindow: 1_048_576,
+    maxTokens: 131_072,
   },
   // --- V2 series (previous gen) ---
   {
@@ -123,8 +121,8 @@ const MIMO_MODELS = [
       cacheRead: 0.01,
       cacheWrite: 0,
     },
-    contextWindow: 256_000,
-    maxTokens: 8_192,
+    contextWindow: 262_144,
+    maxTokens: 65_536,
   },
   {
     id: "xiaomi/mimo-v2-pro",
@@ -145,8 +143,8 @@ const MIMO_MODELS = [
       cacheRead: 0.2,
       cacheWrite: 0,
     },
-    contextWindow: 1_000_000,
-    maxTokens: 8_192,
+    contextWindow: 1_048_576,
+    maxTokens: 131_072,
   },
   {
     id: "xiaomi/mimo-v2-omni",
@@ -167,8 +165,8 @@ const MIMO_MODELS = [
       cacheRead: 0,
       cacheWrite: 0,
     },
-    contextWindow: 1_000_000,
-    maxTokens: 8_192,
+    contextWindow: 262_144,
+    maxTokens: 131_072,
   },
 ];
 

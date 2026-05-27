@@ -101,7 +101,7 @@ class AgentRegistry {
 		info: Omit<SubagentInfo, "id"> & { id?: string },
 	): SubagentInfo {
 		const id = info.id ?? AgentRegistry.nextId();
-		const entry: SubagentInfo = { id, ...info };
+		const entry: SubagentInfo = { ...info, id };
 		this.agents.set(id, entry);
 		return entry;
 	}
@@ -380,8 +380,11 @@ export default function subagentsExtension(pi: ExtensionAPI): void {
 				abortController: new AbortController(),
 			});
 
+			// Note: after registry.register, info.id is always set
+			const agentId = info.id!;
+
 			if (mode === "blocking") {
-				const result = await collectResult(info.id, timeout);
+				const result = await collectResult(agentId, timeout);
 				return [
 					`[Subagent ${info.nickname} (#${info.id}) — ${type}]`,
 					`Status: completed`,

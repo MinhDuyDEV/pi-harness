@@ -1,7 +1,7 @@
 {
-  "defaultProvider": "xiaomi-mimo",
-  "defaultModel": "xiaomi/mimo-v2.5-pro",
-  "defaultThinkingLevel": "high",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "deepseek-v4-flash",
+  "defaultThinkingLevel": "xhigh",
   "editorPaddingX": 1,
   "images": {
     "blockImages": false
