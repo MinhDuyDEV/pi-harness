@@ -83,6 +83,7 @@ interface SessionBeforeTreeResult {
 }
 
 import { DEFAULT_CONFIG, type DCPConfig } from "./dcp/config.js";
+import { updateConfigWithContextDetection, DEFAULT_DYNAMIC_CONFIG, type DynamicContextConfig } from "./dcp/model-context.js";
 import { getSessionId } from "./dcp/context.js";
 import {
 	closeDCPDB,
@@ -153,7 +154,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	let currentTurn = 0;
 	let lastStrategyResult: StrategyResult | null = null;
 	let initialized = false;
-	const storedBlockIds = new Set<number>(); // Track which block raw transcripts we've stored
 
 	// Cache protected tools set (P3 fix: avoid rebuilding per event)
 	const protectedToolCache = new Set([
@@ -164,14 +164,24 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 	function ensureInitialized(ctx: ExtensionContext): void {
 		if (initialized) return;
 		const sessionId = getSessionId(ctx);
+		
+		// Dynamic context detection: adjust limits based on current model
+		const updatedConfig = updateConfigWithContextDetection(config, ctx, config.dynamicContext || DEFAULT_DYNAMIC_CONFIG);
+		Object.assign(config, updatedConfig);
+		
+		// Reinitialize nudge manager with updated config
+		nudgeManager = new NudgeManager(config);
+		
 		initialized = true;
+		if (config.debug) {
+			console.log(`[dcp] Initialized with dynamic context limits: max=${config.compress.maxContextLimit.toLocaleString()}, min=${config.compress.minContextLimit.toLocaleString()}`);
+		}
 	}
 
-	// 3. Register tools (compress + ctx_expand + vcc_snapshot)
+	// 3. Register tools (compress + vcc_snapshot)
 	// pi-vcc owns vcc_recall; DCP stays focused on runtime pruning and DCP-specific context tools.
 	// Pass getPriorityMap callback so compress tool can show priority suggestions in message mode
 	registerCompressTool(pi, config, () => nudgeManager.getPriorityMap());
-	registerExpandTool(pi, config);
 	registerSnapshotTool(pi);
 
 	// -----------------------------------------------------------------------
@@ -233,19 +243,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 				config,
 				currentTurn,
 			);
-
-			// Store raw ranges for ctx_expand (keyed by compression block ID)
-			if (config.expand.enabled && rawRanges.length > 0) {
-				for (const range of rawRanges) {
-					if (range.blockId > 0 && !storedBlockIds.has(range.blockId)) {
-						try {
-							const serialized = JSON.stringify(range.rawMessages);
-							storeRawTranscript(sessionId, range.blockId, serialized, Math.ceil(serialized.length / 4));
-							storedBlockIds.add(range.blockId);
-						} catch { /* best-effort */ }
-					}
-				}
-			}
 
 			lastStrategyResult = totalResult;
 
@@ -715,71 +712,3 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 // ctx_expand tool — Reversible compression
 // ---------------------------------------------------------------------------
 
-function registerExpandTool(pi: ExtensionAPI, config: DCPConfig): void {
-	if (!config.expand.enabled) return;
-
-	pi.registerTool({
-		name: "ctx_expand",
-		label: "Expand Compressed Block",
-		description: [
-			"Decompress a previously compressed conversation block back to its raw transcript.",
-			"Use when you need exact details from a compressed range that the summary doesn't cover.",
-			"The raw transcript is stored before compaction and may be truncated to fit token limits.",
-			"",
-			"Usage: ctx_expand({ blockId: 3 }) — expands block b3",
-		].join("\n"),
-		promptSnippet: "Decompress a DCP block to see raw transcript.",
-		parameters: Type.Object({
-			blockId: Type.Integer({
-				minimum: 1,
-				description: "Block ID to expand (e.g., 3 for block b3)",
-			}),
-		}),
-		async execute(
-			_toolCallId: string,
-			params: { blockId: number },
-			_signal: AbortSignal | undefined,
-			_onUpdate: unknown,
-			ctx: ExtensionContext,
-		) {
-			if (!Number.isInteger(params.blockId) || params.blockId < 1) {
-				throw new Error(`Invalid blockId: ${params.blockId}. Must be a positive integer ≥ 1 (e.g. 3 for block b3).`);
-			}
-			const sessionId = getSessionId(ctx);
-			const expanded = expandCompressedBlock(
-				sessionId,
-				params.blockId,
-				config.expand.maxExpandTokens,
-			);
-
-			if (!expanded) {
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: `No raw transcript found for block b${params.blockId}. The block may not exist or was created before expansion tracking was enabled.`,
-						},
-					],
-					details: undefined,
-				};
-			}
-
-			return {
-				content: [
-					{
-						type: "text" as const,
-						text: [
-							`[Expanded block b${params.blockId}]`,
-							`Max tokens: ${config.expand.maxExpandTokens}`,
-							"",
-							"--- Raw Transcript ---",
-							"",
-							expanded,
-						].join("\n"),
-					},
-				],
-				details: { blockId: params.blockId },
-			};
-		},
-	});
-}

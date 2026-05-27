@@ -3,8 +3,7 @@
  *
  * Hooks into Pi's native session_before_compact to:
  *   1. Enrich compaction with DCP compression blocks
- *   2. Store raw transcript for reversible compression (ctx_expand)
- *   3. Extract durable facts from compaction summary
+ *   2. Extract durable facts from compaction summary
  *
  * Uses convertToLlm() + serializeConversation() from Pi SDK for message serialization.
  * Uses complete() from @earendil-works/pi-ai for DCP-enriched custom compaction.
@@ -16,9 +15,7 @@ import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-a
 import type { DCPConfig, FactCategory } from "./config.js";
 import {
 	getActiveBlocks,
-	storeRawTranscript,
 	storeFact,
-	getRawTranscript,
 	getFactsBySession,
 	updateSessionStats,
 	getSessionStats,
@@ -168,48 +165,6 @@ export function buildEnrichedCompactionContext(
 // ---------------------------------------------------------------------------
 // Raw transcript storage for ctx_expand
 // ---------------------------------------------------------------------------
-
-/**
- * Store the raw messages before compaction for potential expansion later.
- * Uses Pi's serializeConversation if available, falls back to JSON.
- */
-export function storePreCompactionTranscript(
-	sessionId: string,
-	blockId: number,
-	messages: unknown[],
-	serializeFn?: (messages: unknown[]) => string,
-): void {
-	let serialized: string;
-	let tokenCount: number;
-
-	if (serializeFn) {
-		serialized = serializeFn(messages);
-	} else {
-		serialized = JSON.stringify(messages);
-	}
-
-	tokenCount = Math.ceil(serialized.length / 4);
-	storeRawTranscript(sessionId, blockId, serialized, tokenCount);
-}
-
-/**
- * Retrieve a raw transcript for expansion.
- */
-export function expandCompressedBlock(
-	sessionId: string,
-	blockId: number,
-	maxTokens: number,
-): string | null {
-	const transcript = getRawTranscript(sessionId, blockId);
-	if (!transcript) return null;
-
-	const raw = transcript.raw_messages;
-	// Cap at maxTokens (rough: 4 chars per token)
-	const maxChars = maxTokens * 4;
-	if (raw.length <= maxChars) return raw;
-
-	return raw.slice(0, maxChars) + `\n\n[Truncated — ${Math.round((raw.length - maxChars) / 4)} more tokens available]`;
-}
 
 // ---------------------------------------------------------------------------
 // DCP-enriched custom compaction

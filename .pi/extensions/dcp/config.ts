@@ -16,56 +16,56 @@ export type NotificationLevel = "off" | "minimal" | "detailed";
 export type CompressMode = "range" | "message";
 
 export interface CompressConfig {
-	permission: Permission;
-	maxContextLimit: number;
-	minContextLimit: number;
-	nudgeFrequency: number;
-	nudgeForce: NudgeForce;
-	protectedTools: string[];
-	protectUserMessages: boolean;
-	mode: CompressMode;
-	summaryBuffer: number;
-	flatSchema: boolean;
+  permission: Permission;
+  maxContextLimit: number;
+  minContextLimit: number;
+  nudgeFrequency: number;
+  nudgeForce: NudgeForce;
+  protectedTools: string[];
+  protectUserMessages: boolean;
+  mode: CompressMode;
+  summaryBuffer: number;
+  flatSchema: boolean;
 }
 
 export interface ManualModeConfig {
-	enabled: boolean;
-	automaticStrategies: boolean;
+  enabled: boolean;
+  automaticStrategies: boolean;
 }
 
 export interface TurnProtectionConfig {
-	enabled: boolean;
-	/** Minimum number of recent assistant+user message turns to keep raw (uncompressed) */
-	turns: number;
+  enabled: boolean;
+  /** Minimum number of recent assistant+user message turns to keep raw (uncompressed) */
+  turns: number;
 }
 
 export interface ExperimentalConfig {
-	customPrompts: boolean;
-	allowSubAgents: boolean;
+  customPrompts: boolean;
+  allowSubAgents: boolean;
 }
 
 export interface DeduplicationConfig {
-	enabled: boolean;
-	protectedTools: string[];
+  enabled: boolean;
+  protectedTools: string[];
 }
 
 export interface PurgeErrorsConfig {
-	enabled: boolean;
-	/** Number of turns to wait before purging errored tool inputs */
-	turns: number;
-	protectedTools: string[];
+  enabled: boolean;
+  /** Number of turns to wait before purging errored tool inputs */
+  turns: number;
+  protectedTools: string[];
 }
 
 export interface SupersedeWritesConfig {
-	enabled: boolean;
-	/** Minimum estimated turn age before a write can be superseded */
-	turns: number;
+  enabled: boolean;
+  /** Minimum estimated turn age before a write can be superseded */
+  turns: number;
 }
 
 export interface StrategiesConfig {
-	deduplication: DeduplicationConfig;
-	purgeErrors: PurgeErrorsConfig;
-	supersedeWrites: SupersedeWritesConfig;
+  deduplication: DeduplicationConfig;
+  purgeErrors: PurgeErrorsConfig;
+  supersedeWrites: SupersedeWritesConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,80 +73,58 @@ export interface StrategiesConfig {
 // ---------------------------------------------------------------------------
 
 export type FactCategory =
-	| "ARCHITECTURE_DECISIONS"
-	| "CONSTRAINTS"
-	| "NAMING_CONVENTIONS"
-	| "KNOWN_ISSUES"
-	| "WORKFLOW_RULES"
-	| "DEPENDENCIES"
-	| "FILE_PATTERNS"
-	| "API_CONTRACTS";
+  | "ARCHITECTURE_DECISIONS"
+  | "CONSTRAINTS"
+  | "NAMING_CONVENTIONS"
+  | "KNOWN_ISSUES"
+  | "WORKFLOW_RULES"
+  | "DEPENDENCIES"
+  | "FILE_PATTERNS"
+  | "API_CONTRACTS";
 
 export interface FactExtractionConfig {
-	enabled: boolean;
-	/** Categories to extract */
-	categories: FactCategory[];
-	/** Retrieval count threshold for promotion to permanent memory */
-	promotionThreshold: number;
+  enabled: boolean;
+  /** Categories to extract */
+  categories: FactCategory[];
+  /** Retrieval count threshold for promotion to permanent memory */
+  promotionThreshold: number;
 }
 
 // ---------------------------------------------------------------------------
 // Phase 2: Expand (reversible compression) config
 // ---------------------------------------------------------------------------
-
-export interface ExpandConfig {
-	enabled: boolean;
-	/** Max tokens to return when expanding a compressed range */
-	maxExpandTokens: number;
-}
-
-// ---------------------------------------------------------------------------
-// Phase 3: Background historian config
-// ---------------------------------------------------------------------------
-
-export interface HistorianConfig {
-	enabled: boolean;
-	/** Model to use for background summarization (e.g. "haiku") */
-	model: string;
-	/** Timeout per historian call in ms */
-	timeoutMs: number;
-	/** Token budget for historian input chunk */
-	chunkTokenBudget: number;
-}
-
-// ---------------------------------------------------------------------------
 // Phase 1: Auto-compact config
 // ---------------------------------------------------------------------------
 
 export interface AutoCompactConfig {
-	enabled: boolean;
-	/** Context usage % threshold to trigger auto ctx.compact() */
-	thresholdPercent: number;
-	/** Custom instructions for auto-compaction */
-	customInstructions: string;
-	/**
-	 * Cancel Pi's native auto-compaction via session_before_compact.
-	 * When true, DCP returns { cancel: true } to prevent Pi from running
-	 * its own compaction, giving the user full manual control via the
-	 * compress tool. Pi's overflow recovery is still allowed.
-	 *
-	 * Options:
-	 *   - "always": Always cancel native compaction (full manual control)
-	 *   - "when-managed": Cancel only when DCP has active compression blocks
-	 *   - "never": Never cancel (current default behavior)
-	 */
-	cancelNativeCompaction: "always" | "when-managed" | "never";
-	/**
-	 * Fallback models to try for enriched compaction when the primary model
-	 * fails (e.g. rate-limited / 429). Tried in order before deferring to
-	 * Pi native compaction. Activated even when `cancelNativeCompaction` is
-	 * "when-managed" and there are no active DCP blocks, so context overflow
-	 * recovery has a fighting chance when the primary quota is exhausted.
-	 *
-	 * Each entry must match a provider+model registered in the Pi model
-	 * registry (ctx.modelRegistry.find). Set to [] to disable.
-	 */
-	fallbackModels?: Array<{ provider: string; modelId: string }>;
+  enabled: boolean;
+  /** Context usage % threshold to trigger auto ctx.compact() */
+  thresholdPercent: number;
+  /** Custom instructions for auto-compaction */
+  customInstructions: string;
+  /**
+   * Cancel Pi's native auto-compaction via session_before_compact.
+   * When true, DCP returns { cancel: true } to prevent Pi from running
+   * its own compaction, giving the user full manual control via the
+   * compress tool. Pi's overflow recovery is still allowed.
+   *
+   * Options:
+   *   - "always": Always cancel native compaction (full manual control)
+   *   - "when-managed": Cancel only when DCP has active compression blocks
+   *   - "never": Never cancel (current default behavior)
+   */
+  cancelNativeCompaction: "always" | "when-managed" | "never";
+  /**
+   * Fallback models to try for enriched compaction when the primary model
+   * fails (e.g. rate-limited / 429). Tried in order before deferring to
+   * Pi native compaction. Activated even when `cancelNativeCompaction` is
+   * "when-managed" and there are no active DCP blocks, so context overflow
+   * recovery has a fighting chance when the primary quota is exhausted.
+   *
+   * Each entry must match a provider+model registered in the Pi model
+   * registry (ctx.modelRegistry.find). Set to [] to disable.
+   */
+  fallbackModels?: Array<{ provider: string; modelId: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -154,13 +132,30 @@ export interface AutoCompactConfig {
 // ---------------------------------------------------------------------------
 
 export interface OffloadConfig {
-	enabled: boolean;
-	/** Minimum token count to trigger offloading (default: 1000 ≈ 4KB text) */
-	minTokens: number;
-	/** Max ref files per session (oldest purged) */
-	maxRefsPerSession: number;
-	/** Tools whose results should NOT be offloaded */
-	protectedTools: string[];
+  enabled: boolean;
+  /** Minimum token count to trigger offloading (default: 1000 ≈ 4KB text) */
+  minTokens: number;
+  /** Max ref files per session (oldest purged) */
+  maxRefsPerSession: number;
+  /** Tools whose results should NOT be offloaded */
+  protectedTools: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic context detection config (v4)
+// ---------------------------------------------------------------------------
+
+export interface DynamicContextConfig {
+  /** Enable automatic model context detection */
+  enabled: boolean;
+  /** Fallback context limit if detection fails (in tokens) */
+  fallbackLimit: number;
+  /** Percentage of model's context window to use (default: 80%) */
+  usagePercent: number;
+  /** Minimum context limit regardless of model (in tokens) */
+  minLimit: number;
+  /** Maximum context limit regardless of model (in tokens) */
+  maxLimit: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,24 +163,25 @@ export interface OffloadConfig {
 // ---------------------------------------------------------------------------
 
 export interface DCPConfig {
-	enabled: boolean;
-	debug: boolean;
-	pruneNotification: NotificationLevel;
-	protectedFilePatterns: string[];
-	compress: CompressConfig;
-	strategies: StrategiesConfig;
-	manualMode: ManualModeConfig;
-	turnProtection: TurnProtectionConfig;
-	experimental: ExperimentalConfig;
+  enabled: boolean;
+  debug: boolean;
+  pruneNotification: NotificationLevel;
+  protectedFilePatterns: string[];
+  compress: CompressConfig;
+  strategies: StrategiesConfig;
+  manualMode: ManualModeConfig;
+  turnProtection: TurnProtectionConfig;
+  experimental: ExperimentalConfig;
 
-	// v2 additions
-	factExtraction: FactExtractionConfig;
-	expand: ExpandConfig;
-	historian: HistorianConfig;
-	autoCompact: AutoCompactConfig;
+  // v2 additions
+  factExtraction: FactExtractionConfig;
+  autoCompact: AutoCompactConfig;
 
-	// v3: Tool output offloading
-	offload: OffloadConfig;
+  // v3: Tool output offloading
+  offload: OffloadConfig;
+
+  // v4: Dynamic context detection
+  dynamicContext: DynamicContextConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -194,18 +190,18 @@ export interface DCPConfig {
 
 /** @internal Full list of tools that should never be pruned (for reference) */
 export const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
-	// File mutations
-	"write",
-	"edit",
-	// Context management
-	"compress",
-	// Memory persistence
-	"observation",
-	"memory-update",
-	"memory-read",
-	// Task management (Pi tool names)
-	"TaskCreate",
-	"TaskUpdate",
+  // File mutations
+  "write",
+  "edit",
+  // Context management
+  "compress",
+  // Memory persistence
+  "observation",
+  "memory-update",
+  "memory-read",
+  // Task management (Pi tool names)
+  "TaskCreate",
+  "TaskUpdate",
 ];
 
 /**
@@ -214,14 +210,14 @@ export const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
  * Tools with large outputs (write/edit diffs) go in deduplication.protectedTools instead.
  */
 export const COMPRESS_PROTECTED_TOOLS: readonly string[] = [
-	// Context management
-	"compress",
-	// Memory persistence
-	"observation",
-	"memory-update",
-	// Task management (Pi tool names)
-	"TaskCreate",
-	"TaskUpdate",
+  // Context management
+  "compress",
+  // Memory persistence
+  "observation",
+  "memory-update",
+  // Task management (Pi tool names)
+  "TaskCreate",
+  "TaskUpdate",
 ];
 
 // ---------------------------------------------------------------------------
@@ -229,106 +225,110 @@ export const COMPRESS_PROTECTED_TOOLS: readonly string[] = [
 // ---------------------------------------------------------------------------
 
 export const DEFAULT_CONFIG: DCPConfig = {
-	enabled: true,
-	debug: false,
-	pruneNotification: "detailed",
-	protectedFilePatterns: [
-		".env*",
-		"AGENTS.md",
-		".pi/**",
-		".beads/**",
-		"package.json",
-		"tsconfig.json",
-	],
-	compress: {
-		permission: "allow",
-		maxContextLimit: 200_000,
-		minContextLimit: 140_000,
-		nudgeFrequency: 5,
-		nudgeForce: "soft",
-		protectedTools: [...COMPRESS_PROTECTED_TOOLS],
-		protectUserMessages: false,
-		mode: "range",
-		summaryBuffer: 20_000,
-		flatSchema: false,
-	},
-	strategies: {
-		deduplication: {
-			enabled: true,
-			// write/edit protected from dedup (file mutations are unique operations)
-			// but NOT in compress.protectedTools (their diff outputs are too large for auto-preserve)
-			protectedTools: ["write", "edit"],
-		},
-		purgeErrors: {
-			enabled: true,
-			turns: 4,
-			protectedTools: [],
-		},
-		supersedeWrites: {
-			enabled: false,
-			turns: 3,
-		},
-	},
-	manualMode: {
-		enabled: false,
-		automaticStrategies: true,
-	},
-	turnProtection: {
-		enabled: true,
-		turns: 1,
-	},
-	experimental: {
-		customPrompts: false,
-		allowSubAgents: false,
-	},
+  enabled: true,
+  debug: false,
+  pruneNotification: "detailed",
+  protectedFilePatterns: [
+    ".env*",
+    "AGENTS.md",
+    ".pi/**",
+    ".beads/**",
+    "package.json",
+    "tsconfig.json",
+  ],
+  compress: {
+    permission: "allow",
+    maxContextLimit: 800_000,
+    minContextLimit: 600_000,
+    nudgeFrequency: 5,
+    nudgeForce: "soft",
+    protectedTools: [...COMPRESS_PROTECTED_TOOLS],
+    protectUserMessages: false,
+    mode: "range",
+    summaryBuffer: 20_000,
+    flatSchema: false,
+  },
+  strategies: {
+    deduplication: {
+      enabled: true,
+      // write/edit protected from dedup (file mutations are unique operations)
+      // but NOT in compress.protectedTools (their diff outputs are too large for auto-preserve)
+      protectedTools: ["write", "edit"],
+    },
+    purgeErrors: {
+      enabled: true,
+      turns: 4,
+      protectedTools: [],
+    },
+    supersedeWrites: {
+      enabled: false,
+      turns: 3,
+    },
+  },
+  manualMode: {
+    enabled: false,
+    automaticStrategies: true,
+  },
+  turnProtection: {
+    enabled: true,
+    turns: 1,
+  },
+  experimental: {
+    customPrompts: false,
+    allowSubAgents: false,
+  },
 
-	// v2: Cache-aware deferred drop queue
-// v2: Fact extraction from compaction
-	factExtraction: {
-		enabled: true,
-		categories: [
-			"ARCHITECTURE_DECISIONS",
-			"CONSTRAINTS",
-			"NAMING_CONVENTIONS",
-			"KNOWN_ISSUES",
-			"WORKFLOW_RULES",
-			"DEPENDENCIES",
-			"FILE_PATTERNS",
-			"API_CONTRACTS",
-		],
-		promotionThreshold: 3,
-	},
+  // v2: Cache-aware deferred drop queue
+  // v2: Fact extraction from compaction
+  factExtraction: {
+    enabled: true,
+    categories: [
+      "ARCHITECTURE_DECISIONS",
+      "CONSTRAINTS",
+      "NAMING_CONVENTIONS",
+      "KNOWN_ISSUES",
+      "WORKFLOW_RULES",
+      "DEPENDENCIES",
+      "FILE_PATTERNS",
+      "API_CONTRACTS",
+    ],
+    promotionThreshold: 3,
+  },
 
-	// v2: Reversible compression (ctx_expand)
-	expand: {
-		enabled: true,
-		maxExpandTokens: 15_000,
-	},
+  // v2: Auto-compact via ctx.compact()
+  autoCompact: {
+    enabled: true,
+    thresholdPercent: 80,
+    customInstructions:
+      "Focus on preserving: key decisions, file paths modified, current task state, and next steps. Be thorough but concise.",
+    cancelNativeCompaction: "when-managed",
+    // Try Haiku on Copilot as the first fallback — cheaper quota bucket than Sonnet,
+    // so a Sonnet 429 does not cascade into a total compaction failure.
+    fallbackModels: [
+      { provider: "github-copilot", modelId: "claude-haiku-4.5" },
+    ],
+  },
 
-	// v3: Background historian
-	historian: {
-		enabled: false, // Off by default — opt-in
-		model: "haiku",
-		timeoutMs: 300_000, // 5 minutes
-		chunkTokenBudget: 20_000,
-	},
+  // v3: Tool output offloading (inspired by TencentDB-Agent-Memory short-term offload)
+  offload: {
+    enabled: true,
+    minTokens: 2000,
+    maxRefsPerSession: 50,
+    protectedTools: [
+      "compress",
+      "write",
+      "edit",
+      "observation",
+      "memory-update",
+    ],
+  },
 
-	// v2: Auto-compact via ctx.compact()
-	autoCompact: {
-		enabled: true,
-		thresholdPercent: 80,
-		customInstructions: "Focus on preserving: key decisions, file paths modified, current task state, and next steps. Be thorough but concise.",
-		cancelNativeCompaction: "when-managed",
-		// Try Haiku on Copilot as the first fallback — cheaper quota bucket than Sonnet,
-		// so a Sonnet 429 does not cascade into a total compaction failure.
-		fallbackModels: [{ provider: "github-copilot", modelId: "claude-haiku-4.5" }],
-	},
-
-	// v3: Tool output offloading (inspired by TencentDB-Agent-Memory short-term offload)
-	offload: {
-		enabled: true,
-		minTokens: 1000,
-		maxRefsPerSession: 50,
-		protectedTools: ["compress", "write", "edit", "observation", "memory-update"],
-	},
+  // v4: Dynamic context detection
+  dynamicContext: {
+    enabled: true,
+    fallbackLimit: 200_000, // 200K fallback for unknown models
+    usagePercent: 80, // Use 80% of context window
+    minLimit: 100_000, // Minimum 100K tokens
+    maxLimit: 1_000_000, // Maximum 1M tokens (safety cap)
+  },
 };
