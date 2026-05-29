@@ -28,7 +28,7 @@ This is the compressed always-on execution loop. Keep these six rules active eve
 - **Keep diffs surgical** — every changed line traces to the current request. Log `NOTICED BUT NOT TOUCHING: ...` for unrelated issues.
 - **Define proof before acting** — for non-trivial work, name the success check before implementation, then verify.
 - **Design over deliver** — "working code isn't enough." If the quickest fix adds complexity, choose the cleaner approach.
-- **Decide before delivering** — the hardest part of this job is deciding what code should exist, not writing it. Before implementing, produce a reviewable artifact (ADR/spec) that captures the decision, reasoning, and tradeoffs. Grill ambiguous requests. If implementation is difficult, the problem is likely upstream — stop and clarify, don't force it.
+- **Decide before delivering** — the hardest part of this job is deciding what code should exist, not writing it. For feature, architecture, migration, or risky work, produce a reviewable artifact (ADR/spec) that captures the decision, reasoning, and tradeoffs. For mechanical edits, use the edit protocol directly. Grill ambiguous requests. If implementation is difficult, the problem is likely upstream — stop and clarify, don't force it.
 
   **Entry triage:** Ask "Does this need a real decision, or is it mechanical?"
   - One-liner / known fix / mechanical → implement directly.
@@ -96,7 +96,7 @@ Reject changes that worsen overall code health even if they appear to work.
 ---
 
 ## Plan Quality Gate
-Before approving or executing any implementation plan: the plan MUST contain a `## Discovery` section with substantive research findings. No boilerplate. If missing, research first.
+Non-trivial implementation plans must contain a `## Discovery` section with substantive research findings. No boilerplate. Skip this gate for mechanical edits and obvious one-file fixes.
 
 ---
 
@@ -122,18 +122,13 @@ Before approving or executing any implementation plan: the plan MUST contain a `
 
 ---
 
-## Delegation Policy
+## Delegation Principle
 
-| Agent | Use For |
-|---|---|
-| `worker` | Small impl tasks (1-3 files) |
-| `explore` | Codebase search + pattern discovery |
-| `scout` | External docs + research |
-| `reviewer` | Code review, debugging, security |
-| `planner` | Architecture + execution plans |
-| `vision` | UI/UX + accessibility judgment |
+Delegate when specialist context, isolation, or parallelism improves correctness. Use the operational routing policy in `APPEND_SYSTEM.md` when present. After any delegated work, verify against the original task — don't trust summaries.
 
-Delegate when the task clearly matches a specialist. After subagent work, verify against the original task — don't trust the summary.
+## Harness Boundary
+
+Harness is an execution layer, not an authority. Use harness for product-level builds when routed by `APPEND_SYSTEM.md` or explicitly requested. Do not use harness for small edits, docs, prompt/config changes, or harness internals unless explicitly requested. After harness runs, inspect diffs, reject unrelated changes, and verify before accepting output. Do not commit or push harness output unless the user asks.
 
 ---
 

@@ -1,32 +1,73 @@
-# Delegation — Three-Layer Model
+# Delegation — Harness, Agents, and Tasks
 
-## CRITICAL RULE: Always use `harness` for any create/build/make/generate
+Purpose: route work to the right execution layer without overusing the harness or losing safety.
 
-Any time the user says **create**, **build**, **make**, **generate**, or asks for new code to be written —
-**you MUST use the `harness` tool.** Do NOT use `write`, `edit`, or `bash` to create files directly.
+## Decision Priority
 
-The harness tool runs a planner → generator pipeline that ensures proper specs, implementation,
-and optional QA. Even for single-file tasks.
+Apply these rules in order. Higher rules win over lower rules.
 
-**Exception:** Only use `write`/`edit`/`bash` directly for fixes, modifications, or edits to
-_existing_ code. Never for new code.
+1. **Fix/update/refactor existing code** → use direct tools or `worker`; do **not** use harness by default.
+2. **Build/create/make a product-level artifact, app, feature, or multi-file codebase** → use `harness`.
+3. **Create/edit docs, diagrams, prompts, config, tests for existing behavior, or agent files** → use direct tools unless the user explicitly asks for harness.
+4. **Modify the harness extension itself** → prefer direct tools or isolated worktree review; do not recursively use harness unless the user explicitly asks.
+5. **Research/explore/review/plan/visual audit** → use the matching specialist agent.
+6. **Ambiguous or destructive request** → ask before acting.
 
+Examples:
+
+```text
+"create a todo app"                 → harness
+"build a payment system"            → harness
+"make a new React dashboard"         → harness
+"create a harness agent prompt"      → direct tools
+"write a system architecture diagram" → direct response / docs edit
+"fix harness widget metrics"         → direct tools or worker
+"refactor existing auth module"       → direct tools / worker, unless product-scale
+"generate tests for existing parser"  → direct tools / worker
 ```
-User says "create X"    → harness (just the prompt, defaults handle the rest)
-User says "build X"     → harness (just the prompt, defaults handle the rest)
-User says "make X"      → harness (just the prompt, defaults handle the rest)
-User says "fix X"       → direct tools (edit/write)
-User says "update X"    → direct tools (edit/write)
 
-## How to Call `harness` — Actively Choose Parameters
+## Layer 0: Build Harness
 
-For every task, actively analyze and decide each parameter. Do not blindly use defaults.
+| Tool | Purpose |
+|---|---|
+| `harness` | Multi-agent product build: planner → worker → reviewer/fixer loop |
 
-### Required Pre-Call Analysis
+### Use Harness For
 
-Before calling `harness`, output a structured analysis block so the user sees your reasoning:
+- product-level app or feature creation;
+- multi-file builds from a short product prompt;
+- work that benefits from planner → worker → reviewer decomposition;
+- work that benefits from isolated worktrees, fresh review, and durable artifacts.
 
+### Do Not Use Harness For
+
+- tiny mechanical edits;
+- docs, diagrams, prompt, config, or agent-file changes;
+- tests for existing behavior;
+- harness internals unless the user explicitly asks;
+- changes where current conversation context is essential.
+
+Harness internals are modular. Do not assume source layout; inspect current files before modifying the harness.
+
+Default harness agents live in `.pi/agents/harness-{planner,worker,reviewer}.md`. Configure harness prompts and agent-level models there.
+
+`inheritContext` defaults to `false`; harness agent files are standalone system prompts. Only enable inherited context when explicitly useful.
+
+### Harness Model Selection
+
+Harness model priority is:
+
+```text
+tool parameter > agent frontmatter > active model fallback
 ```
+
+Prefer stable harness-agent defaults in `.pi/agents/harness-{planner,worker,reviewer}.md`; use tool parameters for one-off overrides.
+
+## How to Call `harness`
+
+For non-trivial harness calls, emit a short analysis block before calling the tool:
+
+```text
 [Harness Analysis]
   Task: one-line summary
   Complexity: trivial | simple | medium | complex | critical
@@ -41,210 +82,107 @@ Before calling `harness`, output a structured analysis block so the user sees yo
   Iterations: N
 ```
 
-### Pattern Decision
-
-```
-Ask yourself: Does this task need automated verification?
-
-YES → producer-reviewer (generator → evaluator loop)
-      Use for: apps with business logic, data processing, UI, anything where bugs matter
-
-NO  → pipeline (generate only, no evaluation)
-      Use for: trivial scripts, one-off tools, prototypes, well-known boilerplate
-```
-
-### Iterations Decision
-
-```
-Ask yourself: How complex is each sprint?
-
-1 iteration  → Trivial: single file, simple logic, no edge cases
-2 iterations → Medium: a few files, some logic, basic edge cases
-3 iterations → Standard: multiple files, business logic, several edge cases
-4-5          → Complex: critical correctness needed, security, data integrity
-```
-
-### Examples of Active Decisions
-
-| Task | Analysis → Decision |
-|------|-------------------|
-| "create a calculator" | Trivial, well-known → pipeline, 1 iteration |
-| "build a todo app" | Has CRUD, persistence, CLI → producer-reviewer, 2 iterations |
-| "make a retro game maker" | Complex UI, multiple subsystems → producer-reviewer, 5 iterations |
-| "write a hello world script" | Trivial → pipeline, 1 iteration |
-| "build a payment system" | Critical correctness, security → producer-reviewer, 5 iterations |
-| "create a markdown converter" | Known pattern, parsing edge cases → producer-reviewer, 3 iterations |
-
-**Rule:** Actively think about what you're building, how complex it is, and what could break.
-Set iterations based on that analysis, not on a default number.
-
-## Layer 0: Build Harness (product-level)
-
-| Tool      | Purpose                                                          |
-| --------- | ---------------------------------------------------------------- |
-| `harness` | Multi-agent build pipeline: planner → generator → evaluator loop |
-
-**Use for:** building complete applications from a short product prompt (1-4 sentences).
-The harness decomposes work into sprints, implements them with automated QA.
+For trivial harness calls, a one-line analysis is enough.
 
 ### Pattern Selection
 
-| Pattern                       | When                                  | Behavior                                                              |
-| ----------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
-| `producer-reviewer` (default) | Need automated QA per sprint          | Generator builds → Evaluator tests → Fix if FAIL → up to N iterations |
-| `pipeline`                    | Simple sequential build, no QA needed | Generator builds each sprint, no evaluation loop                      |
+| Pattern | Use When | Behavior |
+|---|---|---|
+| `producer-reviewer` | Correctness matters, business logic, persistence, security, UI behavior, non-trivial edge cases | Worker builds → reviewer evaluates → worker fixes until pass or max iterations |
+| `pipeline` | Prototype, boilerplate, known trivial output, no meaningful review needed | Planner → worker only |
 
-**Use producer-reviewer when:** correctness matters, you want automated testing of each feature.
-**Use pipeline when:** the task is well-understood and fast execution matters more than verification.
+### Iteration Selection
 
-### When to Use Harness vs Agent (Layer 1)
+| Iterations | Use When |
+|---:|---|
+| 1 | trivial, single file, no meaningful edge cases |
+| 2 | simple/medium, a few files, basic edge cases |
+| 3 | standard multi-file work with business logic |
+| 4-5 | complex, security/data integrity, high correctness risk |
 
-| Situation                                                           | Use                                                        |
-| ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| User says "build", "create", or "make" ANYTHING — even single files | `harness` (default — planner decomposes, generator builds) |
-| Research / explore / review existing code                           | `Agent` (scout/explore/reviewer)                           |
-| Small implementation (1-3 files)                                    | `Agent` (worker) or direct tools                           |
-| Complex build with multi-step orchestration                         | `harness` (producer-reviewer)                              |
-| Multi-session / long-running builds                                 | `harness` (handles context per agent session)              |
+Actively choose parameters. Do not blindly rely on defaults.
 
-**Rule of thumb:** Any time the user says "create", "build", "make", "generate" → `harness`.
-Reserve `Agent(worker)` only when the task is an explicit fix or small edit to existing code.
+## Post-Harness Acceptance Gate
 
-## Layer 1: Subagents (task-level)
+Subagent success is not proof. After any harness run that changes files:
 
-### Pi Native Tools (from pi-coding-agent)
+1. Inspect the harness worktree diff.
+2. Reject unrelated changes.
+3. Run verification in the worktree.
+4. Copy or accept only scoped files into the main workspace.
+5. Run verification again in the main workspace.
+6. Check acceptance criteria against the original user request.
+7. Do not commit or push unless the user asks.
 
-| Tool                  | Purpose                                              |
-| --------------------- | ---------------------------------------------------- |
-| `Agent`               | Spawn a specialized agent (foreground or background) |
-| `get_subagent_result` | Fetch output from a background agent                 |
-| `steer_subagent`      | Redirect a running background agent                  |
+Never stage with `git add .`. Stage explicit files only.
 
-**Use for:** quick tasks, single-shot delegation, and parallel batches.
+## Layer 1: Specialist Agents
 
-## Layer 2: Task Orchestration (process-level)
+| Agent | Use For |
+|---|---|
+| `scout` | external research, docs, comparisons |
+| `explore` | codebase search, usage tracing, architecture discovery |
+| `reviewer` | bug/security/correctness review |
+| `planner` | architecture and implementation plans |
+| `vision` | screenshots, UI/UX/accessibility judgment |
+| `worker` | small scoped implementation or fixes |
 
-| Tool          | Purpose                                      |
-| ------------- | -------------------------------------------- |
-| `TaskCreate`  | Create a task (optionally with `agentType`)  |
-| `TaskList`    | List tasks and blockers                      |
-| `TaskGet`     | Read full task details                       |
-| `TaskUpdate`  | Update status/owner/dependencies             |
-| `TaskExecute` | Execute agent-backed tasks                   |
-| `TaskOutput`  | Retrieve output from running/completed tasks |
-| `TaskStop`    | Stop a running task                          |
+Use subagents when the work is independent enough to benefit from fresh context. Do it yourself when current conversation state, safety, or exact user intent is critical.
 
-**Use for:** multi-step work with dependencies and pipelines.
+## Layer 2: Task Orchestration
 
-## Decision Flow
+| Tool | Purpose |
+|---|---|
+| `TaskCreate` | create durable tasks |
+| `TaskUpdate` | claim/complete/update tasks |
+| `TaskExecute` | run agent-backed tasks |
+| `TaskOutput` | retrieve task output |
+| `TaskStop` | stop task execution |
 
-Fewer than 3 independent tasks → `Agent` (direct or parallel background).
-Tasks have dependencies → `TaskCreate` + `TaskExecute`.
-Otherwise → parallel background `Agent` calls.
+Use task orchestration for multi-step work with dependencies or persistent handoffs. If the task store is unavailable, proceed directly and state the blocker briefly.
 
-## Context Continuity
+## Delegation Rules
 
-Use `/dcp` to inspect context pressure and active compression blocks.
-Use `vcc_snapshot()` / `vcc_recall()` for session state persistence.
-`compress` calls must be serialized — never run multiple in parallel.
+Delegate when:
 
-## Auto-Delegation (Intent Mapping)
+- the task needs 3+ tool calls **and** does not depend heavily on current conversation context;
+- the task matches a specialist role;
+- parallel independent work exists;
+- external research or broad codebase exploration is needed.
 
-| When user asks...                                                  | Use                                                           |
-| ------------------------------------------------------------------ | ------------------------------------------------------------- |
-| build / create / make any code artifact or project                 | `harness` (always — planner specs the work, generator builds) |
-| research / investigate / compare / what is / how does / look up    | `scout`                                                       |
-| find code / trace usage / locate / where is / search code          | `explore`                                                     |
-| review / check for bugs / audit / is this correct / does this work | `reviewer`                                                    |
-| plan / design / architecture / how should I / outline              | `planner`                                                     |
-| inspect UI / screenshot / visual / accessibility / design review   | `vision`                                                      |
-| small implementation / fix / add / modify / update                 | `worker`                                                      |
-| anything else                                                      | do it yourself                                                |
+Do it yourself when:
 
-## Orchestrator Self-Delegation Rules
+- only 1-2 tool calls are needed;
+- the request is a tight follow-up using current context;
+- the change is surgical;
+- ambiguity or safety requires direct judgment;
+- you are deciding which tool/agent should be used.
 
-**Core principle:** Every tool call the orchestrator makes burns shared context. Subagents have fresh dedicated context. Delegate when the work doesn't need conversation history.
+## Worker and Harness Distrust
 
-### DELEGATE when:
+Never accept subagent or harness self-reports blindly.
 
-- User says **build, create, or make** anything → `harness` (planners specs → generator builds)
-- Task requires **3+ tool calls** (search, fetch, read, grep, etc.)
-- Task is **independent of conversation context** (doesn't need prior messages)
-- Task matches a specialist role (scout, explore, reviewer, planner, vision, worker)
-- Task involves **web research** (websearch, web_fetch, webclaw)
-- Task involves **multi-file exploration** (find, grep across codebase)
-- Task is a **defined unit of work** with clear output (compare X vs Y, review file Z)
+Required after delegated implementation:
 
-### DO IT YOURSELF when:
-
-- **1-2 tool calls** (trivial lookup, single grep, read one file)
-- Task **requires conversation context** (follow-up questions, building on prior discussion)
-- Task is **ambiguous** and needs clarification before acting
-- Task is a **tight follow-up** where the orchestrator already has the context
-- Task is **tool-call routing** (deciding which agent gets what)
-
-### The 3-Call Rule
-
-If you predict the task needs **3 or more tool calls**, delegate it. Period.
-
-```
-1-2 calls → do it yourself (fast, no overhead)
-3+ calls  → delegate (saves orchestrator context, parallel execution)
-```
-
-### Context Cost Comparison
-
-| Approach                  | Orchestrator tokens | Subagent tokens |   Total |
-| ------------------------- | ------------------: | --------------: | ------: |
-| Do 15 tool calls yourself |                ~75K |               0 |     75K |
-| Delegate to scout         |                 ~2K | ~50K (isolated) |    ~52K |
-| **Savings**               |             **73K** |                 | **31%** |
-
-Subagent context doesn't compete with orchestrator context. The orchestrator stays clean for user interaction.
-
-### Parallel Delegation
-
-When multiple independent tasks exist, launch them in parallel:
-
-```ts
-Agent({
-  prompt: "Research X",
-  subagent_type: "scout",
-  run_in_background: true,
-});
-Agent({
-  prompt: "Explore codebase for Y",
-  subagent_type: "explore",
-  run_in_background: true,
-});
-// Continue conversation while agents work
-// get_subagent_result(agent_id, wait: true) when you need the output
-```
-
-This is **always faster** than sequential execution.
-
-## Worker Distrust
-
-Subagent self-reports are not sufficient. After any subagent reports success:
-
-1. Read changed files directly
-2. Run relevant verification
-3. Check acceptance criteria against the original task, not the summary
-4. Confirm the agent stayed within scope
-
-```
-✅ Agent reports → Read diff → Verify → Check criteria → Accept
-```
-
-Subagent results must include: **status**, **files modified**, **verification evidence**, **summary**, **blockers** (if any).
+1. Read changed files directly.
+2. Review the diff.
+3. Run relevant tests/typechecks/lints.
+4. Confirm scope was respected.
+5. Report verification evidence.
 
 ## Context File Pattern
 
-For complex delegation, write large context once and point subagents at the file:
+For complex delegation, write large shared context once and point agents to it:
 
 ```ts
 write(".beads/artifacts/<id>/worker-context.md", contextContent);
 Agent({ prompt: "Read worker-context.md and implement task 3." });
 ```
 
-Use when: shared context > ~500 tokens, multiple subagents need the same background, or plans/specs must be passed without duplication.
+Use this when shared context is larger than ~500 tokens, multiple agents need the same background, or a plan/spec must survive handoffs.
+
+## Context Continuity
+
+Use `/dcp` to inspect context pressure and active compression blocks.
+Use `vcc_recall()` for targeted session history recovery.
+Serialize `compress` calls; never run multiple compressions in parallel.
