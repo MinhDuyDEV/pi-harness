@@ -1,6 +1,6 @@
 ---
 description: Read-only visual analysis specialist for UI/UX review, accessibility audits, and design-system consistency checks.
-model: mimo-v2.5-pro
+model: mimo-v2.5
 thinking: high
 max_turns: 35
 disallowed_tools: edit, write

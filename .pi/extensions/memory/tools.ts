@@ -8,6 +8,7 @@
  */
 
 import { Type } from "@sinclair/typebox";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import type {
 	ConfidenceLevel,
@@ -76,7 +77,7 @@ function renderSearchResults(rows: Array<{
 	return lines.join("\n").trim();
 }
 
-export function registerMemoryTools(pi: any): void {
+export function registerMemoryTools(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "observation",
 		label: "Memory — Store or Give Feedback",
@@ -107,19 +108,19 @@ export function registerMemoryTools(pi: any): void {
 		async execute(
 			_toolCallId: string,
 			params: Record<string, unknown>,
-			_signal: AbortSignal,
-			_onUpdate: (text: string) => void,
+			_signal: AbortSignal | undefined,
+			_onUpdate: ((text: string) => void) | undefined,
 			ctx: any,
 		) {
 			// --- Feedback mode: observation #id marked helpful/harmful ---
 			if (params.id !== undefined && params.feedback !== undefined) {
 				const obsId = Number(params.id);
-				if (!Number.isInteger(obsId)) return textResult("❌ id must be an integer.");
+				if (!Number.isInteger(obsId)) throw new Error("id must be an integer.");
 				const fb = String(params.feedback);
-				if (fb !== "helpful" && fb !== "harmful") return textResult('❌ feedback must be "helpful" or "harmful".');
+				if (fb !== "helpful" && fb !== "harmful") throw new Error('feedback must be "helpful" or "harmful".');
 				const sessionId = ctx?.sessionId ?? ctx?.session_id;
 				const result = recordFeedback(obsId, fb, params.reason as string | undefined, sessionId);
-				if (!result.success) return textResult(`❌ ${result.error ?? "Failed to record feedback."}`);
+				if (!result.success) throw new Error(result.error ?? "Failed to record feedback.");
 				return textResult([
 					`✅ Observation #${obsId} marked ${fb}.`,
 					`- Score: ${result.effectiveScore.toFixed(2)}`,
@@ -130,7 +131,7 @@ export function registerMemoryTools(pi: any): void {
 
 			// --- Create mode: store a new observation ---
 			if (!params.type || !params.title) {
-				return textResult("❌ Provide type+title to create an observation, or id+feedback to give feedback.");
+				throw new Error("Provide type+title to create an observation, or id+feedback to give feedback.");
 			}
 			const type = VALID_TYPES.includes(params.type as ObservationType)
 				? (params.type as ObservationType) : "learning";

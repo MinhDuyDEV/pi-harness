@@ -9,6 +9,7 @@ docs/
 
 # Pi auto-generated sandbox profiles
 .pi/sandbox/
+.pi/docs/
 
 # Node / package manager noise
 node_modules/

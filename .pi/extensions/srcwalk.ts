@@ -27,6 +27,12 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { Type } from "@sinclair/typebox";
+import {
+  type ExtensionAPI,
+  type ExtensionContext,
+  type AgentToolResult,
+  truncateHead,
+} from "@earendil-works/pi-coding-agent";
 import { buildSubprocessEnv } from "./security/env-policy.js";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -299,12 +305,14 @@ async function nativeImpact(args: ToolArgs, signal?: AbortSignal): Promise<strin
 // Tool registration helper
 // ---------------------------------------------------------------------------
 
+const MAX_OUTPUT_BYTES = 32_000;
+
 function registerTool(
-	pi: any,
+	pi: ExtensionAPI,
 	name: string,
 	label: string,
 	description: string,
-	parameters: any,
+	parameters: ReturnType<typeof Type.Object>,
 	executor: (params: ToolArgs, signal: AbortSignal) => Promise<string>,
 	promptSnippet?: string,
 ): void {
@@ -317,20 +325,19 @@ function registerTool(
 		async execute(
 			_toolCallId: string,
 			params: ToolArgs,
-			signal: AbortSignal,
-			_onUpdate: (text: string) => void,
-			_ctx: any,
-		) {
-			try {
-				const text = await executor(params, signal);
-				return { content: [{ type: "text", text }], details: {} };
-			} catch (err) {
-				const msg = err instanceof Error ? err.message : String(err);
-				return {
-					content: [{ type: "text", text: `srcwalk error: ${msg}` }],
-					details: {},
-				};
+			signal: AbortSignal | undefined,
+			_onUpdate: undefined,
+			_ctx: ExtensionContext,
+		): Promise<AgentToolResult> {
+			const raw = await executor(params, signal);
+			const truncated = truncateHead(raw, { maxBytes: MAX_OUTPUT_BYTES });
+			if (truncated.truncated) {
+				const note =
+					`\n\n[Output truncated: ${truncated.bytes} bytes removed. ` +
+					`Full output available in the raw tool result file.]`;
+				truncated.content += note;
 			}
+			return { content: [{ type: "text", text: truncated.content }] };
 		},
 	});
 }
@@ -339,7 +346,7 @@ function registerTool(
 // Extension entry point
 // ---------------------------------------------------------------------------
 
-export default function srcwalkExtension(pi: any): void {
+export default function srcwalkExtension(pi: ExtensionAPI): void {
 	// ---- Core srcwalk_* navigation tools ----------------------------------
 
 	registerTool(

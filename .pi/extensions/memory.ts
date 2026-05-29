@@ -29,15 +29,19 @@ import { curateFromDistillations } from "./memory/curator.js";
 import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
 import { distillSession } from "./memory/distill.js";
 import { clearEmbeddings, embed, warmupEmbeddings } from "./memory/embeddings.js";
-import { checkpointWAL, optimizeFTS5, getDatabaseSizes } from "./memory/maintenance.js";
+import { checkpointWAL, getDatabaseSizes, optimizeFTS5 } from "./memory/maintenance.js";
 import { backfillEmbeddings, getObservationStats } from "./memory/observations.js";
 import { getRelevantKnowledge, storeTemporalMessage } from "./memory/pipeline.js";
 import { sanitize } from "./memory/sanitize.js";
 import { refreshAllScores } from "./memory/scoring.js";
 import { registerMemoryTools } from "./memory/tools.js";
-import { getSessionId } from "./dcp/context.js";
 import { generatePersona, readPersona } from "./memory/persona.js";
 import { detectAndStoreScenes, listScenes } from "./memory/scene.js";
+
+// Stable session identifier from Pi's extension context
+function getSessionId(ctx: any, _event?: any): string {
+  return ctx?.sessionManager?.getSessionId?.() ?? ctx?.cwd ?? "default";
+}
 
 function stringifyForCapture(value: unknown, maxLength: number): string | null {
 	try {
@@ -53,7 +57,7 @@ function stringifyForCapture(value: unknown, maxLength: number): string | null {
 // Extension factory (Pi entry point)
 // ---------------------------------------------------------------------------
 
-export default function memoryExtension(pi: any): void {
+export default function memoryExtension(pi: ExtensionAPI): void {
 	// 1. Initialize database (ensures schema is up to date)
 	try {
 		getMemoryDB();
@@ -302,7 +306,7 @@ export default function memoryExtension(pi: any): void {
 							dbSizeKB: Math.round(sizes.total / 1024),
 							timestamp: new Date().toISOString(),
 						};
-						console.log(JSON.stringify(telemetry));
+						if (MEMORY_CONFIG.debug) console.log(JSON.stringify(telemetry));
 					} catch {
 						// Telemetry is best-effort
 					}
@@ -323,12 +327,6 @@ export default function memoryExtension(pi: any): void {
 		}
 	});
 
-	// --- Reset pipeline state on shutdown ---
-	pi.on("session_shutdown", () => {
-		pipelineTurnCounts.clear();
-
-	});
-
 	// --- Auto context injection on agent start ---
 	pi.on("before_agent_start", async (event: any) => {
 		if (!MEMORY_CONFIG.injection.enabled) return;
@@ -339,17 +337,14 @@ export default function memoryExtension(pi: any): void {
 			try {
 				const personaMd = readPersona("default");
 				if (personaMd) {
-					// Extract a concise summary section from persona for context injection
 					const lines = personaMd.split("\n").filter(l => l.startsWith("**") || l.startsWith("-") || l.startsWith("|")).slice(0, 15);
 					if (lines.length > 0) {
 						personaContext = "\n\n## User Persona Context\n_Learned patterns from past sessions._\n" + lines.join("\n");
 					}
 				}
-			} catch {
-				// Persona injection is best-effort
-			}
+			} catch {}
 
-			// Inject L2 scene context (recurring work patterns)
+			// Inject L2 scene context
 			let sceneContext = "";
 			if (MEMORY_CONFIG.scene.enabled) {
 				try {
@@ -360,33 +355,21 @@ export default function memoryExtension(pi: any): void {
 							sceneContext += `- **${s.name}** (${s.count} obs, score: ${s.score.toFixed(2)}, ${s.span})\n`;
 						}
 					}
-				} catch {
-					// Scene injection is best-effort
-				}
+				} catch {}
 			}
 
 			const stats = getObservationStats();
-			const totalObs = Object.values(stats).reduce((sum, n) => sum + n, 0);
+			const totalObs = Object.values(stats).reduce((sum: number, n: number) => sum + n, 0);
 			if (totalObs === 0 && !personaContext && !sceneContext) return;
 
 			const userMessage = event?.userMessage ?? event?.message ?? event?.input ?? "";
-			const taskTerms =
-				typeof userMessage === "string"
-					? userMessage
-						.toLowerCase()
-						.split(/\s+/)
-						.filter((t: string) => t.length > 2)
-						.slice(0, 20)
-					: [];
-
+			const taskTerms = typeof userMessage === "string"
+				? userMessage.toLowerCase().split(/\s+/).filter((t: string) => t.length > 2).slice(0, 20)
+				: [];
 			if (taskTerms.length === 0) return;
 
 			let queryEmbedding: number[] | null = null;
-			try {
-				queryEmbedding = await embed(taskTerms.join(" "));
-			} catch {
-				// Embedding is best-effort
-			}
+			try { queryEmbedding = await embed(taskTerms.join(" ")); } catch {}
 
 			const knowledge = getRelevantKnowledge(taskTerms, {
 				tokenBudget: MEMORY_CONFIG.injection.tokenBudget,
@@ -394,33 +377,21 @@ export default function memoryExtension(pi: any): void {
 				queryEmbedding,
 			});
 
-			// Build injection content: persona → scenes → task-specific memory.
-			// Storage mirror health is intentionally kept out of prompts; it is diagnostic, not task knowledge.
 			const parts: string[] = [];
 			if (personaContext) parts.push(personaContext);
 			if (sceneContext) parts.push(sceneContext);
 
 			if (knowledge.length > 0) {
-				const memLines = [
-					"\n## Relevant Memory (Auto-Injected)",
-					"_The following observations were retrieved from memory based on the current task._\n",
-				];
+				const memLines = ["\n## Relevant Memory (Auto-Injected)", "_The following observations were retrieved from memory based on the current task._\n"];
 				for (const item of knowledge) {
-					const scoreStr = item.score.toFixed(2);
-					memLines.push(`- **[${item.type}]** ${item.title} _(score: ${scoreStr})_`);
-					if (item.content) {
-						const snippet = item.content.slice(0, 200).replace(/\n/g, " ");
-						memLines.push(`  ${snippet}`);
-					}
+					memLines.push(`- **[${item.type}]** ${item.title} _(score: ${item.score.toFixed(2)})_`);
+					if (item.content) memLines.push(`  ${item.content.slice(0, 200).replace(/\n/g, " ")}`);
 				}
 				parts.push(memLines.join("\n"));
 			}
 
 			if (parts.length === 0) return;
-
-			return {
-				systemPrompt: (event.systemPrompt ?? "") + parts.join("\n"),
-			};
+			return { systemPrompt: (event.systemPrompt ?? "") + parts.join("\n") };
 		} catch {
 			// Injection is best-effort — never break agent startup
 		}
@@ -428,6 +399,7 @@ export default function memoryExtension(pi: any): void {
 
 	// --- Cleanup on shutdown ---
 	pi.on("session_shutdown", () => {
+		pipelineTurnCounts.clear();
 		try {
 			clearEmbeddings();
 			closeMemoryDB();
@@ -436,51 +408,5 @@ export default function memoryExtension(pi: any): void {
 		}
 	});
 
-	// 4. Register /memory command for quick status
-	pi.registerCommand("memory", {
-		description: "Show memory system status",
-		async handler(ctx: any) {
-			try {
-				const { getDatabaseSizes } = await import("./memory/maintenance.js");
-				const { getObservationStats } = await import(
-					"./memory/observations.js"
-				);
-				const { getCaptureStats, getDistillationStats } = await import(
-					"./memory/pipeline.js"
-				);
-				const { checkFTS5Available } = await import("./memory/maintenance.js");
-
-				const sizes = getDatabaseSizes();
-				const stats = getObservationStats();
-				const capture = getCaptureStats();
-				const distill = getDistillationStats();
-				const fts = checkFTS5Available();
-
-				const lines = [
-					"## Memory System Status\n",
-					`**Database**: ${(sizes.total / 1024).toFixed(1)} KB`,
-					`**FTS5**: ${fts ? "Available" : "Unavailable"}`,
-					"",
-					"### Observations",
-					...Object.entries(stats).map(([k, v]) => `  ${k}: ${v}`),
-					"",
-					"### Capture Pipeline",
-					`  Messages: ${capture.total} (undistilled: ${capture.undistilled})`,
-					`  Sessions: ${capture.sessions}`,
-					"",
-					"### Distillations",
-					`  Total: ${distill.total} (${distill.sessions} sessions)`,
-					`  Avg compression: ${((distill.avgCompression ?? 0) * 100).toFixed(1)}%`,
-				];
-
-				if (ctx?.ui) {
-					ctx.ui.notify(lines.join("\n"));
-				}
-			} catch (err) {
-				if (ctx?.ui) {
-					ctx.ui.notify(`Memory status error: ${err}`);
-				}
-			}
-		},
-	});
+	// 4. No /memory command — this extension is for the agent, not the user.
 }

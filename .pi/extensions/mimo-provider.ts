@@ -176,7 +176,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerProvider("xiaomi-mimo", {
     name: "Xiaomi MiMo",
     baseUrl: MIMO_BASE_URL,
-    apiKey: MIMO_API_KEY_ENV,
+    apiKey: "$XIAOMI_MIMO_API_KEY", // $ prefix tells Pi to resolve from env var
     api: "openai-completions",
     models: MIMO_MODELS,
     authHeader: true,

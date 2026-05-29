@@ -20,6 +20,7 @@
 import { execFile } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
+import { truncateHead } from "@earendil-works/pi-coding-agent";
 import { buildSubprocessEnv } from "./security/env-policy.js";
 
 type OutputFormat = "llm" | "markdown" | "text" | "json" | "html";
@@ -27,7 +28,16 @@ type OutputFormat = "llm" | "markdown" | "text" | "json" | "html";
 const WEBCLAW_BIN = process.env.WEBCLAW_BIN || "webclaw";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
+const MAX_OUTPUT_BYTES = 32_000;
 const MAX_BATCH_URLS = 20;
+
+function truncateOutput(text: string): string {
+	const truncated = truncateHead(text, { maxBytes: MAX_OUTPUT_BYTES });
+	if (truncated.truncated) {
+		truncated.content += `\n\n[Output truncated: ${truncated.bytes} bytes removed. Scrape again with a narrower scope for full content.]`;
+	}
+	return truncated.content;
+}
 
 function isAbortError(error: unknown): boolean {
 	const candidate = error as { name?: string; code?: string } | undefined;
@@ -159,7 +169,7 @@ Prefer lightpanda/browser tools instead when:
 		async execute(_toolCallId, params, signal) {
 			try {
 				const args = buildScrapeArgs(params);
-				const text = await runWebclaw(args, signal, (params.timeoutSeconds || 30) * 1000);
+				const text = truncateOutput(await runWebclaw(args, signal, (params.timeoutSeconds || 30) * 1000));
 				return {
 					content: [{ type: "text" as const, text }],
 					details: {
@@ -241,7 +251,7 @@ Maximum 20 URLs per call.`,
 			});
 
 			return {
-				content: [{ type: "text" as const, text: sections.join("\n\n---\n\n") }],
+				content: [{ type: "text" as const, text: truncateOutput(sections.join("\n\n---\n\n")) }],
 				details: {
 					count: urls.length,
 					succeeded: results.filter((result) => result.status === "fulfilled").length,

@@ -162,7 +162,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerProvider("deepseek", {
     name: "DeepSeek",
     baseUrl: DEEPSEEK_BASE_URL,
-    apiKey: DEEPSEEK_API_KEY_ENV,
+    apiKey: "$DEEPSEEK_API_KEY", // $ prefix tells Pi to resolve from env var DEEPSEEK_API_KEY
     api: "deepseek",
     models: DEEPSEEK_MODELS,
     authHeader: true,

@@ -309,7 +309,13 @@ function fallbackUsageFromMessage(message: any, lastInputEstimate: number): Norm
 // Extension
 // ---------------------------------------------------------------------------
 
-export default function usageTrackerExtension(pi: any): void {
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+export default function usageTrackerExtension(pi: ExtensionAPI): void {
 	try {
 		getDB();
 	} catch (err) {
