@@ -1,5 +1,6 @@
 {
 	"name": "pikit",
+	"type": "module",
 "bin": "./bin/cli.js",
 	"version": "1.0.0",
 	"description": "Batteries-included pi coding agent kit — extensions, agents, skills, prompts, and themes",
