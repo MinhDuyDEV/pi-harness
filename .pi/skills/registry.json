@@ -1,8 +1,10 @@
 {
-  "generated_by": "manual skill pruning registry generator",
-  "active_skill_count": 71,
-  "core_skill_count": 37,
-  "optional_skill_count": 34,
+  "generated_by": "registry sync from .pi/skills/*/SKILL.md",
+  "active_skill_count": 64,
+  "core_skill_count": 33,
+  "optional_skill_count": 31,
+  "routing_schema_version": 1,
+  "routing_notes": "role_usage is a conservative hint for harness skill selection; it is not an auto-load instruction.",
   "skills": [
     {
       "name": "accessibility-audit",
@@ -21,26 +23,49 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "frontend"
+      "pack": "frontend",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "load"
+      },
+      "trigger_strength": "conditional",
+      "triggers": [
+        "auditing UI accessibility",
+        "keyboard navigation",
+        "WCAG criteria",
+        "forms and interactive components"
+      ]
     },
     {
-      "name": "agent-teams",
-      "path": "skills/agent-teams/SKILL.md",
-      "description": "Use when coordinating a small team of agents for parallel research, review, or competing implementation hypotheses where shared findings and lead coordination matter.",
+      "name": "agent-code-quality-gate",
+      "path": "skills/agent-code-quality-gate/SKILL.md",
+      "description": "Use before a coding agent claims implementation work is complete, especially after bugfixes, feature edits, refactors, or subagent changes - converts code quality into an operational gate for scope, duplication, behavior tests, verification evidence, and regressions.",
       "version": "1.0.0",
       "tags": [
-        "agent-coordination",
-        "workflow"
+        "workflow",
+        "code-quality",
+        "verification"
       ],
       "dependencies": [],
       "agent_types": [
-        "planner",
         "worker",
         "reviewer"
       ],
       "tools": [],
-      "status": "optional",
-      "pack": "agent-coordination"
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "avoid",
+        "worker": "load",
+        "reviewer": "load"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "before claiming implementation complete",
+        "after subagent or harness changes",
+        "after bugfix, feature edit, refactor, or test change"
+      ]
     },
     {
       "name": "api-and-interface-design",
@@ -62,25 +87,6 @@
       "pack": "core"
     },
     {
-      "name": "augment-context-engine",
-      "path": "skills/augment-context-engine/SKILL.md",
-      "description": "Semantic codebase search via Augment Context Engine MCP. Use when you need to understand code relationships, find relevant implementations, or explore unfamiliar codebases beyond keyword matching.",
-      "version": "1.0.0",
-      "tags": [
-        "research",
-        "context"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "optional",
-      "pack": "research-tools"
-    },
-    {
       "name": "beads",
       "path": "skills/beads/SKILL.md",
       "description": "Use when coordinating persistent multi-session or multi-agent work with dependencies, blockers, ownership, and handoffs that must survive beyond the current conversation.",
@@ -98,26 +104,6 @@
       "tools": [],
       "status": "optional",
       "pack": "agent-coordination"
-    },
-    {
-      "name": "behavioral-kernel",
-      "path": "skills/behavioral-kernel/SKILL.md",
-      "description": "Use when work starts drifting into silent assumptions, overengineering, drive-by refactors, or vague completion claims. Re-centers the agent on a compact Pi-native execution kernel with concrete anti-pattern examples.",
-      "version": "1.0.0",
-      "tags": [
-        "workflow",
-        "behavior",
-        "anti-slop"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core"
     },
     {
       "name": "brainstorming",
@@ -160,7 +146,18 @@
       ],
       "tools": [],
       "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "debugging browser behavior",
+        "console or network evidence",
+        "live DOM verification"
+      ]
     },
     {
       "name": "chrome-devtools",
@@ -217,7 +214,21 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "integrations"
+      "pack": "integrations",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Cloudflare Workers",
+        "Cloudflare Pages",
+        "KV",
+        "D1",
+        "R2",
+        "Wrangler config"
+      ]
     },
     {
       "name": "code-cleanup",
@@ -232,26 +243,6 @@
       "dependencies": [
         "verification-before-completion"
       ],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "code-navigation",
-      "path": "skills/code-navigation/SKILL.md",
-      "description": "Use when navigating unfamiliar code, tracing cross-file dependencies, or before editing — efficient code reading patterns that minimize tool calls and token waste",
-      "version": "1.0.0",
-      "tags": [
-        "workflow",
-        "code-quality",
-        "context"
-      ],
-      "dependencies": [],
       "agent_types": [
         "planner",
         "worker",
@@ -283,55 +274,19 @@
         "bash"
       ],
       "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "condition-based-waiting",
-      "path": "skills/condition-based-waiting/SKILL.md",
-      "description": "Use when tests have race conditions, timing dependencies, or inconsistent pass/fail behavior - replaces arbitrary timeouts with condition polling to wait for actual state changes, eliminating flaky tests from timing guesses",
-      "version": "1.0.0",
-      "tags": [
-        "testing",
-        "debugging"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "context-engineering",
-      "path": "skills/context-engineering/SKILL.md",
-      "description": "Optimizes what context agents load and when. Use at session start, when switching tasks, when output quality degrades, or when project conventions are being ignored.",
-      "version": "1.0.0",
-      "tags": [
-        "context",
-        "workflow",
-        "agent-coordination"
-      ],
-      "dependencies": [
-        "using-pi-skills"
-      ],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer",
-        "scout"
-      ],
-      "tools": [
-        "srcwalk_read",
-        "srcwalk_search",
-        "memory-search",
-        "memory-search",
-        "compress"
-      ],
-      "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "avoid",
+        "worker": "conditional",
+        "reviewer": "load"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "code review",
+        "bug audit",
+        "pre-merge review",
+        "verify delegated implementation"
+      ]
     },
     {
       "name": "core-data-expert",
@@ -377,6 +332,41 @@
       ],
       "status": "core",
       "pack": "core"
+    },
+    {
+      "name": "deep-module-design",
+      "path": "skills/deep-module-design/SKILL.md",
+      "description": "Applies Ousterhout's deep module principles to code design — small interfaces, information hiding, pull complexity downward. Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "code-quality",
+        "ousterhout"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "srcwalk_search",
+        "srcwalk_deps"
+      ],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "load"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "module design",
+        "refactoring shallow code",
+        "architecture review",
+        "AI-generated code structural quality"
+      ]
     },
     {
       "name": "defense-in-depth",
@@ -457,18 +447,13 @@
     {
       "name": "development-lifecycle",
       "path": "skills/development-lifecycle/SKILL.md",
-      "description": "Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm → design → specify → plan → implement → verify) and loads appropriate sub-skills at each stage.",
+      "description": "Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm → grill → ADR → specify → plan → implement → verify) and loads appropriate sub-skills at each stage.",
       "version": "1.0.0",
       "tags": [
         "workflow",
         "planning"
       ],
-      "dependencies": [
-        "brainstorming",
-        "pikit-grill-me",
-        "documentation-and-adrs",
-        "spec-driven-development"
-      ],
+      "dependencies": [],
       "agent_types": [
         "planner",
         "worker",
@@ -477,6 +462,37 @@
       "tools": [],
       "status": "core",
       "pack": "core"
+    },
+    {
+      "name": "diagnose",
+      "path": "skills/diagnose/SKILL.md",
+      "description": "Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says \"diagnose this\" / \"debug this\", reports a bug, says something is broken/throwing/failing, or describes a performance regression.",
+      "version": "1.0.0",
+      "tags": [
+        "debugging",
+        "workflow",
+        "verification"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "avoid",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "hard bug",
+        "performance regression",
+        "reproduce minimise hypothesise instrument fix",
+        "multiple failed fix attempts"
+      ]
     },
     {
       "name": "documentation-and-adrs",
@@ -515,7 +531,19 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "design-tools"
+      "pack": "design-tools",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Figma URL",
+        "implementing from Figma",
+        "extracting design tokens",
+        "downloading Figma assets"
+      ]
     },
     {
       "name": "frontend-design",
@@ -534,26 +562,18 @@
       ],
       "tools": [],
       "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "gemini-large-context",
-      "path": "skills/gemini-large-context/SKILL.md",
-      "description": "Use when analyzing large codebases, comparing multiple files, or researching project-wide patterns that exceed typical context limits - leverages Gemini CLI's 1M token context window for comprehensive analysis",
-      "version": "1.0.0",
-      "tags": [
-        "research",
-        "context"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "optional",
-      "pack": "research-tools"
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "building web UI",
+        "editing React UI components",
+        "creating pages, dashboards, or component libraries"
+      ]
     },
     {
       "name": "git-workflow-and-versioning",
@@ -578,6 +598,72 @@
       "pack": "core"
     },
     {
+      "name": "grill-me",
+      "path": "skills/grill-me/SKILL.md",
+      "description": "Adversarial interrogation of ideas before implementation — pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use when you have a rough idea, ADR, PRD, or spec that needs to survive scrutiny before code is written.",
+      "version": "1.0.0",
+      "tags": [
+        "planning",
+        "review",
+        "decision"
+      ],
+      "dependencies": [
+        "brainstorming",
+        "spec-driven-development"
+      ],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "load",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "pressure-test idea",
+        "ADR review",
+        "PRD or spec ambiguity",
+        "hidden assumptions"
+      ]
+    },
+    {
+      "name": "grill-with-docs",
+      "path": "skills/grill-with-docs/SKILL.md",
+      "description": "Grilling session that challenges your plan against the existing domain model, sharpens terminology, and updates documentation (CONTEXT.md, ADRs) inline as decisions crystallise. Use when user wants to stress-test a plan against their project's language and documented decisions.",
+      "version": "1.0.0",
+      "tags": [
+        "planning",
+        "documentation",
+        "domain-driven-design"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "load",
+        "worker": "conditional",
+        "reviewer": "avoid"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "ambiguous plan",
+        "design needs domain language",
+        "needs CONTEXT.md or ADR updates",
+        "pre-build grilling with docs"
+      ]
+    },
+    {
       "name": "high-end-visual-design",
       "path": "skills/high-end-visual-design/SKILL.md",
       "description": "Use INSTEAD OF design-taste-frontend when user explicitly requests premium, agency-quality, or luxury visual design. Defines exact fonts, spacing, shadows, and animations that make websites feel expensive. Blocks cheap AI defaults.",
@@ -594,6 +680,36 @@
       "tools": [],
       "status": "optional",
       "pack": "frontend"
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "path": "skills/improve-codebase-architecture/SKILL.md",
+      "description": "Find deepening opportunities in a codebase, informed by the domain language in CONTEXT.md and the decisions in docs/adr/. Use when the user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled modules, or make a codebase more testable and AI-navigable.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "code-quality"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "load"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "improve architecture",
+        "deepening opportunities",
+        "make codebase more testable",
+        "AI-navigable refactor candidates"
+      ]
     },
     {
       "name": "incremental-implementation",
@@ -657,25 +773,6 @@
       "tools": [],
       "status": "optional",
       "pack": "integrations"
-    },
-    {
-      "name": "memory-system",
-      "path": "skills/memory-system/SKILL.md",
-      "description": "Use when persisting learnings, loading previous context, or searching past decisions - covers memory file structure, tools, and when to update each file",
-      "version": "1.2.0",
-      "tags": [
-        "context",
-        "workflow"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core"
     },
     {
       "name": "minimalist-ui",
@@ -857,7 +954,19 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "browser-automation"
+      "pack": "browser-automation",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "automated browser testing",
+        "screenshots",
+        "validating forms",
+        "end-to-end UX flows"
+      ]
     },
     {
       "name": "polar",
@@ -876,7 +985,50 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "integrations"
+      "pack": "integrations",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "payments",
+        "subscriptions",
+        "checkout",
+        "license keys",
+        "customer portal with Polar"
+      ]
+    },
+    {
+      "name": "prototype",
+      "path": "skills/prototype/SKILL.md",
+      "description": "Build a throwaway prototype to flesh out a design before committing to it. Routes between two branches — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route. Use when the user wants to prototype, sanity-check a data model or state machine, mock up a UI, explore design options, or says \"prototype this\", \"let me play with it\", \"try a few designs\".",
+      "version": "1.0.0",
+      "tags": [
+        "planning",
+        "workflow",
+        "design"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker"
+      ],
+      "tools": [],
+      "status": "optional",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "avoid"
+      },
+      "trigger_strength": "conditional",
+      "triggers": [
+        "throwaway prototype",
+        "explore design before committing",
+        "compare UI or logic options"
+      ]
     },
     {
       "name": "react-best-practices",
@@ -895,7 +1047,18 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "frontend"
+      "pack": "frontend",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "writing React or Next.js code",
+        "reviewing React performance",
+        "refactoring React components"
+      ]
     },
     {
       "name": "redesign-existing-projects",
@@ -932,7 +1095,19 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "integrations"
+      "pack": "integrations",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "transactional email",
+        "React Email templates",
+        "email webhooks",
+        "Resend integration"
+      ]
     },
     {
       "name": "root-cause-tracing",
@@ -970,7 +1145,20 @@
       ],
       "tools": [],
       "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "load"
+      },
+      "trigger_strength": "conditional",
+      "triggers": [
+        "authentication",
+        "authorization",
+        "secrets",
+        "OWASP risks",
+        "security-sensitive code"
+      ]
     },
     {
       "name": "shipping-and-launch",
@@ -1023,7 +1211,19 @@
         "codesearch"
       ],
       "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "unfamiliar library",
+        "external API",
+        "framework behavior",
+        "current ecosystem guidance"
+      ]
     },
     {
       "name": "spec-driven-development",
@@ -1051,8 +1251,8 @@
     {
       "name": "srcwalk",
       "path": "skills/srcwalk/SKILL.md",
-      "description": "Use when navigating code with srcwalk's native CLI-first workflow — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.",
-      "version": "2.0.0",
+      "description": "Use when navigating code with srcwalk — repo maps, large-file reads, symbol search, callers/callees, flow slices, impact checks, and precise drill-ins.",
+      "version": "2.1.0",
       "tags": [
         "code-intelligence",
         "search",
@@ -1063,7 +1263,8 @@
       "agent_types": [
         "planner",
         "worker",
-        "reviewer"
+        "reviewer",
+        "explorer"
       ],
       "tools": [
         "bash",
@@ -1101,46 +1302,6 @@
       "pack": "design-tools"
     },
     {
-      "name": "structured-edit",
-      "path": "skills/structured-edit/SKILL.md",
-      "description": "Use when editing files to reduce str_replace failures - combines search/Tilth location with read-verify-edit pattern for reliable edits",
-      "version": "1.0.0",
-      "tags": [
-        "code-quality",
-        "workflow"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "subagent-driven-development",
-      "path": "skills/subagent-driven-development/SKILL.md",
-      "description": "Use when executing implementation plans with independent tasks in the current session - dispatches fresh subagent for each task with code review between tasks, enabling fast iteration with quality gates",
-      "version": "1.0.0",
-      "tags": [
-        "workflow",
-        "agent-coordination"
-      ],
-      "dependencies": [
-        "executing-plans"
-      ],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core"
-    },
-    {
       "name": "supabase",
       "path": "skills/supabase/SKILL.md",
       "description": "Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.",
@@ -1157,7 +1318,20 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "integrations"
+      "pack": "integrations",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Supabase auth",
+        "Supabase database",
+        "Supabase storage",
+        "Supabase edge functions",
+        "RLS policies"
+      ]
     },
     {
       "name": "supabase-postgres-best-practices",
@@ -1176,7 +1350,19 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "integrations"
+      "pack": "integrations",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Postgres schema",
+        "indexes",
+        "SQL queries",
+        "RLS policies in Supabase"
+      ]
     },
     {
       "name": "swift-concurrency",
@@ -1252,7 +1438,19 @@
       ],
       "tools": [],
       "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "conditional",
+        "worker": "conditional",
+        "reviewer": "load"
+      },
+      "trigger_strength": "conditional",
+      "triggers": [
+        "writing tests",
+        "changing tests",
+        "using mocks",
+        "test-only production hooks"
+      ]
     },
     {
       "name": "using-git-worktrees",
@@ -1272,52 +1470,6 @@
       "tools": [],
       "status": "core",
       "pack": "core"
-    },
-    {
-      "name": "using-pi-skills",
-      "path": "skills/using-pi-skills/SKILL.md",
-      "description": "Guides Pi agents in selecting, invoking, and completing skills with evidence. Use when starting a session, mapping user intent to workflow, creating a skill, or coordinating lifecycle commands.",
-      "version": "1.0.0",
-      "tags": [
-        "workflow",
-        "meta",
-        "agent-coordination"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer",
-        "scout"
-      ],
-      "tools": [
-        "TaskCreate",
-        "TaskUpdate",
-        "Agent",
-        "memory"
-      ],
-      "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "v0",
-      "path": "skills/v0/SKILL.md",
-      "description": "Use when you need AI-powered UI generation for React components, dashboards, or quick prototypes via v0. MUST load before creating v0 chats or generating components via v0 MCP.",
-      "version": "1.0.0",
-      "tags": [
-        "ui",
-        "mcp",
-        "design"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "optional",
-      "pack": "design-tools"
     },
     {
       "name": "vercel-deploy-claimable",
@@ -1355,7 +1507,18 @@
       ],
       "tools": [],
       "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "avoid",
+        "worker": "load",
+        "reviewer": "load"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "before claiming work complete",
+        "before commit or PR",
+        "after tests or build changes"
+      ]
     },
     {
       "name": "webclaw",
@@ -1373,7 +1536,19 @@
       ],
       "tools": [],
       "status": "optional",
-      "pack": "research-tools"
+      "pack": "research-tools",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "web fetch blocked",
+        "403 or bot protection",
+        "crawl documentation",
+        "batch extract pages"
+      ]
     },
     {
       "name": "writing-skills",
@@ -1395,14 +1570,13 @@
       "pack": "agent-coordination"
     },
     {
-      "name": "pikit-deep-module-design",
-      "path": "skills/deep-module-design/SKILL.md",
-      "description": "Applies Ousterhout's deep module principles to code design — small interfaces, information hiding, pull complexity downward.",
+      "name": "zoom-out",
+      "path": "skills/zoom-out/SKILL.md",
+      "description": "Tell the agent to zoom out and give broader context or a higher-level perspective. Use when you're unfamiliar with a section of code or need to understand how it fits into the bigger picture.",
       "version": "1.0.0",
       "tags": [
-        "architecture",
-        "code-quality",
-        "ousterhout"
+        "context",
+        "architecture"
       ],
       "dependencies": [],
       "agent_types": [
@@ -1410,62 +1584,21 @@
         "worker",
         "reviewer"
       ],
-      "tools": [
-        "srcwalk_search",
-        "srcwalk_deps"
-      ],
+      "tools": [],
       "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "pikit-ubiquitous-language",
-      "path": "skills/ubiquitous-language/SKILL.md",
-      "description": "Establishes shared vocabulary across codebase, context files, and team conversation — from Evans' DDD and Pocock's AI glossary technique.",
-      "version": "1.0.0",
-      "tags": [
-        "architecture",
-        "domain-driven-design",
-        "ai-workflow"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "scout"
-      ],
-      "tools": [
-        "srcwalk_search",
-        "grep",
-        "memory"
-      ],
-      "status": "core",
-      "pack": "core"
-    },
-    {
-      "name": "pikit-grill-me",
-      "path": "skills/grill-me/SKILL.md",
-      "description": "Adversarial interrogation of ideas before implementation — pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use after brainstorming, before ADR or spec writing.",
-      "version": "1.0.0",
-      "tags": [
-        "planning",
-        "review",
-        "decision",
-        "ai-workflow"
-      ],
-      "dependencies": [
-        "brainstorming",
-        "spec-driven-development"
-      ],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [
-        "srcwalk_search",
-        "grep"
-      ],
-      "status": "core",
-      "pack": "core"
+      "pack": "core",
+      "role_usage": {
+        "planner": "load",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "unfamiliar code area",
+        "tunnel vision",
+        "need broader context",
+        "explain system context"
+      ]
     }
   ]
 }

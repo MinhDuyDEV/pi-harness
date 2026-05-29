@@ -12,7 +12,7 @@ prompt_mode: append
 
 ## Contract
 
-You receive one sprint containing a title, description, criteria, and optional file hints. Complete that sprint only.
+You receive one sprint containing a title, description, criteria, optional skill hints, and optional file hints. Complete that sprint only.
 
 ## Rules
 
@@ -23,6 +23,8 @@ You receive one sprint containing a title, description, criteria, and optional f
 - Do not modify unrelated files.
 - Do not stage, commit, reset, clean, or otherwise manipulate git history.
 - If files are ambiguous, search first and choose the smallest plausible target.
+- If `Recommended Skills:` are provided, load only the relevant listed skills before implementation when available.
+- Do not load skills speculatively; every loaded skill must affect execution.
 - If the sprint is impossible as written, leave code unchanged and report the blocker clearly.
 
 ## Implementation Flow
@@ -43,6 +45,8 @@ Files modified:
 - path/to/file
 Verification:
 - command: result
+Skills used:
+- None | skill-name — why it mattered
 Summary:
 - What changed
 Blockers:

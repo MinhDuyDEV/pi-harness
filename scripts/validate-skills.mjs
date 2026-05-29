@@ -24,7 +24,10 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
-const SKILLS_DIR = path.join(REPO_ROOT, ".pi", "skills");
+const PI_DIR = path.join(REPO_ROOT, ".pi");
+const SKILLS_DIR = path.join(PI_DIR, "skills");
+const REGISTRY_PATH = path.join(SKILLS_DIR, "registry.json");
+const SKILLS_LOCK_PATH = path.join(REPO_ROOT, "skills-lock.json");
 
 const args = process.argv.slice(2);
 const FLAG_CHECK = args.includes("--check");
@@ -35,34 +38,27 @@ const SINGLE_SKILL = args.includes("--skill")
   ? args[args.indexOf("--skill") + 1]
   : null;
 
-// ---------- known external (non-pikit) skill set ----------
-// Skills sourced from external repos (via skills-lock.json or Pi defaults)
-// These don't follow pikit naming conventions.
-const EXTERNAL_SKILLS = new Set([
-  "accessibility-audit", "agent-code-quality-gate", "agent-teams",
-  "api-and-interface-design", "augment-context-engine", "beads",
-  "behavioral-kernel", "brainstorming", "browser-testing-with-devtools",
-  "chrome-devtools", "ci-cd-and-automation", "cloudflare", "code-cleanup",
-  "code-navigation", "code-review-and-quality", "condition-based-waiting",
-  "context-engineering", "core-data-expert", "debugging-and-error-recovery",
-  "defense-in-depth", "deprecation-and-migration", "design-system-audit",
-  "design-taste-frontend", "development-lifecycle", "documentation-and-adrs",
-  "figma", "frontend-design", "gemini-large-context",
-  "git-workflow-and-versioning", "high-end-visual-design",
-  "incremental-implementation", "industrial-brutalist-ui", "jira",
-  "memory-system", "minimalist-ui", "mockup-to-code", "obsidian",
+// ---------- external skill naming ----------
+// External skills do not need the local `pikit-` prefix in non-strict mode.
+// Keep this fallback small; skills-lock.json is the source of truth for installed
+// third-party skills, and registry.json is validated separately below.
+const DEFAULT_EXTERNAL_SKILLS = new Set([
+  "accessibility-audit", "agent-code-quality-gate", "api-and-interface-design",
+  "beads", "brainstorming", "browser-testing-with-devtools", "chrome-devtools",
+  "ci-cd-and-automation", "cloudflare", "code-cleanup", "code-review-and-quality",
+  "core-data-expert", "debugging-and-error-recovery", "defense-in-depth",
+  "deprecation-and-migration", "design-system-audit", "design-taste-frontend",
+  "development-lifecycle", "documentation-and-adrs", "figma", "frontend-design",
+  "git-workflow-and-versioning", "high-end-visual-design", "incremental-implementation",
+  "industrial-brutalist-ui", "jira", "minimalist-ui", "mockup-to-code", "obsidian",
   "openpencil", "opensrc", "pdf-extract", "performance-optimization",
-  "planning-and-task-breakdown", "playwright", "polar",
-  "react-best-practices", "redesign-existing-projects", "resend",
-  "root-cause-tracing", "security-and-hardening", "shipping-and-launch",
-  "source-driven-development", "spec-driven-development", "srcwalk",
-  "stitch", "structured-edit", "subagent-driven-development", "supabase",
-  "supabase-postgres-best-practices", "swift-concurrency",
-  "swiftui-expert-skill", "test-driven-development", "testing-anti-patterns",
-  "tilth", "using-git-worktrees", "using-pi-skills", "v0",
-  "vercel-deploy-claimable", "verification-before-completion", "webclaw",
-  "writing-skills",
-  // Non-skill directories inside .pi/skills/
+  "planning-and-task-breakdown", "playwright", "polar", "react-best-practices",
+  "redesign-existing-projects", "resend", "root-cause-tracing", "security-and-hardening",
+  "shipping-and-launch", "source-driven-development", "spec-driven-development",
+  "srcwalk", "stitch", "supabase", "supabase-postgres-best-practices",
+  "swift-concurrency", "swiftui-expert-skill", "test-driven-development",
+  "testing-anti-patterns", "using-git-worktrees", "vercel-deploy-claimable",
+  "verification-before-completion", "webclaw", "writing-skills",
   "references",
 ]);
 
@@ -78,6 +74,35 @@ function fail(msg) {
 function warn(msg) {
   return { severity: "warn", message: msg };
 }
+
+function readJsonIfExists(filePath) {
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch (err) {
+    return { __parseError: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+function parseListValue(value) {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return null;
+  return trimmed
+    .slice(1, -1)
+    .split(",")
+    .map((item) => item.trim().replace(/^["']|["']$/g, ""))
+    .filter(Boolean);
+}
+
+function loadExternalSkills() {
+  const external = new Set(DEFAULT_EXTERNAL_SKILLS);
+  const lock = readJsonIfExists(SKILLS_LOCK_PATH);
+  if (!lock || lock.__parseError || !lock.skills) return external;
+  for (const name of Object.keys(lock.skills)) external.add(name);
+  return external;
+}
+
+const EXTERNAL_SKILLS = loadExternalSkills();
 
 // ---------- scan skills ----------
 
@@ -105,10 +130,12 @@ function parseFrontmatter(content) {
   if (!m) return {};
   const body = m[1];
   const fields = {};
-  // Simple YAML-ish parser for flat key: value pairs
+  // Simple YAML-ish parser for flat key: value pairs and one-line arrays.
   for (const line of body.split("\n")) {
-    const kv = line.match(/^(\w+):\s*(.+)$/);
-    if (kv) fields[kv[1]] = kv[2].trim();
+    const kv = line.match(/^(\w[\w_-]*):\s*(.+)$/);
+    if (!kv) continue;
+    const list = parseListValue(kv[2]);
+    fields[kv[1]] = list ?? kv[2].trim().replace(/^["']|["']$/g, "");
   }
   return fields;
 }
@@ -268,6 +295,95 @@ function checkUserInputSection(skillName, content) {
   return issues;
 }
 
+function checkRegistry(skillDirs) {
+  const issues = [];
+  if (!existsSync(REGISTRY_PATH)) {
+    return [fail(`Missing skills registry: ${REGISTRY_PATH}`)];
+  }
+
+  const registry = readJsonIfExists(REGISTRY_PATH);
+  if (!registry || registry.__parseError) {
+    return [fail(`Invalid skills registry JSON: ${registry?.__parseError ?? "unknown parse error"}`)];
+  }
+  if (!Array.isArray(registry.skills)) {
+    return [fail("skills/registry.json must contain a skills array")];
+  }
+
+  const actual = [];
+  for (const dir of skillDirs) {
+    if (dir === "references") continue;
+    const skill = readSkillMd(dir);
+    if (!skill) continue;
+    const fm = parseFrontmatter(skill.content);
+    actual.push({
+      dir,
+      name: fm.name || dir,
+      path: path.relative(PI_DIR, skill.path).replaceAll(path.sep, "/"),
+    });
+  }
+
+  const entries = registry.skills;
+  const registryNames = new Set(entries.map((entry) => entry.name));
+  const actualNames = new Set(actual.map((entry) => entry.name));
+
+  if (registry.active_skill_count !== entries.length) {
+    issues.push(fail(`active_skill_count=${registry.active_skill_count} but registry has ${entries.length} skills`));
+  }
+  const coreCount = entries.filter((entry) => entry.status === "core").length;
+  const optionalCount = entries.filter((entry) => entry.status === "optional").length;
+  if (registry.core_skill_count !== coreCount) {
+    issues.push(fail(`core_skill_count=${registry.core_skill_count} but registry has ${coreCount} core skills`));
+  }
+  if (registry.optional_skill_count !== optionalCount) {
+    issues.push(fail(`optional_skill_count=${registry.optional_skill_count} but registry has ${optionalCount} optional skills`));
+  }
+
+  for (const { name } of actual) {
+    if (!registryNames.has(name)) issues.push(fail(`Skill '${name}' exists on disk but is missing from registry.json`));
+  }
+  for (const entry of entries) {
+    if (!actualNames.has(entry.name)) issues.push(fail(`Registry skill '${entry.name}' has no matching on-disk SKILL.md name`));
+  }
+
+  const nameCounts = new Map();
+  for (const entry of entries) nameCounts.set(entry.name, (nameCounts.get(entry.name) ?? 0) + 1);
+  for (const [name, count] of nameCounts) {
+    if (count > 1) issues.push(fail(`Duplicate registry skill name '${name}' appears ${count} times`));
+  }
+
+  for (const entry of entries) {
+    const entryPath = typeof entry.path === "string" ? path.join(PI_DIR, entry.path) : null;
+    if (!entryPath || !existsSync(entryPath)) {
+      issues.push(fail(`Registry skill '${entry.name}' path does not exist: ${entry.path}`));
+      continue;
+    }
+    const fm = parseFrontmatter(readFileSync(entryPath, "utf8"));
+    if ((fm.name || path.basename(path.dirname(entryPath))) !== entry.name) {
+      issues.push(fail(`Registry skill '${entry.name}' does not match frontmatter name '${fm.name}' at ${entry.path}`));
+    }
+    if (!entry.description) issues.push(fail(`Registry skill '${entry.name}' is missing description`));
+    if (!entry.version) issues.push(fail(`Registry skill '${entry.name}' is missing version`));
+    if (!["core", "optional"].includes(entry.status)) {
+      issues.push(fail(`Registry skill '${entry.name}' has invalid status '${entry.status}'`));
+    }
+    for (const dependency of entry.dependencies ?? []) {
+      if (!registryNames.has(dependency)) {
+        issues.push(fail(`Registry skill '${entry.name}' depends on missing skill '${dependency}'`));
+      }
+    }
+    const roleUsage = entry.role_usage;
+    if (roleUsage) {
+      for (const [role, usage] of Object.entries(roleUsage)) {
+        if (!["planner", "worker", "reviewer", "scout"].includes(role) || !["avoid", "recommend", "conditional", "load"].includes(usage)) {
+          issues.push(fail(`Registry skill '${entry.name}' has invalid role_usage ${role}: ${usage}`));
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 // ---------- CLI ----------
 
 function printHelp() {
@@ -288,6 +404,7 @@ Checks:
   2. Self-containment (no cross-skill file references)
   3. Script Directory convention (if skill has execution examples)
   4. User Input Tools section (if skill uses AskUserQuestion)
+  5. .pi/skills/registry.json consistency with on-disk Pi skills
 `);
 }
 
@@ -335,6 +452,11 @@ async function main() {
     skillCount++;
 
     if (issues.length === 0) cleanCount++;
+  }
+
+  if (!SINGLE_SKILL) {
+    const registryIssues = checkRegistry(skillDirs);
+    allIssues.push({ skill: "registry", file: REGISTRY_PATH, issues: registryIssues });
   }
 
   // ---------- summary ----------

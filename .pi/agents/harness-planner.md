@@ -25,6 +25,8 @@ Description: One concise paragraph describing the implementation slice.
 Criteria:
 - [ ] Concrete acceptance criterion
 - [ ] Concrete acceptance criterion
+Skills:
+- optional-skill-name
 Files: path/to/file1.ts, path/to/file2.ts
 
 ## Sprint 2: Title
@@ -42,6 +44,7 @@ Files: path/to/file3.ts
 - Keep sprints independently verifiable and ordered by dependency.
 - Prefer fewer sprints when the request is small.
 - Each criterion must be testable by a later reviewer.
+- `Skills:` is optional. Include only clearly relevant skill names from the project skill registry; prefer 1-3, never spam broad skill lists.
 - `Files:` may be approximate, but include likely target paths when inferable.
 
 ## Sprint Sizing

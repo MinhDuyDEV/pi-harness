@@ -108,8 +108,26 @@ Files: src/index.ts`;
 	assert.ok(sprints[0].description.includes("Initialize the project structure"), t);
 	assert.ok(sprints[0].criteria.includes("- [ ] Create package.json"), t);
 	assert.equal(sprints[0].files, "package.json, tsconfig.json", t);
+	assert.deepEqual(sprints[0].skills, [], t);
 	assert.equal(sprints[1].number, 2, t);
 	assert.equal(sprints[1].title, "Core Logic", t);
+}
+
+{
+	const t = "parseSprints extracts optional Skills section";
+	const input = `## Sprint 1: Debug Flow
+Description: Fix failing runtime flow
+Criteria:
+- [ ] Reproduce failure
+- [ ] Add regression coverage
+Skills:
+- diagnose
+- test-driven-development
+Files: src/runtime.ts`;
+	const sprints = parseSprints(input);
+	assert.deepEqual(sprints[0].skills, ["diagnose", "test-driven-development"], t);
+	assert.ok(!sprints[0].criteria.includes("Skills:"), t);
+	assert.equal(sprints[0].files, "src/runtime.ts", t);
 }
 
 {

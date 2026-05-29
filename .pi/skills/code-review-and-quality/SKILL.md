@@ -41,17 +41,20 @@ Use the **three complexity symptoms** as review lenses:
 
 1. Identify base and changed files.
 2. Read the diff and nearby context.
-3. Verify goal completion: exists, substantive, wired.
-4. Check key links: UI -> API, API -> database, form -> handler, state -> render, command -> effect.
-5. **Assess for complexity symptoms**:
+3. Review along two axes when a spec/issue/PRD exists:
+   - **Standards** — does the change follow documented repo standards, ADRs, and conventions?
+   - **Spec** — does the change faithfully implement what was requested, without missing requirements or scope creep?
+4. Verify goal completion: exists, substantive, wired.
+5. Check key links: UI -> API, API -> database, form -> handler, state -> render, command -> effect.
+6. **Assess for complexity symptoms**:
    - Is the interface of each new module as complex as its implementation? (shallow module — Ousterhout)
    - Does a change leak information between unrelated modules?
    - Would a future developer (or AI agent) know where to make the next change?
-6. Look for correctness, security, performance, compatibility, and maintainability issues.
-7. Run or inspect relevant verification when allowed.
-8. **Scan for broken windows** — does the change introduce or fix code that normalizes decay? Messy imports, inconsistent patterns, TODO rot, dead code?
-9. Report only actionable findings that the author should fix.
-10. If no findings, say so and list residual testing gaps.
+7. Look for correctness, security, performance, compatibility, and maintainability issues.
+8. Run or inspect relevant verification when allowed.
+9. **Scan for broken windows** — does the change introduce or fix code that normalizes decay? Messy imports, inconsistent patterns, TODO rot, dead code?
+10. Report only actionable findings that the author should fix.
+11. If no findings, say so and list residual testing gaps.
 
 ## Severity
 

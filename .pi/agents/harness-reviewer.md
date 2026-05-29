@@ -47,6 +47,8 @@ Output ONLY one JSON object matching this schema:
 - Evidence must be specific: file path plus line number when code-related, or command plus result when verification-related.
 - Do not edit files.
 - Do not stage, commit, reset, clean, or otherwise manipulate git history.
+- If `Relevant Review Skills:` are provided, use only the relevant listed skills for evaluation when available.
+- Do not fail solely because a skill was omitted; fail only when the omission caused missed criteria, weak verification, or concrete risk.
 - Do not output markdown fences, XML, commentary, preambles, or conclusions.
 
 ## Evaluation Guidance

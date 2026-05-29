@@ -16,6 +16,7 @@ export interface Sprint {
 	description: string;
 	criteria: string;
 	files: string;
+	skills: string[];
 }
 
 export interface SprintResult {
@@ -40,6 +41,8 @@ Description: ...
 Criteria:
 - [ ] Criterion 1
 - [ ] Criterion 2
+Skills:
+- optional-skill-name
 Files: path/to/file1.ts, path/to/file2.ts
 
 ## Sprint 2: Title
@@ -49,6 +52,7 @@ Criteria:
 - [ ] Criterion 2
 Files: path/to/file3.ts
 
+Skills is optional. Use only registry-valid skill names when clearly relevant. Prefer 1-3 skills.
 Only output sprint sections. No commentary, no tables, no XML blocks, no episode tags.`;
 
 export const HARNESS_EVAL_INSTRUCTIONS = `
@@ -105,11 +109,16 @@ export function parseSprints(text: string): Sprint[] {
 		const num = Number.parseInt(match[1], 10);
 		const title = match[2].trim();
 		const body = match[3].trim();
-		const criteriaMatch = body.match(/Criteria?:?\s*\n?([\s\S]*?)(?=\nFiles:|$)/);
+		const criteriaMatch = body.match(/Criteria?:?\s*\n?([\s\S]*?)(?=\nSkills:|\nFiles:|$)/);
 		const criteria = criteriaMatch?.[1]?.trim() ?? body;
+		const skillsMatch = body.match(/Skills:?\s*\n([\s\S]*?)(?=\nFiles:|$)/);
+		const skills = skillsMatch?.[1]
+			?.split("\n")
+			.map((line) => line.replace(/^[-*]\s*/, "").trim())
+			.filter(Boolean) ?? [];
 		const filesMatch = body.match(/Files:?\s*(.+?)$/m);
 		const files = filesMatch?.[1]?.trim() ?? "";
-		sprints.push({ number: num, title, description: body, criteria, files });
+		sprints.push({ number: num, title, description: body, criteria, files, skills });
 	}
 
 	// Fallback: if no ## Sprint sections found, treat entire output as one sprint
@@ -122,6 +131,7 @@ export function parseSprints(text: string): Sprint[] {
 			description: normalizedText.trim(),
 			criteria: normalizedText.trim(),
 			files: "",
+			skills: [],
 		});
 	}
 

@@ -42,6 +42,7 @@ import {
 } from "./agents.js";
 import { HarnessWidget, type AgentRole } from "./widgets.js";
 import { createHarnessWorkspace, type HarnessWorkspace } from "./gitSafety.js";
+import { resolveSkillHints } from "./skills.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -254,6 +255,7 @@ async function runBuildEvaluatePhase(
 	runCwd: string,
 	widget: HarnessWidget,
 	tracker: HarnessTracker,
+	projectRoot: string,
 	signal?: AbortSignal,
 	onUpdate?: HarnessContext["onUpdate"],
 ): Promise<{
@@ -267,6 +269,10 @@ async function runBuildEvaluatePhase(
 
 	for (let i = 0; i < sprints.length; i++) {
 		const sprint = sprints[i];
+		const skillHints = resolveSkillHints(projectRoot, sprint);
+		for (const warning of skillHints.warnings) {
+			notify(onUpdate, `[warn] ${warning}`, { phase: "skills", warning, sprint: i + 1 });
+		}
 		widget.update({
 			phase: "generating",
 			sprint: i + 1,
@@ -300,6 +306,7 @@ async function runBuildEvaluatePhase(
 			"Criteria:",
 			sprint.criteria,
 		];
+		if (skillHints.workerText) sprintTask.push("", skillHints.workerText);
 		if (sprint.files) sprintTask.push("", `Files: ${sprint.files}`);
 
 		const generator = await spawnAgent({
@@ -362,7 +369,7 @@ async function runBuildEvaluatePhase(
 			});
 			throwIfAborted(signal);
 			await evaluator.prompt(
-				[`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria].join("\n"),
+				[`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria, ...(skillHints.reviewerText ? ["", skillHints.reviewerText] : [])].join("\n"),
 			);
 			evalText = getLastAssistantText(evaluator);
 			const evalResult = parseEvalOutput(evalText);
@@ -430,6 +437,7 @@ async function runBuildEvaluatePhase(
 				"",
 				"Fix these issues:",
 				evalText,
+				...(skillHints.workerText ? ["", skillHints.workerText] : []),
 			].join("\n"));
 			tracker.saveSession(`sprint-${i + 1}`, `generator-iter-${iteration + 1}`, fixer, generatorDef.systemPrompt);
 			fixer.dispose();
@@ -624,6 +632,7 @@ export async function orchestrateHarnessRun(
 		runCwd,
 		widget,
 		tracker,
+		projectRoot,
 		signal,
 		onUpdate,
 	);

@@ -53,6 +53,20 @@ Write code before the test? Delete it. Start over.
 
 Implement fresh from tests. Period.
 
+## Vertical Slice Rule
+
+Do **not** write all tests first, then all implementation. That is horizontal slicing: it tests imagined behavior, overfits to guessed structure, and outruns feedback.
+
+Correct TDD is one vertical tracer bullet at a time:
+
+```text
+RED→GREEN: behavior 1 test → minimal implementation
+RED→GREEN: behavior 2 test → minimal implementation
+RED→GREEN: behavior 3 test → minimal implementation
+```
+
+Each test must verify observable behavior through a public interface. If a test breaks during an internal refactor while behavior is unchanged, it was testing implementation details.
+
 ## Red-Green-Refactor
 
 ```dot
