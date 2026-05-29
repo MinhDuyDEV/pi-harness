@@ -25,6 +25,7 @@ pnpm-debug.log*
 !.env.example
 
 # Pi local caches / generated dirs
+.pi/harness-runs/
 .pi/git/
 .pi/npm/
 .pi/extensions/node_modules/
