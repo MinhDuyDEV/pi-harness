@@ -12,12 +12,71 @@ and optional QA. Even for single-file tasks.
 _existing_ code. Never for new code.
 
 ```
-User says "create X"    → harness
-User says "build X"     → harness
-User says "make X"      → harness
+User says "create X"    → harness (just the prompt, defaults handle the rest)
+User says "build X"     → harness (just the prompt, defaults handle the rest)
+User says "make X"      → harness (just the prompt, defaults handle the rest)
 User says "fix X"       → direct tools (edit/write)
 User says "update X"    → direct tools (edit/write)
+
+## How to Call `harness` — Actively Choose Parameters
+
+For every task, actively analyze and decide each parameter. Do not blindly use defaults.
+
+### Required Pre-Call Analysis
+
+Before calling `harness`, output a structured analysis block so the user sees your reasoning:
+
 ```
+[Harness Analysis]
+  Task: one-line summary
+  Complexity: trivial | simple | medium | complex | critical
+  Pattern: producer-reviewer | pipeline
+  Reasoning:
+    - Files involved: ~N
+    - Business logic: yes/no
+    - Edge cases: yes/no
+    - Data persistence: yes/no
+    - UI/CLI: yes/no
+    - Risk if broken: low/medium/high
+  Iterations: N
+```
+
+### Pattern Decision
+
+```
+Ask yourself: Does this task need automated verification?
+
+YES → producer-reviewer (generator → evaluator loop)
+      Use for: apps with business logic, data processing, UI, anything where bugs matter
+
+NO  → pipeline (generate only, no evaluation)
+      Use for: trivial scripts, one-off tools, prototypes, well-known boilerplate
+```
+
+### Iterations Decision
+
+```
+Ask yourself: How complex is each sprint?
+
+1 iteration  → Trivial: single file, simple logic, no edge cases
+2 iterations → Medium: a few files, some logic, basic edge cases
+3 iterations → Standard: multiple files, business logic, several edge cases
+4-5          → Complex: critical correctness needed, security, data integrity
+```
+
+### Examples of Active Decisions
+
+| Task | Analysis → Decision |
+|------|-------------------|
+| "create a calculator" | Trivial, well-known → pipeline, 1 iteration |
+| "build a todo app" | Has CRUD, persistence, CLI → producer-reviewer, 2 iterations |
+| "make a retro game maker" | Complex UI, multiple subsystems → producer-reviewer, 5 iterations |
+| "write a hello world script" | Trivial → pipeline, 1 iteration |
+| "build a payment system" | Critical correctness, security → producer-reviewer, 5 iterations |
+| "create a markdown converter" | Known pattern, parsing edge cases → producer-reviewer, 3 iterations |
+
+**Rule:** Actively think about what you're building, how complex it is, and what could break.
+Set iterations based on that analysis, not on a default number.
 
 ## Layer 0: Build Harness (product-level)
 

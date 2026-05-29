@@ -7,14 +7,14 @@
  * Users customize agents by editing markdown files, not TypeScript.
  *
  * Default agent mapping:
- *   planner   → .pi/agents/planner.md   (read-only, architecture)
- *   generator → .pi/agents/worker.md    (full tools, implementation)
- *   evaluator → .pi/agents/reviewer.md  (read-only, QA)
+ *   planner   → .pi/agents/harness-planner.md  (strict sprint manifest)
+ *   generator → .pi/agents/harness-worker.md   (single-sprint implementation)
+ *   evaluator → .pi/agents/harness-reviewer.md (strict JSON QA)
  *
  * Each sprint iterates generator↔evaluator up to N times (default 3).
  */
 
-import type { ExtensionAPI, ResourceLoader, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ResourceLoader, ExtensionContext, ThemeColor } from "@earendil-works/pi-coding-agent";
 import {
 	createAgentSession,
 	createExtensionRuntime,
@@ -24,10 +24,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { Model, TextContent, Api, ThinkingLevel } from "@earendil-works/pi-ai";
-import { Text } from "@earendil-works/pi-tui";
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "node:fs";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { readFileSync, existsSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
+import { execSync } from "node:child_process";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -249,10 +250,11 @@ function createMinimalLoader(systemPrompt: string): ResourceLoader {
 }
 
 function parseSprints(text: string): Sprint[] {
+	const normalizedText = text.replace(/\r\n/g, "\n");
 	const sprints: Sprint[] = [];
 	const sprintRegex = /## Sprint (\d+):\s*(.+?)\n([\s\S]*?)(?=\n## Sprint |\n*$)/g;
 	let match: RegExpExecArray | null;
-	while ((match = sprintRegex.exec(text)) !== null) {
+	while ((match = sprintRegex.exec(normalizedText)) !== null) {
 		const num = Number.parseInt(match[1], 10);
 		const title = match[2].trim();
 		const body = match[3].trim();
@@ -264,14 +266,14 @@ function parseSprints(text: string): Sprint[] {
 	}
 
 	// Fallback: if no ## Sprint sections found, treat entire output as one sprint
-	if (sprints.length === 0 && text.trim()) {
-		const lines = text.trim().split("\n");
+	if (sprints.length === 0 && normalizedText.trim()) {
+		const lines = normalizedText.trim().split("\n");
 		const firstLine = lines[0].replace(/^#+\s*/, "").slice(0, 80);
 		sprints.push({
 			number: 1,
 			title: firstLine || "Implementation",
-			description: text.trim(),
-			criteria: text.trim(),
+			description: normalizedText.trim(),
+			criteria: normalizedText.trim(),
 			files: "",
 		});
 	}
@@ -343,24 +345,92 @@ function loadAgentFile(name: string, projectDir: string): AgentConfig | null {
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const SPINNER_INTERVAL_MS = 80;
 
+type HarnessPhase = "initializing" | "planning" | "generating" | "evaluating" | "fixing" | "complete" | "failed" | "";
+type AgentRole = "planner" | "generator" | "evaluator";
+
+type ActiveTool = {
+	id: string;
+	name: string;
+	label: string;
+	startedAt: number;
+};
+
 interface WidgetState {
-	phase: string;
+	phase: HarnessPhase;
 	sprint: number;
 	total: number;
 	agentName: string;
-	toolActivity: string;
+	agentRole: AgentRole | "";
+	agentModel: string;
+	agentThinking: string;
+	activeTools: ActiveTool[];
 	turnCount: number;
+	inputTokens: number;
+	outputTokens: number;
+	totalCost: number;
 	sprintTitle: string;
 	pattern: string;
 	iteration: number;
+	maxIterations: number;
+	passedSprints: number;
+	failedSprints: number;
 }
 
 /** Minimal theme type matching pi-tui's Theme (types not exported directly). */
-type WidgetTheme = { fg: (color: string, text: string) => string; bold?: (text: string) => string };
+type WidgetTheme = { fg: (color: ThemeColor, text: string) => string; bold?: (text: string) => string };
+
+function fitCell(text: string, width: number): string {
+	const clipped = visibleWidth(text) > width ? truncateToWidth(text, width, "…") : text;
+	return clipped + " ".repeat(Math.max(0, width - visibleWidth(clipped)));
+}
+
+function borderSegment(label: string, width: number): string {
+	const clipped = visibleWidth(label) > width ? truncateToWidth(label, width, "") : label;
+	return clipped + "─".repeat(Math.max(0, width - visibleWidth(clipped)));
+}
+
+function formatElapsed(ms: number): string {
+	const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	return minutes > 0 ? `${minutes}m${seconds.toString().padStart(2, "0")}s` : `${seconds}s`;
+}
+
+function formatTokens(count: number): string {
+	if (count <= 0) return "0";
+	if (count < 1000) return String(count);
+	if (count < 1000000) return `${(count / 1000).toFixed(count < 10000 ? 1 : 0)}k`;
+	return `${(count / 1000000).toFixed(1)}M`;
+}
+
+function formatCost(cost: number): string {
+	return cost > 0 ? `$${cost.toFixed(4)}` : "$0";
+}
+
+function modelLabel(model: Model<Api>): string {
+	return `${model.provider}/${model.id}`;
+}
+
+function sessionUsage(session: AgentSession): Pick<WidgetState, "turnCount" | "inputTokens" | "outputTokens" | "totalCost"> {
+	let inputTokens = 0;
+	let outputTokens = 0;
+	let totalCost = 0;
+	let turnCount = 0;
+	for (const message of session.messages as any[]) {
+		if (message.role === "assistant") turnCount++;
+		if (message.usage) {
+			inputTokens += message.usage.input || 0;
+			outputTokens += message.usage.output || 0;
+			totalCost += message.usage.cost?.total || 0;
+		}
+	}
+	return { turnCount, inputTokens, outputTokens, totalCost };
+}
 
 /**
  * Manages a live TUI widget showing harness progress.
- * Pattern: similar to pi-subagents' AgentWidget but adapted for sequential harness phases.
+ * The widget exposes only state the harness actually knows: workflow phase,
+ * active agent metadata, sprint/review progress, active tools, and elapsed time.
  */
 class HarnessWidget {
 	private ctx: ExtensionContext;
@@ -368,6 +438,9 @@ class HarnessWidget {
 	private spinnerIdx = 0;
 	private intervalId: ReturnType<typeof setInterval> | null = null;
 	private registered = false;
+	private startedAt = Date.now();
+	private phaseStartedAt = Date.now();
+	private sprintStartedAt = Date.now();
 
 	constructor(ctx: ExtensionContext) {
 		this.ctx = ctx;
@@ -376,93 +449,216 @@ class HarnessWidget {
 			sprint: 0,
 			total: 0,
 			agentName: "",
-			toolActivity: "",
+			agentRole: "",
+			agentModel: "",
+			agentThinking: "",
+			activeTools: [],
 			turnCount: 0,
+			inputTokens: 0,
+			outputTokens: 0,
+			totalCost: 0,
 			sprintTitle: "",
 			pattern: "",
 			iteration: 0,
+			maxIterations: 3,
+			passedSprints: 0,
+			failedSprints: 0,
 		};
 	}
 
 	update(partial: Partial<WidgetState>) {
+		if (partial.phase && partial.phase !== this.state.phase) {
+			this.phaseStartedAt = Date.now();
+		}
+		if (partial.sprint && partial.sprint !== this.state.sprint) {
+			this.sprintStartedAt = Date.now();
+		}
 		Object.assign(this.state, partial);
 		this.render();
+	}
+
+	private isRunning(): boolean {
+		return ["planning", "generating", "evaluating", "fixing"].includes(this.state.phase);
+	}
+
+	private c(theme: WidgetTheme, color: ThemeColor, text: string): string {
+		return theme.fg(color, text);
+	}
+
+	private b(theme: WidgetTheme, text: string): string {
+		return theme.bold ? theme.bold(text) : text;
+	}
+
+	private phaseLabel(): string {
+		switch (this.state.phase) {
+			case "planning":
+				return "Investigate & plan";
+			case "generating":
+				return "Implement sprint";
+			case "evaluating":
+				return "Evaluate criteria";
+			case "fixing":
+				return "Repair findings";
+			case "complete":
+				return "Workflow complete";
+			case "failed":
+				return "Workflow failed";
+			default:
+				return "Preparing workflow";
+		}
+	}
+
+	private phaseIcon(theme: WidgetTheme): string {
+		const spin = SPINNER_FRAMES[this.spinnerIdx % SPINNER_FRAMES.length];
+		if (this.isRunning()) return this.c(theme, "accent", spin);
+		if (this.state.phase === "complete") return this.c(theme, "success", "✓");
+		if (this.state.phase === "failed") return this.c(theme, "error", "×");
+		return this.c(theme, "muted", "•");
+	}
+
+	private sprintProgressBar(theme: WidgetTheme, width: number): string {
+		const s = this.state;
+		if (s.total <= 0 || width < 8) return "";
+		const done = Math.min(s.total, s.passedSprints + s.failedSprints);
+		const barWidth = Math.max(4, Math.min(width - 8, 18));
+		const filled = Math.min(barWidth, Math.floor((done / s.total) * barWidth));
+		const failed = s.failedSprints > 0;
+		const active = done < s.total && s.sprint > 0;
+		const fill = "━".repeat(filled);
+		const cursor = active && filled < barWidth ? "▶" : "";
+		const rest = "·".repeat(Math.max(0, barWidth - filled - cursor.length));
+		const color: ThemeColor = failed ? "error" : done === s.total ? "success" : "accent";
+		return `${this.c(theme, color, fill + cursor)}${this.c(theme, "dim", rest)} ${done}/${s.total}`;
+	}
+
+	private phaseRow(theme: WidgetTheme, phase: "plan" | "build" | "review" | "finish", label: string, progress: string): string {
+		const s = this.state;
+		const active =
+			(phase === "plan" && s.phase === "planning") ||
+			(phase === "build" && s.phase === "generating") ||
+			(phase === "review" && (s.phase === "evaluating" || s.phase === "fixing")) ||
+			(phase === "finish" && (s.phase === "complete" || s.phase === "failed"));
+		const done =
+			(phase === "plan" && s.total > 0 && s.phase !== "planning" && s.phase !== "initializing") ||
+			(phase === "build" && s.passedSprints + s.failedSprints >= s.total && s.total > 0) ||
+			(phase === "review" && ((s.pattern === "pipeline" && s.total > 0 && s.phase !== "planning" && s.phase !== "initializing") || s.phase === "complete")) ||
+			(phase === "finish" && s.phase === "complete");
+		const failed = (phase === "finish" && s.phase === "failed") || (phase === "build" && s.failedSprints > 0);
+		const prefix = active
+			? `${this.c(theme, "accent", "›")} ${this.phaseIcon(theme)}`
+			: failed
+				? `  ${this.c(theme, "error", "×")}`
+				: done
+					? `  ${this.c(theme, "success", "✓")}`
+					: `  ${this.c(theme, "dim", "·")}`;
+		const textColor: ThemeColor = active ? "accent" : failed ? "error" : done ? "success" : "muted";
+		return `${prefix} ${this.c(theme, textColor, label)} ${this.c(theme, "dim", progress)}`;
+	}
+
+	private activeToolLine(theme: WidgetTheme): string {
+		const tools = this.state.activeTools;
+		if (tools.length === 0) return this.isRunning() ? "waiting for agent" : "idle";
+		return tools
+			.map((tool) => `${tool.label} ${this.c(theme, "dim", formatElapsed(Date.now() - tool.startedAt))}`)
+			.join(", ");
+	}
+
+	private agentLine(theme: WidgetTheme): string {
+		const s = this.state;
+		const parts = [s.agentName || "—"];
+		if (s.agentRole) parts.push(s.agentRole);
+		if (s.agentModel) parts.push(s.agentModel);
+		if (s.agentThinking) parts.push(`think:${s.agentThinking}`);
+		return `${this.c(theme, "muted", "agent")} ${parts.join(" · ")}`;
+	}
+
+	private metricsLine(theme: WidgetTheme): string {
+		const s = this.state;
+		return [
+			`${this.c(theme, "muted", "↻")} ${s.turnCount}`,
+			`${this.c(theme, "muted", "↑")} ${formatTokens(s.inputTokens)}`,
+			`${this.c(theme, "muted", "↓")} ${formatTokens(s.outputTokens)}`,
+			`${this.c(theme, "muted", "¤")} ${formatCost(s.totalCost)}`,
+		].join(" · ");
+	}
+
+	private buildExpandedLines(width: number, theme: WidgetTheme): string[] {
+		const totalWidth = Math.max(80, width);
+		const contentWidth = totalWidth - 7;
+		const leftWidth = Math.min(34, Math.max(28, Math.floor(contentWidth * 0.34)));
+		const rightWidth = contentWidth - leftWidth;
+		const s = this.state;
+		const pattern = s.pattern || "producer-reviewer";
+		const progress = this.sprintProgressBar(theme, 26);
+		const title = ` Harness · ${pattern} · ${progress || "planning"} · ${formatElapsed(Date.now() - this.startedAt)} `;
+		const top = `${this.c(theme, "border", "╭")}${this.c(theme, "borderAccent", borderSegment(" Workflow ", leftWidth + 2))}${this.c(theme, "border", "┬")}${this.c(theme, "borderAccent", borderSegment(title, rightWidth + 2))}${this.c(theme, "border", "╮")}`;
+		const bottom = `${this.c(theme, "border", "╰")}${this.c(theme, "border", "─".repeat(leftWidth + 2))}${this.c(theme, "border", "┴")}${this.c(theme, "border", "─".repeat(rightWidth + 2))}${this.c(theme, "border", "╯")}`;
+		const buildDone = Math.min(s.total, s.passedSprints + s.failedSprints);
+		const reviewProgress = pattern === "pipeline" ? "skipped" : s.iteration > 0 ? `${s.iteration}/${s.maxIterations}` : `0/${s.maxIterations}`;
+		const phaseRows = [
+			this.phaseRow(theme, "plan", "Investigate & plan", s.total > 0 ? "done" : "0/1"),
+			this.phaseRow(theme, "build", "Implement sprints", s.total > 0 ? `${buildDone}/${s.total}` : "0/0"),
+			this.phaseRow(theme, "review", pattern === "pipeline" ? "Pipeline" : "Review & repair", reviewProgress),
+			this.phaseRow(theme, "finish", "Finish", s.phase === "complete" ? "done" : s.phase === "failed" ? "failed" : "pending"),
+		];
+		const rightRows = [
+			`${this.phaseIcon(theme)} ${this.c(theme, s.phase === "failed" ? "error" : "accent", this.b(theme, this.phaseLabel()))}`,
+			this.agentLine(theme),
+		];
+		if (s.total > 0) rightRows.push(`${this.c(theme, "muted", "sprint")} ${s.sprint || 0}/${s.total}${s.sprintTitle ? ` · ${s.sprintTitle}` : ""}`);
+		if (pattern !== "pipeline" && s.iteration > 0) rightRows.push(`${this.c(theme, "muted", "iteration")} ${s.iteration}/${s.maxIterations}`);
+		rightRows.push(`${this.c(theme, "muted", "tools")} ${this.activeToolLine(theme)}`);
+		rightRows.push(`${this.metricsLine(theme)} · ${this.c(theme, "muted", "phase")} ${formatElapsed(Date.now() - this.phaseStartedAt)} · ${this.c(theme, "muted", "sprint")} ${formatElapsed(Date.now() - this.sprintStartedAt)}`);
+		const rowCount = Math.max(phaseRows.length, rightRows.length);
+		const rows: string[] = [];
+		for (let i = 0; i < rowCount; i++) {
+			rows.push(`${this.c(theme, "border", "│")} ${fitCell(phaseRows[i] ?? "", leftWidth)} ${this.c(theme, "border", "│")} ${fitCell(rightRows[i] ?? "", rightWidth)} ${this.c(theme, "border", "│")}`);
+		}
+		return [top, ...rows, bottom];
+	}
+
+	private buildNormalLines(width: number, theme: WidgetTheme): string[] {
+		const s = this.state;
+		const pattern = s.pattern || "producer-reviewer";
+		const progress = this.sprintProgressBar(theme, 18);
+		const header = `${this.phaseIcon(theme)} ${this.b(theme, "Harness")} · ${pattern}${progress ? ` · ${progress}` : ""}`;
+		const rows = [
+			header,
+			`  ${this.c(theme, "accent", this.phaseLabel())} · ${this.agentLine(theme)}`,
+		];
+		if (s.sprintTitle) rows.push(`  ${this.c(theme, "muted", "sprint")} ${s.sprint}/${s.total} · ${s.sprintTitle}`);
+		rows.push(`  ${this.c(theme, "muted", "tools")} ${this.activeToolLine(theme)}`);
+		rows.push(`  ${this.metricsLine(theme)}`);
+		return rows.map((line) => truncateToWidth(line, width, "…"));
+	}
+
+	private buildCompactLines(width: number, theme: WidgetTheme): string[] {
+		const s = this.state;
+		const sprint = s.total > 0 ? ` ${s.sprint || 0}/${s.total}` : "";
+		const agent = s.agentName ? ` · ${s.agentName}` : "";
+		const metrics = ` · ↻${s.turnCount} ↑${formatTokens(s.inputTokens)} ↓${formatTokens(s.outputTokens)} $${formatCost(s.totalCost).slice(1)}`;
+		return [truncateToWidth(`${this.phaseIcon(theme)} harness${sprint} · ${this.phaseLabel()}${agent}${metrics}`, width, "…")];
+	}
+
+	private buildLines(width: number, theme: WidgetTheme): string[] {
+		if (width >= 80) return this.buildExpandedLines(width, theme);
+		if (width >= 60) return this.buildNormalLines(width, theme);
+		return this.buildCompactLines(width, theme);
 	}
 
 	private render() {
 		if (!this.ctx?.ui) return;
 		const s = this.state;
 		const spin = SPINNER_FRAMES[this.spinnerIdx % SPINNER_FRAMES.length];
-
-		const isRunning =
-			s.phase === "planning" ||
-			s.phase === "generating" ||
-			s.phase === "evaluating" ||
-			s.phase === "fixing";
-		const pattern = s.pattern || "producer-reviewer";
-
-		const lines: string[] = [];
-
-		// Header: spinner when running, static char otherwise
-		const icon = isRunning
-			? spin
-			: s.phase === "complete"
-				? "[✓]"
-				: s.phase === "failed"
-					? "[x]"
-					: "[*]";
-		lines.push(`${icon} Harness — ${pattern}`);
-
-		// Sprint progress
-		if (s.total > 0) {
-			const label =
-				s.sprint > 0
-					? `Sprint ${s.sprint}/${s.total}`
-					: `${s.total} sprints planned`;
-			const title = s.sprintTitle ? `: ${s.sprintTitle}` : "";
-			lines.push(`  ${label}${title}`);
-		}
-
-		// Determine if this is the last line (use └ instead of ├)
-		const isLastPhase =
-			s.phase === "complete" || s.phase === "failed" ||
-			(s.phase !== "planning" && s.sprint >= s.total && !s.toolActivity);
-		const branch = isLastPhase ? "  └" : "  ├";
-
-		// Phase with agent
-		if (s.phase === "planning") {
-			const agent = s.agentName ? ` (${s.agentName})` : "";
-			lines.push(`${branch} Planning${agent}`);
-		} else if (s.phase === "generating") {
-			const agent = s.agentName ? ` (${s.agentName})` : "";
-			lines.push(`${branch} Generating${agent}`);
-			if (s.toolActivity) lines.push(`  │  ${s.toolActivity}`);
-			if (s.turnCount > 0) lines.push(`  │  ${s.turnCount} tool use(s)`);
-		} else if (s.phase === "evaluating") {
-			const agent = s.agentName ? ` (${s.agentName})` : "";
-			lines.push(`${branch} Evaluating${agent} — iteration ${s.iteration}`);
-			if (s.toolActivity) lines.push(`  │  ${s.toolActivity}`);
-		} else if (s.phase === "fixing") {
-			const agent = s.agentName ? ` (${s.agentName})` : "";
-			lines.push(`${branch} Fixing${agent} — iteration ${s.iteration}`);
-			if (s.toolActivity) lines.push(`  │  ${s.toolActivity}`);
-		} else if (s.phase === "complete") {
-			lines.push(`  └ [done] Build complete`);
-		} else if (s.phase === "failed") {
-			lines.push(`  └ [abort] Build failed`);
-		}
-
-		// Footer status
-		if (isRunning) {
-			this.ctx.ui.setStatus(
-				"harness",
-				`${s.phase} — sprint ${s.sprint}/${s.total}`,
-			);
+		if (this.isRunning()) {
+			this.ctx.ui.setStatus("harness", `${spin} harness ${s.phase} · sprint ${s.sprint || 0}/${s.total || 0}`);
 		} else {
 			this.ctx.ui.setStatus("harness", undefined);
 		}
-
-		this.ctx.ui.setWidget("harness", lines);
+		this.ctx.ui.setWidget("harness", (_tui, theme) => ({
+			render: (width: number) => this.buildLines(width, theme),
+			invalidate: () => {},
+		}));
 		this.registered = true;
 	}
 
@@ -491,25 +687,31 @@ class HarnessWidget {
 	}
 
 	/** Create an activity-tracking subscription for an agent session. */
-	trackSession(session: AgentSession, agentName: string) {
-		const activeTools = new Map<string, string>();
+	trackSession(session: AgentSession, agentName: string, meta: { role: AgentRole; model: string; thinking?: string }) {
+		const activeTools = new Map<string, ActiveTool>();
 		let turnCount = 0;
+		const usage = () => {
+			const current = sessionUsage(session);
+			return { ...current, turnCount: Math.max(turnCount, current.turnCount) };
+		};
 
 		return session.subscribe((event: AgentSessionEvent) => {
 			if (event.type === "tool_execution_start") {
-				activeTools.set(event.toolCallId, event.toolName);
-				// Build human-readable activity
-				const names = [...new Set(activeTools.values())];
-				const desc = names.map((t) => shortToolName(t)).join(", ");
-				this.update({ toolActivity: desc, agentName, turnCount });
+				activeTools.set(event.toolCallId, {
+					id: event.toolCallId,
+					name: event.toolName,
+					label: shortToolName(event.toolName),
+					startedAt: Date.now(),
+				});
+				this.update({ activeTools: [...activeTools.values()], agentName, agentRole: meta.role, agentModel: meta.model, agentThinking: meta.thinking ?? "", ...usage() });
 			} else if (event.type === "tool_execution_end") {
 				activeTools.delete(event.toolCallId);
-				const names = [...new Set(activeTools.values())];
-				const desc = names.length > 0 ? names.map((t) => shortToolName(t)).join(", ") : "";
-				this.update({ toolActivity: desc, agentName, turnCount });
+				this.update({ activeTools: [...activeTools.values()], agentName, agentRole: meta.role, agentModel: meta.model, agentThinking: meta.thinking ?? "", ...usage() });
 			} else if (event.type === "turn_end") {
 				turnCount++;
-				this.update({ turnCount });
+				this.update(usage());
+			} else if (event.type === "agent_end") {
+				this.update({ activeTools: [], ...usage() });
 			}
 		});
 	}
@@ -528,57 +730,54 @@ function shortToolName(tool: string): string {
 	return map[tool] ?? tool;
 }
 
-// ─── Git Helpers ───────────────────────────────────────────────────────────────
+// ─── Safe Workspace Helpers ───────────────────────────────────────────────────
 
-/** Create a git checkpoint before a sprint. Returns the commit hash to revert to. */
-async function gitCheckpoint(cwd: string): Promise<string | null> {
+function resolveProjectRoot(cwd: string): string {
 	try {
-		const { execSync } = await import("node:child_process");
-		// Record HEAD before sprint
-		const head = execSync("git rev-parse HEAD", { cwd }).toString().trim();
-		// Stage all changes and create lightweight commit
-		execSync("git add -A", { cwd });
-		const status = execSync("git status --porcelain", { cwd }).toString().trim();
-		if (status) {
-			execSync('git commit -m "harness: checkpoint" --allow-empty --no-verify', { cwd });
-		}
-		return head;
+		return execSync("git rev-parse --show-toplevel", { cwd }).toString().trim();
 	} catch {
-		return null; // Not a git repo or git unavailable — no-op
+		return cwd;
 	}
 }
 
-/** Revert to checkpoint on evaluation failure. */
-async function gitRevert(cwd: string, checkpointHash: string): Promise<boolean> {
+type HarnessWorkspace = {
+	cwd: string;
+	isolated: boolean;
+	worktreePath?: string;
+	warning?: string;
+};
+
+/**
+ * Create an isolated detached git worktree for harness writes.
+ * Falls back to the current cwd only when git worktree creation is unavailable.
+ * This deliberately never stages, commits, resets, or bypasses hooks.
+ */
+async function createHarnessWorkspace(cwd: string, prompt: string): Promise<HarnessWorkspace> {
 	try {
-		const { execSync } = await import("node:child_process");
-		execSync(`git reset --hard ${checkpointHash}`, { cwd });
-		return true;
-	} catch {
-		return false;
+		const root = resolveProjectRoot(cwd);
+		const project = root.split(/[\\/]/).pop() || "project";
+		const slug = prompt
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-|-$/g, "")
+			.slice(0, 24) || "run";
+		const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+		const worktreePath = join(homedir(), ".pi", "worktrees", project, `harness-${stamp}-${slug}`);
+		mkdirSync(join(homedir(), ".pi", "worktrees", project), { recursive: true });
+		execSync(`git worktree add --detach ${JSON.stringify(worktreePath)} HEAD`, { cwd: root });
+		return { cwd: worktreePath, isolated: true, worktreePath };
+	} catch (err) {
+		return {
+			cwd,
+			isolated: false,
+			warning: `Could not create isolated git worktree; using current cwd without automatic git rollback. ${(err as Error).message}`,
+		};
 	}
 }
 
-/** Commit after a passing sprint. */
-async function gitCommitSprint(cwd: string, sprintNum: number, title: string): Promise<boolean> {
-	try {
-		const { execSync } = await import("node:child_process");
-		execSync("git add -A", { cwd });
-		execSync(
-			`git commit -m "harness: sprint ${sprintNum} - ${title}" --allow-empty --no-verify`,
-			{ cwd },
-		);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-/** Write or append to PROGRESS.md. */
-function writeProgress(cwd: string, sprintNum: number, title: string, passed: boolean, detail: string) {
-	const { appendFileSync, existsSync, writeFileSync, readFileSync } = require("node:fs");
-	const { join } = require("node:path");
-	const progressPath = join(cwd, "PROGRESS.md");
+/** Write or append to harness-run-local progress artifacts. */
+function writeProgress(runDir: string, sprintNum: number, title: string, passed: boolean, detail: string) {
+	const progressPath = join(runDir, "PROGRESS.md");
 	const line = [
 		`## Sprint ${sprintNum}: ${title}`,
 		`**Status**: ${passed ? "[✓] PASS" : "[x] FAIL"}`,
@@ -592,43 +791,15 @@ function writeProgress(cwd: string, sprintNum: number, title: string, passed: bo
 		appendFileSync(progressPath, line);
 	}
 
-	// Also write sprint-state.json per sprint (from template)
-	const sprintStatePath = join(cwd, `.pi`, `sprint-${sprintNum}-state.json`);
-	const templatePath = join(cwd, ".pi", "templates", "sprint-state.json");
-	let stateJson: any;
-	if (existsSync(templatePath)) {
-		try {
-			stateJson = JSON.parse(readFileSync(templatePath, "utf-8"));
-		} catch {
-			stateJson = null;
-		}
-	}
-	if (!stateJson) {
-		stateJson = {
-			id: `sprint-${sprintNum}`,
-			title,
-			currentPhase: "build",
-			phases: { build: { status: passed ? "completed" : "failed" } },
-			gates: { "review-passed": passed },
-		};
-	} else {
-		stateJson.id = `sprint-${sprintNum}`;
-		stateJson.title = title;
-		stateJson.metrics.completedAt = new Date().toISOString();
-		stateJson.phases.think.status = "completed";
-		stateJson.phases.plan.status = "completed";
-		stateJson.phases.build.status = "completed";
-		stateJson.phases.build.completedAt = new Date().toISOString();
-		if (passed) {
-			stateJson.phases.review.status = "completed";
-			stateJson.phases.qa.status = "completed";
-			stateJson.gates["review-passed"] = true;
-			stateJson.gates["qa-passed"] = true;
-		} else {
-			stateJson.phases.review.status = "failed";
-			stateJson.phases.qa.status = "failed";
-		}
-	}
+	const sprintStatePath = join(runDir, `sprint-${sprintNum}-state.json`);
+	const stateJson = {
+		id: `sprint-${sprintNum}`,
+		title,
+		status: passed ? "passed" : "failed",
+		detail: detail.slice(0, 1000),
+		completedAt: new Date().toISOString(),
+		gates: { "review-passed": passed },
+	};
 	writeFileSync(sprintStatePath, JSON.stringify(stateJson, null, 2), "utf-8");
 }
 
@@ -644,9 +815,6 @@ function generateWorkflowScript(
 	results: SprintResult[],
 ) {
 	try {
-		const { writeFileSync, mkdirSync, readFileSync, existsSync } = require("node:fs");
-		const { join } = require("node:path");
-
 		// Generate a slug from the prompt
 		const slug = prompt
 			.toLowerCase()
@@ -661,7 +829,7 @@ function generateWorkflowScript(
 
 		// Write workflow script
 		const script = `// Generated by Harness — re-run with: node .pi/workflows/${slug}.mjs
-// Original prompt: ${prompt.replace(/"/g, '\\"')}
+// Original prompt: ${JSON.stringify(prompt)}
 
 import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
 import { getModel } from "@earendil-works/pi-ai";
@@ -722,26 +890,56 @@ run().catch(console.error);
 	}
 }
 
-/** Parse structured JSON evaluation output. */
-function parseEvalOutput(text: string): { verdict: string; criteria: Array<{ passes: boolean; evidence: string }>; summary: string } {
-	// Try to extract JSON from the text
-	const jsonMatch = text.match(/\{[\s\S]*"verdict"[\s\S]*\}/);
-	if (jsonMatch) {
-		try {
-			const parsed = JSON.parse(jsonMatch[0]);
-			return {
-				verdict: parsed.verdict || "FAIL",
-				criteria: parsed.criteria || [],
-				summary: parsed.summary || "",
-			};
-		} catch {
-			// fall through
+function extractJsonObjects(text: string): string[] {
+	const objects: string[] = [];
+	let start = -1;
+	let depth = 0;
+	let inString = false;
+	let escaped = false;
+	for (let i = 0; i < text.length; i++) {
+		const char = text[i];
+		if (inString) {
+			if (escaped) escaped = false;
+			else if (char === "\\") escaped = true;
+			else if (char === '"') inString = false;
+			continue;
+		}
+		if (char === '"') {
+			inString = true;
+			continue;
+		}
+		if (char === "{") {
+			if (depth === 0) start = i;
+			depth++;
+		} else if (char === "}" && depth > 0) {
+			depth--;
+			if (depth === 0 && start >= 0) {
+				objects.push(text.slice(start, i + 1));
+				start = -1;
+			}
 		}
 	}
-	// Fallback: text-based detection
+	return objects;
+}
+
+/** Parse structured JSON evaluation output. Default-FAIL on malformed output. */
+function parseEvalOutput(text: string): { verdict: string; criteria: Array<{ passes: boolean; evidence: string }>; summary: string } {
+	for (const candidate of extractJsonObjects(text)) {
+		if (!candidate.includes("verdict")) continue;
+		try {
+			const parsed = JSON.parse(candidate);
+			return {
+				verdict: parsed.verdict === "PASS" ? "PASS" : "FAIL",
+				criteria: Array.isArray(parsed.criteria) ? parsed.criteria : [],
+				summary: typeof parsed.summary === "string" ? parsed.summary : "",
+			};
+		} catch {
+			// Try the next balanced object.
+		}
+	}
 	return {
-		verdict: text.includes("PASS") && !text.includes("FAIL") ? "PASS" : "FAIL",
-		criteria: [{ passes: !text.includes("FAIL"), evidence: text.slice(0, 200) }],
+		verdict: "FAIL",
+		criteria: [{ passes: false, evidence: `Evaluator did not return valid harness JSON. Output: ${text.slice(0, 200)}` }],
 		summary: text.slice(0, 100),
 	};
 }
@@ -845,6 +1043,11 @@ class HarnessTracker {
 		this.write("build-report.md", report);
 	}
 
+	/** Write harness workspace/isolation metadata. */
+	saveWorkspace(workspace: HarnessWorkspace) {
+		this.writeJSON("workspace.json", workspace);
+	}
+
 	/** Write timing summary. */
 	saveTiming() {
 		const elapsed = ((Date.now() - this.startedAt) / 1000).toFixed(1);
@@ -893,20 +1096,20 @@ export default function (pi: ExtensionAPI) {
 			),
 			plannerAgent: Type.Optional(
 				Type.String({
-					description: "Agent name for planner (from .pi/agents/{name}.md). Default: planner",
-					default: "planner",
+					description: "Agent name for planner (from .pi/agents/{name}.md). Default: harness-planner",
+					default: "harness-planner",
 				}),
 			),
 			generatorAgent: Type.Optional(
 				Type.String({
-					description: "Agent name for generator (from .pi/agents/{name}.md). Default: worker",
-					default: "worker",
+					description: "Agent name for generator (from .pi/agents/{name}.md). Default: harness-worker",
+					default: "harness-worker",
 				}),
 			),
 			evaluatorAgent: Type.Optional(
 				Type.String({
-					description: "Agent name for evaluator (from .pi/agents/{name}.md). Default: reviewer",
-					default: "reviewer",
+					description: "Agent name for evaluator (from .pi/agents/{name}.md). Default: harness-reviewer",
+					default: "harness-reviewer",
 				}),
 			),
 			plannerModel: Type.Optional(
@@ -926,39 +1129,63 @@ export default function (pi: ExtensionAPI) {
 			),
 			inheritContext: Type.Optional(
 				Type.Boolean({
-					description: "Inherit AGENTS.md and APPEND_SYSTEM.md rules into sub-agents",
-					default: true,
+					description: "Opt in to prepend AGENTS.md and APPEND_SYSTEM.md to sub-agent prompts. Default is false because agent files are standalone system prompts.",
+					default: false,
 				}),
 			),
 		}),
 
 		async execute(_toolCallId, params, _signal, onUpdate, ctx) {
 			const cwd = ctx.cwd;
+			const projectRoot = resolveProjectRoot(cwd);
 			const maxIterations = params.iterations ?? 3;
 			const pattern = params.pattern ?? "producer-reviewer";
-			const inheritContext = params.inheritContext ?? true;
+			const inheritContext = params.inheritContext ?? false;
 
 			// Widget for live progress
 			const widget = new HarnessWidget(ctx);
-			widget.update({ pattern });
+			widget.update({ pattern, maxIterations });
 
 			// Tracker for full run artifacts
-			const tracker = new HarnessTracker(cwd, params.prompt);
+			const tracker = new HarnessTracker(projectRoot, params.prompt);
+			const workspace = await createHarnessWorkspace(projectRoot, params.prompt);
+			const runCwd = workspace.cwd;
+			tracker.saveWorkspace(workspace);
+
+			if (workspace.warning) {
+				onUpdate?.({
+					content: [{ type: "text", text: `[warn] ${workspace.warning}` }],
+					details: { phase: "workspace", warning: workspace.warning },
+				});
+			}
 
 			// Load context files once
-			const contextFiles = inheritContext ? loadContextFiles(cwd) : { agents: "", append: "" };
+			const contextFiles = inheritContext ? loadContextFiles(projectRoot) : { agents: "", append: "" };
+
+			const warnings: string[] = [];
 
 			// --- Resolve models ---
 			function resolveModel(
 				spec: string | undefined,
 				fallback: Model<Api>,
+				label: string,
 			): Model<Api> {
 				if (!spec) return fallback;
 				const slashIdx = spec.indexOf("/");
-				if (slashIdx === -1 || !ctx.modelRegistry) return fallback;
+				if (slashIdx === -1) {
+					warnings.push(`${label} model "${spec}" is invalid; expected provider/model. Falling back to ${modelLabel(fallback)}.`);
+					return fallback;
+				}
+				if (!ctx.modelRegistry) {
+					warnings.push(`${label} model "${spec}" could not be resolved because modelRegistry is unavailable. Falling back to ${modelLabel(fallback)}.`);
+					return fallback;
+				}
 				const provider = spec.slice(0, slashIdx);
 				const modelId = spec.slice(slashIdx + 1);
 				const found = ctx.modelRegistry.find(provider, modelId);
+				if (!found) {
+					warnings.push(`${label} model "${spec}" was not found. Falling back to ${modelLabel(fallback)}.`);
+				}
 				return found ?? fallback;
 			}
 
@@ -972,13 +1199,16 @@ export default function (pi: ExtensionAPI) {
 			}
 
 			// --- Load agent definitions ---
-			function loadAgentDef(name: string, defaultPrompt: string, defaultTools: string[]): {
+			function loadAgentDef(name: string, defaultName: string, defaultPrompt: string, defaultTools: string[]): {
 				systemPrompt: string;
 				tools: string[];
 				model?: string;
 				thinking?: string;
 			} {
-				const file = loadAgentFile(name, cwd);
+				const file = loadAgentFile(name, projectRoot);
+				if (!file && name !== defaultName) {
+					warnings.push(`Agent "${name}" was not found; falling back to built-in ${defaultName} prompt.`);
+				}
 				const base = file
 					? file.systemPrompt
 					: defaultPrompt;
@@ -991,20 +1221,27 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
+			const plannerAgentName = params.plannerAgent ?? "harness-planner";
+			const generatorAgentName = params.generatorAgent ?? "harness-worker";
+			const evaluatorAgentName = params.evaluatorAgent ?? "harness-reviewer";
+
 			const plannerDef = loadAgentDef(
-				params.plannerAgent ?? "planner",
+				plannerAgentName,
+				"harness-planner",
 				DEFAULT_PLANNER_PROMPT,
 				DEFAULT_PLANNER_TOOLS,
 			);
-			// Prepend output format instructions for sprint parsing (overrides agent's own format)
-			plannerDef.systemPrompt = HARNESS_FORMAT_INSTRUCTIONS + "\n" + plannerDef.systemPrompt;
+			// Append harness format as the final output contract for this run.
+			plannerDef.systemPrompt = plannerDef.systemPrompt + "\n\n" + HARNESS_FORMAT_INSTRUCTIONS;
 			const generatorDef = loadAgentDef(
-				params.generatorAgent ?? "worker",
+				generatorAgentName,
+				"harness-worker",
 				DEFAULT_GENERATOR_PROMPT,
 				DEFAULT_GENERATOR_TOOLS,
 			);
 			const evaluatorDef = loadAgentDef(
-				params.evaluatorAgent ?? "reviewer",
+				evaluatorAgentName,
+				"harness-reviewer",
 				DEFAULT_EVALUATOR_PROMPT,
 				DEFAULT_EVALUATOR_TOOLS,
 			);
@@ -1015,15 +1252,31 @@ export default function (pi: ExtensionAPI) {
 			const resolvedPlannerModel = resolveModel(
 				params.plannerModel ?? plannerDef.model,
 				mainModel,
+				"planner",
 			);
 			const resolvedGeneratorModel = resolveModel(
 				params.generatorModel ?? generatorDef.model,
 				mainModel,
+				"generator",
 			);
 			const resolvedEvaluatorModel = resolveModel(
 				params.evaluatorModel ?? evaluatorDef.model,
 				mainModel,
+				"evaluator",
 			);
+
+			for (const warning of warnings) {
+				onUpdate?.({
+					content: [{ type: "text", text: `[warn] ${warning}` }],
+					details: { phase: "configuration", warning },
+				});
+			}
+
+			function throwIfAborted() {
+				if (_signal?.aborted) throw new Error("Harness run aborted");
+			}
+
+			_signal?.addEventListener("abort", () => widget.clear(), { once: true });
 
 			// --- Helper: create a sub-agent session ---
 			async function spawnAgent(opts: {
@@ -1032,17 +1285,21 @@ export default function (pi: ExtensionAPI) {
 				model: Model<Api>;
 				thinking?: string;
 				agentName: string;
+				role: AgentRole;
 			}): Promise<AgentSession> {
 				const { session } = await createAgentSession({
 					model: opts.model,
 					tools: opts.tools,
 					thinkingLevel: validateThinkingLevel(opts.thinking),
-					sessionManager: SessionManager.inMemory(cwd),
+					sessionManager: SessionManager.inMemory(runCwd),
 					resourceLoader: createMinimalLoader(opts.systemPrompt),
-					cwd,
+					cwd: runCwd,
 				});
-				// Track tool activity in the widget
-				widget.trackSession(session, opts.agentName);
+				widget.trackSession(session, opts.agentName, {
+					role: opts.role,
+					model: modelLabel(opts.model),
+					thinking: opts.thinking,
+				});
 				return session;
 			}
 
@@ -1051,23 +1308,36 @@ export default function (pi: ExtensionAPI) {
 				content: [
 					{
 						type: "text",
-						text: `[Start] Harness (${pattern}): Planning phase using "${params.plannerAgent ?? "planner"}" agent...`,
+						text: `[Start] Harness (${pattern}): Planning phase using "${plannerAgentName}" agent...`,
 					},
 				],
 				details: { phase: "planning" },
 			});
 
 			widget.startSpinner();
-			widget.update({ phase: "planning", agentName: params.plannerAgent ?? "planner" });
+			widget.update({
+				phase: "planning",
+				agentName: plannerAgentName,
+				agentRole: "planner",
+				agentModel: modelLabel(resolvedPlannerModel),
+				agentThinking: plannerDef.thinking ?? "",
+				activeTools: [],
+				turnCount: 0,
+				inputTokens: 0,
+				outputTokens: 0,
+				totalCost: 0,
+			});
 
-			tracker.startPhase("planning", params.plannerAgent ?? "planner");
+			tracker.startPhase("planning", plannerAgentName);
 			const planner = await spawnAgent({
 				systemPrompt: plannerDef.systemPrompt,
 				tools: plannerDef.tools,
 				model: resolvedPlannerModel,
 				thinking: plannerDef.thinking,
-				agentName: params.plannerAgent ?? "planner",
+				agentName: plannerAgentName,
+				role: "planner",
 			});
+			throwIfAborted();
 			await planner.prompt(params.prompt);
 			const specText = getLastAssistantText(planner);
 			tracker.saveSession("plan", "planner", planner, plannerDef.systemPrompt);
@@ -1102,63 +1372,42 @@ export default function (pi: ExtensionAPI) {
 				content: [
 					{
 						type: "text",
-						text: `[Spec] Spec created: ${sprints.length} sprints. Building with "${params.generatorAgent ?? "worker"}"...`,
+						text: `[Spec] Spec created: ${sprints.length} sprints. Building with "${generatorAgentName}"...`,
 					},
 				],
 				details: { phase: "building", sprint: 0, total: sprints.length, spec: specText },
 			});
 
 			// --- Phase 2: Build + Evaluate (per sprint) ---
-			const generator = await spawnAgent({
-				systemPrompt: generatorDef.systemPrompt,
-				tools: generatorDef.tools,
-				model: resolvedGeneratorModel,
-				thinking: generatorDef.thinking,
-				agentName: params.generatorAgent ?? "worker",
-			});
-			const evaluator = await spawnAgent({
-				systemPrompt: evaluatorDef.systemPrompt,
-				tools: evaluatorDef.tools,
-				model: resolvedEvaluatorModel,
-				thinking: evaluatorDef.thinking,
-				agentName: params.evaluatorAgent ?? "reviewer",
-			});
-
 			const results: SprintResult[] = [];
-
-			// Git checkpoint before first sprint (P1)
-			const checkpointHash = await gitCheckpoint(cwd);
+			let passedSprintCount = 0;
+			let failedSprintCount = 0;
 
 			for (let i = 0; i < sprints.length; i++) {
 				const sprint = sprints[i];
-				// --- Generate ---
 				widget.update({
 					phase: "generating",
 					sprint: i + 1,
 					total: sprints.length,
 					sprintTitle: sprint.title,
 					iteration: 0,
+					agentName: generatorAgentName,
+					agentRole: "generator",
+					agentModel: modelLabel(resolvedGeneratorModel),
+					agentThinking: generatorDef.thinking ?? "",
+					activeTools: [],
+					turnCount: 0,
+					inputTokens: 0,
+					outputTokens: 0,
+					totalCost: 0,
 				});
 
-				tracker.startPhase("generating", params.generatorAgent ?? "worker");
-
+				tracker.startPhase("generating", generatorAgentName);
 				onUpdate?.({
-					content: [
-						{
-							type: "text",
-							text: `[Build] Sprint ${i + 1}/${sprints.length}: ${sprint.title}`,
-						},
-					],
-					details: {
-						phase: "sprint",
-						sprint: i + 1,
-						total: sprints.length,
-						title: sprint.title,
-					},
+					content: [{ type: "text", text: `[Build] Sprint ${i + 1}/${sprints.length}: ${sprint.title}` }],
+					details: { phase: "sprint", sprint: i + 1, total: sprints.length, title: sprint.title },
 				});
 
-					tracker.startPhase("generating", params.generatorAgent ?? "worker");
-				tracker.startPhase("evaluating", params.evaluatorAgent ?? "reviewer");
 				const sprintTask = [
 					`Implement Sprint ${i + 1}: ${sprint.title}`,
 					"",
@@ -1169,19 +1418,23 @@ export default function (pi: ExtensionAPI) {
 				];
 				if (sprint.files) sprintTask.push("", `Files: ${sprint.files}`);
 
+				const generator = await spawnAgent({
+					systemPrompt: generatorDef.systemPrompt,
+					tools: generatorDef.tools,
+					model: resolvedGeneratorModel,
+					thinking: generatorDef.thinking,
+					agentName: generatorAgentName,
+					role: "generator",
+				});
+				throwIfAborted();
 				await generator.prompt(sprintTask.join("\n"));
-
-				// Save generator session for this sprint
-				tracker.saveSession(
-					`sprint-${i + 1}`,
-					"generator",
-					generator,
-					generatorDef.systemPrompt,
-				);
+				tracker.saveSession(`sprint-${i + 1}`, "generator", generator, generatorDef.systemPrompt);
+				generator.dispose();
 
 				if (pattern === "pipeline") {
-					// Pipeline mode: no iteration, just generate and move on
-					tracker.saveSession(`sprint-${i + 1}`, "generator", generator, generatorDef.systemPrompt);
+					passedSprintCount++;
+					widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
+					writeProgress(tracker.runDir, i + 1, sprint.title, true, "pipeline mode — no evaluation");
 					results.push({
 						sprint: sprint.title,
 						iterations: 1,
@@ -1191,7 +1444,6 @@ export default function (pi: ExtensionAPI) {
 					continue;
 				}
 
-				// --- Evaluate (producer-reviewer mode, iterate up to maxIterations) ---
 				let passed = false;
 				let evalText = "";
 				let iteration = 0;
@@ -1200,110 +1452,111 @@ export default function (pi: ExtensionAPI) {
 					widget.update({
 						phase: "evaluating",
 						iteration: iteration + 1,
-						agentName: params.evaluatorAgent ?? "reviewer",
+						agentName: evaluatorAgentName,
+						agentRole: "evaluator",
+						agentModel: modelLabel(resolvedEvaluatorModel),
+						agentThinking: evaluatorDef.thinking ?? "",
+						activeTools: [],
+						turnCount: 0,
+						inputTokens: 0,
+						outputTokens: 0,
+						totalCost: 0,
 					});
 
-					tracker.startPhase("evaluating", params.evaluatorAgent ?? "reviewer");
+					tracker.startPhase("evaluating", evaluatorAgentName);
+					const evaluator = await spawnAgent({
+						systemPrompt: evaluatorDef.systemPrompt,
+						tools: evaluatorDef.tools,
+						model: resolvedEvaluatorModel,
+						thinking: evaluatorDef.thinking,
+						agentName: evaluatorAgentName,
+						role: "evaluator",
+					});
+					throwIfAborted();
 					await evaluator.prompt(
-						[
-							`Test Sprint ${i + 1}: ${sprint.title}`,
-							"",
-							"Criteria:",
-							sprint.criteria,
-						].join("\n"),
+						[`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria].join("\n"),
 					);
 					evalText = getLastAssistantText(evaluator);
-
-					// Default-FAIL: parse structured JSON output (P0)
 					const evalResult = parseEvalOutput(evalText);
 					passed = evalResult.verdict === "PASS";
 					const failedCriteria = evalResult.criteria.filter((c) => !c.passes);
-
-					// Save evaluator session for this iteration
-					tracker.saveSession(
-						`sprint-${i + 1}`,
-						`evaluator-iter-${iteration + 1}`,
-						evaluator,
-						evaluatorDef.systemPrompt,
-					);
+					tracker.saveSession(`sprint-${i + 1}`, `evaluator-iter-${iteration + 1}`, evaluator, evaluatorDef.systemPrompt);
+					evaluator.dispose();
 
 					onUpdate?.({
-						content: [
-							{
-								type: "text",
-								text: `  ${passed ? "[✓]" : "[x]"} Sprint ${i + 1} evaluation (iter ${iteration + 1}): ${passed ? "PASS" : "FAIL"}`,
-							},
-						],
-						details: {
-							phase: "evaluation",
-							sprint: i + 1,
-							total: sprints.length,
-							iteration: iteration + 1,
-							passed,
-							evalOutput: evalText,
-						},
+						content: [{ type: "text", text: `  ${passed ? "[✓]" : "[x]"} Sprint ${i + 1} evaluation (iter ${iteration + 1}): ${passed ? "PASS" : "FAIL"}` }],
+						details: { phase: "evaluation", sprint: i + 1, total: sprints.length, iteration: iteration + 1, passed, evalOutput: evalText },
 					});
 
 					if (passed) {
-						// Git commit after passing sprint (P1)
-						await gitCommitSprint(cwd, i + 1, sprint.title);
-						writeProgress(cwd, i + 1, sprint.title, true, evalResult.summary || evalText.slice(0, 200));
+						writeProgress(tracker.runDir, i + 1, sprint.title, true, evalResult.summary || evalText.slice(0, 200));
+						passedSprintCount++;
+						widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
 						break;
 					}
 
 					iteration++;
 					if (iteration >= maxIterations) {
-						// Revert to checkpoint on final failure (P1)
-						if (checkpointHash) await gitRevert(cwd, checkpointHash);
-						writeProgress(cwd, i + 1, sprint.title, false, failedCriteria.map((c) => c.evidence).join("; "));
+						writeProgress(tracker.runDir, i + 1, sprint.title, false, failedCriteria.map((c) => c.evidence).join("; "));
+						failedSprintCount++;
+						widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
 						break;
 					}
 
 					widget.update({
 						phase: "fixing",
 						iteration: iteration + 1,
-						agentName: params.generatorAgent ?? "worker",
+						agentName: generatorAgentName,
+						agentRole: "generator",
+						agentModel: modelLabel(resolvedGeneratorModel),
+						agentThinking: generatorDef.thinking ?? "",
+						activeTools: [],
+						turnCount: 0,
+						inputTokens: 0,
+						outputTokens: 0,
+						totalCost: 0,
 					});
 
-					await generator.prompt(
-						[
-							`Sprint ${i + 1}: ${sprint.title} FAILED evaluation.`,
-							"",
-							"Fix these issues:",
-							evalText,
-						].join("\n"),
-					);
-						tracker.saveSession(
-						`sprint-${i + 1}`,
-						`generator-iter-${iteration + 1}`,
-						generator,
-						generatorDef.systemPrompt,
-					);
+					tracker.startPhase("fixing", generatorAgentName);
+					const fixer = await spawnAgent({
+						systemPrompt: generatorDef.systemPrompt,
+						tools: generatorDef.tools,
+						model: resolvedGeneratorModel,
+						thinking: generatorDef.thinking,
+						agentName: generatorAgentName,
+						role: "generator",
+					});
+					throwIfAborted();
+					await fixer.prompt([
+						`Sprint ${i + 1}: ${sprint.title} FAILED evaluation.`,
+						"",
+						"Fix these issues:",
+						evalText,
+					].join("\n"));
+					tracker.saveSession(`sprint-${i + 1}`, `generator-iter-${iteration + 1}`, fixer, generatorDef.systemPrompt);
+					fixer.dispose();
 				}
 
 				results.push({
 					sprint: sprint.title,
-					iterations: iteration + 1,
+					iterations: Math.max(1, iteration + 1),
 					passed,
 					evalOutput: evalText,
 				});
 			}
-
-			// Cleanup
-			generator.dispose();
-			evaluator.dispose();
 
 			widget.stopSpinner();
 			const allPassed = results.every((r) => r.passed);
 			widget.update({
 				phase: allPassed ? "complete" : "failed",
 				sprintTitle: "",
-				toolActivity: "",
+				activeTools: [],
 				agentName: "",
+				agentRole: "",
+				agentModel: "",
+				agentThinking: "",
 			});
 
-			// Auto-clear widget after 10 seconds
-			setTimeout(() => widget.clear(), 10000);
 			const reportLines = results
 				.map(
 					(r, i) =>
@@ -1312,7 +1565,7 @@ export default function (pi: ExtensionAPI) {
 				.join("\n");
 
 			// Generate reusable workflow script (P2)
-			const workflowSlug = generateWorkflowScript(cwd, params.prompt, specText, sprints, pattern, results);
+			const workflowSlug = generateWorkflowScript(projectRoot, params.prompt, specText, sprints, pattern, results);
 
 			// Save tracking artifacts
 			tracker.saveTiming();
@@ -1325,6 +1578,7 @@ export default function (pi: ExtensionAPI) {
 				`**Sprints**: ${sprints.length}`,
 				workflowSlug ? `**Workflow**: .pi/workflows/${workflowSlug}.mjs` : "",
 				`**Run dir**: .pi/harness-runs/${tracker.runDir.split("/").pop()}`,
+				workspace.isolated ? `**Workspace**: ${workspace.worktreePath}` : "**Workspace**: current cwd (isolated worktree unavailable)",
 				"|--------|-------|--------|------------|",
 				reportLines,
 				"",
@@ -1334,6 +1588,7 @@ export default function (pi: ExtensionAPI) {
 			].join("\n");
 
 			tracker.saveReport(finalReport);
+			widget.clear();
 
 			return {
 				content: [{ type: "text", text: finalReport }],
@@ -1341,9 +1596,9 @@ export default function (pi: ExtensionAPI) {
 					phase: "complete",
 					pattern,
 					pass: allPassed,
-					plannerAgent: params.plannerAgent ?? "planner",
-					generatorAgent: params.generatorAgent ?? "worker",
-					evaluatorAgent: params.evaluatorAgent ?? "reviewer",
+					plannerAgent: plannerAgentName,
+					generatorAgent: generatorAgentName,
+					evaluatorAgent: evaluatorAgentName,
 					sprints: results,
 					spec: specText,
 				},
