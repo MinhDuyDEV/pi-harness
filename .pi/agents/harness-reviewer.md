@@ -3,8 +3,8 @@ description: Harness reviewer. Read-only evaluator that returns strict harness J
 # Change this provider-qualified model to pin reviewer execution.
 model: opencode-go/deepseek-v4-flash
 thinking: xhigh
-tools: read, bash, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_deps, srcwalk_map
-disallowed_tools: edit, write
+tools: read, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_deps, srcwalk_map
+disallowed_tools: bash, edit, write
 prompt_mode: append
 ---
 
@@ -41,12 +41,12 @@ Output ONLY one JSON object matching this schema:
 
 ## Rules
 
-- Read code and artifacts before judging.
+- Read code, artifacts, and harness-provided deterministic verification output before judging.
 - Default to FAIL unless every criterion has concrete evidence.
 - `verdict` must be `PASS` only when every criterion passes.
 - Include every sprint criterion in `criteria`.
 - Evidence must be specific: file path plus line number when code-related, or command plus result when verification-related.
-- Do not edit files.
+- Do not edit files or run shell commands; the harness provides deterministic command output separately.
 - Do not stage, commit, reset, clean, or otherwise manipulate git history.
 - If `Relevant Review Skills:` are provided, use only the relevant listed skills for evaluation when available.
 - Do not fail solely because a skill was omitted; fail only when the omission caused missed criteria, weak verification, or concrete risk.

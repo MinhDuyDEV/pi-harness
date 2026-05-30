@@ -142,11 +142,29 @@ function teardown() {
 	const dir = setup();
 
 	const tracker = new HarnessTracker(dir, "Workspace test");
-	tracker.saveWorkspace({ cwd: "/test", isolated: false });
+	tracker.saveWorkspace({ cwd: "/test", isolated: false, mode: "current" });
 	const wsPath = join(tracker.runDir, "WORKSPACE.json");
 	assert.ok(existsSync(wsPath), t);
 	const ws = JSON.parse(readFileSync(wsPath, "utf-8"));
 	assert.equal(ws.cwd, "/test", t);
+
+	teardown();
+}
+
+{
+	const t = "HarnessTracker.appendState writes durable STATE.md ledger entries";
+	const dir = setup();
+
+	const tracker = new HarnessTracker(dir, "State ledger test");
+	tracker.appendState("planning", "Created 2 sprints", ["Next: run sprint 1"]);
+	const statePath = join(tracker.runDir, "STATE.md");
+	assert.ok(existsSync(statePath), t);
+	const state = readFileSync(statePath, "utf-8");
+	assert.ok(state.includes("# Harness Run State"), t);
+	assert.ok(state.includes("## planning"), t);
+	assert.ok(state.includes("Created 2 sprints"), t);
+	assert.ok(state.includes("Next: run sprint 1"), t);
+	assert.ok(tracker.readState().includes("Created 2 sprints"), t);
 
 	teardown();
 }
@@ -223,9 +241,12 @@ function teardown() {
 	assert.ok(slug !== null, t);
 	assert.ok(typeof slug === "string" && slug.length > 0, t);
 
-	// Check workflow script was written
+	// Check workflow manifest was written without pretending to replay with a hardcoded model.
 	const workflowPath = join(dir, ".pi", "workflows", `${slug}.mjs`);
 	assert.ok(existsSync(workflowPath), t);
+	const workflow = readFileSync(workflowPath, "utf-8");
+	assert.ok(!workflow.includes("claude-sonnet-4-20250514"), t);
+	assert.ok(workflow.includes("Original prompt"), t);
 
 	// Check run card was written
 	const runCardPath = join(dir, ".pi", "harness-runs", `${slug}.md`);

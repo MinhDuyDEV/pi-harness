@@ -9,6 +9,7 @@ import {
 	parseSprints,
 	parseEvalOutput,
 	parseMarkdownFrontmatter,
+	parseCriteriaItems,
 	extractText,
 	getLastAssistantText,
 	HARNESS_FORMAT_INSTRUCTIONS,
@@ -131,9 +132,16 @@ Files: src/runtime.ts`;
 }
 
 {
-	const t = "parseSprints fallback: entire text as one sprint when no ## Sprint sections";
+	const t = "parseSprints is strict by default and rejects output without sprint markers";
 	const input = "Just a simple description with no sprint markers.\nCriteria:\n- [ ] Do something";
 	const sprints = parseSprints(input);
+	assert.deepEqual(sprints, [], t);
+}
+
+{
+	const t = "parseSprints can explicitly allow loose fallback";
+	const input = "Just a simple description with no sprint markers.\nCriteria:\n- [ ] Do something";
+	const sprints = parseSprints(input, { allowFallback: true });
 	assert.equal(sprints.length, 1, t);
 	assert.equal(sprints[0].number, 1, t);
 	assert.equal(sprints[0].title, "Just a simple description with no sprint markers.", t);
@@ -163,6 +171,28 @@ Files: main.ts`;
 	const sprints = parseSprints(input);
 	assert.ok(sprints[0].criteria.includes("- [ ] Criterion A"), t);
 	assert.ok(sprints[0].criteria.includes("- [ ] Criterion B"), t);
+}
+
+{
+	const t = "parseSprints extracts optional Verification Commands section";
+	const input = `## Sprint 1: Feature
+Description: Build feature
+Criteria:
+- [ ] Criterion A
+Verification Commands:
+- npm test
+- node --check src/index.js
+Files: src/index.js`;
+	const sprints = parseSprints(input);
+	assert.deepEqual(sprints[0].verificationCommands, ["npm test", "node --check src/index.js"], t);
+	assert.ok(!sprints[0].criteria.includes("Verification Commands:"), t);
+}
+
+// ─── parseCriteriaItems ───────────────────────────────────────────────────────
+
+{
+	const t = "parseCriteriaItems normalizes checklist criteria";
+	assert.deepEqual(parseCriteriaItems("- [ ] Criterion A\n- Criterion B\n* [x] Criterion C"), ["Criterion A", "Criterion B", "Criterion C"], t);
 }
 
 // ─── parseMarkdownFrontmatter ────────────────────────────────────────────────
@@ -227,13 +257,13 @@ key: value
 // ─── parseEvalOutput ─────────────────────────────────────────────────────────
 
 {
-	const t = "parseEvalOutput parses PASS verdict";
+	const t = "parseEvalOutput parses PASS verdict with concrete criteria evidence";
 	const input = JSON.stringify({
 		verdict: "PASS",
-		criteria: [{ id: "c1", description: "Test A", passes: true, evidence: "Works" }],
+		criteria: [{ id: "c1", description: "Test A", passes: true, evidence: "test.js:1 Works" }],
 		summary: "All good",
 	});
-	const result = parseEvalOutput(input);
+	const result = parseEvalOutput(input, ["Test A"]);
 	assert.equal(result.verdict, "PASS", t);
 	assert.equal(result.criteria.length, 1, t);
 	assert.equal(result.criteria[0].passes, true, t);
@@ -271,16 +301,17 @@ key: value
 
 {
 	const t = "parseEvalOutput extracts JSON from markdown-wrapped output";
-	const input = "Some preamble\n```json\n" + JSON.stringify({ verdict: "PASS", criteria: [], summary: "OK" }) + "\n```";
-	const result = parseEvalOutput(input);
+	const input = "Some preamble\n```json\n" + JSON.stringify({ verdict: "PASS", criteria: [{ description: "A", passes: true, evidence: "cmd: pass" }], summary: "OK" }) + "\n```";
+	const result = parseEvalOutput(input, ["A"]);
 	assert.equal(result.verdict, "PASS", t);
 }
 
 {
-	const t = "parseEvalOutput skips invalid balanced objects";
+	const t = "parseEvalOutput rejects PASS with no criteria evidence";
 	const input = '{"verdict": "PASS", "criteria": [], "summary": "valid" }';
-	const result = parseEvalOutput(input);
-	assert.equal(result.verdict, "PASS", t);
+	const result = parseEvalOutput(input, ["A"]);
+	assert.equal(result.verdict, "FAIL", t);
+	assert.ok(result.criteria.some((criterion) => !criterion.passes), t);
 }
 
 {
@@ -298,6 +329,28 @@ key: value
 	assert.equal(result.criteria.length, 2, t);
 	assert.equal(result.criteria[0].passes, false, t);
 	assert.equal(result.criteria[1].passes, true, t);
+}
+
+{
+	const t = "parseEvalOutput rejects PASS when evidence is missing";
+	const input = JSON.stringify({
+		verdict: "PASS",
+		criteria: [{ description: "A", passes: true, evidence: "" }],
+		summary: "No evidence",
+	});
+	const result = parseEvalOutput(input, ["A"]);
+	assert.equal(result.verdict, "FAIL", t);
+}
+
+{
+	const t = "parseEvalOutput rejects PASS when not all expected criteria are represented";
+	const input = JSON.stringify({
+		verdict: "PASS",
+		criteria: [{ description: "A", passes: true, evidence: "a.test:1" }],
+		summary: "Missing B",
+	});
+	const result = parseEvalOutput(input, ["A", "B"]);
+	assert.equal(result.verdict, "FAIL", t);
 }
 
 // ─── Format Instructions ─────────────────────────────────────────────────────

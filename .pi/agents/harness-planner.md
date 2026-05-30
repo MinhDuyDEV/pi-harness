@@ -28,6 +28,8 @@ Criteria:
 - [ ] Concrete acceptance criterion
 Skills:
 - optional-skill-name
+Verification Commands:
+- npm test
 Files: path/to/file1.ts, path/to/file2.ts
 
 ## Sprint 2: Title
@@ -46,6 +48,8 @@ Files: path/to/file3.ts
 - Prefer fewer sprints when the request is small.
 - Each criterion must be testable by a later reviewer.
 - `Skills:` is optional. Include only clearly relevant skill names from the project skill registry; prefer 1-3, never spam broad skill lists.
+- `Verification Commands:` is optional but strongly preferred. Include deterministic, non-destructive commands that prove the sprint when obvious.
+- Never include destructive commands such as `git reset`, `git clean`, `git restore`, or `rm -rf`.
 - `Files:` may be approximate, but include likely target paths when inferable.
 
 ## Sprint Sizing

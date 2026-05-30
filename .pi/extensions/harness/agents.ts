@@ -87,7 +87,7 @@ export function wrapWithContext(
 export const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
 export const DEFAULT_PLANNER_TOOLS = ["read", "bash", "grep", "find", "ls"];
 export const DEFAULT_GENERATOR_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
-export const DEFAULT_EVALUATOR_TOOLS = ["read", "bash"];
+export const DEFAULT_EVALUATOR_TOOLS = ["read", "grep", "find", "ls"];
 
 export const DEFAULT_PLANNER_PROMPT = `You are a software architect. Your job is to expand a brief product idea into a detailed build specification.
 

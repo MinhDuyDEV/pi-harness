@@ -2,19 +2,17 @@
  * Execution orchestration for the Harness extension.
  *
  * Coordinates planning, implementation, verification, and progress updates
- * while preserving worktree isolation and git safety guarantees.
+ * while preserving workspace policy and git safety guarantees.
  *
  * Extracted from index.ts to remove duplicate agent lifecycle patterns,
  * consolidate error handling, and centralize progress/reporting logic.
  */
 
-import type { ExtensionContext, AgentSession, AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { Model, Api, TextContent } from "@earendil-works/pi-ai";
 import {
 	parseSprints,
 	parseEvalOutput,
-	getLastAssistantText,
 	HARNESS_FORMAT_INSTRUCTIONS,
 	HARNESS_EVAL_INSTRUCTIONS,
 	type Sprint,
@@ -26,13 +24,11 @@ import {
 	writeProgress,
 } from "./artifacts.js";
 import {
-	validateThinkingLevel,
 	loadContextFiles,
 	wrapWithContext,
 	loadAgentFile,
 	modelLabel,
 	resolveModel,
-	createHarnessResourceLoader,
 	DEFAULT_PLANNER_PROMPT,
 	DEFAULT_GENERATOR_PROMPT,
 	DEFAULT_EVALUATOR_PROMPT,
@@ -40,11 +36,14 @@ import {
 	DEFAULT_GENERATOR_TOOLS,
 	DEFAULT_EVALUATOR_TOOLS,
 } from "./agents.js";
-import { HarnessWidget, type AgentRole } from "./widgets.js";
+import { HarnessWidget } from "./widgets.js";
 import { createHarnessWorkspace, type HarnessWorkspace, type HarnessWorkspaceMode } from "./gitSafety.js";
 import { resolveSkillHints } from "./skills.js";
 import { startHarnessTmuxWatch, type HarnessTmuxWatch } from "./tmuxWatch.js";
-import { isInsideTmux, runInteractivePaneAgent } from "./interactivePane.js";
+import { isInsideTmux } from "./interactivePane.js";
+import { runHarnessAgent, type AgentRunnerMode } from "./runner.js";
+import { filterToolsForRole, DEFAULT_HARNESS_POLICY, type HarnessAgentRole } from "./policy.js";
+import { formatVerificationSummary, runVerificationCommands } from "./verification.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -95,6 +94,7 @@ export interface HarnessResult {
  */
 function loadAgentDef(
 	name: string,
+	role: HarnessAgentRole,
 	defaultName: string,
 	defaultPrompt: string,
 	defaultTools: string[],
@@ -109,52 +109,18 @@ function loadAgentDef(
 	}
 	const base = file ? file.systemPrompt : defaultPrompt;
 	const requestedTools = file ? file.tools : defaultTools;
-	const tools = requestedTools.filter((tool) => {
+	const availableTools = requestedTools.filter((tool) => {
 		if (availableToolNames.size === 0 || availableToolNames.has(tool)) return true;
 		warnings.push(`Agent "${name}" requested unavailable tool "${tool}"; it will not be enabled.`);
 		return false;
 	});
+	const tools = filterToolsForRole(availableTools, role, name, warnings);
 	return {
 		systemPrompt: wrapWithContext(base, contextFiles),
 		tools,
 		model: file?.model,
 		thinking: file?.thinking,
 	};
-}
-
-// ─── Agent Session Spawning ──────────────────────────────────────────────────
-
-/**
- * Create a sub-agent session and register it with the widget.
- * Duplicate spawn / track / dispose pattern consolidated here.
- */
-async function spawnAgent(
-	opts: {
-		systemPrompt: string;
-		tools: string[];
-		model: Model<Api>;
-		thinking?: string;
-		agentName: string;
-		role: AgentRole;
-		runCwd: string;
-		widget: HarnessWidget;
-	},
-): Promise<AgentSession> {
-	const resourceLoader = await createHarnessResourceLoader(opts.systemPrompt, opts.runCwd);
-	const { session } = await createAgentSession({
-		model: opts.model,
-		tools: opts.tools,
-		thinkingLevel: validateThinkingLevel(opts.thinking),
-		sessionManager: SessionManager.inMemory(opts.runCwd),
-		resourceLoader,
-		cwd: opts.runCwd,
-	});
-	opts.widget.trackSession(session, opts.agentName, {
-		role: opts.role,
-		model: modelLabel(opts.model),
-		thinking: opts.thinking,
-	});
-	return session;
 }
 
 // ─── Error Handling ──────────────────────────────────────────────────────────
@@ -207,6 +173,15 @@ function shouldUseInteractivePanes(params: HarnessRunParams): boolean {
 	return params.tmuxMode === "watch" && isInsideTmux();
 }
 
+function agentRunnerMode(params: HarnessRunParams): AgentRunnerMode {
+	return shouldUseInteractivePanes(params) ? "interactive-pane" : "sdk";
+}
+
+function runStatePromptSection(tracker: HarnessTracker): string[] {
+	const state = tracker.readState();
+	return state ? ["", "Current harness run state:", state] : [];
+}
+
 // ─── Phase 1: Planning ───────────────────────────────────────────────────────
 
 async function runPlanningPhase(
@@ -219,7 +194,7 @@ async function runPlanningPhase(
 	tracker: HarnessTracker,
 	pattern: string,
 	projectRoot: string,
-	useInteractivePanes: boolean,
+	runnerMode: AgentRunnerMode,
 	signal?: AbortSignal,
 	onUpdate?: HarnessContext["onUpdate"],
 ): Promise<{ specText: string; sprints: Sprint[] }> {
@@ -247,47 +222,29 @@ async function runPlanningPhase(
 	tracker.saveSystemPrompt("plan", "planner", plannerDef.systemPrompt);
 	throwIfAborted(signal);
 
-	let specText: string;
-	if (useInteractivePanes) {
-		const result = await runInteractivePaneAgent({
-			projectRoot,
-			runCwd,
-			runDir: tracker.runDir,
-			subDir: "plan/planner",
-			agentName: plannerAgentName,
-			role: "planner",
-			systemPrompt: plannerDef.systemPrompt,
-			userPrompt: prompt,
-			tools: plannerDef.tools,
-			model: resolvedPlannerModel,
-			thinking: plannerDef.thinking,
-			signal,
-		});
-		specText = result.outputText;
-	} else {
-		const planner = await spawnAgent({
-			systemPrompt: plannerDef.systemPrompt,
-			tools: plannerDef.tools,
-			model: resolvedPlannerModel,
-			thinking: plannerDef.thinking,
-			agentName: plannerAgentName,
-			role: "planner",
-			runCwd,
-			widget,
-		});
-		const stopPlannerLog = tracker.startEventLog("plan", "planner", planner, { phase: "planning", agent: plannerAgentName });
-		try {
-			await planner.prompt(prompt);
-		} finally {
-			stopPlannerLog();
-		}
-		specText = getLastAssistantText(planner);
-		tracker.saveSession("plan", "planner", planner, plannerDef.systemPrompt);
-		planner.dispose();
-	}
+	const result = await runHarnessAgent({
+		mode: runnerMode,
+		projectRoot,
+		runCwd,
+		runDir: tracker.runDir,
+		subDir: "plan/planner",
+		agentName: plannerAgentName,
+		role: "planner",
+		phase: "planning",
+		systemPrompt: plannerDef.systemPrompt,
+		userPrompt: prompt,
+		tools: plannerDef.tools,
+		model: resolvedPlannerModel,
+		thinking: plannerDef.thinking,
+		tracker,
+		widget,
+		signal,
+	});
+	const specText = result.outputText;
 	tracker.saveSpec(specText);
 
 	const sprints = parseSprints(specText);
+	tracker.appendState("planning", `Planner produced ${sprints.length} strict sprint(s).`, sprints.map((sprint) => `Sprint ${sprint.number}: ${sprint.title}`));
 	return { specText, sprints };
 }
 
@@ -316,7 +273,7 @@ async function runBuildEvaluatePhase(
 	const results: SprintResult[] = [];
 	let passedSprintCount = 0;
 	let failedSprintCount = 0;
-	const useInteractivePanes = shouldUseInteractivePanes(params);
+	const runnerMode = agentRunnerMode(params);
 
 	for (let i = 0; i < sprints.length; i++) {
 		const sprint = sprints[i];
@@ -358,6 +315,7 @@ async function runBuildEvaluatePhase(
 			"",
 			"Criteria:",
 			sprint.criteria,
+			...runStatePromptSection(tracker),
 		];
 		if (skillHints.workerText) sprintTask.push("", skillHints.workerText);
 		if (sprint.files) sprintTask.push("", `Files: ${sprint.files}`);
@@ -368,51 +326,41 @@ async function runBuildEvaluatePhase(
 		tracker.savePrompt(`generator-sprint-${i + 1}-user`, generatorPrompt);
 		tracker.saveSystemPrompt(generatorSubDir, "generator", generatorDef.systemPrompt);
 		throwIfAborted(signal);
-		if (useInteractivePanes) {
-			await runInteractivePaneAgent({
-				projectRoot,
-				runCwd,
-				runDir: tracker.runDir,
-				subDir: `${generatorSubDir}/generator`,
-				agentName: generatorAgentName,
-				role: "generator",
-				systemPrompt: generatorDef.systemPrompt,
-				userPrompt: generatorPrompt,
-				tools: generatorDef.tools,
-				model: resolvedGeneratorModel,
-				thinking: generatorDef.thinking,
-				signal,
-			});
-		} else {
-			const generator = await spawnAgent({
-				systemPrompt: generatorDef.systemPrompt,
-				tools: generatorDef.tools,
-				model: resolvedGeneratorModel,
-				thinking: generatorDef.thinking,
-				agentName: generatorAgentName,
-				role: "generator",
-				runCwd,
-				widget,
-			});
-			const stopGeneratorLog = tracker.startEventLog(generatorSubDir, "generator", generator, { phase: "generating", agent: generatorAgentName });
-			try {
-				await generator.prompt(generatorPrompt);
-			} finally {
-				stopGeneratorLog();
-			}
-			tracker.saveSession(generatorSubDir, "generator", generator, generatorDef.systemPrompt);
-			generator.dispose();
-		}
+		await runHarnessAgent({
+			mode: runnerMode,
+			projectRoot,
+			runCwd,
+			runDir: tracker.runDir,
+			subDir: `${generatorSubDir}/generator`,
+			agentName: generatorAgentName,
+			role: "generator",
+			phase: "generating",
+			systemPrompt: generatorDef.systemPrompt,
+			userPrompt: generatorPrompt,
+			tools: generatorDef.tools,
+			model: resolvedGeneratorModel,
+			thinking: generatorDef.thinking,
+			tracker,
+			widget,
+			signal,
+		});
+		tracker.appendState(`sprint ${i + 1} generation`, `Generator completed sprint ${i + 1}: ${sprint.title}.`, sprint.files ? [`Planned files: ${sprint.files}`] : []);
 
 		if (params.pattern === "pipeline") {
-			passedSprintCount++;
+			const verification = runVerificationCommands(sprint.verificationCommands, runCwd, DEFAULT_HARNESS_POLICY);
+			const pipelinePassed = verification.status !== "failed";
+			if (pipelinePassed) passedSprintCount++;
+			else failedSprintCount++;
 			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
-			writeProgress(tracker.runDir, i + 1, sprint.title, true, "pipeline mode — no evaluation");
+			const detail = `pipeline mode — no evaluator; ${formatVerificationSummary(verification)}`;
+			writeProgress(tracker.runDir, i + 1, sprint.title, pipelinePassed, detail);
+			tracker.appendState(`sprint ${i + 1} pipeline`, detail);
 			results.push({
 				sprint: sprint.title,
 				iterations: 1,
-				passed: true,
-				evalOutput: "(pipeline mode — no evaluation)",
+				passed: pipelinePassed,
+				evalOutput: "(pipeline mode — no evaluator)",
+				verification,
 			});
 			continue;
 		}
@@ -420,6 +368,7 @@ async function runBuildEvaluatePhase(
 		let passed = false;
 		let evalText = "";
 		let iteration = 0;
+		let lastVerification = runVerificationCommands([], runCwd, DEFAULT_HARNESS_POLICY);
 
 		while (!passed && iteration < params.iterations) {
 			widget.update({
@@ -439,51 +388,46 @@ async function runBuildEvaluatePhase(
 			});
 
 			tracker.startPhase("evaluating", evaluatorAgentName);
-			const evaluatorPrompt = [`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria, ...(skillHints.reviewerText ? ["", skillHints.reviewerText] : [])].join("\n");
+			lastVerification = runVerificationCommands(sprint.verificationCommands, runCwd, DEFAULT_HARNESS_POLICY);
+			const verificationText = formatVerificationSummary(lastVerification);
+			tracker.appendState(`sprint ${i + 1} verification iter ${iteration + 1}`, verificationText);
+			const evaluatorPrompt = [
+				`Test Sprint ${i + 1}: ${sprint.title}`,
+				"",
+				"Criteria:",
+				sprint.criteria,
+				"",
+				"Harness deterministic verification:",
+				verificationText,
+				...runStatePromptSection(tracker),
+				...(skillHints.reviewerText ? ["", skillHints.reviewerText] : []),
+			].join("\n");
 			const evaluatorSubDir = `sprint-${i + 1}/evaluator-iter-${iteration + 1}`;
 			tracker.savePrompt(`evaluator-sprint-${i + 1}-iter-${iteration + 1}-system`, evaluatorDef.systemPrompt);
 			tracker.savePrompt(`evaluator-sprint-${i + 1}-iter-${iteration + 1}-user`, evaluatorPrompt);
 			tracker.saveSystemPrompt(evaluatorSubDir, "evaluator", evaluatorDef.systemPrompt);
 			throwIfAborted(signal);
-			if (useInteractivePanes) {
-				const result = await runInteractivePaneAgent({
-					projectRoot,
-					runCwd,
-					runDir: tracker.runDir,
-					subDir: `${evaluatorSubDir}/evaluator`,
-					agentName: evaluatorAgentName,
-					role: "evaluator",
-					systemPrompt: evaluatorDef.systemPrompt,
-					userPrompt: evaluatorPrompt,
-					tools: evaluatorDef.tools,
-					model: resolvedEvaluatorModel,
-					thinking: evaluatorDef.thinking,
-					signal,
-				});
-				evalText = result.outputText;
-			} else {
-				const evaluator = await spawnAgent({
-					systemPrompt: evaluatorDef.systemPrompt,
-					tools: evaluatorDef.tools,
-					model: resolvedEvaluatorModel,
-					thinking: evaluatorDef.thinking,
-					agentName: evaluatorAgentName,
-					role: "evaluator",
-					runCwd,
-					widget,
-				});
-				const stopEvaluatorLog = tracker.startEventLog(evaluatorSubDir, "evaluator", evaluator, { phase: "evaluating", agent: evaluatorAgentName });
-				try {
-					await evaluator.prompt(evaluatorPrompt);
-				} finally {
-					stopEvaluatorLog();
-				}
-				evalText = getLastAssistantText(evaluator);
-				tracker.saveSession(evaluatorSubDir, "evaluator", evaluator, evaluatorDef.systemPrompt);
-				evaluator.dispose();
-			}
-			const evalResult = parseEvalOutput(evalText);
-			passed = evalResult.verdict === "PASS";
+			const evalRun = await runHarnessAgent({
+				mode: runnerMode,
+				projectRoot,
+				runCwd,
+				runDir: tracker.runDir,
+				subDir: `${evaluatorSubDir}/evaluator`,
+				agentName: evaluatorAgentName,
+				role: "evaluator",
+				phase: "evaluating",
+				systemPrompt: evaluatorDef.systemPrompt,
+				userPrompt: evaluatorPrompt,
+				tools: evaluatorDef.tools,
+				model: resolvedEvaluatorModel,
+				thinking: evaluatorDef.thinking,
+				tracker,
+				widget,
+				signal,
+			});
+			evalText = evalRun.outputText;
+			const evalResult = parseEvalOutput(evalText, sprint.criteria);
+			passed = evalResult.verdict === "PASS" && lastVerification.status !== "failed";
 			const failedCriteria = evalResult.criteria.filter((c) => !c.passes);
 
 			notify(
@@ -500,7 +444,7 @@ async function runBuildEvaluatePhase(
 			);
 
 			if (passed) {
-				writeProgress(tracker.runDir, i + 1, sprint.title, true, evalResult.summary || evalText.slice(0, 200));
+				writeProgress(tracker.runDir, i + 1, sprint.title, true, `${evalResult.summary || evalText.slice(0, 200)}; ${lastVerification.status === "skipped" ? "verification skipped" : `verification ${lastVerification.status}`}`);
 				passedSprintCount++;
 				widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
 				break;
@@ -508,7 +452,7 @@ async function runBuildEvaluatePhase(
 
 			iteration++;
 			if (iteration >= params.iterations) {
-				writeProgress(tracker.runDir, i + 1, sprint.title, false, failedCriteria.map((c) => c.evidence).join("; "));
+				writeProgress(tracker.runDir, i + 1, sprint.title, false, [failedCriteria.map((c) => c.evidence).join("; "), formatVerificationSummary(lastVerification)].filter(Boolean).join("; "));
 				failedSprintCount++;
 				widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
 				break;
@@ -536,6 +480,10 @@ async function runBuildEvaluatePhase(
 				"",
 				"Fix these issues:",
 				evalText,
+				"",
+				"Harness deterministic verification:",
+				formatVerificationSummary(lastVerification),
+				...runStatePromptSection(tracker),
 				...(skillHints.workerText ? ["", skillHints.workerText] : []),
 			].join("\n");
 			const fixerSubDir = `sprint-${i + 1}/generator-iter-${iteration + 1}`;
@@ -543,41 +491,25 @@ async function runBuildEvaluatePhase(
 			tracker.savePrompt(`generator-sprint-${i + 1}-iter-${iteration + 1}-user`, fixerPrompt);
 			tracker.saveSystemPrompt(fixerSubDir, "generator", generatorDef.systemPrompt);
 			throwIfAborted(signal);
-			if (useInteractivePanes) {
-				await runInteractivePaneAgent({
-					projectRoot,
-					runCwd,
-					runDir: tracker.runDir,
-					subDir: `${fixerSubDir}/generator`,
-					agentName: generatorAgentName,
-					role: "generator",
-					systemPrompt: generatorDef.systemPrompt,
-					userPrompt: fixerPrompt,
-					tools: generatorDef.tools,
-					model: resolvedGeneratorModel,
-					thinking: generatorDef.thinking,
-					signal,
-				});
-			} else {
-				const fixer = await spawnAgent({
-					systemPrompt: generatorDef.systemPrompt,
-					tools: generatorDef.tools,
-					model: resolvedGeneratorModel,
-					thinking: generatorDef.thinking,
-					agentName: generatorAgentName,
-					role: "generator",
-					runCwd,
-					widget,
-				});
-				const stopFixerLog = tracker.startEventLog(fixerSubDir, "generator", fixer, { phase: "fixing", agent: generatorAgentName });
-				try {
-					await fixer.prompt(fixerPrompt);
-				} finally {
-					stopFixerLog();
-				}
-				tracker.saveSession(fixerSubDir, "generator", fixer, generatorDef.systemPrompt);
-				fixer.dispose();
-			}
+			await runHarnessAgent({
+				mode: runnerMode,
+				projectRoot,
+				runCwd,
+				runDir: tracker.runDir,
+				subDir: `${fixerSubDir}/generator`,
+				agentName: generatorAgentName,
+				role: "generator",
+				phase: "fixing",
+				systemPrompt: generatorDef.systemPrompt,
+				userPrompt: fixerPrompt,
+				tools: generatorDef.tools,
+				model: resolvedGeneratorModel,
+				thinking: generatorDef.thinking,
+				tracker,
+				widget,
+				signal,
+			});
+			tracker.appendState(`sprint ${i + 1} fix iter ${iteration + 1}`, `Generator attempted fixes for sprint ${i + 1}.`);
 		}
 
 		results.push({
@@ -585,6 +517,7 @@ async function runBuildEvaluatePhase(
 			iterations: Math.max(1, iteration + 1),
 			passed,
 			evalOutput: evalText,
+			verification: lastVerification,
 		});
 	}
 
@@ -605,7 +538,7 @@ function buildFinalReport(
 ): string {
 	const allPassed = results.every((r) => r.passed);
 	const reportLines = results
-		.map((r, i) => `| ${i + 1} | ${r.sprint} | ${r.passed ? "[✓] PASS" : "[x] FAIL"} | ${r.iterations} |`)
+		.map((r, i) => `| ${i + 1} | ${r.sprint} | ${r.passed ? "[✓] PASS" : "[x] FAIL"} | ${r.verification?.status ?? "unknown"} | ${r.iterations} |`)
 		.join("\n");
 
 	return [
@@ -619,7 +552,8 @@ function buildFinalReport(
 		watch.attachCommand ? `**Watch**: ${watch.attachCommand}` : params.tmuxMode === "off" ? "**Watch**: off" : watch.warning ? `**Watch**: ${watch.warning}` : "",
 		watch.warning && watch.attachCommand ? `**Tmux note**: ${watch.warning}` : "",
 		workspace.isolated ? `**Workspace**: worktree — ${workspace.worktreePath}` : `**Workspace**: current — ${workspace.cwd}`,
-		"|--------|-------|--------|------------|",
+		"| Sprint | Title | Result | Verification | Iterations |",
+		"|--------|-------|--------|--------------|------------|",
 		reportLines,
 		"",
 		allPassed
@@ -634,7 +568,7 @@ function buildFinalReport(
  * Run the full harness orchestration.
  *
  * Coordinates planning, implementation, verification, and progress updates
- * while preserving worktree isolation and git safety guarantees.
+ * while preserving workspace policy and git safety guarantees.
  *
  * Returns the same shape as the original index.ts execute() method to
  * maintain backward compatibility. Error handling and progress updates
@@ -677,6 +611,7 @@ export async function orchestrateHarnessRun(
 	// --- Load agent definitions ---
 	const plannerDef = loadAgentDef(
 		params.plannerAgent,
+		"planner",
 		"harness-planner",
 		DEFAULT_PLANNER_PROMPT,
 		DEFAULT_PLANNER_TOOLS,
@@ -690,6 +625,7 @@ export async function orchestrateHarnessRun(
 
 	const generatorDef = loadAgentDef(
 		params.generatorAgent,
+		"generator",
 		"harness-worker",
 		DEFAULT_GENERATOR_PROMPT,
 		DEFAULT_GENERATOR_TOOLS,
@@ -700,6 +636,7 @@ export async function orchestrateHarnessRun(
 	);
 	const evaluatorDef = loadAgentDef(
 		params.evaluatorAgent,
+		"evaluator",
 		"harness-reviewer",
 		DEFAULT_EVALUATOR_PROMPT,
 		DEFAULT_EVALUATOR_TOOLS,
@@ -739,7 +676,7 @@ export async function orchestrateHarnessRun(
 		tracker,
 		params.pattern,
 		projectRoot,
-		shouldUseInteractivePanes(params),
+		agentRunnerMode(params),
 		signal,
 		onUpdate,
 	);

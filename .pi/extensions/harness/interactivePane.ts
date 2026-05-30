@@ -117,7 +117,7 @@ export async function runInteractivePaneAgent(opts: InteractivePaneRunOptions): 
 		"--session-dir", shellQuote(sessionDir),
 		"--tools", shellQuote(opts.tools.join(",")),
 		"--model", shellQuote(modelLabel(opts.model)),
-		"--system-prompt", shellQuote(opts.systemPrompt),
+		"--system-prompt", shellQuote(systemPath),
 	];
 	if (opts.thinking) args.push("--thinking", shellQuote(opts.thinking));
 	args.push(shellQuote(`@${promptPath}`));
@@ -131,6 +131,7 @@ export async function runInteractivePaneAgent(opts: InteractivePaneRunOptions): 
 
 	const originalPane = runTmux(["display-message", "-p", "#{pane_id}"]);
 	const paneId = runTmux(["split-window", "-h", "-P", "-F", "#{pane_id}", "-c", opts.runCwd, `bash -lc ${shellQuote(script)}`]);
+	writeFileSync(join(agentDir, "PANE.txt"), paneId, "utf-8");
 	try {
 		runTmux(["select-layout", "tiled"]);
 		runTmux(["select-pane", "-t", originalPane]);

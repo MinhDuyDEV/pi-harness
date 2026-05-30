@@ -17,6 +17,7 @@ export interface Sprint {
 	criteria: string;
 	files: string;
 	skills: string[];
+	verificationCommands: string[];
 }
 
 export interface SprintResult {
@@ -24,6 +25,28 @@ export interface SprintResult {
 	iterations: number;
 	passed: boolean;
 	evalOutput: string;
+	verification?: VerificationSummary;
+}
+
+export interface VerificationCommandResult {
+	command: string;
+	allowed: boolean;
+	exitCode: number | null;
+	stdout: string;
+	stderr: string;
+	durationMs: number;
+	reason?: string;
+}
+
+export interface VerificationSummary {
+	status: "passed" | "failed" | "skipped";
+	results: VerificationCommandResult[];
+}
+
+export interface EvalCriterionResult {
+	description?: string;
+	passes: boolean;
+	evidence: string;
 }
 
 // ─── Format Instructions ─────────────────────────────────────────────────────
@@ -43,6 +66,8 @@ Criteria:
 - [ ] Criterion 2
 Skills:
 - optional-skill-name
+Verification Commands:
+- npm test
 Files: path/to/file1.ts, path/to/file2.ts
 
 ## Sprint 2: Title
@@ -53,6 +78,7 @@ Criteria:
 Files: path/to/file3.ts
 
 Skills is optional. Use only registry-valid skill names when clearly relevant. Prefer 1-3 skills.
+Verification Commands is optional but strongly preferred when a deterministic command can prove the sprint.
 Only output sprint sections. No commentary, no tables, no XML blocks, no episode tags.`;
 
 export const HARNESS_EVAL_INSTRUCTIONS = `
@@ -69,13 +95,13 @@ Output your evaluation as structured JSON. No other commentary.
       "id": "c1",
       "description": "What was tested",
       "passes": true or false,
-      "evidence": "Evidence file or observation"
+      "evidence": "Specific file:line or command evidence"
     }
   ],
   "summary": "One-line summary"
 }
 
-Only output JSON. No other text, no markdown.`;
+Only output JSON. No other text, no markdown. A PASS requires every sprint criterion to appear in criteria with passes=true and non-empty evidence.`;
 
 // ─── Text Helpers ─────────────────────────────────────────────────────────────
 
@@ -100,7 +126,26 @@ export function getLastAssistantText(session: AgentSession): string {
 
 // ─── Sprint Manifest Parsing ──────────────────────────────────────────────────
 
-export function parseSprints(text: string): Sprint[] {
+export function parseCriteriaItems(criteria: string): string[] {
+	return criteria
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.map((line) => line.replace(/^[-*]\s*/, "").replace(/^\[[ xX]\]\s*/, "").trim())
+		.filter(Boolean);
+}
+
+function parseListSection(body: string, label: string, stopLabels: string[]): string[] {
+	const stops = stopLabels.map((item) => `\\n${item}:`).join("|");
+	const regex = new RegExp(`${label}:?\\s*\\n([\\s\\S]*?)(?=${stops}|$)`);
+	const match = body.match(regex);
+	return match?.[1]
+		?.split("\n")
+		.map((line) => line.replace(/^[-*]\s*/, "").trim())
+		.filter(Boolean) ?? [];
+}
+
+export function parseSprints(text: string, options: { allowFallback?: boolean } = {}): Sprint[] {
 	const normalizedText = text.replace(/\r\n/g, "\n");
 	const sprints: Sprint[] = [];
 	const sprintRegex = /## Sprint (\d+):\s*(.+?)\n([\s\S]*?)(?=\n## Sprint |\n*$)/g;
@@ -109,20 +154,16 @@ export function parseSprints(text: string): Sprint[] {
 		const num = Number.parseInt(match[1], 10);
 		const title = match[2].trim();
 		const body = match[3].trim();
-		const criteriaMatch = body.match(/Criteria?:?\s*\n?([\s\S]*?)(?=\nSkills:|\nFiles:|$)/);
+		const criteriaMatch = body.match(/Criteria?:?\s*\n?([\s\S]*?)(?=\nSkills:|\nVerification Commands:|\nFiles:|$)/);
 		const criteria = criteriaMatch?.[1]?.trim() ?? body;
-		const skillsMatch = body.match(/Skills:?\s*\n([\s\S]*?)(?=\nFiles:|$)/);
-		const skills = skillsMatch?.[1]
-			?.split("\n")
-			.map((line) => line.replace(/^[-*]\s*/, "").trim())
-			.filter(Boolean) ?? [];
+		const skills = parseListSection(body, "Skills", ["Verification Commands", "Files"]);
+		const verificationCommands = parseListSection(body, "Verification Commands", ["Files"]);
 		const filesMatch = body.match(/Files:?\s*(.+?)$/m);
 		const files = filesMatch?.[1]?.trim() ?? "";
-		sprints.push({ number: num, title, description: body, criteria, files, skills });
+		sprints.push({ number: num, title, description: body, criteria, files, skills, verificationCommands });
 	}
 
-	// Fallback: if no ## Sprint sections found, treat entire output as one sprint
-	if (sprints.length === 0 && normalizedText.trim()) {
+	if (sprints.length === 0 && normalizedText.trim() && options.allowFallback) {
 		const lines = normalizedText.trim().split("\n");
 		const firstLine = lines[0].replace(/^#+\s*/, "").slice(0, 80);
 		sprints.push({
@@ -132,6 +173,7 @@ export function parseSprints(text: string): Sprint[] {
 			criteria: normalizedText.trim(),
 			files: "",
 			skills: [],
+			verificationCommands: [],
 		});
 	}
 
@@ -152,7 +194,6 @@ export function parseMarkdownFrontmatter(
 	const body = match[2].trim();
 	const frontmatter: Record<string, string> = {};
 
-	// Simple line-by-line YAML key: value parser
 	for (const line of raw.split("\n")) {
 		const kvMatch = line.match(/^\s*(\w[\w_-]*)\s*:\s*(.*?)\s*$/);
 		if (kvMatch) {
@@ -200,23 +241,64 @@ function extractJsonObjects(text: string): string[] {
 	return objects;
 }
 
+function normalizeExpectedCriteria(expectedCriteria?: readonly string[] | string): string[] {
+	if (!expectedCriteria) return [];
+	if (typeof expectedCriteria === "string") return parseCriteriaItems(expectedCriteria);
+	return expectedCriteria.map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeEvalCriteria(value: unknown): EvalCriterionResult[] {
+	if (!Array.isArray(value)) return [];
+	return value.map((item) => {
+		if (typeof item !== "object" || item === null) return { passes: false, evidence: "Malformed criterion" };
+		const record = item as Record<string, unknown>;
+		const description = typeof record.description === "string"
+			? record.description
+			: typeof record.criterion === "string"
+				? record.criterion
+				: typeof record.id === "string"
+					? record.id
+					: undefined;
+		return {
+			description,
+			passes: record.passes === true,
+			evidence: typeof record.evidence === "string" ? record.evidence.trim() : "",
+		};
+	});
+}
+
+function failEval(criteria: EvalCriterionResult[], summary: string, evidence: string): { verdict: "FAIL"; criteria: EvalCriterionResult[]; summary: string } {
+	return {
+		verdict: "FAIL",
+		criteria: [...criteria, { passes: false, evidence }],
+		summary,
+	};
+}
+
 /**
- * Parse structured JSON evaluation output. Default-FAIL on malformed output.
+ * Parse structured JSON evaluation output. Default-FAIL on malformed output or
+ * weak PASS evidence.
  */
-export function parseEvalOutput(text: string): {
-	verdict: string;
-	criteria: Array<{ passes: boolean; evidence: string }>;
+export function parseEvalOutput(text: string, expectedCriteria?: readonly string[] | string): {
+	verdict: "PASS" | "FAIL";
+	criteria: EvalCriterionResult[];
 	summary: string;
 } {
+	const expected = normalizeExpectedCriteria(expectedCriteria);
 	for (const candidate of extractJsonObjects(text)) {
 		if (!candidate.includes("verdict")) continue;
 		try {
-			const parsed = JSON.parse(candidate);
-			return {
-				verdict: parsed.verdict === "PASS" ? "PASS" : "FAIL",
-				criteria: Array.isArray(parsed.criteria) ? parsed.criteria : [],
-				summary: typeof parsed.summary === "string" ? parsed.summary : "",
-			};
+			const parsed = JSON.parse(candidate) as Record<string, unknown>;
+			const criteria = normalizeEvalCriteria(parsed.criteria);
+			const summary = typeof parsed.summary === "string" ? parsed.summary : "";
+			if (parsed.verdict !== "PASS") return { verdict: "FAIL", criteria, summary };
+			if (criteria.length === 0) return failEval(criteria, summary, "Evaluator returned PASS with no criteria evidence.");
+			if (expected.length > 0 && criteria.length < expected.length) {
+				return failEval(criteria, summary, `Evaluator returned PASS but covered ${criteria.length}/${expected.length} expected criteria.`);
+			}
+			const weak = criteria.find((criterion) => !criterion.passes || criterion.evidence.length === 0);
+			if (weak) return failEval(criteria, summary, "Evaluator returned PASS with failing or missing-evidence criteria.");
+			return { verdict: "PASS", criteria, summary };
 		} catch {
 			// Try the next balanced object.
 		}

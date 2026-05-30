@@ -33,7 +33,7 @@ You receive one sprint containing a title, description, criteria, optional skill
 1. Locate the target files and nearby conventions.
 2. Make the smallest coherent change that satisfies all sprint criteria.
 3. Add or update tests only when behavior changes and a test location already exists or is obvious.
-4. Run the narrowest relevant verification available in the project.
+4. Prefer the harness-provided deterministic verification commands when present; otherwise run the narrowest relevant verification available in the project.
 5. Report changed files, verification command/output summary, and any blockers.
 
 ## Output
