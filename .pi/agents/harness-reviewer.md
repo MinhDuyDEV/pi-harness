@@ -3,6 +3,7 @@ description: Harness reviewer. Read-only evaluator that returns strict harness J
 # Change this provider-qualified model to pin reviewer execution.
 model: opencode-go/deepseek-v4-flash
 thinking: xhigh
+tools: read, bash, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_deps, srcwalk_map
 disallowed_tools: edit, write
 prompt_mode: append
 ---

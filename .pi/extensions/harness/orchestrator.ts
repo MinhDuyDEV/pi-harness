@@ -32,7 +32,7 @@ import {
 	loadAgentFile,
 	modelLabel,
 	resolveModel,
-	createMinimalLoader,
+	createHarnessResourceLoader,
 	DEFAULT_PLANNER_PROMPT,
 	DEFAULT_GENERATOR_PROMPT,
 	DEFAULT_EVALUATOR_PROMPT,
@@ -76,6 +76,7 @@ export interface HarnessContext {
 	signal?: AbortSignal;
 	onUpdate?: AgentToolUpdateCallback<Record<string, unknown>>;
 	ctx: ExtensionContext;
+	availableToolNames?: Set<string>;
 }
 
 export interface HarnessResult {
@@ -98,13 +99,19 @@ function loadAgentDef(
 	projectRoot: string,
 	contextFiles: { agents: string; append: string },
 	warnings: string[],
+	availableToolNames: Set<string>,
 ): AgentDef {
 	const file = loadAgentFile(name, projectRoot);
 	if (!file && name !== defaultName) {
 		warnings.push(`Agent "${name}" was not found; falling back to built-in ${defaultName} prompt.`);
 	}
 	const base = file ? file.systemPrompt : defaultPrompt;
-	const tools = file ? file.tools : defaultTools;
+	const requestedTools = file ? file.tools : defaultTools;
+	const tools = requestedTools.filter((tool) => {
+		if (availableToolNames.size === 0 || availableToolNames.has(tool)) return true;
+		warnings.push(`Agent "${name}" requested unavailable tool "${tool}"; it will not be enabled.`);
+		return false;
+	});
 	return {
 		systemPrompt: wrapWithContext(base, contextFiles),
 		tools,
@@ -131,12 +138,13 @@ async function spawnAgent(
 		widget: HarnessWidget;
 	},
 ): Promise<AgentSession> {
+	const resourceLoader = await createHarnessResourceLoader(opts.systemPrompt, opts.runCwd);
 	const { session } = await createAgentSession({
 		model: opts.model,
 		tools: opts.tools,
 		thinkingLevel: validateThinkingLevel(opts.thinking),
 		sessionManager: SessionManager.inMemory(opts.runCwd),
-		resourceLoader: createMinimalLoader(opts.systemPrompt),
+		resourceLoader,
 		cwd: opts.runCwd,
 	});
 	opts.widget.trackSession(session, opts.agentName, {
@@ -581,6 +589,7 @@ export async function orchestrateHarnessRun(
 	const contextFiles = params.inheritContext ? loadContextFiles(projectRoot) : { agents: "", append: "" };
 
 	const warnings: string[] = [];
+	const availableToolNames = context.availableToolNames ?? new Set<string>();
 
 	// --- Load agent definitions ---
 	const plannerDef = loadAgentDef(
@@ -591,6 +600,7 @@ export async function orchestrateHarnessRun(
 		projectRoot,
 		contextFiles,
 		warnings,
+		availableToolNames,
 	);
 	// Append harness format as the final output contract for this run.
 	plannerDef.systemPrompt = plannerDef.systemPrompt + "\n\n" + HARNESS_FORMAT_INSTRUCTIONS;
@@ -603,6 +613,7 @@ export async function orchestrateHarnessRun(
 		projectRoot,
 		contextFiles,
 		warnings,
+		availableToolNames,
 	);
 	const evaluatorDef = loadAgentDef(
 		params.evaluatorAgent,
@@ -612,6 +623,7 @@ export async function orchestrateHarnessRun(
 		projectRoot,
 		contextFiles,
 		warnings,
+		availableToolNames,
 	);
 	// Append evaluation output format instructions (Default-FAIL contract)
 	evaluatorDef.systemPrompt += HARNESS_EVAL_INSTRUCTIONS;

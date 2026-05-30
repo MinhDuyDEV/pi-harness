@@ -3,6 +3,7 @@ description: Harness worker. Implements exactly one harness sprint with narrow s
 # Change this provider-qualified model to pin worker execution.
 model: opencode-go/deepseek-v4-flash
 thinking: high
+tools: read, bash, edit, write, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_deps, srcwalk_map
 prompt_mode: append
 ---
 

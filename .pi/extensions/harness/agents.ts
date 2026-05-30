@@ -11,7 +11,6 @@
  */
 
 import type { ResourceLoader } from "@earendil-works/pi-coding-agent";
-import { createExtensionRuntime } from "@earendil-works/pi-coding-agent";
 import type { Model, Api, ThinkingLevel } from "@earendil-works/pi-ai";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
@@ -25,6 +24,7 @@ interface AgentFrontmatter {
 	model?: string;
 	thinking?: string;
 	max_turns?: number;
+	tools?: string;
 	disallowed_tools?: string;
 	prompt_mode?: string;
 }
@@ -84,7 +84,7 @@ export function wrapWithContext(
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const ALL_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
+export const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
 export const DEFAULT_PLANNER_TOOLS = ["read", "bash", "grep", "find", "ls"];
 export const DEFAULT_GENERATOR_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 export const DEFAULT_EVALUATOR_TOOLS = ["read", "bash"];
@@ -141,19 +141,31 @@ Recommendations:
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Build a minimal ResourceLoader for a given system prompt. */
-export function createMinimalLoader(systemPrompt: string): ResourceLoader {
-	return {
-		getExtensions: () => ({ extensions: [], errors: [], runtime: createExtensionRuntime() }),
-		getSkills: () => ({ skills: [], diagnostics: [] }),
-		getPrompts: () => ({ prompts: [], diagnostics: [] }),
-		getThemes: () => ({ themes: [], diagnostics: [] }),
-		getAgentsFiles: () => ({ agentsFiles: [] }),
-		getSystemPrompt: () => systemPrompt,
-		getAppendSystemPrompt: () => [],
-		extendResources: () => {},
-		reload: async () => {},
-	};
+function parseToolList(value: string | undefined): string[] {
+	if (!value) return [];
+	return value
+		.split(",")
+		.map((tool) => tool.trim())
+		.filter(Boolean);
+}
+
+/**
+ * Build a ResourceLoader for harness child sessions.
+ *
+ * The harness owns the system prompt, but it should still expose project/global
+ * extension tools, skills, and prompt resources to child agents. Using
+ * DefaultResourceLoader keeps extension-provided tools such as srcwalk/webclaw
+ * available when the agent allowlist names them.
+ */
+export async function createHarnessResourceLoader(systemPrompt: string, cwd: string): Promise<ResourceLoader> {
+	const { DefaultResourceLoader, getAgentDir } = await import("@earendil-works/pi-coding-agent");
+	const loader = new DefaultResourceLoader({
+		cwd,
+		agentDir: getAgentDir(),
+		systemPrompt,
+	});
+	await loader.reload();
+	return loader;
 }
 
 /**
@@ -170,11 +182,11 @@ export function loadAgentFile(name: string, projectDir: string): AgentConfig | n
 
 	const fm = frontmatter as unknown as AgentFrontmatter;
 
-	// Resolve tools: all 7 minus disallowed_tools
-	const disallowed = fm.disallowed_tools
-		? fm.disallowed_tools.split(",").map((t) => t.trim())
-		: [];
-	const tools = ALL_TOOLS.filter((t) => !disallowed.includes(t));
+	// Resolve tools: explicit `tools:` allowlist if provided, otherwise all built-ins.
+	// In both cases, remove anything listed in `disallowed_tools:`.
+	const disallowed = new Set(parseToolList(fm.disallowed_tools));
+	const baseTools = fm.tools ? parseToolList(fm.tools) : [...BUILTIN_TOOL_NAMES];
+	const tools = baseTools.filter((tool) => !disallowed.has(tool));
 
 	return {
 		systemPrompt: body,

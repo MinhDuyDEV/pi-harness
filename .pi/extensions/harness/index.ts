@@ -122,6 +122,8 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
+			const availableToolNames = new Set(pi.getAllTools().map((tool) => tool.name));
+
 			return orchestrateHarnessRun(
 				{
 					prompt: params.prompt,
@@ -144,6 +146,7 @@ export default function (pi: ExtensionAPI) {
 					signal: _signal,
 					onUpdate,
 					ctx,
+					availableToolNames,
 				},
 			);
 		},
