@@ -6,6 +6,7 @@ import type { HarnessTracker } from "./artifacts.js";
 import { runInteractivePaneAgent } from "./interactivePane.js";
 import { getLastAssistantText } from "./parsing.js";
 import type { HarnessWidget, AgentRole } from "./widgets.js";
+import { sessionUsage } from "./widgets.js";
 
 export type AgentRunnerMode = "sdk" | "interactive-pane";
 
@@ -34,6 +35,8 @@ export interface HarnessAgentRunResult {
 	outputText: string;
 	sessionFile?: string;
 	paneId?: string;
+	/** Session usage metrics for the widget, always populated even if events were missed. */
+	usage: { turnCount: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; totalCost: number };
 }
 
 async function spawnSdkAgent(opts: HarnessAgentRunRequest): Promise<AgentSession> {
@@ -77,7 +80,16 @@ export async function runHarnessAgent(opts: HarnessAgentRunRequest): Promise<Har
 				...usage,
 			}),
 		});
-		return { mode: opts.mode, status: "completed", outputText: result.outputText, sessionFile: result.sessionFile, paneId: result.paneId };
+		return { mode: opts.mode, status: "completed", outputText: result.outputText, sessionFile: result.sessionFile, paneId: result.paneId, usage: { turnCount: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, totalCost: 0 } };
+	}
+
+	// The SDK's built-in tools (write, edit, bash) resolve relative paths against
+	// process.cwd(). Since the pi process may have cwd set to .pi/ instead of the
+	// project root, temporarily set process.cwd() to runCwd so tool calls from the
+	// agent session create files at the correct location.
+	const originalCwd = process.cwd();
+	if (originalCwd !== opts.runCwd) {
+		process.chdir(opts.runCwd);
 	}
 
 	const session = await spawnSdkAgent(opts);
@@ -86,9 +98,14 @@ export async function runHarnessAgent(opts: HarnessAgentRunRequest): Promise<Har
 		await session.prompt(opts.userPrompt);
 	} finally {
 		stopLog();
+		// Restore original process cwd
+		if (originalCwd !== opts.runCwd) {
+			process.chdir(originalCwd);
+		}
 	}
 	const outputText = getLastAssistantText(session);
+	const usage = sessionUsage(session);
 	opts.tracker.saveSession(opts.subDir, opts.role, session, opts.systemPrompt);
 	session.dispose();
-	return { mode: opts.mode, status: "completed", outputText };
+	return { mode: opts.mode, status: "completed", outputText, usage };
 }

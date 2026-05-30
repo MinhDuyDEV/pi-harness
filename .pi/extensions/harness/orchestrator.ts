@@ -242,6 +242,15 @@ async function runPlanningPhase(
 		widget,
 		signal,
 	});
+	// Ensure final planner metrics always appear in widget.
+	widget.update({
+		turnCount: result.usage.turnCount,
+		inputTokens: result.usage.inputTokens,
+		outputTokens: result.usage.outputTokens,
+		cacheReadTokens: result.usage.cacheReadTokens,
+		cacheWriteTokens: result.usage.cacheWriteTokens,
+		totalCost: result.usage.totalCost,
+	});
 	const specText = result.outputText;
 	tracker.saveSpec(specText);
 

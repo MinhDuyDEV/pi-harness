@@ -510,6 +510,17 @@ export class HarnessWidget {
 		this.registered = true;
 	}
 
+	getMetrics(): Pick<WidgetState, "turnCount" | "inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens" | "totalCost"> {
+		return {
+			turnCount: this.state.turnCount,
+			inputTokens: this.state.inputTokens,
+			outputTokens: this.state.outputTokens,
+			cacheReadTokens: this.state.cacheReadTokens,
+			cacheWriteTokens: this.state.cacheWriteTokens,
+			totalCost: this.state.totalCost,
+		};
+	}
+
 	startSpinner() {
 		this.spinnerIdx = 0;
 		this.intervalId = setInterval(() => {
