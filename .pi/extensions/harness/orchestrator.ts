@@ -41,9 +41,10 @@ import {
 	DEFAULT_EVALUATOR_TOOLS,
 } from "./agents.js";
 import { HarnessWidget, type AgentRole } from "./widgets.js";
-import { createHarnessWorkspace, type HarnessWorkspace } from "./gitSafety.js";
+import { createHarnessWorkspace, type HarnessWorkspace, type HarnessWorkspaceMode } from "./gitSafety.js";
 import { resolveSkillHints } from "./skills.js";
 import { startHarnessTmuxWatch, type HarnessTmuxWatch } from "./tmuxWatch.js";
+import { isInsideTmux, runInteractivePaneAgent } from "./interactivePane.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,7 @@ export interface HarnessRunParams {
 	evaluatorModel?: string;
 	inheritContext: boolean;
 	tmuxMode: "off" | "watch";
+	workspace: HarnessWorkspaceMode;
 }
 
 export interface HarnessContext {
@@ -199,6 +201,12 @@ function notify(
 	});
 }
 
+// ─── Interactive Pane Mode ───────────────────────────────────────────────────
+
+function shouldUseInteractivePanes(params: HarnessRunParams): boolean {
+	return params.tmuxMode === "watch" && isInsideTmux();
+}
+
 // ─── Phase 1: Planning ───────────────────────────────────────────────────────
 
 async function runPlanningPhase(
@@ -210,6 +218,8 @@ async function runPlanningPhase(
 	widget: HarnessWidget,
 	tracker: HarnessTracker,
 	pattern: string,
+	projectRoot: string,
+	useInteractivePanes: boolean,
 	signal?: AbortSignal,
 	onUpdate?: HarnessContext["onUpdate"],
 ): Promise<{ specText: string; sprints: Sprint[] }> {
@@ -232,30 +242,50 @@ async function runPlanningPhase(
 	});
 
 	tracker.startPhase("planning", plannerAgentName);
-	const planner = await spawnAgent({
-		systemPrompt: plannerDef.systemPrompt,
-		tools: plannerDef.tools,
-		model: resolvedPlannerModel,
-		thinking: plannerDef.thinking,
-		agentName: plannerAgentName,
-		role: "planner",
-		runCwd,
-		widget,
-	});
 	tracker.savePrompt("planner-system", plannerDef.systemPrompt);
 	tracker.savePrompt("planner-user", prompt);
 	tracker.saveSystemPrompt("plan", "planner", plannerDef.systemPrompt);
-	const stopPlannerLog = tracker.startEventLog("plan", "planner", planner, { phase: "planning", agent: plannerAgentName });
 	throwIfAborted(signal);
-	try {
-		await planner.prompt(prompt);
-	} finally {
-		stopPlannerLog();
+
+	let specText: string;
+	if (useInteractivePanes) {
+		const result = await runInteractivePaneAgent({
+			projectRoot,
+			runCwd,
+			runDir: tracker.runDir,
+			subDir: "plan/planner",
+			agentName: plannerAgentName,
+			role: "planner",
+			systemPrompt: plannerDef.systemPrompt,
+			userPrompt: prompt,
+			tools: plannerDef.tools,
+			model: resolvedPlannerModel,
+			thinking: plannerDef.thinking,
+			signal,
+		});
+		specText = result.outputText;
+	} else {
+		const planner = await spawnAgent({
+			systemPrompt: plannerDef.systemPrompt,
+			tools: plannerDef.tools,
+			model: resolvedPlannerModel,
+			thinking: plannerDef.thinking,
+			agentName: plannerAgentName,
+			role: "planner",
+			runCwd,
+			widget,
+		});
+		const stopPlannerLog = tracker.startEventLog("plan", "planner", planner, { phase: "planning", agent: plannerAgentName });
+		try {
+			await planner.prompt(prompt);
+		} finally {
+			stopPlannerLog();
+		}
+		specText = getLastAssistantText(planner);
+		tracker.saveSession("plan", "planner", planner, plannerDef.systemPrompt);
+		planner.dispose();
 	}
-	const specText = getLastAssistantText(planner);
-	tracker.saveSession("plan", "planner", planner, plannerDef.systemPrompt);
 	tracker.saveSpec(specText);
-	planner.dispose();
 
 	const sprints = parseSprints(specText);
 	return { specText, sprints };
@@ -286,6 +316,7 @@ async function runBuildEvaluatePhase(
 	const results: SprintResult[] = [];
 	let passedSprintCount = 0;
 	let failedSprintCount = 0;
+	const useInteractivePanes = shouldUseInteractivePanes(params);
 
 	for (let i = 0; i < sprints.length; i++) {
 		const sprint = sprints[i];
@@ -332,29 +363,46 @@ async function runBuildEvaluatePhase(
 		if (sprint.files) sprintTask.push("", `Files: ${sprint.files}`);
 		const generatorPrompt = sprintTask.join("\n");
 
-		const generator = await spawnAgent({
-			systemPrompt: generatorDef.systemPrompt,
-			tools: generatorDef.tools,
-			model: resolvedGeneratorModel,
-			thinking: generatorDef.thinking,
-			agentName: generatorAgentName,
-			role: "generator",
-			runCwd,
-			widget,
-		});
 		const generatorSubDir = `sprint-${i + 1}`;
 		tracker.savePrompt(`generator-sprint-${i + 1}-system`, generatorDef.systemPrompt);
 		tracker.savePrompt(`generator-sprint-${i + 1}-user`, generatorPrompt);
 		tracker.saveSystemPrompt(generatorSubDir, "generator", generatorDef.systemPrompt);
-		const stopGeneratorLog = tracker.startEventLog(generatorSubDir, "generator", generator, { phase: "generating", agent: generatorAgentName });
 		throwIfAborted(signal);
-		try {
-			await generator.prompt(generatorPrompt);
-		} finally {
-			stopGeneratorLog();
+		if (useInteractivePanes) {
+			await runInteractivePaneAgent({
+				projectRoot,
+				runCwd,
+				runDir: tracker.runDir,
+				subDir: `${generatorSubDir}/generator`,
+				agentName: generatorAgentName,
+				role: "generator",
+				systemPrompt: generatorDef.systemPrompt,
+				userPrompt: generatorPrompt,
+				tools: generatorDef.tools,
+				model: resolvedGeneratorModel,
+				thinking: generatorDef.thinking,
+				signal,
+			});
+		} else {
+			const generator = await spawnAgent({
+				systemPrompt: generatorDef.systemPrompt,
+				tools: generatorDef.tools,
+				model: resolvedGeneratorModel,
+				thinking: generatorDef.thinking,
+				agentName: generatorAgentName,
+				role: "generator",
+				runCwd,
+				widget,
+			});
+			const stopGeneratorLog = tracker.startEventLog(generatorSubDir, "generator", generator, { phase: "generating", agent: generatorAgentName });
+			try {
+				await generator.prompt(generatorPrompt);
+			} finally {
+				stopGeneratorLog();
+			}
+			tracker.saveSession(generatorSubDir, "generator", generator, generatorDef.systemPrompt);
+			generator.dispose();
 		}
-		tracker.saveSession(generatorSubDir, "generator", generator, generatorDef.systemPrompt);
-		generator.dispose();
 
 		if (params.pattern === "pipeline") {
 			passedSprintCount++;
@@ -391,34 +439,52 @@ async function runBuildEvaluatePhase(
 			});
 
 			tracker.startPhase("evaluating", evaluatorAgentName);
-			const evaluator = await spawnAgent({
-				systemPrompt: evaluatorDef.systemPrompt,
-				tools: evaluatorDef.tools,
-				model: resolvedEvaluatorModel,
-				thinking: evaluatorDef.thinking,
-				agentName: evaluatorAgentName,
-				role: "evaluator",
-				runCwd,
-				widget,
-			});
 			const evaluatorPrompt = [`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria, ...(skillHints.reviewerText ? ["", skillHints.reviewerText] : [])].join("\n");
 			const evaluatorSubDir = `sprint-${i + 1}/evaluator-iter-${iteration + 1}`;
 			tracker.savePrompt(`evaluator-sprint-${i + 1}-iter-${iteration + 1}-system`, evaluatorDef.systemPrompt);
 			tracker.savePrompt(`evaluator-sprint-${i + 1}-iter-${iteration + 1}-user`, evaluatorPrompt);
 			tracker.saveSystemPrompt(evaluatorSubDir, "evaluator", evaluatorDef.systemPrompt);
-			const stopEvaluatorLog = tracker.startEventLog(evaluatorSubDir, "evaluator", evaluator, { phase: "evaluating", agent: evaluatorAgentName });
 			throwIfAborted(signal);
-			try {
-				await evaluator.prompt(evaluatorPrompt);
-			} finally {
-				stopEvaluatorLog();
+			if (useInteractivePanes) {
+				const result = await runInteractivePaneAgent({
+					projectRoot,
+					runCwd,
+					runDir: tracker.runDir,
+					subDir: `${evaluatorSubDir}/evaluator`,
+					agentName: evaluatorAgentName,
+					role: "evaluator",
+					systemPrompt: evaluatorDef.systemPrompt,
+					userPrompt: evaluatorPrompt,
+					tools: evaluatorDef.tools,
+					model: resolvedEvaluatorModel,
+					thinking: evaluatorDef.thinking,
+					signal,
+				});
+				evalText = result.outputText;
+			} else {
+				const evaluator = await spawnAgent({
+					systemPrompt: evaluatorDef.systemPrompt,
+					tools: evaluatorDef.tools,
+					model: resolvedEvaluatorModel,
+					thinking: evaluatorDef.thinking,
+					agentName: evaluatorAgentName,
+					role: "evaluator",
+					runCwd,
+					widget,
+				});
+				const stopEvaluatorLog = tracker.startEventLog(evaluatorSubDir, "evaluator", evaluator, { phase: "evaluating", agent: evaluatorAgentName });
+				try {
+					await evaluator.prompt(evaluatorPrompt);
+				} finally {
+					stopEvaluatorLog();
+				}
+				evalText = getLastAssistantText(evaluator);
+				tracker.saveSession(evaluatorSubDir, "evaluator", evaluator, evaluatorDef.systemPrompt);
+				evaluator.dispose();
 			}
-			evalText = getLastAssistantText(evaluator);
 			const evalResult = parseEvalOutput(evalText);
 			passed = evalResult.verdict === "PASS";
 			const failedCriteria = evalResult.criteria.filter((c) => !c.passes);
-			tracker.saveSession(evaluatorSubDir, "evaluator", evaluator, evaluatorDef.systemPrompt);
-			evaluator.dispose();
 
 			notify(
 				onUpdate,
@@ -465,16 +531,6 @@ async function runBuildEvaluatePhase(
 			});
 
 			tracker.startPhase("fixing", generatorAgentName);
-			const fixer = await spawnAgent({
-				systemPrompt: generatorDef.systemPrompt,
-				tools: generatorDef.tools,
-				model: resolvedGeneratorModel,
-				thinking: generatorDef.thinking,
-				agentName: generatorAgentName,
-				role: "generator",
-				runCwd,
-				widget,
-			});
 			const fixerPrompt = [
 				`Sprint ${i + 1}: ${sprint.title} FAILED evaluation.`,
 				"",
@@ -486,15 +542,42 @@ async function runBuildEvaluatePhase(
 			tracker.savePrompt(`generator-sprint-${i + 1}-iter-${iteration + 1}-system`, generatorDef.systemPrompt);
 			tracker.savePrompt(`generator-sprint-${i + 1}-iter-${iteration + 1}-user`, fixerPrompt);
 			tracker.saveSystemPrompt(fixerSubDir, "generator", generatorDef.systemPrompt);
-			const stopFixerLog = tracker.startEventLog(fixerSubDir, "generator", fixer, { phase: "fixing", agent: generatorAgentName });
 			throwIfAborted(signal);
-			try {
-				await fixer.prompt(fixerPrompt);
-			} finally {
-				stopFixerLog();
+			if (useInteractivePanes) {
+				await runInteractivePaneAgent({
+					projectRoot,
+					runCwd,
+					runDir: tracker.runDir,
+					subDir: `${fixerSubDir}/generator`,
+					agentName: generatorAgentName,
+					role: "generator",
+					systemPrompt: generatorDef.systemPrompt,
+					userPrompt: fixerPrompt,
+					tools: generatorDef.tools,
+					model: resolvedGeneratorModel,
+					thinking: generatorDef.thinking,
+					signal,
+				});
+			} else {
+				const fixer = await spawnAgent({
+					systemPrompt: generatorDef.systemPrompt,
+					tools: generatorDef.tools,
+					model: resolvedGeneratorModel,
+					thinking: generatorDef.thinking,
+					agentName: generatorAgentName,
+					role: "generator",
+					runCwd,
+					widget,
+				});
+				const stopFixerLog = tracker.startEventLog(fixerSubDir, "generator", fixer, { phase: "fixing", agent: generatorAgentName });
+				try {
+					await fixer.prompt(fixerPrompt);
+				} finally {
+					stopFixerLog();
+				}
+				tracker.saveSession(fixerSubDir, "generator", fixer, generatorDef.systemPrompt);
+				fixer.dispose();
 			}
-			tracker.saveSession(fixerSubDir, "generator", fixer, generatorDef.systemPrompt);
-			fixer.dispose();
 		}
 
 		results.push({
@@ -535,7 +618,7 @@ function buildFinalReport(
 		`**Run dir**: .pi/harness-runs/${tracker.runId}`,
 		watch.attachCommand ? `**Watch**: ${watch.attachCommand}` : params.tmuxMode === "off" ? "**Watch**: off" : watch.warning ? `**Watch**: ${watch.warning}` : "",
 		watch.warning && watch.attachCommand ? `**Tmux note**: ${watch.warning}` : "",
-		workspace.isolated ? `**Workspace**: ${workspace.worktreePath}` : "**Workspace**: current cwd (isolated worktree unavailable)",
+		workspace.isolated ? `**Workspace**: worktree — ${workspace.worktreePath}` : `**Workspace**: current — ${workspace.cwd}`,
 		"|--------|-------|--------|------------|",
 		reportLines,
 		"",
@@ -569,7 +652,7 @@ export async function orchestrateHarnessRun(
 
 	// Tracker for full run artifacts
 	const tracker = new HarnessTracker(projectRoot, params.prompt);
-	tracker.recordEvent({ event: "run_start", pattern: params.pattern, prompt: params.prompt, tmuxMode: params.tmuxMode });
+	tracker.recordEvent({ event: "run_start", pattern: params.pattern, prompt: params.prompt, tmuxMode: params.tmuxMode, workspace: params.workspace });
 	const watch = params.tmuxMode === "watch" ? startHarnessTmuxWatch(projectRoot, tracker.runDir, tracker.runId) : {};
 	if (watch.attachCommand) {
 		notify(onUpdate, `[watch] Harness tmux session: ${watch.attachCommand}`, { phase: "watch", tmuxSession: watch.sessionName, attachCommand: watch.attachCommand });
@@ -577,7 +660,7 @@ export async function orchestrateHarnessRun(
 	} else if (watch.warning) {
 		notify(onUpdate, `[warn] ${watch.warning}`, { phase: "watch", warning: watch.warning });
 	}
-	const workspace = await createHarnessWorkspace(projectRoot, params.prompt);
+	const workspace = await createHarnessWorkspace(projectRoot, params.prompt, params.workspace);
 	const runCwd = workspace.cwd;
 	tracker.saveWorkspace(workspace);
 
@@ -655,6 +738,8 @@ export async function orchestrateHarnessRun(
 		widget,
 		tracker,
 		params.pattern,
+		projectRoot,
+		shouldUseInteractivePanes(params),
 		signal,
 		onUpdate,
 	);

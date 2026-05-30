@@ -102,8 +102,18 @@ export default function (pi: ExtensionAPI) {
 					Type.Literal("watch"),
 					Type.Literal("off"),
 				], {
-					description: 'Tmux observability mode. "watch" starts non-interactive panes tailing harness event logs/artifacts/outputs. "off" disables tmux. Default: watch.',
+					description: 'Tmux observability mode. "watch" shows harness execution in tmux when available. "off" disables tmux. Default: watch.',
 					default: "watch",
+				}),
+			),
+			workspace: Type.Optional(
+				Type.Union([
+					Type.Literal("current"),
+					Type.Literal("worktree"),
+					Type.Literal("auto"),
+				], {
+					description: 'Workspace mode. "current" runs in the active workspace (default). "worktree" creates an isolated detached git worktree. "auto" currently aliases current unless future policy changes.',
+					default: "current",
 				}),
 			),
 		}),
@@ -137,6 +147,7 @@ export default function (pi: ExtensionAPI) {
 					evaluatorModel: params.evaluatorModel,
 					inheritContext: params.inheritContext ?? false,
 					tmuxMode: params.tmuxMode ?? "watch",
+					workspace: params.workspace ?? "current",
 				},
 				{
 					cwd,

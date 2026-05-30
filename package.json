@@ -11,6 +11,8 @@
 		"url": "https://github.com/huynhgiabuu/pikit"
 	},
 	"scripts": {
+		"start": "node scripts/serve-workbench.mjs",
+		"test": "node --test",
 		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec",
 		"sync:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs",
 		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check",

@@ -37,7 +37,7 @@ Examples:
 - product-level app or feature creation;
 - multi-file builds from a short product prompt;
 - work that benefits from planner → worker → reviewer decomposition;
-- work that benefits from isolated worktrees, fresh review, and durable artifacts.
+- work that benefits from visible agent execution, fresh review, and durable artifacts.
 
 ### Do Not Use Harness For
 
@@ -79,6 +79,7 @@ For non-trivial harness calls, emit a short analysis block before calling the to
     - Data persistence: yes/no
     - UI/CLI: yes/no
     - Risk if broken: low/medium/high
+  Workspace: current | worktree | auto (state why)
   Iterations: N
 ```
 
@@ -102,15 +103,36 @@ For trivial harness calls, a one-line analysis is enough.
 
 Actively choose parameters. Do not blindly rely on defaults.
 
+### Harness Workspace Policy
+
+Default to the **current workspace** for harness runs. Do not use an isolated worktree just because harness can create one.
+
+Use a worktree only when at least one is true:
+
+- the task is complex, risky, destructive, or likely to touch many files;
+- the user explicitly asks for isolation;
+- multiple competing implementations or parallel branches are useful;
+- the current workspace has unrelated changes that must not be disturbed;
+- rollback/review safety matters more than immediate visibility.
+
+Prefer current workspace when:
+
+- the task is small or medium and easy to inspect;
+- the user wants live tmux/interactive panes connected to the files they are editing;
+- the output should appear directly in the active editor/project tree;
+- the overhead of copy-back/merge would be larger than the safety benefit.
+
+If choosing a worktree, state why in the Harness Analysis. If no strong reason exists, use the current workspace.
+
 ## Post-Harness Acceptance Gate
 
 Harness output is not proof. After any harness run that changes files:
 
-1. Inspect the harness worktree diff.
+1. Inspect the changed-file diff in the workspace the harness used.
 2. Reject unrelated changes.
-3. Run verification in the worktree.
-4. Copy or accept only scoped files into the main workspace.
-5. Run verification again in the main workspace.
+3. Run verification in that workspace.
+4. If a worktree was used, copy or accept only scoped files into the main workspace.
+5. Run verification again in the main workspace when files were copied back or when the harness touched the main workspace directly.
 6. Check acceptance criteria against the original user request.
 7. Do not commit or push unless the user asks.
 

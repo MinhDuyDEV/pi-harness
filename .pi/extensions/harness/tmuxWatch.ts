@@ -47,6 +47,10 @@ export function startHarnessTmuxWatch(projectRoot: string, runDir: string, runId
 	}
 
 	const sessionName = sessionSafe(`pi-harness-${runId}`);
+	if (process.env.TMUX) {
+		return { sessionName: "current window" };
+	}
+
 	const eventsPath = join(runDir, "EVENTS.ndjson");
 	const progressPath = join(runDir, "PROGRESS.md");
 	const specPath = join(runDir, "SPEC.md");

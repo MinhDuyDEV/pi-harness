@@ -19,9 +19,12 @@ import { homedir } from "node:os";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type HarnessWorkspaceMode = "current" | "worktree" | "auto";
+
 export interface HarnessWorkspace {
 	cwd: string;
 	isolated: boolean;
+	mode: HarnessWorkspaceMode;
 	worktreePath?: string;
 	warning?: string;
 }
@@ -44,19 +47,24 @@ export function resolveProjectRoot(cwd: string): string {
 // ─── Workspace Isolation ──────────────────────────────────────────────────────
 
 /**
- * Create an isolated detached git worktree for harness writes.
- * Falls back to the current cwd only when git worktree creation is unavailable.
+ * Select the workspace a harness run should mutate.
  *
- * Safety guarantees:
- *   - Uses `git worktree add --detach HEAD` — creates a detached HEAD,
- *     never stages, commits, resets, or bypasses hooks.
- *   - All agent file mutations happen inside this isolated worktree.
- *   - No automatic stage, commit, reset, or unrelated dirty-file modification
- *     is introduced at any point in the workspace lifecycle.
- *   - If worktree creation fails, execution falls back to cwd with a warning
- *     and no git isolation — caller is responsible for safety.
+ * Default policy is current workspace. Worktrees are opt-in because they add
+ * copy-back/merge overhead and make live tmux panes less directly connected to
+ * the files the user is editing.
+ *
+ * `auto` currently aliases `current`; callers should choose `worktree`
+ * explicitly when risk/complexity justifies isolation.
  */
-export async function createHarnessWorkspace(cwd: string, prompt: string): Promise<HarnessWorkspace> {
+export async function createHarnessWorkspace(
+	cwd: string,
+	prompt: string,
+	mode: HarnessWorkspaceMode = "current",
+): Promise<HarnessWorkspace> {
+	if (mode === "current" || mode === "auto") {
+		return { cwd, isolated: false, mode };
+	}
+
 	try {
 		const root = resolveProjectRoot(cwd);
 		const project = root.split(/[\\/]/).pop() || "project";
@@ -69,11 +77,12 @@ export async function createHarnessWorkspace(cwd: string, prompt: string): Promi
 		const worktreePath = join(homedir(), ".pi", "worktrees", project, `harness-${stamp}-${slug}`);
 		mkdirSync(join(homedir(), ".pi", "worktrees", project), { recursive: true });
 		execSync(`git worktree add --detach ${JSON.stringify(worktreePath)} HEAD`, { cwd: root });
-		return { cwd: worktreePath, isolated: true, worktreePath };
+		return { cwd: worktreePath, isolated: true, mode, worktreePath };
 	} catch (err) {
 		return {
 			cwd,
 			isolated: false,
+			mode,
 			warning: `Could not create isolated git worktree; using current cwd without automatic git rollback. ${(err as Error).message}`,
 		};
 	}

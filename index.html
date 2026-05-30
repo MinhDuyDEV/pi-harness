@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Agent Workbench</title>
+  <link rel="stylesheet" href="src/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <header class="app-header" role="banner">
+    <h1 class="app-title">Agent Workbench</h1>
+    <p class="app-subtitle">Manage projects, agent profiles, and runs</p>
+  </header>
+
+  <main id="main-content" role="main">
+    <!-- Tab Navigation -->
+    <nav class="tab-bar" role="tablist" aria-label="Sections">
+      <button
+        class="tab-btn"
+        role="tab"
+        id="tab-projects"
+        aria-selected="true"
+        aria-controls="panel-projects"
+        tabindex="0"
+        data-panel="projects"
+      >
+        Projects
+      </button>
+      <button
+        class="tab-btn"
+        role="tab"
+        id="tab-agents"
+        aria-selected="false"
+        aria-controls="panel-agents"
+        tabindex="-1"
+        data-panel="agents"
+      >
+        Agent Profiles
+      </button>
+      <button
+        class="tab-btn"
+        role="tab"
+        id="tab-runs"
+        aria-selected="false"
+        aria-controls="panel-runs"
+        tabindex="-1"
+        data-panel="runs"
+      >
+        Runs
+      </button>
+    </nav>
+
+    <!-- ==================== Panel: Projects ==================== -->
+    <section
+      class="panel"
+      role="tabpanel"
+      id="panel-projects"
+      aria-labelledby="tab-projects"
+    >
+      <header class="panel-header">
+        <h2 class="panel-title">Projects</h2>
+        <button class="btn btn--primary" id="btn-add-project" type="button">+ New Project</button>
+      </header>
+
+      <form class="entity-form" id="form-project" aria-label="Project form" hidden>
+        <h3 class="form-title" id="form-project-title">New Project</h3>
+        <div class="field">
+          <label for="project-name">Project name <span aria-hidden="true">*</span></label>
+          <input type="text" id="project-name" name="name" required autocomplete="off" />
+          <span class="field-msg" role="alert"></span>
+        </div>
+        <div class="field">
+          <label for="project-description">Description</label>
+          <textarea id="project-description" name="description" rows="3" autocomplete="off"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit">Save Project</button>
+          <button class="btn btn--ghost" type="button" id="btn-cancel-project">Cancel</button>
+        </div>
+      </form>
+
+      <div class="entity-list" id="list-projects" role="list" aria-label="Project list">
+        <p class="empty-state" id="empty-projects">No projects yet. Create your first project to get started.</p>
+      </div>
+    </section>
+
+    <!-- ==================== Panel: Agent Profiles ==================== -->
+    <section
+      class="panel"
+      role="tabpanel"
+      id="panel-agents"
+      aria-labelledby="tab-agents"
+      hidden
+    >
+      <header class="panel-header">
+        <h2 class="panel-title">Agent Profiles</h2>
+        <button class="btn btn--primary" id="btn-add-agent" type="button">+ New Agent Profile</button>
+      </header>
+
+      <form class="entity-form" id="form-agent" aria-label="Agent profile form" hidden>
+        <h3 class="form-title" id="form-agent-title">New Agent Profile</h3>
+        <div class="field">
+          <label for="agent-name">Profile name <span aria-hidden="true">*</span></label>
+          <input type="text" id="agent-name" name="name" required autocomplete="off" />
+          <span class="field-msg" role="alert"></span>
+        </div>
+        <div class="field">
+          <label for="agent-role">Role <span aria-hidden="true">*</span></label>
+          <select id="agent-role" name="role" required>
+            <option value="planner">Planner</option>
+            <option value="worker">Worker</option>
+            <option value="reviewer">Reviewer</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="agent-model">Model string <span aria-hidden="true">*</span></label>
+          <input type="text" id="agent-model" name="model" required value="gpt-4o" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label for="agent-thinking-level">Thinking level</label>
+          <select id="agent-thinking-level" name="thinkingLevel">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <fieldset class="field fieldset">
+          <legend>Allowed tools</legend>
+          <label><input type="checkbox" name="allowedTools" value="read" /> Read files</label>
+          <label><input type="checkbox" name="allowedTools" value="edit" /> Edit files</label>
+          <label><input type="checkbox" name="allowedTools" value="bash" /> Shell commands</label>
+          <label><input type="checkbox" name="allowedTools" value="web" /> Web search</label>
+          <label><input type="checkbox" name="allowedTools" value="browser" /> Browser testing</label>
+        </fieldset>
+        <div class="field">
+          <label for="agent-system-prompt">System prompt <span class="optional">optional</span></label>
+          <textarea id="agent-system-prompt" name="systemPrompt" rows="4" placeholder="You are a helpful assistant that…" autocomplete="off"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit">Save Agent Profile</button>
+          <button class="btn btn--ghost" type="button" id="btn-cancel-agent">Cancel</button>
+        </div>
+      </form>
+
+      <div class="entity-list" id="list-agents" role="list" aria-label="Agent profile list">
+        <p class="empty-state" id="empty-agents">No agent profiles yet. Create an agent profile to define an LLM configuration.</p>
+      </div>
+    </section>
+
+    <!-- ==================== Panel: Runs ==================== -->
+    <section
+      class="panel"
+      role="tabpanel"
+      id="panel-runs"
+      aria-labelledby="tab-runs"
+      hidden
+    >
+      <header class="panel-header">
+        <h2 class="panel-title">Runs</h2>
+        <button class="btn btn--primary" id="btn-start-run" type="button">+ Start Run</button>
+      </header>
+
+      <form class="entity-form" id="form-run" aria-label="Start a new run" hidden>
+        <h3 class="form-title" id="form-run-title">Start a New Run</h3>
+        <div class="field">
+          <label for="run-project">Project</label>
+          <select id="run-project" name="projectId" required></select>
+          <span class="field-msg" role="alert"></span>
+        </div>
+        <div class="field">
+          <label for="run-agents">Agent Profiles</label>
+          <select id="run-agents" name="agentProfileIds" required multiple size="5" aria-describedby="run-agents-help"></select>
+          <p class="field-help" id="run-agents-help">Select one or more profiles. Use Shift or Command/Ctrl for multiple selections.</p>
+          <span class="field-msg" role="alert"></span>
+        </div>
+        <div class="field">
+          <label for="run-input">Input / Task description</label>
+          <textarea id="run-input" name="input" rows="4" placeholder="Describe the task for this run…" autocomplete="off"></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn--primary" type="submit">Start Run</button>
+          <button class="btn btn--ghost" type="button" id="btn-cancel-run">Cancel</button>
+        </div>
+      </form>
+
+      <!-- Run filters -->
+      <div class="run-filters" id="run-filters" role="search" aria-label="Filter runs">
+        <div class="filter-row">
+          <div class="filter-field filter-field--grow">
+            <input type="search" id="filter-search" placeholder="Search runs by text or artifact content…" autocomplete="off" aria-label="Search runs" />
+          </div>
+          <div class="filter-field">
+            <select id="filter-project" aria-label="Filter by project">
+              <option value="">All Projects</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <select id="filter-status" aria-label="Filter by status">
+              <option value="">All Statuses</option>
+              <option value="idle">○ Idle</option>
+              <option value="running">⟳ Running</option>
+              <option value="completed">✓ Completed</option>
+              <option value="failed">✗ Failed</option>
+            </select>
+          </div>
+          <div class="filter-field">
+            <input type="text" id="filter-agent" placeholder="Agent name…" autocomplete="off" aria-label="Filter by agent name" />
+          </div>
+          <button class="btn btn--ghost btn--sm" id="btn-clear-filters" type="button" title="Clear all filters">Clear</button>
+        </div>
+      </div>
+
+      <div class="entity-list" id="list-runs" role="list" aria-label="Run list">
+        <p class="empty-state" id="empty-runs">No runs started yet. Select a project and agent profile to begin.</p>
+      </div>
+
+      <!-- Run detail view (hidden until a run is selected) -->
+      <div class="run-detail" id="run-detail" hidden aria-label="Run detail">
+        <div id="run-detail-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Confirm dialog (native) -->
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <h3 id="confirm-title" class="confirm-title">Confirm</h3>
+    <p id="confirm-message">Are you sure?</p>
+    <div class="confirm-actions">
+      <button class="btn btn--danger" id="confirm-yes" type="button">Delete</button>
+      <button class="btn btn--ghost" id="confirm-no" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
