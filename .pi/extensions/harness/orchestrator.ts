@@ -308,6 +308,8 @@ async function runBuildEvaluatePhase(
 			contextItemCount: sprint.contextNeeded.length,
 			proofItemCount: sprint.proofRequired.length,
 			traceQuality: "pending",
+			dependencyCount: sprint.dependencies.length,
+			frictionCount: 0,
 		});
 
 		tracker.startPhase("generating", generatorAgentName);
@@ -418,7 +420,7 @@ async function runBuildEvaluatePhase(
 			};
 			results.push(sprintResult);
 			const traceQuality = assessSprintTrace(sprint, sprintResult);
-			widget.update({ traceQuality: traceQuality.level });
+			widget.update({ traceQuality: traceQuality.level, frictionCount: traceQuality.friction.length });
 			tracker.recordEvent({ event: "sprint_trace_quality", sprint: i + 1, ...traceQuality });
 			continue;
 		}
@@ -593,7 +595,7 @@ async function runBuildEvaluatePhase(
 		};
 		results.push(sprintResult);
 		const traceQuality = assessSprintTrace(sprint, sprintResult);
-		widget.update({ traceQuality: traceQuality.level });
+		widget.update({ traceQuality: traceQuality.level, frictionCount: traceQuality.friction.length });
 		tracker.recordEvent({ event: "sprint_trace_quality", sprint: i + 1, ...traceQuality });
 	}
 

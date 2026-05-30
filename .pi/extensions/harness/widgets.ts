@@ -68,6 +68,8 @@ export interface WidgetState {
 	contextItemCount: number;
 	proofItemCount: number;
 	traceQuality: WidgetTraceQualityStatus;
+	dependencyCount: number;
+	frictionCount: number;
 }
 
 /** Minimal theme type matching pi-tui's Theme (types not exported directly). */
@@ -253,6 +255,8 @@ export class HarnessWidget {
 			contextItemCount: 0,
 			proofItemCount: 0,
 			traceQuality: "pending",
+			dependencyCount: 0,
+			frictionCount: 0,
 		};
 	}
 
@@ -408,12 +412,15 @@ export class HarnessWidget {
 
 	private planLine(theme: WidgetTheme): string {
 		const s = this.state;
-		return [
+		const parts = [
 			`${this.c(theme, "muted", "lane")} ${s.riskLane || "normal"}`,
 			`${this.c(theme, "muted", "ctx")} ${s.contextItemCount}`,
 			`${this.c(theme, "muted", "proof")} ${s.proofItemCount}`,
 			`${this.c(theme, "muted", "trace")} ${this.c(theme, traceColor(s.traceQuality), traceWord(s.traceQuality))}`,
-		].join(" · ");
+		];
+		if (s.dependencyCount > 0) parts.push(`${this.c(theme, "muted", "dep")} ${s.dependencyCount}`);
+		if (s.frictionCount > 0) parts.push(`${this.c(theme, "muted", "fri")} ${s.frictionCount}`);
+		return parts.join(" · ");
 	}
 
 	private buildExpandedLines(width: number, theme: WidgetTheme): string[] {

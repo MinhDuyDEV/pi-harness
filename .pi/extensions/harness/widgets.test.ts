@@ -49,11 +49,14 @@ function renderWidget(width: number, update: Parameters<HarnessWidget["update"]>
 		contextItemCount: 2,
 		proofItemCount: 3,
 		traceQuality: "weak",
+		dependencyCount: 1,
+		frictionCount: 2,
 		iteration: 1,
 		maxIterations: 3,
 	});
 	const output = lines.join("\n");
 	assert.ok(output.includes("Phase graph"), "expanded widget labels the phase graph");
+	assert.ok(output.includes("dep 1") && output.includes("fri 2"), "expanded widget shows dependency and friction counts");
 	assert.ok(output.includes("task") && output.includes("Runtime seam"), "expanded widget shows the current task");
 	assert.ok(output.includes("lock read-only"), "reviewer rows show read-only lock semantics");
 	assert.ok(output.includes("gate FAIL · 2 cmd"), "expanded widget shows deterministic gate status and command count");
