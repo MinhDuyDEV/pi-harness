@@ -27,6 +27,8 @@ const SPINNER_INTERVAL_MS = 80;
 
 export type HarnessPhase = "initializing" | "planning" | "generating" | "evaluating" | "fixing" | "complete" | "failed" | "";
 export type AgentRole = "planner" | "generator" | "evaluator";
+export type VerificationGateStatus = "pending" | "running" | "passed" | "failed" | "skipped";
+export type ReviewStatus = "pending" | "running" | "passed" | "failed" | "skipped";
 
 export type ActiveTool = {
 	id: string;
@@ -56,6 +58,11 @@ export interface WidgetState {
 	maxIterations: number;
 	passedSprints: number;
 	failedSprints: number;
+	ownedFiles: string;
+	verificationCommandCount: number;
+	verificationStatus: VerificationGateStatus;
+	reviewStatus: ReviewStatus;
+	runnerMode: string;
 }
 
 /** Minimal theme type matching pi-tui's Theme (types not exported directly). */
@@ -89,6 +96,42 @@ function formatTokens(count: number): string {
 
 function formatCost(cost: number): string {
 	return cost > 0 ? `$${cost.toFixed(4)}` : "$0";
+}
+
+function splitFiles(files: string): string[] {
+	return files
+		.split(/[\n,]+/)
+		.map((file) => file.trim())
+		.filter(Boolean);
+}
+
+function compactFiles(files: string): string {
+	const items = splitFiles(files);
+	if (items.length === 0) return "—";
+	if (items.length === 1) return items[0];
+	return `${items[0]} +${items.length - 1}`;
+}
+
+function statusWord(status: VerificationGateStatus | ReviewStatus): string {
+	switch (status) {
+		case "running":
+			return "RUN";
+		case "passed":
+			return "PASS";
+		case "failed":
+			return "FAIL";
+		case "skipped":
+			return "SKIP";
+		default:
+			return "WAIT";
+	}
+}
+
+function statusColor(status: VerificationGateStatus | ReviewStatus): ThemeColor {
+	if (status === "passed") return "success";
+	if (status === "failed") return "error";
+	if (status === "running") return "accent";
+	return "muted";
 }
 
 function shortToolName(tool: string): string {
@@ -176,6 +219,11 @@ export class HarnessWidget {
 			maxIterations: 3,
 			passedSprints: 0,
 			failedSprints: 0,
+			ownedFiles: "",
+			verificationCommandCount: 0,
+			verificationStatus: "pending",
+			reviewStatus: "pending",
+			runnerMode: "",
 		};
 	}
 
@@ -296,6 +344,39 @@ export class HarnessWidget {
 		].join(" · ");
 	}
 
+	private statusBadge(theme: WidgetTheme, status: VerificationGateStatus | ReviewStatus): string {
+		return this.c(theme, statusColor(status), statusWord(status));
+	}
+
+	private taskStatus(theme: WidgetTheme): string {
+		const s = this.state;
+		if (s.phase === "complete") return this.c(theme, "success", "PASS");
+		if (s.phase === "failed") return this.c(theme, "error", "FAIL");
+		if (this.isRunning()) return this.c(theme, "accent", "RUN");
+		return this.c(theme, "muted", "WAIT");
+	}
+
+	private writeLockLine(theme: WidgetTheme): string {
+		const s = this.state;
+		const lock = s.agentRole === "generator" ? compactFiles(s.ownedFiles) : "read-only";
+		return `${this.c(theme, "muted", "lock")} ${lock}`;
+	}
+
+	private gateLine(theme: WidgetTheme): string {
+		const s = this.state;
+		const count = s.verificationCommandCount > 0 ? ` · ${s.verificationCommandCount} cmd` : "";
+		return `${this.c(theme, "muted", "gate")} ${this.statusBadge(theme, s.verificationStatus)}${count}`;
+	}
+
+	private reviewLine(theme: WidgetTheme): string {
+		return `${this.c(theme, "muted", "review")} ${this.statusBadge(theme, this.state.reviewStatus)}`;
+	}
+
+	private runnerLine(theme: WidgetTheme): string {
+		const mode = this.state.runnerMode || "sdk";
+		return `${this.c(theme, "muted", "runner")} ${mode}`;
+	}
+
 	private buildExpandedLines(width: number, theme: WidgetTheme): string[] {
 		const totalWidth = Math.max(80, width);
 		const contentWidth = totalWidth - 7;
@@ -304,22 +385,24 @@ export class HarnessWidget {
 		const s = this.state;
 		const pattern = s.pattern || "producer-reviewer";
 		const progress = this.sprintProgressBar(theme, 26);
-		const title = ` Harness · ${pattern} · ${progress || "planning"} · ${formatElapsed(Date.now() - this.startedAt)} `;
-		const top = `${this.c(theme, "border", "╭")}${this.c(theme, "borderAccent", borderSegment(" Workflow ", leftWidth + 2))}${this.c(theme, "border", "┬")}${this.c(theme, "borderAccent", borderSegment(title, rightWidth + 2))}${this.c(theme, "border", "╮")}`;
+		const title = ` Harness MC · ${pattern} · ${progress || "planning"} · ${formatElapsed(Date.now() - this.startedAt)} `;
+		const top = `${this.c(theme, "border", "╭")}${this.c(theme, "borderAccent", borderSegment(" Phase graph ", leftWidth + 2))}${this.c(theme, "border", "┬")}${this.c(theme, "borderAccent", borderSegment(title, rightWidth + 2))}${this.c(theme, "border", "╮")}`;
 		const bottom = `${this.c(theme, "border", "╰")}${this.c(theme, "border", "─".repeat(leftWidth + 2))}${this.c(theme, "border", "┴")}${this.c(theme, "border", "─".repeat(rightWidth + 2))}${this.c(theme, "border", "╯")}`;
 		const buildDone = Math.min(s.total, s.passedSprints + s.failedSprints);
 		const reviewProgress = pattern === "pipeline" ? "skipped" : s.iteration > 0 ? `${s.iteration}/${s.maxIterations}` : `0/${s.maxIterations}`;
 		const phaseRows = [
-			this.phaseRow(theme, "plan", "Investigate & plan", s.total > 0 ? "done" : "0/1"),
-			this.phaseRow(theme, "build", "Implement sprints", s.total > 0 ? `${buildDone}/${s.total}` : "0/0"),
-			this.phaseRow(theme, "review", pattern === "pipeline" ? "Pipeline" : "Review & repair", reviewProgress),
-			this.phaseRow(theme, "finish", "Finish", s.phase === "complete" ? "done" : s.phase === "failed" ? "failed" : "pending"),
+			this.phaseRow(theme, "plan", "Plan manifest", s.total > 0 ? `${s.total} tasks` : "0/1"),
+			this.phaseRow(theme, "build", "Implement owned seams", s.total > 0 ? `${buildDone}/${s.total}` : "0/0"),
+			this.phaseRow(theme, "review", pattern === "pipeline" ? "Deterministic gate" : "Gate + reviewer", reviewProgress),
+			this.phaseRow(theme, "finish", "Merge decision", s.phase === "complete" ? "passed" : s.phase === "failed" ? "failed" : "pending"),
 		];
+		const sprintLabel = s.total > 0 ? `${s.sprint || 0}/${s.total}` : "planning";
 		const rightRows = [
-			`${this.phaseIcon(theme)} ${this.c(theme, s.phase === "failed" ? "error" : "accent", this.b(theme, this.phaseLabel()))}`,
-			this.agentLine(theme),
+			`${this.taskStatus(theme)} ${this.c(theme, s.phase === "failed" ? "error" : "accent", this.b(theme, this.phaseLabel()))}`,
+			`${this.c(theme, "muted", "task")} ${s.sprintTitle || "sprint manifest"} ${this.c(theme, "dim", `(${sprintLabel})`)}`,
+			`${this.agentLine(theme)} · ${this.runnerLine(theme)}`,
+			`${this.writeLockLine(theme)} · ${this.gateLine(theme)} · ${this.reviewLine(theme)}`,
 		];
-		if (s.total > 0) rightRows.push(`${this.c(theme, "muted", "sprint")} ${s.sprint || 0}/${s.total}${s.sprintTitle ? ` · ${s.sprintTitle}` : ""}`);
 		if (pattern !== "pipeline" && s.iteration > 0) rightRows.push(`${this.c(theme, "muted", "iteration")} ${s.iteration}/${s.maxIterations}`);
 		rightRows.push(`${this.c(theme, "muted", "tools")} ${this.activeToolLine(theme)}`);
 		rightRows.push(`${this.metricsLine(theme)} · ${this.c(theme, "muted", "phase")} ${formatElapsed(Date.now() - this.phaseStartedAt)} · ${this.c(theme, "muted", "sprint")} ${formatElapsed(Date.now() - this.sprintStartedAt)}`);
@@ -335,12 +418,13 @@ export class HarnessWidget {
 		const s = this.state;
 		const pattern = s.pattern || "producer-reviewer";
 		const progress = this.sprintProgressBar(theme, 18);
-		const header = `${this.phaseIcon(theme)} ${this.b(theme, "Harness")} · ${pattern}${progress ? ` · ${progress}` : ""}`;
+		const header = `${this.taskStatus(theme)} ${this.b(theme, "Harness")} · ${pattern}${progress ? ` · ${progress}` : ""}`;
 		const rows = [
 			header,
 			`  ${this.c(theme, "accent", this.phaseLabel())} · ${this.agentLine(theme)}`,
 		];
-		if (s.sprintTitle) rows.push(`  ${this.c(theme, "muted", "sprint")} ${s.sprint}/${s.total} · ${s.sprintTitle}`);
+		if (s.sprintTitle) rows.push(`  ${this.c(theme, "muted", "task")} ${s.sprint}/${s.total} · ${s.sprintTitle}`);
+		rows.push(`  ${this.writeLockLine(theme)} · ${this.gateLine(theme)} · ${this.reviewLine(theme)}`);
 		rows.push(`  ${this.c(theme, "muted", "tools")} ${this.activeToolLine(theme)}`);
 		rows.push(`  ${this.metricsLine(theme)}`);
 		return rows.map((line) => truncateToWidth(line, width, "…"));
@@ -350,8 +434,9 @@ export class HarnessWidget {
 		const s = this.state;
 		const sprint = s.total > 0 ? ` ${s.sprint || 0}/${s.total}` : "";
 		const agent = s.agentName ? ` · ${s.agentName}` : "";
+		const gate = ` · gate:${statusWord(s.verificationStatus)}`;
 		const metrics = ` · ↻${s.turnCount} ↑${formatTokens(s.inputTokens)} ↓${formatTokens(s.outputTokens)} c${formatTokens(s.cacheReadTokens)}/${formatTokens(s.cacheWriteTokens)} $${formatCost(s.totalCost).slice(1)}`;
-		return [truncateToWidth(`${this.phaseIcon(theme)} harness${sprint} · ${this.phaseLabel()}${agent}${metrics}`, width, "…")];
+		return [truncateToWidth(`${this.taskStatus(theme)} harness${sprint}${gate} · ${this.phaseLabel()}${agent}${metrics}`, width, "…")];
 	}
 
 	private buildLines(width: number, theme: WidgetTheme): string[] {

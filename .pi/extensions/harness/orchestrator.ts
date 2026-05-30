@@ -299,6 +299,10 @@ async function runBuildEvaluatePhase(
 			cacheReadTokens: 0,
 			cacheWriteTokens: 0,
 			totalCost: 0,
+			ownedFiles: sprint.files,
+			verificationCommandCount: sprint.verificationCommands.length,
+			verificationStatus: sprint.verificationCommands.length > 0 ? "pending" : "skipped",
+			reviewStatus: params.pattern === "pipeline" ? "skipped" : "pending",
 		});
 
 		tracker.startPhase("generating", generatorAgentName);
@@ -348,11 +352,12 @@ async function runBuildEvaluatePhase(
 		tracker.appendState(`sprint ${i + 1} generation`, `Generator completed sprint ${i + 1}: ${sprint.title}.`, sprint.files ? [`Planned files: ${sprint.files}`] : []);
 
 		if (params.pattern === "pipeline") {
+			widget.update({ phase: "evaluating", verificationStatus: sprint.verificationCommands.length > 0 ? "running" : "skipped", reviewStatus: "skipped", activeTools: [] });
 			const verification = runVerificationCommands(sprint.verificationCommands, runCwd, DEFAULT_HARNESS_POLICY);
 			const pipelinePassed = verification.status !== "failed";
 			if (pipelinePassed) passedSprintCount++;
 			else failedSprintCount++;
-			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, activeTools: [] });
+			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, verificationStatus: verification.status, reviewStatus: "skipped", activeTools: [] });
 			const detail = `pipeline mode — no evaluator; ${formatVerificationSummary(verification)}`;
 			writeProgress(tracker.runDir, i + 1, sprint.title, pipelinePassed, detail);
 			tracker.appendState(`sprint ${i + 1} pipeline`, detail);
@@ -386,10 +391,13 @@ async function runBuildEvaluatePhase(
 				cacheReadTokens: 0,
 				cacheWriteTokens: 0,
 				totalCost: 0,
+				verificationStatus: sprint.verificationCommands.length > 0 ? "running" : "skipped",
+				reviewStatus: "pending",
 			});
 
 			tracker.startPhase("evaluating", evaluatorAgentName);
 			lastVerification = runVerificationCommands(sprint.verificationCommands, runCwd, DEFAULT_HARNESS_POLICY);
+			widget.update({ verificationStatus: lastVerification.status, reviewStatus: "running" });
 			const verificationText = formatVerificationSummary(lastVerification);
 			tracker.appendState(`sprint ${i + 1} verification iter ${iteration + 1}`, verificationText);
 			const evaluatorPrompt = [
@@ -429,6 +437,7 @@ async function runBuildEvaluatePhase(
 			evalText = evalRun.outputText;
 			const evalResult = parseEvalOutput(evalText, sprint.criteria);
 			passed = evalResult.verdict === "PASS" && lastVerification.status !== "failed";
+			widget.update({ reviewStatus: passed ? "passed" : "failed" });
 			const failedCriteria = evalResult.criteria.filter((c) => !c.passes);
 
 			notify(
@@ -473,6 +482,7 @@ async function runBuildEvaluatePhase(
 				cacheReadTokens: 0,
 				cacheWriteTokens: 0,
 				totalCost: 0,
+				reviewStatus: "failed",
 			});
 
 			tracker.startPhase("fixing", generatorAgentName);
@@ -583,7 +593,7 @@ export async function orchestrateHarnessRun(
 
 	// Widget for live progress
 	const widget = new HarnessWidget(ctx);
-	widget.update({ pattern: params.pattern, maxIterations: params.iterations });
+	widget.update({ pattern: params.pattern, maxIterations: params.iterations, runnerMode: agentRunnerMode(params) });
 
 	// Tracker for full run artifacts
 	const tracker = new HarnessTracker(projectRoot, params.prompt);

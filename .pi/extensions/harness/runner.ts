@@ -69,6 +69,13 @@ export async function runHarnessAgent(opts: HarnessAgentRunRequest): Promise<Har
 			model: opts.model,
 			thinking: opts.thinking,
 			signal: opts.signal,
+			onUsage: (usage) => opts.widget.update({
+				agentName: opts.agentName,
+				agentRole: opts.role,
+				agentModel: modelLabel(opts.model),
+				agentThinking: opts.thinking ?? "",
+				...usage,
+			}),
 		});
 		return { mode: opts.mode, status: "completed", outputText: result.outputText, sessionFile: result.sessionFile, paneId: result.paneId };
 	}
