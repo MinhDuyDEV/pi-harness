@@ -50,7 +50,14 @@ export function runVerificationCommands(
 		});
 	}
 
-	const failed = results.some((result) => !result.allowed || result.exitCode !== 0);
+	const failed = results.some((result) => {
+		if (!result.allowed) return true;
+		if (result.exitCode !== 0) return true;
+		// Commands that echo "FAIL" or "ERROR" are failures even if exit code is 0.
+		const stdout = result.stdout.toLowerCase();
+		if (/(?:^|\n)\s*(?:fail|error|failed)\s*(?:$|\n)/.test(stdout)) return true;
+		return false;
+	});
 	return { status: failed ? "failed" : "passed", results };
 }
 

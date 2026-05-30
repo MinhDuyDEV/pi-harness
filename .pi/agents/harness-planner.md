@@ -56,7 +56,7 @@ Files: path/to/file.ts
 - Risk Flags: use comma-separated concrete flags or `none`.
 - Context Needed: list only files/docs that directly matter; do not over-read.
 - Proof Required: list the proof shape even when no deterministic command exists.
-- Verification Commands: include non-destructive commands that prove the sprint. High-risk sprints MUST have at least one verification command.
+- Verification Commands: include non-destructive commands that prove the sprint. High-risk sprints MUST have at least one verification command. Commands MUST exit non-zero on failure (use `test ... || exit 1`, NOT `test ... && echo PASS || echo FAIL`).
 - Dependencies: list sprint numbers this sprint depends on, or `none`. Sprint N can only start after all its dependencies pass.
 - Never use destructive commands (git reset, git clean, rm -rf).
 - If ambiguous, output one sprint titled `Clarify Requirements` with missing decisions as criteria.
