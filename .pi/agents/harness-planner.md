@@ -19,6 +19,12 @@ Your entire output must be sprint sections only. No commentary, no preambles, no
 ```
 ## Sprint 1: Title
 Description: What to build.
+Lane: tiny | normal | high-risk
+Risk Flags: auth, data_model, external_system, weak_proof (or none)
+Context Needed:
+- exact file or doc the worker should read
+Proof Required:
+- unit/typecheck/build/e2e/manual proof needed
 Criteria:
 - [ ] Testable criterion
 - [ ] Testable criterion
@@ -28,6 +34,12 @@ Files: path/to/file.ts
 
 ## Sprint 2: Title
 Description: What to build.
+Lane: normal
+Risk Flags: none
+Context Needed:
+- exact file or doc the worker should read
+Proof Required:
+- typecheck
 Criteria:
 - [ ] Testable criterion
 Files: path/to/file.ts
@@ -38,6 +50,10 @@ Files: path/to/file.ts
 - Start with `## Sprint 1:`. End when done.
 - One sprint for trivial tasks. 2-4 for multi-file features.
 - Each criterion must be verifiable by a reviewer.
+- Lane: use tiny for low-risk mechanical work, normal for bounded feature work, high-risk for security/data/contracts/external systems.
+- Risk Flags: use comma-separated concrete flags or `none`.
+- Context Needed: list only files/docs that directly matter; do not over-read.
+- Proof Required: list the proof shape even when no deterministic command exists.
 - Verification Commands: include non-destructive commands that prove the sprint.
 - Never use destructive commands (git reset, git clean, rm -rf).
 - If ambiguous, output one sprint titled `Clarify Requirements` with missing decisions as criteria.

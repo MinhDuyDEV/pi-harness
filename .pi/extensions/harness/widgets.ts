@@ -29,6 +29,7 @@ export type HarnessPhase = "initializing" | "planning" | "generating" | "evaluat
 export type AgentRole = "planner" | "generator" | "evaluator";
 export type VerificationGateStatus = "pending" | "running" | "passed" | "failed" | "skipped";
 export type ReviewStatus = "pending" | "running" | "passed" | "failed" | "skipped";
+export type WidgetTraceQualityStatus = "pending" | "weak" | "ok" | "strong";
 
 export type ActiveTool = {
 	id: string;
@@ -63,6 +64,10 @@ export interface WidgetState {
 	verificationStatus: VerificationGateStatus;
 	reviewStatus: ReviewStatus;
 	runnerMode: string;
+	riskLane: string;
+	contextItemCount: number;
+	proofItemCount: number;
+	traceQuality: WidgetTraceQualityStatus;
 }
 
 /** Minimal theme type matching pi-tui's Theme (types not exported directly). */
@@ -131,6 +136,26 @@ function statusColor(status: VerificationGateStatus | ReviewStatus): ThemeColor 
 	if (status === "passed") return "success";
 	if (status === "failed") return "error";
 	if (status === "running") return "accent";
+	return "muted";
+}
+
+function traceWord(status: WidgetTraceQualityStatus): string {
+	switch (status) {
+		case "strong":
+			return "STRONG";
+		case "ok":
+			return "OK";
+		case "weak":
+			return "WEAK";
+		default:
+			return "WAIT";
+	}
+}
+
+function traceColor(status: WidgetTraceQualityStatus): ThemeColor {
+	if (status === "strong") return "success";
+	if (status === "ok") return "accent";
+	if (status === "weak") return "error";
 	return "muted";
 }
 
@@ -224,6 +249,10 @@ export class HarnessWidget {
 			verificationStatus: "pending",
 			reviewStatus: "pending",
 			runnerMode: "",
+			riskLane: "normal",
+			contextItemCount: 0,
+			proofItemCount: 0,
+			traceQuality: "pending",
 		};
 	}
 
@@ -377,6 +406,16 @@ export class HarnessWidget {
 		return `${this.c(theme, "muted", "runner")} ${mode}`;
 	}
 
+	private planLine(theme: WidgetTheme): string {
+		const s = this.state;
+		return [
+			`${this.c(theme, "muted", "lane")} ${s.riskLane || "normal"}`,
+			`${this.c(theme, "muted", "ctx")} ${s.contextItemCount}`,
+			`${this.c(theme, "muted", "proof")} ${s.proofItemCount}`,
+			`${this.c(theme, "muted", "trace")} ${this.c(theme, traceColor(s.traceQuality), traceWord(s.traceQuality))}`,
+		].join(" · ");
+	}
+
 	private buildExpandedLines(width: number, theme: WidgetTheme): string[] {
 		const totalWidth = Math.max(80, width);
 		const contentWidth = totalWidth - 7;
@@ -400,6 +439,7 @@ export class HarnessWidget {
 		const rightRows = [
 			`${this.taskStatus(theme)} ${this.c(theme, s.phase === "failed" ? "error" : "accent", this.b(theme, this.phaseLabel()))}`,
 			`${this.c(theme, "muted", "task")} ${s.sprintTitle || "sprint manifest"} ${this.c(theme, "dim", `(${sprintLabel})`)}`,
+			this.planLine(theme),
 			`${this.agentLine(theme)} · ${this.runnerLine(theme)}`,
 			`${this.writeLockLine(theme)} · ${this.gateLine(theme)} · ${this.reviewLine(theme)}`,
 		];
@@ -424,6 +464,7 @@ export class HarnessWidget {
 			`  ${this.c(theme, "accent", this.phaseLabel())} · ${this.agentLine(theme)}`,
 		];
 		if (s.sprintTitle) rows.push(`  ${this.c(theme, "muted", "task")} ${s.sprint}/${s.total} · ${s.sprintTitle}`);
+		rows.push(`  ${this.planLine(theme)}`);
 		rows.push(`  ${this.writeLockLine(theme)} · ${this.gateLine(theme)} · ${this.reviewLine(theme)}`);
 		rows.push(`  ${this.c(theme, "muted", "tools")} ${this.activeToolLine(theme)}`);
 		rows.push(`  ${this.metricsLine(theme)}`);
@@ -435,8 +476,9 @@ export class HarnessWidget {
 		const sprint = s.total > 0 ? ` ${s.sprint || 0}/${s.total}` : "";
 		const agent = s.agentName ? ` · ${s.agentName}` : "";
 		const gate = ` · gate:${statusWord(s.verificationStatus)}`;
+		const trace = ` · trace:${traceWord(s.traceQuality)}`;
 		const metrics = ` · ↻${s.turnCount} ↑${formatTokens(s.inputTokens)} ↓${formatTokens(s.outputTokens)} c${formatTokens(s.cacheReadTokens)}/${formatTokens(s.cacheWriteTokens)} $${formatCost(s.totalCost).slice(1)}`;
-		return [truncateToWidth(`${this.taskStatus(theme)} harness${sprint}${gate} · ${this.phaseLabel()}${agent}${metrics}`, width, "…")];
+		return [truncateToWidth(`${this.taskStatus(theme)} harness${sprint}${gate}${trace} · ${this.phaseLabel()}${agent}${metrics}`, width, "…")];
 	}
 
 	private buildLines(width: number, theme: WidgetTheme): string[] {

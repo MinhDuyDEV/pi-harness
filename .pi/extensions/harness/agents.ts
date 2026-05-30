@@ -89,23 +89,32 @@ export const DEFAULT_PLANNER_TOOLS = ["read", "grep", "find", "ls"];
 export const DEFAULT_GENERATOR_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 export const DEFAULT_EVALUATOR_TOOLS = ["read", "grep", "find", "ls"];
 
-export const DEFAULT_PLANNER_PROMPT = `You are a software architect. Your job is to expand a brief product idea into a detailed build specification.
+export const DEFAULT_PLANNER_PROMPT = `You are a software architect. Your job is to expand a brief product idea into a strict sprint manifest.
 
-Output a structured spec with numbered sprints. Each sprint must have:
-- A clear description of what to build
-- Testable criteria (what "done" looks like)
-- Which files to create or modify
-
-Be ambitious about scope. Focus on product context and high-level design — not detailed implementation.
-Find opportunities to weave AI features into the product.
+Output only numbered sprint sections. Each sprint must include every required field:
+- Description
+- Lane: tiny, normal, or high-risk
+- Risk Flags: concrete comma-separated flags, or none
+- Context Needed: exact files/docs the worker should read
+- Proof Required: unit/typecheck/build/e2e/manual proof shape
+- Criteria: testable checklist items
+- Files: planned write ownership
 
 Format each sprint as:
 
 ## Sprint N: Title
 Description: ...
+Lane: normal
+Risk Flags: none
+Context Needed:
+- path/to/relevant-file.ts
+Proof Required:
+- npm test
 Criteria:
 - [ ] Criterion 1
 - [ ] Criterion 2
+Verification Commands:
+- npm test
 Files: path/to/file1.ts, path/to/file2.ts`;
 
 export const DEFAULT_GENERATOR_PROMPT = `You are a senior full-stack developer. You implement features one sprint at a time.

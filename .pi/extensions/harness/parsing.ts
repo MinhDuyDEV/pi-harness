@@ -10,10 +10,16 @@ import type { TextContent } from "@earendil-works/pi-ai";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+export type HarnessRiskLane = "tiny" | "normal" | "high-risk";
+
 export interface Sprint {
 	number: number;
 	title: string;
 	description: string;
+	riskLane: HarnessRiskLane;
+	riskFlags: string[];
+	contextNeeded: string[];
+	proofRequired: string[];
 	criteria: string;
 	files: string;
 	skills: string[];
@@ -58,8 +64,10 @@ export const HARNESS_FORMAT_INSTRUCTIONS = `
 
 This harness enforces a strict sprint manifest format. If you do not follow it, your output will be rejected.
 
-Required fields per sprint: Description, Criteria, Files.
+Required fields per sprint: Description, Lane, Risk Flags, Context Needed, Proof Required, Criteria, Files.
 Optional: Skills, Verification Commands.
+
+Use Lane: tiny, normal, or high-risk. Risk Flags, Context Needed, Proof Required, Skills, and Verification Commands may be bullet lists or comma-separated inline values.
 
 Start with \`## Sprint 1:\`. Output only sprint sections. No commentary.`;
 
@@ -117,17 +125,32 @@ export function parseCriteriaItems(criteria: string): string[] {
 		.filter(Boolean);
 }
 
-function parseListSection(body: string, label: string, stopLabels: string[]): string[] {
+function parseTextSection(body: string, label: string, stopLabels: string[]): string {
 	const stops = stopLabels.map((item) => `\\n${item}:`).join("|");
-	const regex = new RegExp(`${label}:?\\s*\\n([\\s\\S]*?)(?=${stops}|$)`);
-	const match = body.match(regex);
-	return match?.[1]
-		?.split("\n")
-		.map((line) => line.replace(/^[-*]\s*/, "").trim())
-		.filter(Boolean) ?? [];
+	const regex = new RegExp(`${label}:?\\s*([\\s\\S]*?)(?=${stops}|$)`);
+	return body.match(regex)?.[1]?.trim() ?? "";
 }
 
-export function parseSprints(text: string, options: { allowFallback?: boolean } = {}): Sprint[] {
+function parseListSection(body: string, label: string, stopLabels: string[]): string[] {
+	return parseTextSection(body, label, stopLabels)
+		.split(/\n|,/)
+		.map((line) => line.replace(/^[-*]\s*/, "").trim())
+		.filter((line) => Boolean(line) && !["none", "n/a", "na"].includes(line.toLowerCase()));
+}
+
+function parseRiskLane(value: string): HarnessRiskLane | null {
+	const normalized = value.trim().toLowerCase().replace(/_/g, "-");
+	if (normalized === "tiny") return "tiny";
+	if (normalized === "normal") return "normal";
+	if (normalized === "high-risk" || normalized === "high risk") return "high-risk";
+	return null;
+}
+
+function hasSection(body: string, label: string): boolean {
+	return new RegExp(`(^|\\n)${label}:`, "i").test(body);
+}
+
+export function parseSprints(text: string): Sprint[] {
 	const normalizedText = text.replace(/\r\n/g, "\n");
 	const sprints: Sprint[] = [];
 	const sprintRegex = /## Sprint (\d+):\s*(.+?)\n([\s\S]*?)(?=\n## Sprint |\n*$)/g;
@@ -136,27 +159,22 @@ export function parseSprints(text: string, options: { allowFallback?: boolean } 
 		const num = Number.parseInt(match[1], 10);
 		const title = match[2].trim();
 		const body = match[3].trim();
-		const criteriaMatch = body.match(/Criteria?:?\s*\n?([\s\S]*?)(?=\nSkills:|\nVerification Commands:|\nFiles:|$)/);
-		const criteria = criteriaMatch?.[1]?.trim() ?? body;
+		const stopLabels = ["Description", "Lane", "Risk Flags", "Context Needed", "Proof Required", "Criteria", "Skills", "Verification Commands", "Files"];
+		const requiredSections = ["Description", "Lane", "Risk Flags", "Context Needed", "Proof Required", "Criteria", "Files"];
+		if (!requiredSections.every((label) => hasSection(body, label))) continue;
+		const description = parseTextSection(body, "Description", stopLabels);
+		const criteriaMatch = body.match(/Criteria?:?\s*\n?([\s\S]*?)(?=\nLane:|\nRisk Flags:|\nContext Needed:|\nProof Required:|\nSkills:|\nVerification Commands:|\nFiles:|$)/);
+		const criteria = criteriaMatch?.[1]?.trim() ?? "";
+		const riskLane = parseRiskLane(parseTextSection(body, "Lane", stopLabels));
+		const riskFlags = parseListSection(body, "Risk Flags", stopLabels);
+		const contextNeeded = parseListSection(body, "Context Needed", stopLabels);
+		const proofRequired = parseListSection(body, "Proof Required", stopLabels);
 		const skills = parseListSection(body, "Skills", ["Verification Commands", "Files"]);
 		const verificationCommands = parseListSection(body, "Verification Commands", ["Files"]);
 		const filesMatch = body.match(/Files:?\s*(.+?)$/m);
 		const files = filesMatch?.[1]?.trim() ?? "";
-		sprints.push({ number: num, title, description: body, criteria, files, skills, verificationCommands });
-	}
-
-	if (sprints.length === 0 && normalizedText.trim() && options.allowFallback) {
-		const lines = normalizedText.trim().split("\n");
-		const firstLine = lines[0].replace(/^#+\s*/, "").slice(0, 80);
-		sprints.push({
-			number: 1,
-			title: firstLine || "Implementation",
-			description: normalizedText.trim(),
-			criteria: normalizedText.trim(),
-			files: "",
-			skills: [],
-			verificationCommands: [],
-		});
+		if (!description || !criteria || !riskLane || !files) continue;
+		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, skills, verificationCommands });
 	}
 
 	return sprints;

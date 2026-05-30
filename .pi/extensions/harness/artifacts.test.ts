@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
 
-import { writeProgress, HarnessTracker, generateWorkflowScript, resolveProjectRoot } from "./artifacts.js";
+import { writeProgress, HarnessTracker, generateWorkflowScript } from "./artifacts.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -186,6 +186,27 @@ function teardown() {
 }
 
 {
+	const t = "HarnessTracker.saveTraceQuality writes TRACE-QUALITY.json";
+	const dir = setup();
+
+	const tracker = new HarnessTracker(dir, "Trace quality test");
+	tracker.saveTraceQuality({
+		level: "ok",
+		score: 4,
+		maxScore: 5,
+		friction: ["missing deterministic proof"],
+		items: [],
+	});
+	const tracePath = join(tracker.runDir, "TRACE-QUALITY.json");
+	assert.ok(existsSync(tracePath), t);
+	const trace = JSON.parse(readFileSync(tracePath, "utf-8"));
+	assert.equal(trace.level, "ok", t);
+	assert.deepEqual(trace.friction, ["missing deterministic proof"], t);
+
+	teardown();
+}
+
+{
 	const t = "HarnessTracker.saveSession writes output and cache-aware usage without transcript";
 	const dir = setup();
 	const tracker = new HarnessTracker(dir, "Session test");
@@ -293,13 +314,6 @@ function teardown() {
 	assert.ok(slug !== null, t);
 
 	teardown();
-}
-
-// ─── resolveProjectRoot re-export ────────────────────────────────────────────
-
-{
-	const t = "resolveProjectRoot is re-exported from artifacts";
-	assert.equal(typeof resolveProjectRoot, "function", t);
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

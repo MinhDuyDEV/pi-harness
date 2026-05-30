@@ -128,7 +128,7 @@ Delegate when specialist context, isolation, or parallelism improves correctness
 
 ## Harness Boundary
 
-Harness is an execution layer, not an authority. Use harness for product-level builds when routed by `APPEND_SYSTEM.md` or explicitly requested. Do not use harness for small edits, docs, prompt/config changes, or harness internals unless explicitly requested. After harness runs, inspect diffs, reject unrelated changes, and verify before accepting output. Do not commit or push harness output unless the user asks.
+Harness is an execution layer, not an authority. Harness features are enforcement mechanisms, not authority: the main agent defines intent, scope, and proof; the harness may execute, observe, isolate, and verify, but harness output is never accepted without independent inspection. Use harness for product-level builds when routed by `APPEND_SYSTEM.md` or explicitly requested. Do not use harness for small edits, docs, prompt/config changes, or harness internals unless explicitly requested. After harness runs, inspect diffs, reject unrelated changes, and verify before accepting output. Do not commit or push harness output unless the user asks.
 
 ---
 

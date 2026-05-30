@@ -44,6 +44,7 @@ import { isInsideTmux } from "./interactivePane.js";
 import { runHarnessAgent, type AgentRunnerMode } from "./runner.js";
 import { filterToolsForRole, DEFAULT_HARNESS_POLICY, type HarnessAgentRole } from "./policy.js";
 import { formatVerificationSummary, runVerificationCommands } from "./verification.js";
+import { assessRunTrace, assessSprintTrace, formatTraceQualitySummary, type RunTraceQualitySummary } from "./traceQuality.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -245,7 +246,7 @@ async function runPlanningPhase(
 	tracker.saveSpec(specText);
 
 	const sprints = parseSprints(specText);
-	tracker.appendState("planning", `Planner produced ${sprints.length} strict sprint(s).`, sprints.map((sprint) => `Sprint ${sprint.number}: ${sprint.title}`));
+	tracker.appendState("planning", `Planner produced ${sprints.length} strict sprint(s).`, sprints.map((sprint) => `Sprint ${sprint.number}: ${sprint.title} · lane ${sprint.riskLane} · proof ${sprint.proofRequired.length}`));
 	return { specText, sprints };
 }
 
@@ -303,6 +304,10 @@ async function runBuildEvaluatePhase(
 			verificationCommandCount: sprint.verificationCommands.length,
 			verificationStatus: sprint.verificationCommands.length > 0 ? "pending" : "skipped",
 			reviewStatus: params.pattern === "pipeline" ? "skipped" : "pending",
+			riskLane: sprint.riskLane,
+			contextItemCount: sprint.contextNeeded.length,
+			proofItemCount: sprint.proofRequired.length,
+			traceQuality: "pending",
 		});
 
 		tracker.startPhase("generating", generatorAgentName);
@@ -317,6 +322,12 @@ async function runBuildEvaluatePhase(
 			`Implement Sprint ${i + 1}: ${sprint.title}`,
 			"",
 			`Description: ${sprint.description}`,
+			`Lane: ${sprint.riskLane}`,
+			`Risk Flags: ${sprint.riskFlags.length > 0 ? sprint.riskFlags.join(", ") : "none"}`,
+			"Context Needed:",
+			...(sprint.contextNeeded.length > 0 ? sprint.contextNeeded.map((item) => `- ${item}`) : ["- none listed"]),
+			"Proof Required:",
+			...(sprint.proofRequired.length > 0 ? sprint.proofRequired.map((item) => `- ${item}`) : ["- none listed"]),
 			"",
 			"Criteria:",
 			sprint.criteria,
@@ -361,13 +372,17 @@ async function runBuildEvaluatePhase(
 			const detail = `pipeline mode — no evaluator; ${formatVerificationSummary(verification)}`;
 			writeProgress(tracker.runDir, i + 1, sprint.title, pipelinePassed, detail);
 			tracker.appendState(`sprint ${i + 1} pipeline`, detail);
-			results.push({
+			const sprintResult: SprintResult = {
 				sprint: sprint.title,
 				iterations: 1,
 				passed: pipelinePassed,
 				evalOutput: "(pipeline mode — no evaluator)",
 				verification,
-			});
+			};
+			results.push(sprintResult);
+			const traceQuality = assessSprintTrace(sprint, sprintResult);
+			widget.update({ traceQuality: traceQuality.level });
+			tracker.recordEvent({ event: "sprint_trace_quality", sprint: i + 1, ...traceQuality });
 			continue;
 		}
 
@@ -402,6 +417,11 @@ async function runBuildEvaluatePhase(
 			tracker.appendState(`sprint ${i + 1} verification iter ${iteration + 1}`, verificationText);
 			const evaluatorPrompt = [
 				`Test Sprint ${i + 1}: ${sprint.title}`,
+				"",
+				`Lane: ${sprint.riskLane}`,
+				`Risk Flags: ${sprint.riskFlags.length > 0 ? sprint.riskFlags.join(", ") : "none"}`,
+				"Proof Required:",
+				...(sprint.proofRequired.length > 0 ? sprint.proofRequired.map((item) => `- ${item}`) : ["- none listed"]),
 				"",
 				"Criteria:",
 				sprint.criteria,
@@ -523,13 +543,17 @@ async function runBuildEvaluatePhase(
 			tracker.appendState(`sprint ${i + 1} fix iter ${iteration + 1}`, `Generator attempted fixes for sprint ${i + 1}.`);
 		}
 
-		results.push({
+		const sprintResult: SprintResult = {
 			sprint: sprint.title,
 			iterations: Math.max(1, iteration + 1),
 			passed,
 			evalOutput: evalText,
 			verification: lastVerification,
-		});
+		};
+		results.push(sprintResult);
+		const traceQuality = assessSprintTrace(sprint, sprintResult);
+		widget.update({ traceQuality: traceQuality.level });
+		tracker.recordEvent({ event: "sprint_trace_quality", sprint: i + 1, ...traceQuality });
 	}
 
 	return { results, passedSprintCount, failedSprintCount };
@@ -546,11 +570,18 @@ function buildFinalReport(
 	workspace: HarnessWorkspace,
 	workflowSlug: string | null,
 	watch: HarnessTmuxWatch,
+	traceSummary: RunTraceQualitySummary,
 ): string {
 	const allPassed = results.every((r) => r.passed);
 	const reportLines = results
-		.map((r, i) => `| ${i + 1} | ${r.sprint} | ${r.passed ? "[✓] PASS" : "[x] FAIL"} | ${r.verification?.status ?? "unknown"} | ${r.iterations} |`)
+		.map((r, i) => {
+			const trace = traceSummary.items[i]?.level ?? "weak";
+			return `| ${i + 1} | ${r.sprint} | ${r.passed ? "[✓] PASS" : "[x] FAIL"} | ${r.verification?.status ?? "unknown"} | ${trace} | ${r.iterations} |`;
+		})
 		.join("\n");
+	const frictionLines = traceSummary.friction.length > 0
+		? ["", "**Harness friction**:", ...traceSummary.friction.slice(0, 8).map((item) => `- ${item}`)]
+		: ["", "**Harness friction**: none"];
 
 	return [
 		"## Harness Build Results",
@@ -563,9 +594,11 @@ function buildFinalReport(
 		watch.attachCommand ? `**Watch**: ${watch.attachCommand}` : params.tmuxMode === "off" ? "**Watch**: off" : watch.warning ? `**Watch**: ${watch.warning}` : "",
 		watch.warning && watch.attachCommand ? `**Tmux note**: ${watch.warning}` : "",
 		workspace.isolated ? `**Workspace**: worktree — ${workspace.worktreePath}` : `**Workspace**: current — ${workspace.cwd}`,
-		"| Sprint | Title | Result | Verification | Iterations |",
-		"|--------|-------|--------|--------------|------------|",
+		`**Trace quality**: ${traceSummary.level} (${traceSummary.score}/${traceSummary.maxScore})`,
+		"| Sprint | Title | Result | Verification | Trace | Iterations |",
+		"|--------|-------|--------|--------------|-------|------------|",
 		reportLines,
+		...frictionLines,
 		"",
 		allPassed
 			? "All sprints passed. Consider integration testing, deployment, and polish."
@@ -581,9 +614,8 @@ function buildFinalReport(
  * Coordinates planning, implementation, verification, and progress updates
  * while preserving workspace policy and git safety guarantees.
  *
- * Returns the same shape as the original index.ts execute() method to
- * maintain backward compatibility. Error handling and progress updates
- * remain equivalent for successful and failed runs.
+ * Returns the extension tool result consumed by index.ts. Planner manifests
+ * are strict; invalid contracts fail before implementation.
  */
 export async function orchestrateHarnessRun(
 	params: HarnessRunParams,
@@ -758,10 +790,13 @@ export async function orchestrateHarnessRun(
 
 	// Save tracking artifacts
 	tracker.saveTiming();
+	const traceSummary = assessRunTrace(sprints, results);
+	tracker.saveTraceQuality(traceSummary);
+	tracker.appendState("trace quality", formatTraceQualitySummary(traceSummary));
 
-	const finalReport = buildFinalReport(params, results, specText, sprints, tracker, workspace, workflowSlug, watch);
+	const finalReport = buildFinalReport(params, results, specText, sprints, tracker, workspace, workflowSlug, watch, traceSummary);
 	tracker.saveReport(finalReport);
-	tracker.recordEvent({ event: "run_end", passed: allPassed });
+	tracker.recordEvent({ event: "run_end", passed: allPassed, traceQuality: traceSummary.level, frictionCount: traceSummary.friction.length });
 	widget.clear();
 
 	return {

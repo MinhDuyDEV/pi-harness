@@ -37,7 +37,7 @@ function renderWidget(width: number, update: Parameters<HarnessWidget["update"]>
 		runnerMode: "sdk",
 		sprint: 2,
 		total: 4,
-		sprintTitle: "Runtime compatibility seam",
+		sprintTitle: "Runtime seam",
 		agentName: "harness-reviewer",
 		agentRole: "evaluator",
 		agentModel: "deepseek-v4-flash",
@@ -45,15 +45,20 @@ function renderWidget(width: number, update: Parameters<HarnessWidget["update"]>
 		verificationCommandCount: 2,
 		verificationStatus: "failed",
 		reviewStatus: "running",
+		riskLane: "high-risk",
+		contextItemCount: 2,
+		proofItemCount: 3,
+		traceQuality: "weak",
 		iteration: 1,
 		maxIterations: 3,
 	});
 	const output = lines.join("\n");
 	assert.ok(output.includes("Phase graph"), "expanded widget labels the phase graph");
-	assert.ok(output.includes("task") && output.includes("Runtime compatibility seam"), "expanded widget shows the current task");
+	assert.ok(output.includes("task") && output.includes("Runtime seam"), "expanded widget shows the current task");
 	assert.ok(output.includes("lock read-only"), "reviewer rows show read-only lock semantics");
 	assert.ok(output.includes("gate FAIL · 2 cmd"), "expanded widget shows deterministic gate status and command count");
 	assert.ok(output.includes("review RUN"), "expanded widget separates reviewer status from gate status");
+	assert.ok(output.includes("lane high-risk") && output.includes("trace WEAK"), "expanded widget shows risk lane and trace quality");
 	for (const line of lines) assert.ok(visibleWidth(line) <= 100, `line exceeds width: ${line}`);
 }
 
@@ -71,10 +76,15 @@ function renderWidget(width: number, update: Parameters<HarnessWidget["update"]>
 		verificationCommandCount: 1,
 		verificationStatus: "pending",
 		reviewStatus: "skipped",
+		riskLane: "normal",
+		contextItemCount: 1,
+		proofItemCount: 1,
+		traceQuality: "pending",
 	});
 	const output = lines.join("\n");
 	assert.ok(output.includes("lock src/index.tsx +1"), "generator rows compact planned write ownership");
 	assert.ok(output.includes("gate WAIT · 1 cmd"), "normal widget shows pending gate command");
+	assert.ok(output.includes("ctx 1") && output.includes("proof 1"), "normal widget shows context and proof plan counts");
 	for (const line of lines) assert.ok(visibleWidth(line) <= 72, `line exceeds width: ${line}`);
 }
 
@@ -85,8 +95,10 @@ function renderWidget(width: number, update: Parameters<HarnessWidget["update"]>
 		total: 3,
 		agentName: "harness-worker",
 		verificationStatus: "running",
+		traceQuality: "ok",
 	});
 	assert.equal(lines.length, 1, "compact widget renders one line");
 	assert.ok(lines[0].includes("gate:RUN"), "compact widget preserves gate status");
+	assert.ok(lines[0].includes("trace:OK"), "compact widget preserves trace quality");
 	assert.ok(visibleWidth(lines[0]) <= 59, "compact line fits requested width");
 }

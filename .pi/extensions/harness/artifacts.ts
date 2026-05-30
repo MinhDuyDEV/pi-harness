@@ -2,23 +2,15 @@
  * Workspace/progress artifact utilities for the Harness extension.
  *
  * Separates run tracking, progress logging, and workflow script generation
- * from the main execution flow. Git safety (workspace isolation, project root
- * resolution) is delegated to ./gitSafety.js — this module re-exports those
- * types and functions for backward compatibility.
+ * from the main execution flow. Git safety stays in ./gitSafety.js.
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { extractText, getLastAssistantText, type Sprint, type SprintResult } from "./parsing.js";
-import {
-	resolveProjectRoot,
-	createHarnessWorkspace,
-	type HarnessWorkspace,
-} from "./gitSafety.js";
-
-// Re-export git safety types and functions for callers that import from artifacts.
-export { resolveProjectRoot, createHarnessWorkspace, type HarnessWorkspace };
+import type { RunTraceQualitySummary } from "./traceQuality.js";
+import type { HarnessWorkspace } from "./gitSafety.js";
 
 // ─── Progress Artifacts ───────────────────────────────────────────────────────
 
@@ -436,6 +428,11 @@ export class HarnessTracker {
 	/** Write final build report. */
 	saveReport(report: string) {
 		this.write("BUILD-REPORT.md", report);
+	}
+
+	/** Write trace-quality and harness-friction summary. */
+	saveTraceQuality(summary: RunTraceQualitySummary) {
+		this.writeJSON("TRACE-QUALITY.json", summary);
 	}
 
 	/** Write harness workspace/isolation metadata. */

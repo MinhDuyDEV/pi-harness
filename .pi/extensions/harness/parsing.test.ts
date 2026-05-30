@@ -91,6 +91,12 @@ import {
 	const t = "parseSprints extracts numbered sprint sections";
 	const input = `## Sprint 1: Setup Project
 Description: Initialize the project structure
+Lane: normal
+Risk Flags: none
+Context Needed:
+- package.json
+Proof Required:
+- unit
 Criteria:
 - [ ] Create package.json
 - [ ] Add TypeScript config
@@ -98,6 +104,12 @@ Files: package.json, tsconfig.json
 
 ## Sprint 2: Core Logic
 Description: Implement the core algorithm
+Lane: normal
+Risk Flags: none
+Context Needed:
+- src/index.ts
+Proof Required:
+- unit
 Criteria:
 - [ ] Write main module
 Files: src/index.ts`;
@@ -118,6 +130,12 @@ Files: src/index.ts`;
 	const t = "parseSprints extracts optional Skills section";
 	const input = `## Sprint 1: Debug Flow
 Description: Fix failing runtime flow
+Lane: normal
+Risk Flags: weak_proof
+Context Needed:
+- src/runtime.ts
+Proof Required:
+- regression test
 Criteria:
 - [ ] Reproduce failure
 - [ ] Add regression coverage
@@ -139,22 +157,13 @@ Files: src/runtime.ts`;
 }
 
 {
-	const t = "parseSprints can explicitly allow loose fallback";
-	const input = "Just a simple description with no sprint markers.\nCriteria:\n- [ ] Do something";
-	const sprints = parseSprints(input, { allowFallback: true });
-	assert.equal(sprints.length, 1, t);
-	assert.equal(sprints[0].number, 1, t);
-	assert.equal(sprints[0].title, "Just a simple description with no sprint markers.", t);
-}
-
-{
 	const t = "parseSprints handles empty input";
 	assert.deepEqual(parseSprints(""), [], t);
 }
 
 {
 	const t = "parseSprints handles Windows line endings";
-	const input = "## Sprint 1: Test\r\nDescription: Win line endings\r\nCriteria:\r\n- [ ] A\r\nFiles: a.ts";
+	const input = "## Sprint 1: Test\r\nDescription: Win line endings\r\nLane: tiny\r\nRisk Flags: none\r\nContext Needed:\r\n- a.ts\r\nProof Required:\r\n- node --check\r\nCriteria:\r\n- [ ] A\r\nFiles: a.ts";
 	const sprints = parseSprints(input);
 	assert.equal(sprints.length, 1, t);
 	assert.equal(sprints[0].title, "Test", t);
@@ -164,6 +173,12 @@ Files: src/runtime.ts`;
 	const t = "parseSprints extracts criteria before Files:";
 	const input = `## Sprint 1: Feature
 Description: Build feature
+Lane: normal
+Risk Flags: none
+Context Needed:
+- main.ts
+Proof Required:
+- unit
 Criteria:
 - [ ] Criterion A
 - [ ] Criterion B
@@ -177,6 +192,12 @@ Files: main.ts`;
 	const t = "parseSprints extracts optional Verification Commands section";
 	const input = `## Sprint 1: Feature
 Description: Build feature
+Lane: normal
+Risk Flags: none
+Context Needed:
+- src/index.js
+Proof Required:
+- unit
 Criteria:
 - [ ] Criterion A
 Verification Commands:
@@ -186,6 +207,40 @@ Files: src/index.js`;
 	const sprints = parseSprints(input);
 	assert.deepEqual(sprints[0].verificationCommands, ["npm test", "node --check src/index.js"], t);
 	assert.ok(!sprints[0].criteria.includes("Verification Commands:"), t);
+}
+
+{
+	const t = "parseSprints extracts risk, context, and proof metadata";
+	const input = `## Sprint 1: Auth Gate
+Description: Add guarded route behavior
+Lane: high-risk
+Risk Flags: auth, authorization
+Context Needed:
+- docs/product/permissions.md
+- src/auth/session.ts
+Proof Required: unit, integration, e2e smoke
+Criteria:
+- [ ] Reject anonymous users
+Verification Commands:
+- npm test -- auth
+Files: src/auth/session.ts, test/auth.test.ts`;
+	const sprints = parseSprints(input);
+	assert.equal(sprints[0].description, "Add guarded route behavior", t);
+	assert.equal(sprints[0].riskLane, "high-risk", t);
+	assert.deepEqual(sprints[0].riskFlags, ["auth", "authorization"], t);
+	assert.deepEqual(sprints[0].contextNeeded, ["docs/product/permissions.md", "src/auth/session.ts"], t);
+	assert.deepEqual(sprints[0].proofRequired, ["unit", "integration", "e2e smoke"], t);
+	assert.ok(!sprints[0].criteria.includes("Proof Required:"), t);
+}
+
+{
+	const t = "parseSprints rejects incomplete sprint sections missing required risk metadata";
+	const input = `## Sprint 1: Incomplete Manifest
+Description: Missing strict metadata
+Criteria:
+- [ ] Still works
+Files: src/index.js`;
+	assert.deepEqual(parseSprints(input), [], t);
 }
 
 // ─── parseCriteriaItems ───────────────────────────────────────────────────────
