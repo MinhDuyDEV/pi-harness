@@ -87,8 +87,12 @@ export class NudgeManager {
     }
 
     // Zone 3: Above effective max — critical nudge
-    // Skip if auto-compact already fired to avoid duplicate critical nudges
-    if (contextPercent >= config.maxContextLimit && !this.state.autoCompactTriggered) {
+    if (contextPercent >= config.maxContextLimit) {
+      // Auto-compact already produced the critical pressure signal. Do not fall
+      // through to gentle nudges while still above max; that creates duplicate
+      // messages with a weaker tone for the same unresolved pressure event.
+      if (this.state.autoCompactTriggered) return null;
+
       this.state.pendingNudge = this.buildCriticalNudge(contextTokens, contextPercent);
       this.state.lastNudgeTurn = this.currentTurn;
       return this.state.pendingNudge;
