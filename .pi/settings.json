@@ -12,7 +12,7 @@
     "npm:@tintinweb/pi-subagents",
     "npm:@tintinweb/pi-tasks",
     "npm:@marckrenn/pi-sub-bar",
-    "npm:@heyhuynhgiabuu/pi-diff",
+    "git:github.com/heyhuynhgiabuu/pi-diff@v0.5.0",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:@sting8k/pi-vcc",
