@@ -13,3 +13,13 @@ Use this directory for small scripts that:
 Do **not** put Pi extension tools here. Extension tools belong in `.pi/extensions/` so Pi can register them through the extension runtime.
 
 Before adding a helper, prefer direct shell commands. Add a script only when the command becomes repeated, error-prone, or needs structured output.
+
+## Candidate wrappers
+
+Browser and UI verification are the main use case for `.pi/cli/` because they benefit from repeatable commands and saved artifacts:
+
+- `browser-devtools.mjs` — connect to an existing Chrome DevTools endpoint, inspect console/network/DOM state, and write findings to `.pi/plans/<id>/BROWSER-DEVTOOLS.md`.
+- `playwright-flow.mjs` — run a scripted browser flow with Playwright, save screenshots/traces/logs, and write a summary to `.pi/plans/<id>/PLAYWRIGHT-FLOW.md`.
+- `browser-screenshot.mjs` — capture deterministic screenshots for visual review and save outputs under `.pi/plans/<id>/screenshots/`.
+
+Keep these wrappers thin: argument parsing, command execution, artifact writing. Put reusable Pi-facing tools in `.pi/extensions/` instead.
