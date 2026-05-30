@@ -29,7 +29,7 @@ skill({ name: "planning-and-task-breakdown" });
 
 ## Core Rules
 
-- Do not use external task trackers or orchestration CLIs.
+- Keep the plan self-contained under `.pi/plans/$ARGUMENTS/`.
 - Read `.pi/plans/$ARGUMENTS/SPEC.md` before planning.
 - Write durable outputs to `.pi/plans/$ARGUMENTS/` only.
 - Direct tools first; use tmux/self-spawn only when fresh context is worth the overhead.

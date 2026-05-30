@@ -23,7 +23,7 @@ skill({ name: "code-review-and-quality" });
 
 - Direct implementation in this session is the default.
 - Use tmux/self-spawn only for independent, file-disjoint work with written prompts and written outputs.
-- Do not use external task trackers, hidden workers, or orchestration CLIs.
+- Keep execution state in `.pi/plans/$ARGUMENTS/` artifacts and current-session notes.
 - Read files before editing; verify every meaningful change.
 - Never stage with `git add .`; stage explicit files only when the user asks for a commit.
 - Do not mix unrelated dirty work into the shipped scope.

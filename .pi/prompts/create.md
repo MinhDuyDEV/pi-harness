@@ -5,7 +5,7 @@ argument-hint: "<description> [--type epic|feature|task|bug] [--spec-only]"
 
 # Create: $ARGUMENTS
 
-Create a durable work artifact under `.pi/plans/<id>/` — no hidden task extension, no external orchestration.
+Create a durable work artifact under `.pi/plans/<id>/` with visible files and explicit next steps.
 
 > **Workflow:** `/create` → `/plan <id>` when needed → `/ship <id>`
 >
@@ -20,7 +20,7 @@ skill({ name: "using-git-worktrees" }); // only if isolated workspace is request
 
 ## Rules
 
-- Do not use external issue-tracker CLIs, hidden task tools, or hidden worker orchestration.
+- Keep all planning state in visible files under `.pi/plans/<id>/`.
 - Do not implement code in this command.
 - Prefer direct repo inspection, memory search, and visible files.
 - If research needs fresh context, write a brief file and explicitly self-spawn Pi via tmux/`pi --print-turn`; require written output before trusting it.

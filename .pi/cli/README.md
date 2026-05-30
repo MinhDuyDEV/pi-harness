@@ -5,7 +5,7 @@ Project-local CLI helpers live here when a workflow needs repeatable local autom
 Use this directory for small scripts that:
 
 - run through `bash` or another local command from Pi;
-- do not require MCP adapters, hidden task runners, or background orchestration services;
+- do not require background services unless the user explicitly starts them;
 - take explicit file/path arguments instead of reading hidden runtime state;
 - write durable outputs under `.pi/plans/<id>/` when used for handoffs;
 - are safe to inspect, rerun, and verify independently.
