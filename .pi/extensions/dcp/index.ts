@@ -10,9 +10,12 @@ import type {
   ContextEvent,
   ExtensionAPI,
   ExtensionContext,
+  InputEvent,
+  SessionBeforeCompactEvent,
   ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 
+import type { Message } from "@earendil-works/pi-ai";
 import { DEFAULT_CONFIG, type DCPConfig } from "./config.js";
 import {
   cleanupSession,
@@ -42,7 +45,9 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   }
 
   // ── Event: input — track turns ──────────────────────────────────────
-  pi.on("input", () => {
+  pi.on("input", (event: InputEvent) => {
+    // Skip mid-stream steers — only count idle prompts and follow-ups
+    if (event.streamingBehavior === "steer") return;
     nudge.incTurn();
   });
 
@@ -91,7 +96,8 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     try {
       ensureInitialized(ctx);
       const sessionId = ctx.cwd; // use cwd as session identifier
-      const pruned = processContextMessages(event.messages as any, sessionId, config);
+      // ContextEvent.messages is AgentMessage[] (internal), but processContextMessages handles all message types
+      const pruned = processContextMessages(event.messages as Message[], sessionId, config);
       return { messages: pruned };
     } catch {
       // best-effort — return unmodified on error
@@ -99,7 +105,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   });
 
   // ── Event: session_before_compact — enrich with DCP blocks ──────────
-  pi.on("session_before_compact", async (event: any, ctx: ExtensionContext) => {
+  pi.on("session_before_compact", async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
     try {
       ensureInitialized(ctx);
       const sessionId = ctx.cwd;

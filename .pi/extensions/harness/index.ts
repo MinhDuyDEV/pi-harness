@@ -20,7 +20,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { TextContent } from "@earendil-works/pi-ai";
-import { Type } from "typebox";
+import { Type } from "@sinclair/typebox";
 import { resolveProjectRoot } from "./gitSafety.js";
 import { orchestrateHarnessRun } from "./orchestrator.js";
 

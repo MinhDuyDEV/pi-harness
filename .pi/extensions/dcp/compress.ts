@@ -8,12 +8,15 @@
  */
 
 import type {
-  AgentMessage,
   AssistantMessage,
-  ToolCallContent,
+  ImageContent,
+  Message,
+  TextContent,
+  ThinkingContent,
+  ToolCall,
   ToolResultMessage,
   UserMessage,
-} from "@earendil-works/pi-agent-core";
+} from "@earendil-works/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -21,6 +24,38 @@ import type {
 import { Type } from "@sinclair/typebox";
 
 import type { DCPConfig } from "./config.js";
+
+// ---------------------------------------------------------------------------
+// Custom message types (internal to DCP extension)
+// ---------------------------------------------------------------------------
+
+/** Custom message type for DCP compressed summaries */
+interface DCPCompressedSummaryMessage {
+  role: "custom";
+  customType: "dcp-compressed-summary";
+  content: string;
+  display: boolean;
+  timestamp: number;
+}
+
+/** Internal Pi message type for bash execution results */
+interface BashExecutionMessage {
+  role: "bashExecution";
+  command: string;
+  output: string;
+}
+
+/** Internal Pi message type for compaction summaries */
+interface CompactionSummaryMessage {
+  role: "compactionSummary";
+  summary: string;
+}
+
+/** Internal Pi message type for branch summaries */
+interface BranchSummaryMessage {
+  role: "branchSummary";
+  summary: string;
+}
 
 // ---------------------------------------------------------------------------
 // In-memory block storage
@@ -113,15 +148,15 @@ export function getStats(sessionId: string) {
 /**
  * Estimate token count for a message using chars/4 heuristic.
  */
-function estimateTokens(msg: AgentMessage): number {
+function estimateTokens(msg: Message): number {
   let chars = 0;
   if (msg.role === "assistant") {
     const asst = msg as AssistantMessage;
     for (const part of asst.content) {
-      if (part.type === "text") chars += (part as any).text?.length ?? 0;
-      else if (part.type === "thinking") chars += (part as any).thinking?.length ?? 0;
+      if (part.type === "text") chars += (part as TextContent).text?.length ?? 0;
+      else if (part.type === "thinking") chars += (part as ThinkingContent).thinking?.length ?? 0;
       else if (part.type === "toolCall") {
-        const tc = part as ToolCallContent;
+        const tc = part as ToolCall;
         chars += tc.name.length + JSON.stringify(tc.arguments).length;
       }
     }
@@ -129,15 +164,15 @@ function estimateTokens(msg: AgentMessage): number {
     const um = msg as UserMessage;
     if (typeof um.content === "string") chars = um.content.length;
     else if (Array.isArray(um.content))
-      chars = um.content.reduce((s: number, c: any) => s + (c.text?.length ?? 0), 0);
+      chars = um.content.reduce((s: number, c: TextContent | ImageContent) => s + (c.type === "text" ? c.text.length : 0), 0);
   } else if (msg.role === "toolResult") {
     const tr = msg as ToolResultMessage;
-    chars = tr.content.reduce((s: number, c: any) => s + (c.text?.length ?? 0), 0);
-  } else if ((msg as any).role === "bashExecution") {
-    const b = msg as any;
+    chars = tr.content.reduce((s: number, c: TextContent | ImageContent) => s + (c.type === "text" ? c.text.length : 0), 0);
+  } else if ((msg as BashExecutionMessage).role === "bashExecution") {
+    const b = msg as BashExecutionMessage;
     chars = (b.command?.length ?? 0) + (b.output?.length ?? 0);
-  } else if ((msg as any).role === "compactionSummary" || (msg as any).role === "branchSummary") {
-    chars = (msg as any).summary?.length ?? 0;
+  } else if ((msg as CompactionSummaryMessage).role === "compactionSummary" || (msg as BranchSummaryMessage).role === "branchSummary") {
+    chars = (msg as CompactionSummaryMessage | BranchSummaryMessage).summary?.length ?? 0;
   }
   return Math.ceil(chars / 4);
 }
@@ -147,7 +182,7 @@ function estimateToolArgsTokens(args: unknown): number {
 }
 
 /** Strip tool arguments from a tool call content block, replace with a marker */
-function stripToolArgs(tc: ToolCallContent, marker: string): number {
+function stripToolArgs(tc: ToolCall, marker: string): number {
   const before = estimateToolArgsTokens(tc.arguments);
   tc.arguments = { __dcp: marker };
   return before;
@@ -164,7 +199,7 @@ interface ToolOp {
   isError: boolean;
 }
 
-function extractToolOps(messages: AgentMessage[]): ToolOp[] {
+function extractToolOps(messages: Message[]): ToolOp[] {
   const ops: ToolOp[] = [];
   for (let mi = 0; mi < messages.length; mi++) {
     const msg = messages[mi];
@@ -174,7 +209,7 @@ function extractToolOps(messages: AgentMessage[]): ToolOp[] {
       for (let ci = 0; ci < asst.content.length; ci++) {
         const part = asst.content[ci];
         if (part.type === "toolCall") {
-          const tc = part as ToolCallContent;
+          const tc = part as ToolCall;
           ops.push({ messageIndex: mi, contentIndex: ci, type: "call", toolName: tc.name, toolCallId: tc.id, isError: false });
         }
       }
@@ -193,9 +228,9 @@ function extractToolOps(messages: AgentMessage[]): ToolOp[] {
  * and replace those messages with a compact summary message.
  */
 function applyCompressStrip(
-  messages: AgentMessage[],
+  messages: Message[],
   config: DCPConfig,
-): { messages: AgentMessage[]; prunedTokens: number; prunedCount: number } {
+): { messages: Message[]; prunedTokens: number; prunedCount: number } {
   const ops = extractToolOps(messages);
   const compressResults: Array<{
     callIndex: number;
@@ -214,7 +249,7 @@ function applyCompressStrip(
     const resultMsg = messages[op.messageIndex] as ToolResultMessage;
     let fullText = "";
     for (const part of resultMsg.content) {
-      if (part.type === "text") fullText += (part as any).text ?? "";
+      if (part.type === "text") fullText += (part as TextContent).text ?? "";
     }
     const marker = "The following is the authoritative summary of the compressed range:";
     const idx = fullText.indexOf(marker);
@@ -222,8 +257,8 @@ function applyCompressStrip(
 
     // Extract topic from call
     const callMsg = messages[callOp.messageIndex] as AssistantMessage;
-    const tc = callMsg.content[callOp.contentIndex] as ToolCallContent;
-    const topic = (tc.arguments as any)?.topic ?? "compressed";
+    const tc = callMsg.content[callOp.contentIndex] as ToolCall;
+    const topic = (tc.arguments as Record<string, unknown>)?.topic ?? "compressed";
 
     compressResults.push({
       callIndex: callOp.messageIndex,
@@ -259,8 +294,8 @@ function applyCompressStrip(
 
       const m = messages[j];
       // Nest previously compressed summaries
-      if ((m as any).role === "custom" && (m as any).customType === "dcp-compressed-summary") {
-        const content = (m as any).content;
+      if ((m as Record<string, unknown>)?.role === "custom" && (m as Record<string, unknown>)?.customType === "dcp-compressed-summary") {
+        const content = (m as Record<string, unknown>)?.content;
         if (typeof content === "string" && content.trim()) nestedSummaries.push(content);
       }
       // Preserve protected tool outputs
@@ -269,7 +304,7 @@ function applyCompressStrip(
         if (protectedSet.has(tr.toolName) && !tr.isError) {
           let text = "";
           for (const part of tr.content) {
-            if (part.type === "text") text += (part as any).text ?? "";
+            if (part.type === "text") text += (part as TextContent).text ?? "";
           }
           if (text.trim()) protectedContent.push(`[${tr.toolName}] ${text.trim()}`);
         }
@@ -279,7 +314,7 @@ function applyCompressStrip(
         const um = m as UserMessage;
         let text = "";
         if (typeof um.content === "string") text = um.content;
-        else if (Array.isArray(um.content)) text = um.content.reduce((s: string, c: any) => s + (c.text ?? ""), "");
+        else if (Array.isArray(um.content)) text = um.content.reduce((s: string, c: TextContent | ImageContent) => s + (c.type === "text" ? c.text : ""), "");
         if (text.trim()) protectedContent.push(`[user] ${text.trim()}`);
       }
     }
@@ -305,7 +340,7 @@ function applyCompressStrip(
   }
 
   // Rebuild message array
-  const newMessages: AgentMessage[] = [];
+  const newMessages: Message[] = [];
   const injectionMap = new Map<number, typeof injections>();
   for (const inj of injections) {
     if (!injectionMap.has(inj.atIndex)) injectionMap.set(inj.atIndex, []);
@@ -317,12 +352,12 @@ function applyCompressStrip(
     if (injects) {
       for (const inj of injects) {
         newMessages.push({
-          role: "custom" as any,
+          role: "custom",
           customType: "dcp-compressed-summary",
           content: inj.summary,
           display: false,
           timestamp: Date.now(),
-        } as any);
+        } as DCPCompressedSummaryMessage);
       }
     }
     if (indicesToRemove.has(i)) continue;
@@ -341,7 +376,7 @@ function applyCompressStrip(
  * strip the arguments from older calls and replace result content with a short marker.
  */
 function applyDedup(
-  messages: AgentMessage[],
+  messages: Message[],
   config: DCPConfig,
 ): { prunedTokens: number; prunedCount: number } {
   if (!config.dedup.enabled) return { prunedTokens: 0, prunedCount: 0 };
@@ -354,7 +389,7 @@ function applyDedup(
     if (op.type !== "call" || !op.toolName || protectedSet.has(op.toolName)) continue;
     // Hash the arguments
     const asst = messages[op.messageIndex] as AssistantMessage;
-    const tc = asst.content[op.contentIndex] as ToolCallContent;
+    const tc = asst.content[op.contentIndex] as ToolCall;
     const hash = JSON.stringify(tc.arguments);
     const key = `${op.toolName}:${hash}`;
     if (!groups.has(key)) groups.set(key, []);
@@ -370,13 +405,13 @@ function applyDedup(
       const oldCall = calls[i];
       // Strip call arguments
       const asst = messages[oldCall.messageIndex] as AssistantMessage;
-      const tc = asst.content[oldCall.contentIndex] as ToolCallContent;
+      const tc = asst.content[oldCall.contentIndex] as ToolCall;
       prunedTokens += stripToolArgs(tc, "deduplicated");
       // Strip corresponding result
       for (const op of ops) {
         if (op.type === "result" && op.toolCallId === oldCall.toolCallId) {
           const rm = messages[op.messageIndex] as ToolResultMessage;
-          const textPart = rm.content.find((c) => c.type === "text") as any;
+          const textPart = rm.content.find((c) => c.type === "text") as TextContent | undefined;
           const snippet = textPart?.text?.slice(0, 100).replace(/\n/g, " ").trim() ?? "";
           rm.content = [{ type: "text", text: `[duplicate: ${oldCall.toolName} — ${snippet}…]` }];
           prunedCount++;
@@ -396,7 +431,7 @@ function applyDedup(
  * Strip large input arguments from errored tool calls older than N turns.
  */
 function applyPurgeErrors(
-  messages: AgentMessage[],
+  messages: Message[],
   config: DCPConfig,
 ): { prunedTokens: number; prunedCount: number } {
   if (!config.purgeErrors.enabled) return { prunedTokens: 0, prunedCount: 0 };
@@ -421,7 +456,7 @@ function applyPurgeErrors(
     if (estimatedTurns < config.purgeErrors.turns) continue;
 
     const asst = messages[op.messageIndex] as AssistantMessage;
-    const tc = asst.content[op.contentIndex] as ToolCallContent;
+    const tc = asst.content[op.contentIndex] as ToolCall;
     const argsLen = JSON.stringify(tc.arguments).length;
     // Only strip substantial inputs (> ~50 tokens)
     if (argsLen < 200) continue;
@@ -443,10 +478,10 @@ function applyPurgeErrors(
  * then dedup and purge-errors operate on the remaining messages.
  */
 export function processContextMessages(
-  messages: AgentMessage[],
+  messages: Message[],
   sessionId: string,
   config: DCPConfig,
-): AgentMessage[] {
+): Message[] {
   const state = getState(sessionId);
 
   // 1. Compress-strip

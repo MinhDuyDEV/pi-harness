@@ -24,6 +24,7 @@
  *   - Maturity states: candidate → established → proven (auto-deprecate on harmful)
  */
 
+import type { TextContent } from "@earendil-works/pi-ai";
 import { MEMORY_CONFIG } from "./memory/config.js";
 import { curateFromDistillations } from "./memory/curator.js";
 import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
@@ -37,9 +38,17 @@ import { refreshAllScores } from "./memory/scoring.js";
 import { registerMemoryTools } from "./memory/tools.js";
 import { generatePersona, readPersona } from "./memory/persona.js";
 import { detectAndStoreScenes, listScenes } from "./memory/scene.js";
+import type {
+  AgentEndEvent,
+  BeforeAgentStartEvent,
+  ExtensionContext,
+  InputEvent,
+  SessionCompactEvent,
+  ToolResultEvent,
+} from "@earendil-works/pi-coding-agent";
 
 // Stable session identifier from Pi's extension context
-function getSessionId(ctx: any, _event?: any): string {
+function getSessionId(ctx: ExtensionContext, _event?: unknown): string {
   return ctx?.sessionManager?.getSessionId?.() ?? ctx?.cwd ?? "default";
 }
 
@@ -77,8 +86,11 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	let maintenanceCycleCount = 0;
 
 	// --- Capture user messages ---
-	pi.on("input", (event: any, ctx: any) => {
+	pi.on("input", (event: InputEvent, ctx: ExtensionContext) => {
 		if (!MEMORY_CONFIG.capture.enabled) return;
+
+		// Skip mid-stream steers — only process idle prompts and follow-ups
+		if (event.streamingBehavior === "steer") return;
 
 		try {
 			const text =
@@ -113,22 +125,22 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	});
 
 	// --- Capture tool results ---
-	pi.on("tool_result", (event: any, ctx: any) => {
+	pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
 		if (!MEMORY_CONFIG.capture.enabled) return;
 
 		try {
-			const toolName = event?.name ?? event?.toolName ?? "tool";
-			const toolCallId = event?.toolCallId ?? event?.id ?? null;
-			const isError = Boolean(event?.isError ?? event?.error);
+			const toolName = event.toolName ?? "tool";
+			const toolCallId = event.toolCallId ?? null;
+			const isError = Boolean(event.isError);
 			const status = isError ? "error" : "completed";
 			let rawJson = stringifyForCapture(event, MEMORY_CONFIG.capture.maxRawJsonLength);
 			if (rawJson && MEMORY_CONFIG.sanitization.enabled) {
 				rawJson = sanitize(rawJson).text;
 			}
-			const textParts = Array.isArray(event?.content)
+			const textParts = Array.isArray(event.content)
 				? event.content
-					.filter((c: any) => c?.type === "text" && typeof c.text === "string")
-					.map((c: any) => c.text)
+					.filter((c): c is TextContent => c.type === "text" && typeof c.text === "string")
+					.map((c) => c.text)
 				: [];
 			const legacyResult = event?.result;
 			const legacyText =
@@ -136,8 +148,8 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 					? legacyResult
 					: Array.isArray(legacyResult?.content)
 						? legacyResult.content
-								.filter((c: any) => c?.type === "text" && typeof c.text === "string")
-								.map((c: any) => c.text)
+								.filter((c): c is TextContent => c?.type === "text" && typeof c.text === "string")
+								.map((c) => c.text)
 								.join("\n")
 						: typeof legacyResult?.content === "string"
 							? legacyResult.content
@@ -181,7 +193,9 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	const pipelineTurnCounts = new Map<string, { count: number; warmupThreshold: number; lastRunMs: number; lastActivityMs: number }>();
 
 	// --- Track user input for turn counting ---
-	pi.on("input", (_event: any, ctx: any) => {
+	pi.on("input", (_event: InputEvent, ctx: ExtensionContext) => {
+		// Skip mid-stream steers — only count idle prompts and follow-ups
+		if (_event.streamingBehavior === "steer") return;
 		const sessionId = getSessionId(ctx, _event);
 		const state = pipelineTurnCounts.get(sessionId) ?? {
 			count: 0,
@@ -232,7 +246,7 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	}
 
 	// --- Run pipeline on agent_end ---
-	pi.on("agent_end", async (event: any, ctx: any) => {
+	pi.on("agent_end", async (event: AgentEndEvent, ctx: ExtensionContext) => {
 		try {
 			const sessionId = getSessionId(ctx, event);
 
@@ -318,7 +332,7 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	});
 
 	// --- Reset pipeline state on session compact ---
-	pi.on("session_compact", (_event: any, ctx: any) => {
+	pi.on("session_compact", (_event: SessionCompactEvent, ctx: ExtensionContext) => {
 		try {
 			const sessionId = getSessionId(ctx, _event);
 			pipelineTurnCounts.delete(sessionId);
@@ -328,7 +342,7 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 	});
 
 	// --- Auto context injection on agent start ---
-	pi.on("before_agent_start", async (event: any) => {
+	pi.on("before_agent_start", async (event: BeforeAgentStartEvent) => {
 		if (!MEMORY_CONFIG.injection.enabled) return;
 
 		try {
