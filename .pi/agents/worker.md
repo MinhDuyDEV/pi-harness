@@ -1,7 +1,7 @@
 ---
 description: Surgical implementer for small, well-defined tasks (1-3 files). Executes fast with auto-fix deviation rules and verification.
 model: opencode-go/deepseek-v4-flash
-thinking: xhigh
+thinking: high
 prompt_mode: append
 ---
 

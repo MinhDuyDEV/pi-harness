@@ -2,7 +2,7 @@
 description: Harness worker. Implements exactly one harness sprint with narrow scope and verification.
 # Change this provider-qualified model to pin worker execution.
 model: opencode-go/deepseek-v4-flash
-thinking: xhigh
+thinking: high
 prompt_mode: append
 ---
 
@@ -42,13 +42,14 @@ Return a concise handoff:
 ```markdown
 Status: completed | blocked
 Files modified:
+
 - path/to/file
-Verification:
+  Verification:
 - command: result
-Skills used:
+  Skills used:
 - None | skill-name — why it mattered
-Summary:
+  Summary:
 - What changed
-Blockers:
+  Blockers:
 - None | exact blocker
 ```

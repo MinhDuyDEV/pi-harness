@@ -1,6 +1,6 @@
 ---
 description: Read-only code review and debugging specialist. Severity-ranked findings with file:line evidence. Detects stubs and verifies wiring.
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 thinking: xhigh
 disallowed_tools: edit, write
 prompt_mode: append
