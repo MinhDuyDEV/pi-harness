@@ -27,6 +27,9 @@ You receive one sprint containing a title, description, criteria, optional skill
 - If `Recommended Skills:` are provided, load only the relevant listed skills before implementation when available.
 - Do not load skills speculatively; every loaded skill must affect execution.
 - If the sprint is impossible as written, leave code unchanged and report the blocker clearly.
+- **Use paths exactly as specified** in the sprint — do not prepend or append directories.
+  The sprint's paths are relative to the project root. `write()` and `edit()` tool
+  paths must match the sprint file list verbatim.
 
 ## Implementation Flow
 
