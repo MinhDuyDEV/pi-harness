@@ -26,6 +26,7 @@ export interface Sprint {
 	skills: string[];
 	verificationCommands: string[];
 	verificationRequired: boolean;
+	dependencies: number[];
 }
 
 export interface SprintResult {
@@ -161,7 +162,7 @@ export function parseSprints(text: string): Sprint[] {
 		const num = Number.parseInt(match[1], 10);
 		const title = match[2].trim();
 		const body = match[3].trim();
-		const stopLabels = ["Description", "Lane", "Risk Flags", "Context Needed", "Proof Required", "Criteria", "Skills", "Verification Commands", "Files"];
+		const stopLabels = ["Description", "Lane", "Risk Flags", "Context Needed", "Proof Required", "Criteria", "Skills", "Verification Commands", "Dependencies", "Files"];
 		const requiredSections = ["Description", "Lane", "Risk Flags", "Context Needed", "Proof Required", "Criteria", "Files"];
 		if (!requiredSections.every((label) => hasSection(body, label))) continue;
 		const description = parseTextSection(body, "Description", stopLabels);
@@ -172,13 +173,15 @@ export function parseSprints(text: string): Sprint[] {
 		const contextNeeded = parseListSection(body, "Context Needed", stopLabels);
 		const proofRequired = parseListSection(body, "Proof Required", stopLabels);
 		const skills = parseListSection(body, "Skills", ["Verification Commands", "Files"]);
-		const verificationCommands = parseListSection(body, "Verification Commands", ["Files"]);
+		const verificationCommands = parseListSection(body, "Verification Commands", ["Dependencies", "Files"]);
+		const dependenciesRaw = parseListSection(body, "Dependencies", ["Files"]);
+		const dependencies = dependenciesRaw.map((item) => Number.parseInt(item, 10)).filter((n) => Number.isFinite(n) && n !== num);
 		const filesMatch = body.match(/Files:?\s*(.+?)$/m);
 		const files = filesMatch?.[1]?.trim() ?? "";
 		if (!description || !criteria || !riskLane || !files) continue;
 		const ownedFiles = files.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
 		const verificationRequired = riskLane === "high-risk" || proofRequired.some((item) => !/^(manual|manual review|review|none|n\/?a)$/i.test(item.trim()));
-		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, ownedFiles, skills, verificationCommands, verificationRequired });
+		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, ownedFiles, skills, verificationCommands, verificationRequired, dependencies });
 	}
 
 	return sprints;

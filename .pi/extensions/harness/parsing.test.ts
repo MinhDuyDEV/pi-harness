@@ -100,6 +100,7 @@ Proof Required:
 Criteria:
 - [ ] Create package.json
 - [ ] Add TypeScript config
+Dependencies: none
 Files: package.json, tsconfig.json
 
 ## Sprint 2: Core Logic
@@ -112,6 +113,7 @@ Proof Required:
 - unit
 Criteria:
 - [ ] Write main module
+Dependencies: 1
 Files: src/index.ts`;
 
 	const sprints = parseSprints(input);
@@ -124,8 +126,10 @@ Files: src/index.ts`;
 	assert.deepEqual(sprints[0].ownedFiles, ["package.json", "tsconfig.json"], t);
 	assert.equal(sprints[0].verificationRequired, true, t);
 	assert.deepEqual(sprints[0].skills, [], t);
+	assert.deepEqual(sprints[0].dependencies, [], t);
 	assert.equal(sprints[1].number, 2, t);
 	assert.equal(sprints[1].title, "Core Logic", t);
+	assert.deepEqual(sprints[1].dependencies, [1], t);
 }
 
 {
@@ -209,6 +213,25 @@ Files: src/index.js`;
 	const sprints = parseSprints(input);
 	assert.deepEqual(sprints[0].verificationCommands, ["npm test", "node --check src/index.js"], t);
 	assert.ok(!sprints[0].criteria.includes("Verification Commands:"), t);
+	assert.deepEqual(sprints[0].dependencies, [], t);
+}
+
+{
+	const t = "parseSprints extracts Dependencies section and filters self-references";
+	const input = `## Sprint 2: Feature B
+Description: Build on Sprint 1
+Lane: normal
+Risk Flags: none
+Context Needed:
+- src/b.ts
+Proof Required:
+- unit
+Criteria:
+- [ ] Works
+Dependencies: 1, 2
+Files: src/b.ts`;
+	const sprints = parseSprints(input);
+	assert.deepEqual(sprints[0].dependencies, [1], t);
 }
 
 {

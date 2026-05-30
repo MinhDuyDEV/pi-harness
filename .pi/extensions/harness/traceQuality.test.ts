@@ -23,6 +23,7 @@ function sprint(overrides: Partial<Sprint> = {}): Sprint {
 		skills: [],
 		verificationCommands: ["npm test"],
 		verificationRequired: true,
+		dependencies: [],
 		...overrides,
 	};
 }

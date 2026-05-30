@@ -30,6 +30,7 @@ Criteria:
 - [ ] Testable criterion
 Verification Commands:
 - npm test
+Dependencies: none
 Files: path/to/file.ts
 
 ## Sprint 2: Title
@@ -42,6 +43,7 @@ Proof Required:
 - typecheck
 Criteria:
 - [ ] Testable criterion
+Dependencies: 1
 Files: path/to/file.ts
 ```
 
@@ -55,5 +57,6 @@ Files: path/to/file.ts
 - Context Needed: list only files/docs that directly matter; do not over-read.
 - Proof Required: list the proof shape even when no deterministic command exists.
 - Verification Commands: include non-destructive commands that prove the sprint. High-risk sprints MUST have at least one verification command.
+- Dependencies: list sprint numbers this sprint depends on, or `none`. Sprint N can only start after all its dependencies pass.
 - Never use destructive commands (git reset, git clean, rm -rf).
 - If ambiguous, output one sprint titled `Clarify Requirements` with missing decisions as criteria.

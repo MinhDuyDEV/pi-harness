@@ -328,6 +328,7 @@ async function runBuildEvaluatePhase(
 			...(sprint.contextNeeded.length > 0 ? sprint.contextNeeded.map((item) => `- ${item}`) : ["- none listed"]),
 			"Proof Required:",
 			...(sprint.proofRequired.length > 0 ? sprint.proofRequired.map((item) => `- ${item}`) : ["- none listed"]),
+			`Dependencies: ${sprint.dependencies.length > 0 ? sprint.dependencies.map((d) => `Sprint ${d}`).join(", ") : "none"}`,
 			"",
 			"Criteria:",
 			sprint.criteria,
@@ -369,6 +370,22 @@ async function runBuildEvaluatePhase(
 			signal,
 		});
 		tracker.appendState(`sprint ${i + 1} generation`, `Generator completed sprint ${i + 1}: ${sprint.title}.`, sprint.files ? [`Planned files: ${sprint.files}`] : []);
+
+		// Fail if any dependency hasn't passed.
+		const failedDependencies = sprint.dependencies.filter((dep) => {
+			const depResult = results[dep - 1];
+			return !depResult || !depResult.passed;
+		});
+		if (failedDependencies.length > 0) {
+			failedSprintCount++;
+			const detail = `BLOCKED: depends on sprint(s) ${failedDependencies.join(", ")} which did not pass.`;
+			writeProgress(tracker.runDir, i + 1, sprint.title, false, detail);
+			tracker.appendState(`sprint ${i + 1} blocked`, detail);
+			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, verificationStatus: "failed", reviewStatus: "skipped", activeTools: [] });
+			tracker.recordEvent({ event: "sprint_blocked", sprint: i + 1, reason: "failed_dependencies", failedDependencies });
+			results.push({ sprint: sprint.title, iterations: 0, passed: false, evalOutput: detail, verification: { status: "failed", results: [] } });
+			continue;
+		}
 
 		// High-risk sprints without verification commands fail immediately.
 		if (sprint.verificationRequired && sprint.verificationCommands.length === 0) {
