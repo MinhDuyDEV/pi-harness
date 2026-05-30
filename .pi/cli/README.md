@@ -14,12 +14,20 @@ Do **not** put Pi extension tools here. Extension tools belong in `.pi/extension
 
 Before adding a helper, prefer direct shell commands. Add a script only when the command becomes repeated, error-prone, or needs structured output.
 
-## Candidate wrappers
+## Browser wrappers
 
-Browser and UI verification are the main use case for `.pi/cli/` because they benefit from repeatable commands and saved artifacts:
+Browser and UI verification are the main use case for `.pi/cli/` because they benefit from repeatable commands and saved artifacts.
 
-- `browser-devtools.mjs` — connect to an existing Chrome DevTools endpoint, inspect console/network/DOM state, and write findings to `.pi/plans/<id>/BROWSER-DEVTOOLS.md`.
-- `playwright-flow.mjs` — run a scripted browser flow with Playwright, save screenshots/traces/logs, and write a summary to `.pi/plans/<id>/PLAYWRIGHT-FLOW.md`.
-- `browser-screenshot.mjs` — capture deterministic screenshots for visual review and save outputs under `.pi/plans/<id>/screenshots/`.
+- `browser-devtools.mjs` — connects to an existing Chrome DevTools endpoint, inspects page/console/network state, and writes `.pi/plans/<id>/BROWSER-DEVTOOLS.md`.
+- `playwright-flow.mjs` — runs a scripted browser flow with Playwright, saves screenshots/traces/logs, and writes `.pi/plans/<id>/PLAYWRIGHT-FLOW.md`.
+- `browser-screenshot.mjs` — captures deterministic responsive screenshots and writes `.pi/plans/<id>/SCREENSHOTS.md` plus `.pi/plans/<id>/screenshots/*.png`.
 
-Keep these wrappers thin: argument parsing, command execution, artifact writing. Put reusable Pi-facing tools in `.pi/extensions/` instead.
+Examples:
+
+```bash
+.pi/cli/browser-devtools.mjs --work-id my-check --url http://localhost:3000 --eval 'document.title'
+.pi/cli/playwright-flow.mjs --work-id my-check --url http://localhost:3000 --step snapshot --step screenshot=home.png
+.pi/cli/browser-screenshot.mjs --work-id my-check --url http://localhost:3000 --full-page
+```
+
+Keep wrappers thin: argument parsing, command execution, artifact writing. Put reusable Pi-facing tools in `.pi/extensions/` instead.
