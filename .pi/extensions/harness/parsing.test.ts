@@ -122,6 +122,7 @@ Files: src/index.ts`;
 	assert.ok(sprints[0].criteria.includes("- [ ] Create package.json"), t);
 	assert.equal(sprints[0].files, "package.json, tsconfig.json", t);
 	assert.deepEqual(sprints[0].ownedFiles, ["package.json", "tsconfig.json"], t);
+	assert.equal(sprints[0].verificationRequired, true, t);
 	assert.deepEqual(sprints[0].skills, [], t);
 	assert.equal(sprints[1].number, 2, t);
 	assert.equal(sprints[1].title, "Core Logic", t);
@@ -232,6 +233,7 @@ Files: src/auth/session.ts, test/auth.test.ts`;
 	assert.deepEqual(sprints[0].contextNeeded, ["docs/product/permissions.md", "src/auth/session.ts"], t);
 	assert.deepEqual(sprints[0].proofRequired, ["unit", "integration", "e2e smoke"], t);
 	assert.deepEqual(sprints[0].ownedFiles, ["src/auth/session.ts", "test/auth.test.ts"], t);
+	assert.equal(sprints[0].verificationRequired, true, t);
 	assert.ok(!sprints[0].criteria.includes("Proof Required:"), t);
 }
 

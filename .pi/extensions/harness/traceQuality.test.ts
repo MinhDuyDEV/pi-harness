@@ -22,6 +22,7 @@ function sprint(overrides: Partial<Sprint> = {}): Sprint {
 		ownedFiles: ["src/index.ts", "test/index.test.ts"],
 		skills: [],
 		verificationCommands: ["npm test"],
+		verificationRequired: true,
 		...overrides,
 	};
 }

@@ -25,6 +25,7 @@ export interface Sprint {
 	ownedFiles: string[];
 	skills: string[];
 	verificationCommands: string[];
+	verificationRequired: boolean;
 }
 
 export interface SprintResult {
@@ -176,7 +177,8 @@ export function parseSprints(text: string): Sprint[] {
 		const files = filesMatch?.[1]?.trim() ?? "";
 		if (!description || !criteria || !riskLane || !files) continue;
 		const ownedFiles = files.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
-		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, ownedFiles, skills, verificationCommands });
+		const verificationRequired = riskLane === "high-risk" || proofRequired.some((item) => !/^(manual|manual review|review|none|n\/?a)$/i.test(item.trim()));
+		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, ownedFiles, skills, verificationCommands, verificationRequired });
 	}
 
 	return sprints;

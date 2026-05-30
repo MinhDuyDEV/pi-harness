@@ -370,6 +370,18 @@ async function runBuildEvaluatePhase(
 		});
 		tracker.appendState(`sprint ${i + 1} generation`, `Generator completed sprint ${i + 1}: ${sprint.title}.`, sprint.files ? [`Planned files: ${sprint.files}`] : []);
 
+		// High-risk sprints without verification commands fail immediately.
+		if (sprint.verificationRequired && sprint.verificationCommands.length === 0) {
+			failedSprintCount++;
+			const detail = `BLOCKED: high-risk sprint requires verification commands but none were declared.`;
+			writeProgress(tracker.runDir, i + 1, sprint.title, false, detail);
+			tracker.appendState(`sprint ${i + 1} blocked`, detail);
+			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, verificationStatus: "failed", reviewStatus: "skipped", activeTools: [] });
+			tracker.recordEvent({ event: "sprint_blocked", sprint: i + 1, reason: "missing_verification_commands", riskLane: sprint.riskLane });
+			results.push({ sprint: sprint.title, iterations: 0, passed: false, evalOutput: detail, verification: { status: "failed", results: [] } });
+			continue;
+		}
+
 		if (params.pattern === "pipeline") {
 			widget.update({ phase: "evaluating", verificationStatus: sprint.verificationCommands.length > 0 ? "running" : "skipped", reviewStatus: "skipped", activeTools: [] });
 			const verification = runVerificationCommands(sprint.verificationCommands, runCwd, DEFAULT_HARNESS_POLICY);
