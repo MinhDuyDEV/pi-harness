@@ -207,8 +207,12 @@ pi --name "review <id>" --print-turn "Read .pi/plans/<id>/WORKER-CONTEXT.md and 
 
 Use this when shared context is larger than ~500 tokens, multiple sessions need the same background, or a plan/spec must survive handoffs.
 
-## Context Continuity
+## Context Retrieval Routing
 
-Use `/dcp` to inspect context pressure and active compression blocks.
-Use `vcc_recall()` for targeted session history recovery.
+Use `memory-search` for durable project knowledge: prior decisions, repeated bugfixes, architecture patterns, warnings, and lessons that should survive beyond the current conversation.
+
+Use `vcc_recall()` for current-session or recent-history recovery: compressed details, earlier tool output, commands already run, user decisions, and “continue from before” context.
+
+After either retrieval path, verify current code, config, git state, and file contents from disk before acting. Neither memory nor session history is proof of current workspace state.
+
 Serialize `compress` calls; never run multiple compressions in parallel.
