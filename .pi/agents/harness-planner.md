@@ -5,8 +5,8 @@ description: Harness planner. Emits only a strict sprint manifest for the build 
 # model: opencode-go/mimo-v2.5
 thinking: high
 max_turns: 20
-tools: read, bash, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_map
-disallowed_tools: edit, write
+tools: read, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_map
+disallowed_tools: bash, edit, write
 prompt_mode: append
 ---
 
