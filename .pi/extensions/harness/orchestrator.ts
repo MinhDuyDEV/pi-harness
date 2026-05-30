@@ -334,7 +334,15 @@ async function runBuildEvaluatePhase(
 			...runStatePromptSection(tracker),
 		];
 		if (skillHints.workerText) sprintTask.push("", skillHints.workerText);
-		if (sprint.files) sprintTask.push("", `Files: ${sprint.files}`);
+		if (sprint.ownedFiles.length > 0) {
+			sprintTask.push(
+				"",
+				"OWNED FILES — you may ONLY create or modify these files:",
+				...sprint.ownedFiles.map((file) => `- ${file}`),
+				"",
+				"Do NOT edit, create, or delete any file not listed above. If you need a dependency, declare it in the sprint criteria instead.",
+			);
+		}
 		const generatorPrompt = sprintTask.join("\n");
 
 		const generatorSubDir = `sprint-${i + 1}`;
@@ -422,6 +430,10 @@ async function runBuildEvaluatePhase(
 				`Risk Flags: ${sprint.riskFlags.length > 0 ? sprint.riskFlags.join(", ") : "none"}`,
 				"Proof Required:",
 				...(sprint.proofRequired.length > 0 ? sprint.proofRequired.map((item) => `- ${item}`) : ["- none listed"]),
+				"",
+				"File ownership contract:",
+				...(sprint.ownedFiles.length > 0 ? sprint.ownedFiles.map((file) => `- ${file}`) : ["- no files declared"]),
+				"FAIL this sprint if the generator created, modified, or deleted any file not listed above.",
 				"",
 				"Criteria:",
 				sprint.criteria,

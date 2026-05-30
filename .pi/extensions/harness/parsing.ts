@@ -22,6 +22,7 @@ export interface Sprint {
 	proofRequired: string[];
 	criteria: string;
 	files: string;
+	ownedFiles: string[];
 	skills: string[];
 	verificationCommands: string[];
 }
@@ -174,7 +175,8 @@ export function parseSprints(text: string): Sprint[] {
 		const filesMatch = body.match(/Files:?\s*(.+?)$/m);
 		const files = filesMatch?.[1]?.trim() ?? "";
 		if (!description || !criteria || !riskLane || !files) continue;
-		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, skills, verificationCommands });
+		const ownedFiles = files.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, ownedFiles, skills, verificationCommands });
 	}
 
 	return sprints;

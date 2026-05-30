@@ -19,6 +19,7 @@ function sprint(overrides: Partial<Sprint> = {}): Sprint {
 		proofRequired: ["unit"],
 		criteria: "- [ ] Implements behavior",
 		files: "src/index.ts, test/index.test.ts",
+		ownedFiles: ["src/index.ts", "test/index.test.ts"],
 		skills: [],
 		verificationCommands: ["npm test"],
 		...overrides,
