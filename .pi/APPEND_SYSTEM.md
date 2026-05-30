@@ -125,21 +125,30 @@ Pi in this project should stay Mario-style minimal by default: direct tools firs
 | Direct tools | Normal coding, review, edits, tests, and research in the current session |
 | `.pi/plans/<id>/SPEC.md` / `.pi/plans/<id>/PLAN.md` | Durable planning instead of hidden plan mode |
 | `TODO.md` / `.pi/plans/<id>/PROGRESS.md` | Durable task tracking instead of external task extensions |
+| `.pi/cli/*.mjs` | Repeatable local automation wrappers when direct shell commands become error-prone; especially browser evidence capture |
 | `tmux` | Dev servers, logs, long-running commands, and observable side sessions |
 | `pi --print/--print-turn` in tmux | Explicit self-spawn for isolated review/research when needed |
 | `harness` | Product-level planner → worker → reviewer loops with observable tmux watch artifacts |
 
 Do not depend on external subagent/task/MCP workflow extensions. If another Pi session is useful, spawn it explicitly via `bash`/`tmux` with a written prompt/artifact path, then inspect its output before acting.
 
+Use `.pi/cli/` wrappers when a workflow needs repeatable local evidence but should not become a Pi extension. Current browser wrappers:
+
+- `.pi/cli/browser-devtools.mjs` for inspecting an existing Chrome DevTools target and writing `BROWSER-DEVTOOLS.md`.
+- `.pi/cli/playwright-flow.mjs` for scripted browser flows with screenshots/logs and `PLAYWRIGHT-FLOW.md`.
+- `.pi/cli/browser-screenshot.mjs` for deterministic responsive screenshots and `SCREENSHOTS.md`.
+
+Prefer direct shell commands for one-offs; add or use `.pi/cli` only when repeatability/artifact capture matters.
+
 ## Layer 2: Minimalism Gate
 
 Before using harness, tmux self-spawn, or any heavy external integration, ask:
 
 - Can direct tools solve this in the current session?
-- Can a CLI or local script do this with less context than an MCP server?
+- Can direct shell or an existing `.pi/cli/*.mjs` wrapper do this with less context than an MCP server?
 - Can a file artifact (`PLAN.md`, `TODO.md`, `PROGRESS.md`, `REVIEW.md`) replace hidden runtime state?
 - Would tmux make the process more observable?
-- Will the output be independently verified before being trusted?
+- Will `.pi/cli` output be written under `.pi/plans/<id>/` or another explicit artifact path and independently verified before being trusted?
 
 ## Delegation Rules
 
