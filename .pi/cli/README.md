@@ -1,17 +1,15 @@
 # `.pi/cli/`
 
-Home for project-local CLI wrappers that replace external orchestration and adapter dependencies.
+Project-local CLI helpers live here when a workflow needs repeatable local automation but should not become a Pi extension.
 
-Guidelines:
+Use this directory for small scripts that:
 
-- Run wrappers through `bash`/local commands from Pi; do not require adapter packages or background services.
-- Keep wrappers small, inspectable, and project-scoped.
-- Prefer file inputs/outputs under `.pi/plans/<id>/` for durable handoffs.
-- Do not hide state in long-running services unless the user explicitly starts them.
-- Verify wrapper output before trusting it in implementation or review.
+- run through `bash` or another local command from Pi;
+- do not require MCP adapters, hidden task runners, or background orchestration services;
+- take explicit file/path arguments instead of reading hidden runtime state;
+- write durable outputs under `.pi/plans/<id>/` when used for handoffs;
+- are safe to inspect, rerun, and verify independently.
 
-Possible future wrappers:
+Do **not** put Pi extension tools here. Extension tools belong in `.pi/extensions/` so Pi can register them through the extension runtime.
 
-- `figma-fetch.mjs` — fetch design metadata/assets into a visible artifact.
-- `browser-flow.mjs` — run repeatable browser checks and save logs/screenshots.
-- `openpencil-client.mjs` — export or inspect `.op` design files from the CLI.
+Before adding a helper, prefer direct shell commands. Add a script only when the command becomes repeated, error-prone, or needs structured output.
