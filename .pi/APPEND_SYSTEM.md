@@ -28,8 +28,8 @@ Examples:
 
 ## Layer 0: Build Harness
 
-| Tool | Purpose |
-|---|---|
+| Tool      | Purpose                                                           |
+| --------- | ----------------------------------------------------------------- |
 | `harness` | Multi-agent product build: planner → worker → reviewer/fixer loop |
 
 ### Use Harness For
@@ -86,19 +86,19 @@ For trivial harness calls, a one-line analysis is enough.
 
 ### Pattern Selection
 
-| Pattern | Use When | Behavior |
-|---|---|---|
+| Pattern             | Use When                                                                                        | Behavior                                                                       |
+| ------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `producer-reviewer` | Correctness matters, business logic, persistence, security, UI behavior, non-trivial edge cases | Worker builds → reviewer evaluates → worker fixes until pass or max iterations |
-| `pipeline` | Prototype, boilerplate, known trivial output, no meaningful review needed | Planner → worker only |
+| `pipeline`          | Prototype, boilerplate, known trivial output, no meaningful review needed                       | Planner → worker only                                                          |
 
 ### Iteration Selection
 
-| Iterations | Use When |
-|---:|---|
-| 1 | trivial, single file, no meaningful edge cases |
-| 2 | simple/medium, a few files, basic edge cases |
-| 3 | standard multi-file work with business logic |
-| 4-5 | complex, security/data integrity, high correctness risk |
+| Iterations | Use When                                                |
+| ---------: | ------------------------------------------------------- |
+|          1 | trivial, single file, no meaningful edge cases          |
+|          2 | simple/medium, a few files, basic edge cases            |
+|          3 | standard multi-file work with business logic            |
+|        4-5 | complex, security/data integrity, high correctness risk |
 
 Actively choose parameters. Do not blindly rely on defaults.
 
@@ -116,19 +116,36 @@ Harness output is not proof. After any harness run that changes files:
 
 Never stage with `git add .`. Stage explicit files only.
 
+## Scoped Context Files
+
+Pi automatically loads global, parent, and current-directory `AGENTS.md`/`CLAUDE.md` files at session start. Do **not** scan and load every subdirectory context file.
+
+When working in a specific subtree or editing files under a new area, check for the nearest relevant context file before changing code:
+
+```sh
+p="$(cd "$(dirname <target-file>)" && pwd)"
+while [ "$p" != "/" ]; do
+  [ -f "$p/AGENTS.md" ] && echo "$p/AGENTS.md"
+  [ -f "$p/CLAUDE.md" ] && echo "$p/CLAUDE.md"
+  p="$(dirname "$p")"
+done
+```
+
+Read only context files that are in or above the target scope, or clearly govern the files being changed. Do not import unrelated skill/template `AGENTS.md` files just because they exist elsewhere in the repo.
+
 ## Layer 1: File/Tmux/Self-Spawn Workflows
 
 Pi in this project should stay Mario-style minimal by default: direct tools first, then visible file artifacts, then tmux/self-spawn only when isolation is genuinely useful.
 
-| Primitive | Use For |
-|---|---|
-| Direct tools | Normal coding, review, edits, tests, and research in the current session |
-| `.pi/plans/<id>/SPEC.md` / `.pi/plans/<id>/PLAN.md` | Durable planning instead of hidden plan mode |
-| `TODO.md` / `.pi/plans/<id>/PROGRESS.md` | Durable progress tracking with plain files |
-| `.pi/cli/*.mjs` | Repeatable local automation wrappers when direct shell commands become error-prone; especially browser evidence capture |
-| `tmux` | Dev servers, logs, long-running commands, and observable side sessions |
-| `pi --print/--print-turn` in tmux | Explicit self-spawn for isolated review/research when needed |
-| `harness` | Product-level planner → worker → reviewer loops with observable tmux watch artifacts |
+| Primitive                                           | Use For                                                                                                                 |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Direct tools                                        | Normal coding, review, edits, tests, and research in the current session                                                |
+| `.pi/plans/<id>/SPEC.md` / `.pi/plans/<id>/PLAN.md` | Durable planning instead of hidden plan mode                                                                            |
+| `TODO.md` / `.pi/plans/<id>/PROGRESS.md`            | Durable progress tracking with plain files                                                                              |
+| `.pi/cli/*.mjs`                                     | Repeatable local automation wrappers when direct shell commands become error-prone; especially browser evidence capture |
+| `tmux`                                              | Dev servers, logs, long-running commands, and observable side sessions                                                  |
+| `pi --print/--print-turn` in tmux                   | Explicit self-spawn for isolated review/research when needed                                                            |
+| `harness`                                           | Product-level planner → worker → reviewer loops with observable tmux watch artifacts                                    |
 
 If another Pi session is useful, spawn it explicitly via `bash`/`tmux` with a written prompt/artifact path, then inspect its output before acting.
 
