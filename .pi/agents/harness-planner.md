@@ -2,7 +2,7 @@
 description: Harness planner. Emits only a strict sprint manifest for the build harness.
 # Pin this agent with a provider-qualified model, e.g. opencode-go/mimo-v2.5.
 # If omitted, harness falls back to plannerModel param, then the active model.
-# model: opencode-go/mimo-v2.5
+model: opencode-go/mimo-v2.5
 thinking: high
 max_turns: 20
 tools: read, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_map
