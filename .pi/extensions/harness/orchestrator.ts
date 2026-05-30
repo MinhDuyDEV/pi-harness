@@ -218,7 +218,8 @@ async function runPlanningPhase(
 
 	tracker.startPhase("planning", plannerAgentName);
 	tracker.savePrompt("planner-system", plannerDef.systemPrompt);
-	tracker.savePrompt("planner-user", prompt);
+	const planningPrompt = `Decompose the following task into numbered sprints for the build harness.\n\nTASK:\n${prompt}`;
+	tracker.savePrompt("planner-user", planningPrompt);
 	tracker.saveSystemPrompt("plan", "planner", plannerDef.systemPrompt);
 	throwIfAborted(signal);
 
@@ -232,7 +233,7 @@ async function runPlanningPhase(
 		role: "planner",
 		phase: "planning",
 		systemPrompt: plannerDef.systemPrompt,
-		userPrompt: prompt,
+		userPrompt: planningPrompt,
 		tools: plannerDef.tools,
 		model: resolvedPlannerModel,
 		thinking: plannerDef.thinking,

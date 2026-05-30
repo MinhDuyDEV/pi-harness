@@ -54,32 +54,14 @@ export interface EvalCriterionResult {
 export const HARNESS_FORMAT_INSTRUCTIONS = `
 
 ---
-[CRITICAL OUTPUT FORMAT — OVERRIDES ALL OTHER FORMAT INSTRUCTIONS]
+[ENFORCED OUTPUT CONTRACT]
 
-You MUST output your plan ONLY as numbered sprint sections in this EXACT format.
-IGNORE any other output format instructions in your system prompt.
+This harness enforces a strict sprint manifest format. If you do not follow it, your output will be rejected.
 
-## Sprint 1: Title
-Description: ...
-Criteria:
-- [ ] Criterion 1
-- [ ] Criterion 2
-Skills:
-- optional-skill-name
-Verification Commands:
-- npm test
-Files: path/to/file1.ts, path/to/file2.ts
+Required fields per sprint: Description, Criteria, Files.
+Optional: Skills, Verification Commands.
 
-## Sprint 2: Title
-Description: ...
-Criteria:
-- [ ] Criterion 1
-- [ ] Criterion 2
-Files: path/to/file3.ts
-
-Skills is optional. Use only registry-valid skill names when clearly relevant. Prefer 1-3 skills.
-Verification Commands is optional but strongly preferred when a deterministic command can prove the sprint.
-Only output sprint sections. No commentary, no tables, no XML blocks, no episode tags.`;
+Start with \`## Sprint 1:\`. Output only sprint sections. No commentary.`;
 
 export const HARNESS_EVAL_INSTRUCTIONS = `
 
