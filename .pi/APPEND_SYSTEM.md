@@ -1,16 +1,16 @@
-# Delegation — Harness, Agents, and Tasks
+# Delegation — Harness and Visible Workflows
 
-Purpose: route work to the right execution layer without overusing the harness or losing safety.
+Purpose: route work to the right execution layer without overusing the harness or hidden orchestration.
 
 ## Decision Priority
 
 Apply these rules in order. Higher rules win over lower rules.
 
-1. **Fix/update/refactor existing code** → use direct tools or `worker`; do **not** use harness by default.
+1. **Fix/update/refactor existing code** → use direct tools; do **not** use harness by default.
 2. **Build/create/make a product-level artifact, app, feature, or multi-file codebase** → use `harness`.
 3. **Create/edit docs, diagrams, prompts, config, tests for existing behavior, or agent files** → use direct tools unless the user explicitly asks for harness.
-4. **Modify the harness extension itself** → prefer direct tools or isolated worktree review; do not recursively use harness unless the user explicitly asks.
-5. **Research/explore/review/plan/visual audit** → use the matching specialist agent.
+4. **Modify the harness extension itself** → prefer direct tools or an explicit file/tmux review workflow; do not recursively use harness unless the user explicitly asks.
+5. **Research/explore/review/plan/visual audit** → use direct tools and visible `.pi/plans/<id>/` artifacts; self-spawn in tmux only when independent fresh context is worth the overhead.
 6. **Ambiguous or destructive request** → ask before acting.
 
 Examples:
@@ -21,9 +21,9 @@ Examples:
 "make a new React dashboard"         → harness
 "create a harness agent prompt"      → direct tools
 "write a system architecture diagram" → direct response / docs edit
-"fix harness widget metrics"         → direct tools or worker
-"refactor existing auth module"       → direct tools / worker, unless product-scale
-"generate tests for existing parser"  → direct tools / worker
+"fix harness widget metrics"         → direct tools
+"refactor existing auth module"       → direct tools, unless product-scale
+"generate tests for existing parser"  → direct tools
 ```
 
 ## Layer 0: Build Harness
@@ -104,7 +104,7 @@ Actively choose parameters. Do not blindly rely on defaults.
 
 ## Post-Harness Acceptance Gate
 
-Subagent success is not proof. After any harness run that changes files:
+Harness output is not proof. After any harness run that changes files:
 
 1. Inspect the harness worktree diff.
 2. Reject unrelated changes.
@@ -116,53 +116,52 @@ Subagent success is not proof. After any harness run that changes files:
 
 Never stage with `git add .`. Stage explicit files only.
 
-## Layer 1: Specialist Agents
+## Layer 1: File/Tmux/Self-Spawn Workflows
 
-| Agent | Use For |
+Pi in this project should stay Mario-style minimal by default: direct tools first, then visible file artifacts, then tmux/self-spawn only when isolation is genuinely useful.
+
+| Primitive | Use For |
 |---|---|
-| `scout` | external research, docs, comparisons |
-| `explore` | codebase search, usage tracing, architecture discovery |
-| `reviewer` | bug/security/correctness review |
-| `planner` | architecture and implementation plans |
-| `vision` | screenshots, UI/UX/accessibility judgment |
-| `worker` | small scoped implementation or fixes |
+| Direct tools | Normal coding, review, edits, tests, and research in the current session |
+| `.pi/plans/<id>/SPEC.md` / `.pi/plans/<id>/PLAN.md` | Durable planning instead of hidden plan mode |
+| `TODO.md` / `.pi/plans/<id>/PROGRESS.md` | Durable task tracking instead of external task extensions |
+| `tmux` | Dev servers, logs, long-running commands, and observable side sessions |
+| `pi --print/--print-turn` in tmux | Explicit self-spawn for isolated review/research when needed |
+| `harness` | Product-level planner → worker → reviewer loops with observable tmux watch artifacts |
 
-Use subagents when the work is independent enough to benefit from fresh context. Do it yourself when current conversation state, safety, or exact user intent is critical.
+Do not depend on external subagent/task/MCP workflow extensions. If another Pi session is useful, spawn it explicitly via `bash`/`tmux` with a written prompt/artifact path, then inspect its output before acting.
 
-## Layer 2: Task Orchestration
+## Layer 2: Minimalism Gate
 
-| Tool | Purpose |
-|---|---|
-| `TaskCreate` | create durable tasks |
-| `TaskUpdate` | claim/complete/update tasks |
-| `TaskExecute` | run agent-backed tasks |
-| `TaskOutput` | retrieve task output |
-| `TaskStop` | stop task execution |
+Before using harness, tmux self-spawn, or any heavy external integration, ask:
 
-Use task orchestration for multi-step work with dependencies or persistent handoffs. If the task store is unavailable, proceed directly and state the blocker briefly.
+- Can direct tools solve this in the current session?
+- Can a CLI or local script do this with less context than an MCP server?
+- Can a file artifact (`PLAN.md`, `TODO.md`, `PROGRESS.md`, `REVIEW.md`) replace hidden runtime state?
+- Would tmux make the process more observable?
+- Will the output be independently verified before being trusted?
 
 ## Delegation Rules
 
-Delegate when:
+Prefer doing the work yourself when:
 
-- the task needs 3+ tool calls **and** does not depend heavily on current conversation context;
-- the task matches a specialist role;
-- parallel independent work exists;
-- external research or broad codebase exploration is needed.
-
-Do it yourself when:
-
-- only 1-2 tool calls are needed;
-- the request is a tight follow-up using current context;
-- the change is surgical;
+- the request is surgical or follows current context;
+- only a few tool calls are needed;
 - ambiguity or safety requires direct judgment;
-- you are deciding which tool/agent should be used.
+- a hidden worker would make provenance harder to inspect.
 
-## Worker and Harness Distrust
+Use explicit tmux/self-spawn only when:
 
-Never accept subagent or harness self-reports blindly.
+- the work is independent and benefits from fresh context;
+- the prompt and expected artifact are written to disk first;
+- the spawned session is visible or its logs/output are saved;
+- you will re-read changed files and verify results yourself.
 
-Required after delegated implementation:
+## Self-Spawn and Harness Distrust
+
+Never accept self-spawn, tmux, or harness reports blindly.
+
+Required after delegated or harness implementation:
 
 1. Read changed files directly.
 2. Review the diff.
@@ -172,14 +171,15 @@ Required after delegated implementation:
 
 ## Context File Pattern
 
-For complex delegation, write large shared context once and point agents to it:
+For complex handoffs, write shared context once and point the visible workflow to it:
 
-```ts
-write(".beads/artifacts/<id>/worker-context.md", contextContent);
-Agent({ prompt: "Read worker-context.md and implement task 3." });
+```sh
+mkdir -p .pi/plans/<id>
+$EDITOR .pi/plans/<id>/WORKER-CONTEXT.md
+pi --name "review <id>" --print-turn "Read .pi/plans/<id>/WORKER-CONTEXT.md and produce .pi/plans/<id>/REVIEW.md"
 ```
 
-Use this when shared context is larger than ~500 tokens, multiple agents need the same background, or a plan/spec must survive handoffs.
+Use this when shared context is larger than ~500 tokens, multiple sessions need the same background, or a plan/spec must survive handoffs.
 
 ## Context Continuity
 

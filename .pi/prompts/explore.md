@@ -6,166 +6,111 @@ agentType: planner
 
 # Explore: $ARGUMENTS
 
-Think through an idea, problem, or approach with structured alternatives and tradeoffs — before committing to a bead or plan.
+Think through an idea, problem, or approach with structured alternatives and tradeoffs before creating a file-backed work plan.
 
-> **Workflow:** **`/explore`** → `/create` (if worth pursuing) or discard
->
-> Use when you're not sure WHAT to build or HOW to approach it. This is ideation with rigor, not open-ended brainstorming.
->
-> **When to use:** Before `/create`, when the approach isn't obvious. Skip for clear, well-scoped work.
+> **Workflow:** `/explore` → `/create` if worth pursuing, or discard.
 
 ## Load Skills
 
 ```typescript
-skill({ name: "brainstorming" }); // Collaborative refinement
-skill({ name: "memory-system" }); // Load past decisions
+skill({ name: "brainstorming" });
+skill({ name: "memory-system" });
 ```
 
 ## Phase 1: Ground
 
-Search for prior art and past decisions:
+Search prior art and current code directly:
 
 ```typescript
 memory-search({ query: "<topic keywords>", limit: 5 });
 ```
 
 ```bash
-# What exists in the codebase already?
-git log --oneline -20 | grep -i "<keyword>"
+git log --oneline -20 | grep -i "<keyword>" || true
+srcwalk overview . 2>/dev/null || true
+srcwalk discover "$ARGUMENTS" 2>/dev/null || true
 ```
 
-Spawn an explore agent to understand the current state:
-
-```typescript
-Agent({
-  subagent_type: "explore",
-  description: "Map existing patterns for this area",
-  prompt: `Search the codebase for existing implementations, patterns, and conventions related to: $ARGUMENTS
-
-  Return: what exists today, what patterns are used, what files are involved.`,
-});
-```
+Return what exists today, patterns used, and files involved. If exploration is large enough to deserve fresh context, write `.pi/plans/<id>/EXPLORE-BRIEF.md` and explicitly run tmux/`pi --print-turn`; require `.pi/plans/<id>/EXPLORATION.md` as output before trusting it.
 
 ## Phase 2: Frame the Problem
 
-Before proposing solutions, state the problem clearly:
+State:
 
-1. **What's the goal?** (outcome, not task)
-2. **What constraints exist?** (tech stack, time, compatibility, user preferences)
-3. **What's the risk of doing nothing?** (is this urgent or nice-to-have?)
+1. **Goal** — outcome, not task.
+2. **Constraints** — stack, compatibility, time, user preferences.
+3. **Risk of doing nothing** — urgency vs nice-to-have.
 
-If the problem isn't clear after reading context, ask the user to clarify — but max 2 questions.
+If context is still unclear, ask at most two targeted questions.
 
 ## Phase 3: Generate Alternatives
 
-Produce 2-3 approaches. For each:
+Produce 2-3 approaches.
 
-| Aspect       | What to Cover                          |
-| ------------ | -------------------------------------- |
-| **Approach** | 1-2 sentence summary                   |
-| **How**      | Key implementation steps (3-5 bullets) |
-| **Pros**     | What this gets right                   |
-| **Cons**     | What this gets wrong or makes harder   |
-| **Effort**   | S (<1h), M (1-3h), L (1-2d), XL (>2d)  |
-| **Risk**     | What could go wrong                    |
+| Aspect | What to Cover |
+| --- | --- |
+| Approach | 1-2 sentence summary |
+| How | 3-5 implementation steps |
+| Pros | What this gets right |
+| Cons | What this worsens or complicates |
+| Effort | S (<1h), M (1-3h), L (1-2d), XL (>2d) |
+| Risk | What could go wrong |
 
-**Rules for alternatives:**
+Rules:
 
-- At least one must be the simplest viable option
-- At least one must be different in kind, not just degree (different architecture, not just different library)
-- Don't pad with bad options to make the recommended one look good
+- Include the simplest viable option.
+- Include at least one meaningfully different option.
+- Do not pad with bad options.
 
 ## Phase 4: Recommend
-
-Pick one approach and explain why:
 
 ```markdown
 ## Recommendation
 
 **Approach:** [Name]
 **Effort:** [S/M/L/XL]
-**Why:** [2-3 sentences — why this over the others]
-**When to reconsider:** [What signals would make you switch to an alternative]
+**Why:** [2-3 sentences]
+**When to reconsider:** [signals that would change the decision]
 ```
 
 ## Phase 5: Output Proposal
-
-Write the proposal as a structured document:
 
 ```markdown
 # Exploration: [Topic]
 
 ## Problem
-
 [What we're trying to solve]
 
 ## Constraints
-
-- [Constraint 1]
-- [Constraint 2]
+- ...
 
 ## Alternatives
-
 ### Option A: [Name]
-
 - **How:** ...
 - **Pros:** ...
 - **Cons:** ...
-- **Effort:** S/M/L/XL
+- **Effort:** ...
 
 ### Option B: [Name]
-
-- **How:** ...
-- **Pros:** ...
-- **Cons:** ...
-- **Effort:** S/M/L/XL
-
-### Option C: [Name] (if applicable)
-
 ...
 
 ## Recommendation
-
-**Option [X]** because [reasoning].
-**Reconsider if:** [triggers for switching]
+**Option [X]** because ...
 
 ## Next Step
-
 `/create "[description based on chosen approach]"`
 ```
 
-**If a bead exists:** Save to `.beads/artifacts/$BEAD_ID/exploration.md`
-**If no bead:** Display inline, don't create files.
+If a matching work directory already exists, save to `.pi/plans/<id>/EXPLORATION.md`; otherwise display inline and do not create files unless the user asks.
 
 ## Phase 6: Ask User
 
-Present the proposal and ask:
-
-```typescript
-ask_user_question({
-  questions: [
-    {
-      header: "Approach",
-      question: "Which approach do you want to pursue?",
-      options: [
-        { label: "Option A (Recommended)", description: "[brief]" },
-        { label: "Option B", description: "[brief]" },
-        { label: "Option C", description: "[brief]" },
-        { label: "None — need more research", description: "Spawn scout agents" },
-      ],
-      multiSelect: false,
-    },
-  ],
-});
-```
-
-If user picks an approach → suggest `/create "[description]"` with the chosen approach baked in.
-If user wants more research → spawn a `scout` agent for the specific unknowns.
+Present the proposal and ask which approach to pursue. If none is ready, recommend `/research <specific-question>`.
 
 ## Related Commands
 
-| Need                      | Command                             |
-| ------------------------- | ----------------------------------- |
-| Commit to an approach     | `/create`                           |
-| Research external options | `/research`                         |
-| Open-ended ideation       | Load `brainstorming` skill directly |
+| Need | Command |
+| --- | --- |
+| Commit to an approach | `/create` |
+| Research external options | `/research` |
+| Plan details | `/plan <id>` |

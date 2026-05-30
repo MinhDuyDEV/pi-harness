@@ -8,38 +8,33 @@ agentType: vision
 
 Design a component, page, or design system with a clear aesthetic point of view.
 
-> **Design track (optional):** Not part of the core `/create → /ship` workflow.
-> Use when you need visual design guidance before or during implementation.
+> Optional design track for `/create → /plan → /ship`. Use when visual direction should be decided before or during implementation.
 
 ## Parse Arguments
 
-| Argument    | Default  | Description                                 |
-| ----------- | -------- | ------------------------------------------- |
-| `component` | —        | Design a specific component                 |
-| `page`      | —        | Design a page layout                        |
-| `system`    | —        | Create or extend a design system            |
-| `[topic]`   | required | What to design (e.g. "button", "dashboard") |
-| `--quick`   | false    | High-level direction only, skip code        |
+| Argument | Default | Description |
+| --- | --- | --- |
+| `component` | — | Design a specific component |
+| `page` | — | Design a page layout |
+| `system` | — | Create or extend a design system |
+| `[topic]` | required | What to design, e.g. button or dashboard |
+| `--quick` | false | Direction only, no code |
 
 ## Load Skills
 
 ```typescript
-skill({ name: "frontend-design" }); // Design system guidance, anti-patterns, references
+skill({ name: "frontend-design" });
 ```
-
----
 
 ## Phase 1: Detect Existing Design System
 
 ```typescript
 srcwalk_files({ pattern: "**/tailwind.config.{js,ts,mjs}" });
 srcwalk_files({ pattern: "**/globals.css" });
-srcwalk_files({ pattern: "**/components.json" }); // shadcn
+srcwalk_files({ pattern: "**/components.json" });
 ```
 
-Read what exists. Don't design in a vacuum — build on the project's current system.
-
----
+Read what exists. Do not design in a vacuum.
 
 ## Phase 2: Check Memory
 
@@ -48,40 +43,30 @@ memory-search({ query: "[topic] design UI", limit: 3 });
 memory-search({ query: "design system colors typography", limit: 3 });
 ```
 
-Reuse existing aesthetic decisions. Don't contradict previous design choices unless the user asks.
-
----
+Reuse existing aesthetic decisions unless the user asks to change them.
 
 ## Phase 3: Design
 
-The `frontend-design` skill provides all reference material:
+Before designing, state:
 
-- Aesthetic directions and design philosophy
-- Typography and font pairing guidance
-- Color systems (OKLCH)
-- Animation patterns (Motion + Tailwind)
-- Anti-patterns and AI slop avoidance
-- shadcn/ui component patterns
-- Tailwind v4 configuration
+1. **Aesthetic direction** — style and rationale.
+2. **Key characteristics** — 3 specific choices.
 
-**Before designing, state:**
+Output by type:
 
-1. **Aesthetic direction** — which style and why
-2. **Key characteristics** — 3 specific elements you'll apply
+| Task Type | Output |
+| --- | --- |
+| `component` | Spec: variants, sizes, states, code if not `--quick` |
+| `page` | Layout, sections, responsive behavior |
+| `system` | Tokens, CSS variables, usage guidelines |
 
-Then produce the design:
+For `--quick`, provide direction and key decisions only.
 
-| Task Type   | Output                                |
-| ----------- | ------------------------------------- |
-| `component` | Spec (variants, sizes, states) + code |
-| `page`      | Layout structure + section breakdown  |
-| `system`    | Tokens (CSS variables) + guidelines   |
+## Phase 4: Save Artifact When Relevant
 
-For `--quick`: Skip code output. Provide direction + key decisions only.
+If a matching work directory exists, write `.pi/plans/<id>/DESIGN.md`. Otherwise report inline unless the user asks for a file.
 
----
-
-## Phase 4: Record Decision
+## Phase 5: Record Decision
 
 ```typescript
 observation({
@@ -93,19 +78,17 @@ observation({
 });
 ```
 
----
-
 ## Examples
 
 ```bash
-/design component button           # Full component design with code
-/design page landing --quick       # High-level page direction only
-/design system                     # Create/extend design system tokens
+/design component button
+/design page landing --quick
+/design system
 ```
 
 ## Related Commands
 
-| Need               | Command         |
-| ------------------ | --------------- |
-| Review existing UI | `/ui-review`    |
-| Ship it            | `/ship <bead>`  |
+| Need | Command |
+| --- | --- |
+| Review existing UI | `/ui-review` |
+| Implement it | `/ship <id>` |

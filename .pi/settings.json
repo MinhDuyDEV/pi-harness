@@ -8,11 +8,8 @@
   },
   "packages": [
     "git:github.com/ghoseb/pi-askuserquestion",
-    "npm:pi-mcp-adapter",
-    "npm:@tintinweb/pi-subagents",
-    "npm:@tintinweb/pi-tasks",
     "npm:@marckrenn/pi-sub-bar",
-    "git:github.com/heyhuynhgiabuu/pi-diff@v0.5.0",
+    "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:@sting8k/pi-vcc",
@@ -46,7 +43,7 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.77.0",
+  "lastChangelogVersion": "0.78.0",
   "treeFilterMode": "default",
   "transport": "sse",
   "hideThinkingBlock": false,

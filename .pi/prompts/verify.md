@@ -1,170 +1,166 @@
 ---
 description: Verify implementation completeness, correctness, and coherence
-argument-hint: "<bead-id> [--quick] [--full] [--fix] [--no-cache]"
+argument-hint: "<work-id|path> [--quick] [--full] [--fix] [--no-cache]"
 agentType: reviewer
 ---
 
 # Verify: $ARGUMENTS
 
-Check implementation against PRD before shipping.
+Check implementation against a file-backed work spec or a specific path.
 
 ## Load Skills
 
 ```typescript
-skill({ name: "beads" });
 skill({ name: "verification-before-completion" });
+skill({ name: "code-review-and-quality" });
 ```
 
 ## Parse Arguments
 
-| Argument     | Default  | Description                                    |
-| ------------ | -------- | ---------------------------------------------- |
-| `<bead-id>`  | required | The bead to verify                             |
-| `--quick`    | false    | Gates only, skip coherence check               |
-| `--full`     | false    | Force full verification mode (non-incremental) |
-| `--fix`      | false    | Auto-fix lint/format issues                    |
-| `--no-cache` | false    | Bypass verification cache, force fresh run     |
+| Argument | Default | Description |
+| --- | --- | --- |
+| `<work-id|path>` | required | Work directory under `.pi/plans/` or file/directory path |
+| `--quick` | false | Gates only, skip coherence checks |
+| `--full` | false | Force full verification mode |
+| `--fix` | false | Run project auto-fix command if available |
+| `--no-cache` | false | Bypass verification cache |
 
 ## Determine Input Type
 
-| Input Type | Detection                   | Action                              |
-| ---------- | --------------------------- | ----------------------------------- |
-| Bead ID    | Matches `br-xxx` or numeric | Check implementation vs PRD in bead |
-| Path       | File/directory path         | Verify that specific path           |
-| `all`      | Keyword                     | Verify all in-progress work         |
+| Input | Detection | Action |
+| --- | --- | --- |
+| Work ID | `.pi/plans/$ARGUMENTS/` exists | Verify implementation against `SPEC.md` and `PLAN.md` |
+| Path | file/directory exists | Verify that path and related changes |
+| Empty-like broad request | otherwise | Stop and ask for a work ID or path |
 
-## Before You Verify
+## Core Rules
 
-- **Be certain**: Only flag issues you can verify with tools
-- **Don't invent problems**: If an edge case isn't in the PRD, don't flag it
-- **Run the gates**: Build, test, lint, typecheck are non-negotiable
-- **Use project conventions**: Check `package.json` scripts first
+- Only claim issues backed by tool output or file evidence.
+- Run project-native gates when possible.
+- Directly run any test file created or modified.
+- Record fresh evidence before claiming pass.
+- Do not update hidden trackers; write visible verification artifacts.
 
-## Phase 0: Check Verification Cache
+## Phase 0: Cache Check
 
-Before running any gates, check if a recent verification is still valid:
+Use a local cache under `.pi/plans/_VERIFY.log` only when not in `--full` or `--no-cache` mode.
 
 ```bash
-# Compute current state fingerprint (commit hash + diff)
 CURRENT_STAMP=$(printf '%s\n%s' \
   "$(git rev-parse HEAD)" \
-  "$(git diff HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx')" \
+  "$(git diff HEAD)" \
   | shasum -a 256 | cut -d' ' -f1)
-LAST_STAMP=$(tail -1 .beads/verify.log 2>/dev/null | awk '{print $1}')
+LAST_STAMP=$(tail -1 .pi/plans/_VERIFY.log 2>/dev/null | awk '{print $1}')
 ```
 
-| Condition                                 | Action                                                 |
-| ----------------------------------------- | ------------------------------------------------------ |
-| `--no-cache` or `--full`                  | Skip cache check, run fresh                            |
-| `CURRENT_STAMP == LAST_STAMP`             | Report **cached PASS**, skip to Phase 2 (completeness) |
-| `CURRENT_STAMP != LAST_STAMP` or no cache | Run gates normally                                     |
-
-When cache hits, report:
-
-```text
-Verification: cached PASS (no changes since <timestamp from verify.log>)
-```
+If the stamp matches and the user did not request fresh verification, report cached status clearly. Otherwise run gates.
 
 ## Phase 1: Gather Context
 
+For a work ID:
+
 ```bash
-br show $ARGUMENTS
+WORK_DIR=.pi/plans/$ARGUMENTS
+find "$WORK_DIR" -maxdepth 2 -type f | sort
 ```
 
-Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
+Read available artifacts:
 
-Read the PRD and any other artifacts (plan.md, research.md, design.md).
+- `SPEC.md`
+- `PLAN.md`
+- `RESEARCH.md`
+- `PROGRESS.md`
+- `RUN-REPORT.md`
 
-**Verify guards:**
-
-- [ ] Bead is `in_progress`
-- [ ] `prd.md` exists
-- [ ] You have read the full PRD
+For a path, read the file(s), nearby tests, and current diff.
 
 ## Phase 2: Completeness
 
-Extract all requirements/tasks from the PRD and verify each is implemented:
+Extract requirements from `SPEC.md` or the user request.
 
-- For each requirement: find evidence in the codebase (file:line reference)
-- Mark as: complete, partial, or missing
-- Report completeness score (X/Y requirements met)
+For each requirement:
 
-## Phase 3: Correctness
+- Find code evidence (`file:line`).
+- Mark complete, partial, missing, or not applicable.
+- Note any behavior that is stubbed, unwired, or only superficially implemented.
 
-Follow the `verification-before-completion` skill protocol:
+## Phase 3: Correctness Gates
 
-**Default: incremental mode** (changed files only, parallel gates).
+Follow `verification-before-completion`.
 
-| Mode        | When                                      | Behavior                         |
-| ----------- | ----------------------------------------- | -------------------------------- |
-| Incremental | Default, <20 changed files                | Lint changed files, test changed |
-| Full        | `--full` flag, >20 changed files, or ship | Lint all, test all               |
-
-**Execution order:**
-
-1. **Parallel**: typecheck + lint (simultaneously)
-2. **Sequential** (after parallel passes): test, then build (ship only)
-
-Report results with mode column:
-
-```text
-| Gate      | Status | Mode        | Time   |
-|-----------|--------|-------------|--------|
-| Typecheck | PASS   | full        | 2.1s   |
-| Lint      | PASS   | incremental | 0.3s   |
-| Test      | PASS   | incremental | 1.2s   |
-| Build     | SKIP   | —           | —      |
-```
-
-**After all gates pass**, record to verification cache:
+Detect toolchain first:
 
 ```bash
-echo "$CURRENT_STAMP $(date -u +%Y-%m-%dT%H:%M:%SZ) PASS" >> .beads/verify.log
+ls package.json Makefile justfile Cargo.toml pyproject.toml go.mod 2>/dev/null || true
 ```
 
-If `--fix` flag provided, run the project's auto-fix command (e.g., `npm run lint:fix`, `ruff check --fix`, `cargo clippy --fix`).
+Run appropriate gates:
 
-## Phase 4: Coherence (skip with --quick)
+| Gate | Examples |
+| --- | --- |
+| Typecheck | `npm run typecheck`, `tsc --noEmit`, `cargo check` |
+| Lint | `npm run lint`, `ruff check`, `cargo clippy` |
+| Test | `npm test`, targeted test commands, `cargo test` |
+| Build | `npm run build`, `go build ./...` |
 
-Cross-reference artifacts for contradictions:
+If `--fix` is present, run the project’s established auto-fix command only after reading scripts/config.
 
-- PRD vs implementation (does code address all PRD requirements?)
-- Plan vs implementation (did code follow the plan?)
-- Research recommendations vs actual approach (if different, is it justified?)
-
-Flag contradictions with specific file references.
-
-## Phase 5: Report
+When gates pass, append:
 
 ```bash
-br comments add $ARGUMENTS "Verification: [PASS|PARTIAL|FAIL] - [summary]"
+mkdir -p .pi/plans
+echo "$CURRENT_STAMP $(date -u +%Y-%m-%dT%H:%M:%SZ) PASS" >> .pi/plans/_VERIFY.log
 ```
 
-Output:
+## Phase 4: Coherence (Skip with `--quick`)
 
-1. **Result**: READY TO SHIP / NEEDS WORK / BLOCKED
-2. **Completeness**: score and status
-3. **Correctness**: gate results (with mode column)
-4. **Coherence**: contradictions found (if not --quick)
-5. **Blocking issues** to fix before shipping
-6. **Next step**: `/ship $ARGUMENTS` if ready, or list fixes needed
+Cross-check:
 
-Record significant findings with `observation()`:
+- Spec vs implementation.
+- Plan vs implementation.
+- Research recommendations vs final approach.
+- Changed files vs intended scope.
 
-```typescript
-observation({
-  type: "discovery", // or "warning", "bugfix"
-  title: "Verify: [bead-id] [key finding]",
-  narrative: "[What was found, impact, resolution]",
-  concepts: "verification, [component]",
-  confidence: "high",
-});
+Flag contradictions with exact file references.
+
+## Phase 5: Write Artifact
+
+For a work ID, write `.pi/plans/$ARGUMENTS/VERIFICATION.md`:
+
+```markdown
+# Verification: $ARGUMENTS
+
+## Result
+READY / NEEDS WORK / BLOCKED
+
+## Completeness
+| Requirement | Status | Evidence |
+| --- | --- | --- |
+
+## Gates
+| Command | Result | Evidence |
+| --- | --- | --- |
+
+## Coherence
+- ...
+
+## Blocking Issues
+- ...
 ```
+
+## Output
+
+Report:
+
+1. Result: READY / NEEDS WORK / BLOCKED.
+2. Completeness score.
+3. Gate commands and results.
+4. Coherence findings.
+5. Blocking issues and next step.
 
 ## Related Commands
 
-| Need              | Command            |
-| ----------------- | ------------------ |
-| Ship after verify | `/ship <id>`       |
-| Review code       | `/review-codebase` |
-| Check bead status  | `br list`          |
+| Need | Command |
+| --- | --- |
+| Ship after verify | `/ship <id>` |
+| Review code | `/review-codebase` |

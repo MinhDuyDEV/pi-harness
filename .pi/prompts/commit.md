@@ -26,33 +26,34 @@ git diff --cached --stat
 ### Phase 2: Analyze
 
 - Identify the type of change:
-  - `feat`: New feature or capability
-  - `fix`: Bug fix
-  - `refactor`: Code restructuring (no behavior change)
-  - `test`: Test-only changes
-  - `chore`: Config, tooling, dependencies
-  - `docs`: Documentation only
-
-- Determine scope from changed files (e.g., `auth`, `api`, `ui`)
-- Summarize what changed and why
+  - `feat`: new feature or capability
+  - `fix`: bug fix
+  - `refactor`: code restructuring without behavior change
+  - `test`: test-only changes
+  - `chore`: config, tooling, dependencies
+  - `docs`: documentation only
+- Determine scope from changed files.
+- Summarize what changed and why.
+- Reference issue IDs or `.pi/plans/<id>/` work IDs when applicable.
 
 ### Phase 3: Stage
 
-If nothing is staged (`git diff --cached` is empty):
+If nothing is staged:
 
-- Stage specific files relevant to the change (never `git add .`)
-- Group related changes into one logical commit
-- Leave unrelated changes unstaged
+- Stage specific files relevant to this logical change.
+- Never use `git add .` or `git add -A`.
+- Leave unrelated changes unstaged.
 
 ### Phase 4: Commit
 
 Format: `type(scope): concise description`
 
 Rules:
-- Subject line: max 72 chars, imperative mood ("add" not "added")
-- Body: explain WHY, not WHAT (the diff shows what)
-- Reference issue/bead IDs if applicable
-- No emoji in commit messages
+
+- Subject line: max 72 chars, imperative mood.
+- Body: explain why, not what.
+- No emoji.
+- Do not bypass hooks.
 
 ```bash
 git commit -m "type(scope): description" -m "body (optional)"
@@ -67,6 +68,6 @@ git diff --stat HEAD~1
 
 ## Options
 
-- `--all`: Stage all modified tracked files before committing
-- `--amend`: Amend the previous commit instead of creating new
-- Free text: Use as the commit message directly
+- `--all`: Stage all modified tracked files only after showing the exact list and confirming scope.
+- `--amend`: Amend the previous commit instead of creating a new one.
+- Free text: Use as the commit message directly.

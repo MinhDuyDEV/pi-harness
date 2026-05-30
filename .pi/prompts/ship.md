@@ -1,395 +1,184 @@
 ---
-description: Ship a bead - implement PRD tasks, verify, review, close
-argument-hint: "<bead-id>"
+description: Execute a file-backed work item, verify it, and prepare handoff
+argument-hint: "<work-id>"
 ---
 
 # Ship: $ARGUMENTS
 
-Execute PRD tasks, verify each passes, run review, close the bead.
+Implement `.pi/plans/<work-id>/SPEC.md` or `.pi/plans/<work-id>/PLAN.md`, verify the result, review the diff, and update the run artifacts.
 
-> **Workflow:** `/create` → **`/ship <id>`**
->
-> Bead MUST have `prd.md`. If not yet claimed, `/ship` auto-claims it.
+> **Workflow:** `/create` → `/plan <id>` (optional) → `/ship <id>`
 
 ## Load Skills
 
 ```typescript
-skill({ name: "beads" });
 skill({ name: "memory-system" });
 skill({ name: "behavioral-kernel" });
-skill({ name: "using-git-worktrees" });
+skill({ name: "incremental-implementation" });
 skill({ name: "verification-before-completion" });
-skill({ name: "development-lifecycle" }); // Mid-point + completion checks during execution
-```
-
-## Determine Input Type
-
-| Input Type | Detection                   | Action                     |
-| ---------- | --------------------------- | -------------------------- |
-| Bead ID    | Matches `br-xxx` or numeric | Ship that bead             |
-| Path       | File/directory path         | Not supported for ship     |
-| `all`      | Keyword                     | Ship all in_progress beads |
-
-## Before You Ship
-
-- **Be certain**: Only ship if all tasks pass verification
-- **Don't skip gates**: Build, test, lint, typecheck are non-negotiable
-- **Run the review**: Always spawn a reviewer agent before closing
-- **Verify goals**: Tasks completing ≠ goals achieved (use goal-backward verification)
-- **Commit before close**: Per-task commits required, don't ship without git history
-- **Ask before closing**: Never close bead without user confirmation
-- **Apply the behavioral kernel**: before each wave or fallback task, state the smallest current slice, what is explicitly out of scope, and the proof path that will confirm the task is actually done
-
-## Available Tools
-
-| Tool                 | Use When                                  |
-| -------------------- | ----------------------------------------- |
-| `explore`            | Finding patterns in codebase, prior art   |
-| `scout`              | External research, best practices         |
-| `lsp`                | Finding symbol definitions, references    |
-| `srcwalk_search`       | Finding code patterns                     |
-| `Agent`              | Spawning subagents for parallel execution |
-
-## Phase 1: Guards
-
-### Memory Grounding
-
-Follow the `memory-system` skill protocol. Focus on failed approaches to avoid repeating.
-
-### Bead Validation
-
-```bash
-br show $ARGUMENTS
-```
-
-Verify:
-
-- Bead is `in_progress` or unclaimed (auto-claim if needed)
-- `.beads/artifacts/$ARGUMENTS/prd.md` exists (if not, tell user to run `/create` first)
-
-Check what artifacts exist:
-
-Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
-
-### Run Report Initialization
-
-Create or update `.beads/artifacts/$ARGUMENTS/agent-run-report.md` from `.pi/templates/agent-run-report.md` before implementation work begins.
-
-Minimum required fields before Phase 2:
-
-- Task: bead ID + title from `br show $ARGUMENTS`
-- Status: `in_progress`
-- Inputs: user request, bead ID, PRD/plan paths, memory/context consulted
-- Verification table initialized with planned commands
-
-Append to this report after each task, verification gate, review pass, blocker, subagent run, and approval checkpoint. This report is observability evidence; it does not replace progress.txt or PRD task status.
-
-## Phase 1B: Auto-Claim (if not yet in_progress)
-
-If bead status is NOT `in_progress`, auto-claim it:
-
-```bash
-br update $ARGUMENTS --status in_progress
-```
-
-Then ask about workspace:
-
-### Workspace Setup
-
-Follow the `using-git-worktrees` skill protocol when you need an isolated workspace.
-
-**If bead is already `in_progress`:** Skip this phase entirely.
-
-## Phase 2: Route to Execution
-
-| Artifact exists | Action                                                   |
-| --------------- | -------------------------------------------------------- |
-| `plan.md`       | Load `subagent-driven-development`, follow its batch process |
-| `prd.json`      | Proceed to PRD task loop below                           |
-| Only `prd.md`   | Use the `beads` skill to create `prd.json`, then proceed |
-
-## Phase 3: Wave-Based Execution
-
-If `plan.md` exists with dependency graph:
-
-1. **Load skill:** `skill({ name: "subagent-driven-development" })`
-2. **Parse waves** from dependency graph section
-3. **Execute wave-by-wave:**
-   - Single-task wave → execute directly (no subagent overhead)
-   - Multi-task wave → dispatch parallel worker subagents with the `Agent` tool, one per task
-4. **Review after each wave** — run verification gates, report, wait for feedback
-5. **Continue** until all waves complete
-
-**Parallel safety:** Only tasks within same wave run in parallel. Tasks must NOT share files. Tasks in Wave N+1 wait for Wave N.
-
-### Phase 3A: PRD Task Loop (Sequential Fallback)
-
-For each task (wave-based or sequential fallback):
-
-1. **Read** the task description, verification steps, and affected files
-2. **Read** the affected files before editing
-3. **Implement** the changes — stay within the task's `files` list
-4. **Handle Deviations:** Apply deviation rules 1-4 as discovered
-5. **Checkpoint Protocol:** If task has `checkpoint:*`, stop and request user input
-6. **Verify** — run each verification step from the task
-7. **If verification fails**, fix and retry (max 2 attempts per task)
-8. **Commit** — per-task commit (see below)
-9. **Mark** `passes: true` in `prd.json`
-10. **Append** progress to `.beads/artifacts/$ARGUMENTS/progress.txt`
-11. **Update** `.beads/artifacts/$ARGUMENTS/agent-run-report.md` with files changed, verification evidence, subagent outputs, deviations, and failures/recoveries for this task
-
-### Checkpoint Protocol
-
-When task has `checkpoint:*` type:
-
-| Type                      | Action                                                     |
-| ------------------------- | ---------------------------------------------------------- |
-| `checkpoint:human-verify` | Execute automation first, then pause for user verification |
-| `checkpoint:decision`     | Present options, wait for selection                        |
-| `checkpoint:human-action` | Request specific action with verification command          |
-
-**Automation-first:** If verification CAN be automated, MUST automate it before requesting human check.
-
-**Checkpoint return format:**
-
-```markdown
-## CHECKPOINT REACHED
-
-**Type:** [human-verify | decision | human-action]
-**Progress:** X/Y tasks complete
-
-### Completed
-
-| Task | Commit | Status |
-| ---- | ------ | ------ |
-| [N]  | [hash] | [✓/✗]  |
-
-### Current Task
-
-**Task:** [name]
-**Blocked by:** [specific blocker]
-
-### Awaiting
-
-[What user needs to do/provide]
-```
-
-### TDD Execution Flow
-
-When task specifies TDD:
-
-**RED Phase:**
-
-1. Create test file with failing test
-2. Run test → MUST fail
-3. Commit: `test: add failing test for [feature]`
-
-**GREEN Phase:**
-
-1. Write minimal code to make test pass
-2. Run test → MUST pass
-3. Commit: `feat: implement [feature]`
-
-**REFACTOR Phase:** (if needed)
-
-1. Clean up code
-2. Run tests → MUST still pass
-3. Commit if changes: `refactor: clean up [feature]`
-
-### Task Commit Protocol
-
-After each task completes (verification passed):
-
-1. **Check modified files:** `git status --short`
-2. **Stage individually** (NEVER `git add .`):
-   ```bash
-   git add src/auth/login.ts
-   git add src/auth/login.test.ts
-   ```
-3. **Commit with type prefix:**
-
-   ```bash
-   git commit -m "feat(bead-$ARGUMENTS): [task description]
-
-   - [key change 1]
-   - [key change 2]"
-   ```
-
-4. **Record hash** in progress log
-
-**Commit types:**
-| Type | Use For |
-|------|---------|
-| `feat` | New feature, endpoint, component |
-| `fix` | Bug fix, error correction |
-| `test` | Test-only changes (TDD RED phase) |
-| `refactor` | Code cleanup, no behavior change |
-| `chore` | Config, tooling, dependencies |
-
-### Stop Conditions
-
-- Verification fails 2x on same task → stop, report blocker
-- Blocked by unfinished dependency → stop, report which one
-- Modifying files outside task scope → stop, ask user
-- Rule 4 deviation encountered → stop, present options
-
-## Phase 4: Verification
-
-Follow the `verification-before-completion` skill protocol in full mode:
-
-- Use **full mode** (shipping requires all gates)
-- All 4 gates must pass before proceeding to commit/push
-- Also run PRD `Verify:` commands
-
-## Phase 5: Review
-
-Load and run the review skill:
-
-```typescript
 skill({ name: "code-review-and-quality" });
 ```
 
-Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
+## Core Rules
+
+- Direct implementation in this session is the default.
+- Use tmux/self-spawn only for independent, file-disjoint work with written prompts and written outputs.
+- Do not use external task trackers, hidden workers, or orchestration CLIs.
+- Read files before editing; verify every meaningful change.
+- Never stage with `git add .`; stage explicit files only when the user asks for a commit.
+- Do not mix unrelated dirty work into the shipped scope.
+
+## Phase 1: Guards
 
 ```bash
-BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~1)
-HEAD_SHA=$(git rev-parse HEAD)
+WORK_DIR=.pi/plans/$ARGUMENTS
+test -d "$WORK_DIR"
+test -f "$WORK_DIR/SPEC.md"
+find "$WORK_DIR" -maxdepth 2 -type f | sort
+git status --porcelain
 ```
 
-Fill placeholders:
+Read, in order when present:
 
-- `{WHAT_WAS_IMPLEMENTED}`: bead title + brief summary of what changed
-- `{PLAN_OR_REQUIREMENTS}`: `.beads/artifacts/$ARGUMENTS/prd.md`
-- `{BASE_SHA}` / `{HEAD_SHA}`: from above
+1. `.pi/plans/$ARGUMENTS/SPEC.md`
+2. `.pi/plans/$ARGUMENTS/PLAN.md`
+3. `.pi/plans/$ARGUMENTS/RESEARCH.md`
+4. `.pi/plans/$ARGUMENTS/DESIGN.md`
+5. `.pi/plans/$ARGUMENTS/PROGRESS.md`
 
-Wait for all 5 agents to return. Synthesize findings.
+Create or update `.pi/plans/$ARGUMENTS/RUN-REPORT.md` before implementation begins.
 
-**Auto-fix rule:**
+Minimum report fields:
 
-- Critical issues → fix inline, re-run Phase 4 verification, continue
-- Important issues → fix inline, continue
-- Minor issues → add to bead comments
+```markdown
+# Run Report: $ARGUMENTS
 
-If review finds critical issues that require architectural decisions → stop → present options to user.
+## Status
+in_progress
 
-### Goal-Backward Verification (if plan.md exists)
+## Inputs
+- Spec: `.pi/plans/$ARGUMENTS/SPEC.md`
+- Plan: `.pi/plans/$ARGUMENTS/PLAN.md` if present
 
-Verify that tasks completed ≠ goals achieved:
+## Execution Log
+| Time | Step | Evidence |
+| --- | --- | --- |
 
-**Three-Level Verification:**
+## Verification
+| Command | Result | Notes |
+| --- | --- | --- |
 
-| Level              | Check                  | Command/Action                                                    |
-| ------------------ | ---------------------- | ----------------------------------------------------------------- |
-| **1: Exists**      | File is present        | `ls src/auth/login.ts`                                              |
-| **2: Substantive** | Not a stub/placeholder | `grep -v "TODO\|FIXME\|return null\|placeholder" src/auth/login.ts` |
-| **3: Wired**       | Connected and used     | `grep -r "import.*ComponentName" src/`                            |
-
-**Key Link Verification:**
-
-- Component → API: `grep -E "fetch.*api/|axios" Component.tsx`
-- API → Database: `grep -E "prisma\.|db\." route.ts`
-- Form → Handler: `grep "onSubmit" Component.tsx`
-- State → Render: `grep "{stateVar}" Component.tsx`
-
-**Stub Detection:**
-Red flags indicating incomplete implementation:
-
-```javascript
-return <div>Component</div>      // Placeholder
-return <div>{/* TODO */}</div>    // Empty
-return null                       // Empty
-onClick={() => {}}                // No-op handler
-fetch('/api/...')                 // No await, ignored
-return Response.json({ok: true})  // Static, not query result
+## Files Changed
+- TBD
 ```
 
-If any artifact fails Level 2 or 3 → fix → re-verify.
+## Phase 2: Execution Route
 
-## Phase 5B: Final Run Report Update
+| Artifact | Action |
+| --- | --- |
+| `PLAN.md` exists | Execute plan tasks/waves in order |
+| only `SPEC.md` exists | Derive the smallest safe implementation slice from the spec |
+| missing `SPEC.md` | Stop and ask user to run `/create` |
 
-Before asking to close the bead, update `.beads/artifacts/$ARGUMENTS/agent-run-report.md`:
+If the plan contains waves:
 
-- Status: `completed` only if all verification and review gates passed; otherwise `blocked` or `partial`
-- Execution table: every major step and artifact path
-- Files changed: scoped to this bead only
-- Verification table: exact commands/checks and results
-- Subagents: agent IDs/types/status/output paths and whether the main agent independently verified results
-- Failures and recovery: failed attempts, root causes, and follow-ups
-- Approval gates: close/commit/push/destructive actions all explicitly recorded
+1. Execute one wave at a time.
+2. Multi-task waves are sequential unless tasks are independent and file-disjoint.
+3. For tmux/self-spawn, write `.pi/plans/$ARGUMENTS/WORKER-<n>.md` first and require `.pi/plans/$ARGUMENTS/WORKER-<n>-OUTPUT.md` back.
+4. Re-read outputs, inspect diffs, and verify before accepting them.
 
-Do not claim the bead is ready to close unless this report contains fresh verification evidence.
+## Phase 3: Task Loop
 
-## Phase 6: Close
+For each task:
 
-Ask user before closing:
+1. State the current slice, out-of-scope items, and proof command.
+2. Read the listed files and nearby call sites.
+3. Add or update tests first when behavior changes.
+4. Implement the smallest working change.
+5. Run the task verification command.
+6. If verification fails twice on the same approach, stop and report the blocker.
+7. Append progress to `.pi/plans/$ARGUMENTS/PROGRESS.md`.
+8. Update `.pi/plans/$ARGUMENTS/RUN-REPORT.md` with files changed and evidence.
 
-```typescript
-ask_user_question({
-  questions: [
-    {
-      header: "Close",
-      question: "All tasks pass, gates green, review clean. Close bead $ARGUMENTS?",
-      options: [
-        { label: "Yes, close it (Recommended)", description: "All checks passed" },
-        { label: "No, keep open", description: "Need more work" },
-      ],
-      multiSelect: false,
-    },
-  ],
-});
-```
+Checkpoint types:
 
-If confirmed:
+| Type | Action |
+| --- | --- |
+| `checkpoint:decision` | Present options and wait |
+| `checkpoint:human-verify` | Run automation first, then ask for manual verification |
+| `checkpoint:human-action` | Request the exact external action and verification evidence |
+
+## Phase 4: Verification
+
+Follow `verification-before-completion`.
+
+Run project-specific commands first by inspecting `package.json`, `Makefile`, `justfile`, `Cargo.toml`, `pyproject.toml`, or similar.
+
+Minimum evidence:
+
+- Typecheck/lint/test/build as applicable.
+- Direct tests for any test file created or modified.
+- Goal-backward checks against `SPEC.md` success criteria.
+- Diff review scoped to files changed for this work item.
+
+Record exact commands and results in `.pi/plans/$ARGUMENTS/RUN-REPORT.md`.
+
+## Phase 5: Review
+
+Use `code-review-and-quality` in the current session by default.
+
+Review scope:
 
 ```bash
-br close $ARGUMENTS --reason "Shipped: all PRD tasks pass, verification + review passed"
-br sync --flush-only
+git status --short
+git diff --stat
+git diff
 ```
 
-Record significant learnings with `/knowledge $ARGUMENTS` after closing.
+Check:
+
+- Correctness against `.pi/plans/$ARGUMENTS/SPEC.md`.
+- Security and data-handling risks.
+- Type safety and test coverage.
+- Simplicity: no speculative abstractions or unrelated cleanup.
+- No hidden dependency on external orchestration.
+
+If an independent review is worth the overhead, use a visible tmux/print workflow:
+
+```bash
+mkdir -p .pi/plans/$ARGUMENTS
+pi --name "review-$ARGUMENTS" --print-turn "Read .pi/plans/$ARGUMENTS/SPEC.md and the current git diff. Write review findings to .pi/plans/$ARGUMENTS/REVIEW.md."
+```
+
+Then read `.pi/plans/$ARGUMENTS/REVIEW.md`, verify findings, and fix only scoped issues.
+
+## Phase 6: Handoff
+
+Before claiming done:
+
+- `.pi/plans/$ARGUMENTS/PROGRESS.md` is current.
+- `.pi/plans/$ARGUMENTS/RUN-REPORT.md` has fresh verification evidence.
+- `git status --short` is understood and unrelated dirty files are called out.
+- The final response lists changed files, verification commands, and remaining risks.
+
+Do not commit, push, close, or delete work artifacts unless the user explicitly asks.
 
 ## Output
 
 Report:
 
-1. **Execution Summary:**
-   - Tasks completed/total
-   - Waves executed (if plan.md with waves)
-   - Deviations applied (Rules 1-3)
-   - Checkpoints encountered (human-verify/decision/human-action)
-   - Commits made
-   - Run report: `.beads/artifacts/$ARGUMENTS/agent-run-report.md`
-
-2. **PRD Task Results:**
-   - Each task status (✓ pass, ✗ fail, ⏸ checkpoint)
-   - Files modified per task
-   - Commit hashes
-
-3. **Verification Gate Results:**
-   - Build: [pass/fail]
-   - Test: [pass/fail]
-   - Lint: [pass/fail]
-   - Typecheck: [pass/fail]
-
-4. **Goal-Backward Verification:**
-   - Artifacts verified: [N] exists, [M] substantive, [K] wired
-   - Key links checked: [pass/fail per link]
-   - Stubs detected: [N] (if any)
-
-5. **Review Summary:**
-   - Critical issues: [N]
-   - Important issues: [N]
-   - Minor issues: [N]
-   - Overall assessment: [pass/needs work]
-
-6. **Next Steps:**
-   - `/pr` to create pull request
-   - Manual commits if not already done
-   - Create follow-up beads for deferred work
+1. Work ID and artifact paths.
+2. Tasks completed and skipped/deferred items.
+3. Files changed.
+4. Verification commands and results.
+5. Review findings and fixes.
+6. Next step: `/pr`, commit request, or follow-up work.
 
 ## Related Commands
 
-| Need        | Command   |
-| ----------- | --------- |
+| Need | Command |
+| --- | --- |
 | Create spec | `/create` |
-| Create PR   | `/pr`     |
+| Add plan | `/plan <id>` |
+| Verify only | `/verify <id>` |
+| Create PR | `/pr <id>` |

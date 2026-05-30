@@ -1,135 +1,113 @@
 ---
 description: Review code for quality, security, and compliance
-argument-hint: "[path|bead-id|pr-number|'all'] [--quick|--thorough]"
+argument-hint: "[path|work-id|pr-number|'all'] [--quick|--thorough]"
 agentType: reviewer
 ---
 
 # Review: $ARGUMENTS
 
+Review changed code or a target path for correctness, security, maintainability, and goal completion.
+
 ## Load Skills
 
 ```typescript
-skill({ name: "beads" });
 skill({ name: "code-review-and-quality" });
 skill({ name: "verification-before-completion" });
 ```
 
 ## Determine Input Type
 
-| Input Type            | Detection                    | Action                     |
-| --------------------- | ---------------------------- | -------------------------- |
-| No arguments          | Default                      | Review uncommitted changes |
-| Commit hash (40-char) | SHA pattern                  | `git show a1b2c3d4`        |
-| Branch name           | String, not matching above   | `git diff main...HEAD`     |
-| PR URL/number         | Contains "github.com" or "#" | `gh pr diff`               |
+| Input | Detection | Action |
+| --- | --- | --- |
+| No arguments | default | Review uncommitted changes |
+| Work ID | `.pi/plans/$ARGUMENTS/` exists | Review current implementation against that spec |
+| File/directory | path exists | Review that scope |
+| Commit hash | SHA pattern | Review `git show <sha>` |
+| PR URL/number | GitHub URL or number marker | Use `gh pr diff` |
+| `all` | keyword | Review branch diff |
 
 ## Before You Review
 
-- **Be certain**: Only flag issues you can verify with tools
-- **Don't invent problems**: If an edge case isn't specified, don't flag it
-- **Don't be a zealot about style**: Unless it violates project conventions, don't flag
-- **Review the changes**: Don't review pre-existing code that wasn't modified
-- **Investigate first**: If unsure, use explore/scout agents before flagging
-
-## Available Tools
-
-| Tool                 | Use When                                |
-| -------------------- | --------------------------------------- |
-| `explore`            | Finding patterns in codebase, prior art |
-| `scout`              | External research, best practices       |
-| `lsp`                | Finding symbol definitions, references  |
-| `srcwalk_search`       | Finding code patterns                   |
-| `codesearch`         | Real-world usage examples               |
+- Only flag issues you can verify.
+- Review changed code, not unrelated pre-existing code.
+- Read full files, not just diff hunks.
+- Use project conventions rather than personal style.
+- If uncertain, inspect code paths before raising a finding.
 
 ## Phase 1: Gather Context
 
 ```bash
 git status --short
-git diff --cached  # staged
-git diff           # unstaged
+git diff --cached
+git diff
 ```
 
-For each changed file:
+For each changed file, read the full file or relevant symbol sections.
 
-- Read the full file to understand context
-- Don't rely on diff alone — code that looks wrong in isolation may be correct
+If a work ID is provided, read `.pi/plans/$ARGUMENTS/SPEC.md` and any `PLAN.md` / `VERIFICATION.md` files.
 
-If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
+## Phase 2: Scope
 
-## Phase 2: Determine Scope
-
-| Input                    | Scope                 | How to Get Code           |
-| ------------------------ | --------------------- | ------------------------- |
-| File/directory path      | That path only        | `read` or `glob` + `read` |
-| Bead ID (e.g., `br-123`) | Implementation vs PRD | `br show` then `git diff` |
-| PR number (e.g., `#45`)  | PR changes            | `gh pr diff 45`           |
-| `all` or empty           | Recent changes        | `git diff main...HEAD`    |
-
-If bead provided, read `.beads/artifacts/$ID/prd.md` to review against spec.
+| Input | Scope | How to Get Code |
+| --- | --- | --- |
+| Path | That path only | `read`, `srcwalk_read`, `grep` |
+| Work ID | Implementation vs spec | `.pi/plans/<id>/SPEC.md` + git diff |
+| PR | PR changes | `gh pr diff` |
+| `all` or empty | Recent/local changes | `git diff main...HEAD` or current diff |
 
 ## Phase 3: Automated Checks
 
-Follow the `verification-before-completion` skill protocol.
+Follow `verification-before-completion` for relevant gates.
 
-Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
+Also scan for:
 
-Also scan for common issues appropriate to the detected language:
-
-- Debug statements (`console.log`, `print()`, `println!`, `fmt.Println`)
-- Loose typing (`any` in TypeScript, `type: ignore` in Python)
-- `TODO|FIXME|HACK` markers
-- Hardcoded secrets patterns
+- Debug statements.
+- Loose typing or unjustified ignores.
+- `TODO`, `FIXME`, `HACK` markers in changed code.
+- Hardcoded secrets or credentials.
+- New dependencies without clear need.
 
 ## Phase 4: Manual Review
 
-Review each category:
+| Category | Focus |
+| --- | --- |
+| Correctness | Behavior matches spec and edge cases |
+| Security | Auth checks, input validation, no secret exposure |
+| Performance | Unbounded work, N+1 queries, hot-path regressions |
+| Maintainability | Simplicity, naming, duplication, module boundaries |
+| Error Handling | Useful context, safe user-facing errors |
+| Testing | Changed behavior has meaningful tests |
+| Type Safety | No unjustified `any`, null hazards, unsafe casts |
 
-| Category            | Focus                                                                   |
-| ------------------- | ----------------------------------------------------------------------- |
-| **Security**        | Auth checks, input validation, no secrets in code, injection prevention |
-| **Performance**     | N+1 queries, unbounded loops, missing pagination, hot path ops          |
-| **Maintainability** | Complexity, DRY violations, dead code, naming clarity                   |
-| **Error Handling**  | Async error handling, error context, sanitized user errors              |
-| **Testing**         | Coverage on changed code, behavior tests, edge cases                    |
-| **Type Safety**     | No unjustified `any`, null handling, explicit return types              |
+Depth levels:
 
-**Depth levels:**
-
-- `--quick`: Automated checks + skim, critical issues only
-- Default: Full automated + manual review
-- `--thorough`: Deep analysis of all categories
+- `--quick`: critical issues only.
+- Default: full automated + manual review.
+- `--thorough`: deeper call graph and blast-radius checks.
 
 ## Phase 5: Report
 
 Group findings by severity:
 
-- **Critical** (must fix before merge): with file:line, issue, fix
-- **Important** (should fix): with file:line, issue, fix
-- **Minor** (nice to have): with file:line, suggestion
+- **Critical** — must fix before merge.
+- **Important** — should fix or explicitly accept.
+- **Minor** — optional cleanup.
 
-Include:
+Each finding must include file/line, issue, impact, and recommended fix.
 
-1. Summary metrics (files reviewed, issues by severity)
-2. Strengths (what's done well, with file:line)
-3. Verdict: Ready to merge / With fixes / No
-4. Reasoning (1-2 sentences)
+Output:
 
-Record significant findings with `observation()`:
+1. Files reviewed.
+2. Findings by severity.
+3. Verification commands run.
+4. Verdict: Ready / With fixes / Blocked.
+5. Reasoning in 1-2 sentences.
 
-```typescript
-observation({
-  type: "discovery", // or "warning", "pattern", "bugfix"
-  title: "Review: [scope] [key finding]",
-  narrative: "[What was found, severity, file:line, recommended fix]",
-  concepts: "code-review, [category]",
-  confidence: "high",
-});
-```
+Record significant findings with `observation()` when useful.
 
 ## Related Commands
 
-| Need                | Command        |
-| ------------------- | -------------- |
-| Ship after review   | `/ship <id>`   |
+| Need | Command |
+| --- | --- |
+| Ship after review | `/ship <id>` |
 | Verify completeness | `/verify <id>` |
-| Check bead status    | `br list`         |

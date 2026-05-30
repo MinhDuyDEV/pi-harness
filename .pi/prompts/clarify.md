@@ -1,6 +1,6 @@
 ---
 description: Reduce ambiguity before planning or implementation
-argument-hint: "<request or bead-id> [--quick|--deep]"
+argument-hint: "<request-or-work-id> [--quick|--deep]"
 ---
 
 # Clarify: $ARGUMENTS
@@ -10,7 +10,6 @@ Reduce ambiguity before planning or implementation. Use this when the request is
 ## Load Skills
 
 ```typescript
-skill({ name: "beads" });
 skill({ name: "brainstorming" });
 skill({ name: "source-driven-development" });
 ```
@@ -18,72 +17,68 @@ skill({ name: "source-driven-development" });
 ## Parse Arguments
 
 | Argument | Default | Description |
-| -------- | ------- | ----------- |
-| `<request or bead-id>` | required | Freeform request text or an existing bead ID |
-| `--quick` | false | Minimize clarification to the smallest set of questions needed to choose the next command |
-| `--deep` | false | Expand clarification to cover non-goals, risks, interfaces, and success criteria before handoff |
+| --- | --- | --- |
+| `<request-or-work-id>` | required | Freeform request text or a directory under `.pi/plans/` |
+| `--quick` | false | Ask the smallest set of questions needed to choose the next command |
+| `--deep` | false | Clarify non-goals, risks, interfaces, and success criteria before handoff |
 
-**Mode rules:**
-- Default mode: ask only enough to make the next command obvious
-- `--quick`: aim to stop after 1-3 high-leverage questions
-- `--deep`: keep going until scope, non-goals, constraints, and success criteria are all explicit
-- If both flags appear, `--deep` wins
+If both flags appear, `--deep` wins.
 
 ## When to Use
 
-- The request has unclear scope, constraints, or success criteria
-- There are multiple plausible interpretations of what "done" means
-- You can feel yourself wanting to assume instead of verify
-- `/plan` would be premature because the main branch decision is still unresolved
+- Scope, constraints, or success criteria are unclear.
+- Multiple plausible interpretations would lead to different implementations.
+- `/plan` would be premature because a main decision is unresolved.
 
-## When NOT to Use
+## When Not to Use
 
-- The request is already specific enough to plan directly
-- The task is purely mechanical and local
-- The ambiguity is only about codebase facts you can inspect yourself
+- The request is already specific enough to plan directly.
+- The task is mechanical and local.
+- The ambiguity is only about repo facts you can inspect yourself.
 
 ## Core Rules
 
-- **Inspect first, ask second** — never ask the user for codebase facts you can discover directly
-- **One question at a time** — each question must reduce a real ambiguity
-- **Prefer structured choices** when possible
-- **Surface non-goals explicitly** — what should *not* change is often as important as what should
-- **Stop once the next command is obvious** — don't turn clarification into therapy
+- Inspect first, ask second.
+- Ask only questions that change the plan.
+- Prefer structured choices.
+- Surface non-goals explicitly.
+- Stop once the next command is obvious.
 
-## Process
+## Phase 1: Ground
 
-### Phase 1: Ground
+1. Identify unknowns blocking execution.
+2. If `$ARGUMENTS` maps to `.pi/plans/$ARGUMENTS/`, read available artifacts:
+   - `SPEC.md`
+   - `PLAN.md`
+   - `RESEARCH.md`
+   - `PROGRESS.md`
+3. Inspect repo/docs/memory before asking the user for facts.
+4. Classify unknowns:
+   - **Scope** — included/excluded work.
+   - **Constraint** — compatibility, timeline, safety, tooling.
+   - **Success** — proof of completion.
+   - **Preference** — valid options requiring user choice.
 
-1. Read the request and identify the unknowns blocking execution
-2. If `$ARGUMENTS` is a bead ID, ground yourself first:
-   - `br show $ARGUMENTS`
-   - `ls .beads/artifacts/$ARGUMENTS/`
-   - read existing PRD / design / plan artifacts before asking anything
-3. Inspect the repo, docs, memory, and existing plans before asking anything
-4. Classify unknowns into:
-   - **Scope** — what is included/excluded
-   - **Constraint** — compatibility, timeline, safety, tooling
-   - **Success** — how we know we're done
-   - **Preference** — valid options where the user should choose
-
-### Phase 2: Clarify
+## Phase 2: Clarify
 
 Ask the smallest useful question first.
 
 Good targets:
+
 - Which user-visible outcome matters most?
 - What must remain unchanged?
-- Which trade-off wins: speed, safety, simplicity, or completeness?
-- Is there an existing artifact (PRD, issue, spec, screenshot) that should control scope?
+- Which tradeoff wins: speed, safety, simplicity, or completeness?
+- Is there an existing artifact, issue, screenshot, or spec that controls scope?
 
 Bad targets:
-- "Where is X implemented?" when you can inspect the repo
-- Three questions in one message
-- Questions that don't change the plan
 
-### Phase 3: Converge
+- Repo facts you can inspect.
+- Bundled multi-part questions.
+- Questions that do not alter the plan.
 
-After each answer, update the current picture:
+## Phase 3: Converge
+
+After each answer, update:
 
 ```markdown
 ## Clarified So Far
@@ -94,13 +89,11 @@ After each answer, update the current picture:
 - Open questions:
 ```
 
-If two or more material ambiguities remain, continue.
-If one or zero remain, stop and route forward.
+Stopping thresholds:
 
-**Stopping thresholds:**
-- Default: stop when the next command is obvious
-- `--quick`: stop as soon as one clear path wins
-- `--deep`: do not stop until non-goals, constraints, and success criteria are all explicit
+- Default: stop when the next command is obvious.
+- `--quick`: stop as soon as one clear path wins.
+- `--deep`: continue until non-goals, constraints, and success criteria are explicit.
 
 ## Output
 
@@ -125,14 +118,15 @@ End with a concise **Clarity Brief**:
 - ...
 
 ## Recommended Next Command
-- `/plan ...` when implementation should be planned
-- `/research ...` when external facts are missing
-- `/start ...` when execution can begin directly
+- `/create "..."` to create/update a file-backed spec
+- `/plan <id>` when execution needs sequencing
+- `/research <topic-or-id>` when external facts are missing
+- `/ship <id>` when execution can begin
 ```
 
 ## Success Criteria
 
-- You asked only questions that materially changed direction
-- You did not ask the user for repo facts you could inspect yourself
-- Non-goals and constraints are explicit
-- The next recommended command is obvious
+- Questions were necessary and targeted.
+- Repo facts were inspected directly.
+- Non-goals and constraints are explicit.
+- The next command is obvious.

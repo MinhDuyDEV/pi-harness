@@ -1,95 +1,77 @@
 ---
-description: Create and submit pull request with bead traceability
-argument-hint: "[bead-id] [--draft]"
+description: Create and submit a pull request with file-backed work traceability
+argument-hint: "[work-id] [--draft]"
 ---
 
-# Pull Request
+# Pull Request: $ARGUMENTS
+
+Create a pull request after verification and review gates pass.
 
 ## Load Skills
 
 ```typescript
-skill({ name: "beads" });
 skill({ name: "memory-system" });
 skill({ name: "code-review-and-quality" });
 skill({ name: "verification-before-completion" });
+skill({ name: "git-workflow-and-versioning" });
 ```
 
 ## Parse Arguments
 
-| Argument    | Default  | Description        |
-| ----------- | -------- | ------------------ |
-| `<bead-id>` | optional | Link PR to bead    |
-| `--draft`   | false    | Create as draft PR |
+| Argument | Default | Description |
+| --- | --- | --- |
+| `<work-id>` | optional | Link PR to `.pi/plans/<id>/` artifacts |
+| `--draft` | false | Create as draft PR |
 
 ## Phase 1: Pre-PR Verification
 
 ```bash
 git status --porcelain
+git branch --show-current
+git diff --stat
+git diff --cached --stat
 ```
 
-If uncommitted changes exist, ask whether to commit first.
+If uncommitted changes exist, ask whether to commit first. Do not stage broad changes automatically.
 
-Follow the `verification-before-completion` and `code-review-and-quality` skill protocols. All gates must pass before creating the PR.
+Run `verification-before-completion` and `code-review-and-quality`. All critical issues and required gates must pass before pushing.
 
-Check `package.json` scripts, `Makefile`, or `justfile` for project-specific commands first — prefer those over generic defaults.
-
-If any gate fails, stop. Fix errors first, then run `/pr` again.
+Check project-native commands first: `package.json`, `Makefile`, `justfile`, `Cargo.toml`, `pyproject.toml`, `go.mod`.
 
 ## Phase 2: Gather Context
 
-### Memory Grounding
-
-Follow the `memory-system` skill protocol. Include relevant findings in the PR description.
-
-### Git Context
-
 ```bash
 git branch --show-current
-git log main...HEAD --oneline
-git diff main...HEAD --stat
+git log main...HEAD --oneline 2>/dev/null || git log --oneline -10
+git diff main...HEAD --stat 2>/dev/null || git diff --stat
 ```
 
-If bead ID provided:
+If a work ID is provided and `.pi/plans/$ARGUMENTS/` exists, read:
+
+- `SPEC.md`
+- `PLAN.md`
+- `VERIFICATION.md`
+- `RUN-REPORT.md`
+
+Use these to summarize goal, scope, and test evidence.
+
+## Phase 3: Pre-PR Review
+
+Review the diff one final time:
 
 ```bash
-br show $ARGUMENTS
-```
-
-Read `.beads/artifacts/$ARGUMENTS/` to check what artifacts exist.
-
-Read the PRD to extract goal and success criteria for the PR description.
-
-## Phase 2B: Pre-PR Review
-
-This is the last gate before code hits GitHub. Run it every time.
-
-Load the review skill:
-
-```typescript
-skill({ name: "code-review-and-quality" });
-```
-
-Run **5 parallel agents**: security/correctness, performance/architecture, type-safety/tests, conventions/patterns, simplicity/completeness.
-
-```bash
-BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git merge-base HEAD origin/main)
+BASE_SHA=$(git rev-parse origin/main 2>/dev/null || git merge-base HEAD main 2>/dev/null || git rev-parse HEAD~1)
 HEAD_SHA=$(git rev-parse HEAD)
+git diff "$BASE_SHA"..."$HEAD_SHA" --stat 2>/dev/null || git diff --stat
 ```
 
-Fill placeholders:
+Gate rule: all Critical issues must be resolved before pushing. Important issues must be fixed or documented in the PR body.
 
-- `{WHAT_WAS_IMPLEMENTED}`: what this PR delivers (from git log summary)
-- `{PLAN_OR_REQUIREMENTS}`: PRD path or brief requirements
-- `{BASE_SHA}` / `{HEAD_SHA}`: from above
+After fixes, re-run verification gates for changed files.
 
-**Gate rule:** All Critical issues must be resolved before pushing. No exceptions.
-Important issues: fix or document as known limitation in PR body.
+## Phase 4: Push Confirmation
 
-After fixing issues, re-run verification gates from Phase 1 if code was changed.
-
-## Phase 3: Push and Confirm
-
-Show what will be pushed and ask the user:
+Ask before pushing:
 
 ```typescript
 ask_user_question({
@@ -114,10 +96,9 @@ If confirmed:
 git push -u origin $(git branch --show-current)
 ```
 
-## Phase 4: Create PR
+## Phase 5: Create PR
 
 ```bash
-# Verify gh CLI is installed
 command -v gh >/dev/null 2>&1 || { echo "Error: gh CLI not found. Install: https://cli.github.com"; exit 1; }
 
 gh pr create --title "<title>" --body "$(cat <<'EOF'
@@ -127,40 +108,42 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 
 ## Changes
 
-- `src/auth/login.ts`: [what changed]
-- `src/auth/session.ts`: [what changed]
+- `path/to/file`: [what changed]
 
 ## Testing
 
-- All tests pass
-- Lint and typecheck pass
-- Manual verification: [how to test]
+- [command]: [result]
+
+## Artifacts
+
+- Spec: `.pi/plans/<id>/SPEC.md` (if applicable)
+- Verification: `.pi/plans/<id>/VERIFICATION.md` (if applicable)
 
 ## Checklist
 
-- [x] Tests added/updated
-- [x] All gates pass
-- [ ] Docs updated (if applicable)
+- [x] Tests added/updated where needed
+- [x] Verification gates pass
+- [x] Review completed
+- [ ] Docs updated if applicable
 EOF
 )"
 ```
 
-If `--draft`, add `--draft` flag.
-
-If bead ID provided, add artifacts section linking to `.beads/artifacts/$ARGUMENTS/prd.md`.
+If `--draft` is present or the user selected draft, add `--draft`.
 
 ## Output
 
 Report:
 
-1. PR URL
-2. Status (Ready for Review / Draft)
-3. Branch → main
-4. Gate results
+1. PR URL.
+2. Status: ready or draft.
+3. Branch and base.
+4. Gate results.
+5. Linked `.pi/plans/<id>/` artifacts if applicable.
 
 ## Related Commands
 
-| Need         | Command        |
-| ------------ | -------------- |
-| Ship first   | `/ship <id>`   |
+| Need | Command |
+| --- | --- |
+| Ship first | `/ship <id>` |
 | Verify first | `/verify <id>` |
