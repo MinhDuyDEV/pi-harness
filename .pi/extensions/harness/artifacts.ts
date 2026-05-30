@@ -8,9 +8,9 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { getLastAssistantText, type Sprint, type SprintResult } from "./parsing.js";
+import { basename, join } from "node:path";
+import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import { extractText, getLastAssistantText, type Sprint, type SprintResult } from "./parsing.js";
 import {
 	resolveProjectRoot,
 	createHarnessWorkspace,
@@ -117,17 +117,17 @@ run().catch(console.error);
 			const template = readFileSync(templatePath, "utf-8");
 			const sprintSummary = results
 				.map((r, i) => `| ${i + 1} | ${r.sprint} | ${r.passed ? "PASS" : "FAIL"} | ${r.iterations} |`)
-				.join("\\n");
+				.join("\n");
 			card = template
 				.replace(/\*\*Name:\*\*.*/m, `**Name:** ${slug}`)
 				.replace(/\*\*Date:\*\*.*/m, `**Date:** ${new Date().toISOString()}`)
 				.replace(/\*\*Change.*\*\*.*/m, `**Change / workflow under test:** ${prompt}`)
 				.replace(/Run report path:.*/, `Run report path: .pi/harness-runs/${slug}.md`)
 				.replace(/Subagent output files:.*/, `Subagent output files: .pi/workflows/${slug}.mjs`);
-			card += `\\n### Results\\n| Sprint | Title | Result | Iterations |\\n|--------|-------|--------|------------|\\n${sprintSummary}`;
-			card += `\\n**Status**: ${allPassed ? "All passed" : "Some failed"}`;
+			card += `\n### Results\n| Sprint | Title | Result | Iterations |\n|--------|-------|--------|------------|\n${sprintSummary}`;
+			card += `\n**Status**: ${allPassed ? "All passed" : "Some failed"}`;
 		} else {
-			card = `# Harness Run: ${slug}\\n**Prompt**: ${prompt}\\n**Date**: ${new Date().toISOString()}\\n**Status**: ${allPassed ? "All passed" : "Some failed"}`;
+			card = `# Harness Run: ${slug}\n**Prompt**: ${prompt}\n**Date**: ${new Date().toISOString()}\n**Status**: ${allPassed ? "All passed" : "Some failed"}`;
 		}
 
 		writeFileSync(join(runsDir, `${slug}.md`), card, "utf-8");
@@ -139,14 +139,158 @@ run().catch(console.error);
 
 // ─── Run Tracker ───────────────────────────────────────────────────────────────
 
+interface UsageSummary {
+	inputTokens: number;
+	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	thinkingTokens: number;
+	totalTokens: number;
+	totalCost: number;
+	turns: number;
+}
+
+interface UsageRecord extends UsageSummary {
+	id: string;
+	subDir: string;
+	role: string;
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+	return typeof value === "object" && value !== null;
+}
+
+function numberField(source: UnknownRecord, key: string): number {
+	const value = source[key];
+	return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function usageFromMessage(message: unknown): UsageSummary {
+	const empty = {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		thinkingTokens: 0,
+		totalTokens: 0,
+		totalCost: 0,
+		turns: 0,
+	};
+	if (!isRecord(message) || !isRecord(message.usage)) return empty;
+
+	const usage = message.usage;
+	const cost = isRecord(usage.cost) ? numberField(usage.cost, "total") : 0;
+	const input = numberField(usage, "input");
+	const output = numberField(usage, "output");
+	const cacheRead = numberField(usage, "cacheRead");
+	const cacheWrite = numberField(usage, "cacheWrite");
+	const thinking = numberField(usage, "thinking");
+	const total = numberField(usage, "totalTokens") || input + output + cacheRead + cacheWrite + thinking;
+
+	return {
+		inputTokens: input,
+		outputTokens: output,
+		cacheReadTokens: cacheRead,
+		cacheWriteTokens: cacheWrite,
+		thinkingTokens: thinking,
+		totalTokens: total,
+		totalCost: cost,
+		turns: 0,
+	};
+}
+
+function summarizeSessionUsage(session: AgentSession): UsageSummary {
+	const summary: UsageSummary = {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		thinkingTokens: 0,
+		totalTokens: 0,
+		totalCost: 0,
+		turns: 0,
+	};
+
+	for (const message of session.messages as readonly unknown[]) {
+		if (isRecord(message) && message.role === "assistant") summary.turns++;
+		const usage = usageFromMessage(message);
+		summary.inputTokens += usage.inputTokens;
+		summary.outputTokens += usage.outputTokens;
+		summary.cacheReadTokens += usage.cacheReadTokens;
+		summary.cacheWriteTokens += usage.cacheWriteTokens;
+		summary.thinkingTokens += usage.thinkingTokens;
+		summary.totalTokens += usage.totalTokens;
+		summary.totalCost += usage.totalCost;
+	}
+
+	summary.totalCost = Math.round(summary.totalCost * 10000) / 10000;
+	return summary;
+}
+
+function truncate(text: string, max = 4000): string {
+	return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function safeJsonSummary(value: unknown, max = 4000): string {
+	try {
+		return truncate(JSON.stringify(value), max);
+	} catch {
+		return truncate(String(value), max);
+	}
+}
+
+function eventPayload(event: AgentSessionEvent): UnknownRecord {
+	switch (event.type) {
+		case "tool_execution_start":
+			return { event: event.type, toolName: event.toolName, toolCallId: event.toolCallId, args: safeJsonSummary(event.args) };
+		case "tool_execution_update":
+			return { event: event.type, toolName: event.toolName, toolCallId: event.toolCallId, args: safeJsonSummary(event.args), partialResult: safeJsonSummary(event.partialResult) };
+		case "tool_execution_end":
+			return { event: event.type, toolName: event.toolName, toolCallId: event.toolCallId, isError: event.isError, result: safeJsonSummary(event.result) };
+		case "message_start":
+		case "message_update":
+			return isRecord(event.message) ? { event: event.type, messageRole: event.message.role } : { event: event.type };
+		case "message_end":
+			return isRecord(event.message)
+				? { event: event.type, messageRole: event.message.role, text: "content" in event.message ? truncate(extractText(event.message.content as string | readonly { type: string; text?: string }[]), 4000) : "" }
+				: { event: event.type };
+		case "turn_end": {
+			const usage = usageFromMessage(event.message);
+			return { event: event.type, usage, toolResultCount: event.toolResults.length };
+		}
+		case "agent_end":
+			return { event: event.type, messageCount: event.messages.length, willRetry: event.willRetry };
+		case "queue_update":
+			return { event: event.type, steeringCount: event.steering.length, followUpCount: event.followUp.length };
+		case "compaction_end":
+			return { event: event.type, reason: event.reason, aborted: event.aborted, willRetry: event.willRetry, errorMessage: event.errorMessage };
+		case "auto_retry_start":
+			return { event: event.type, attempt: event.attempt, maxAttempts: event.maxAttempts, delayMs: event.delayMs, errorMessage: event.errorMessage };
+		case "auto_retry_end":
+			return { event: event.type, success: event.success, attempt: event.attempt, finalError: event.finalError };
+		case "compaction_start":
+			return { event: event.type, reason: event.reason };
+		case "session_info_changed":
+			return { event: event.type, name: event.name };
+		case "thinking_level_changed":
+			return { event: event.type, level: event.level };
+		default:
+			return { event: event.type };
+	}
+}
+
 /**
- * Tracks all agent conversations and artifacts for a harness run.
- * Stores everything under .pi/harness-runs/<run-id>/ organized by sprint.
+ * Tracks all agent artifacts for a harness run.
+ * Stores inspectable files under .pi/harness-runs/<run-id>/ organized by sprint.
  */
 export class HarnessTracker {
 	readonly runDir: string;
+	readonly runId: string;
 	private startedAt = Date.now();
 	private phaseLog: Array<{ phase: string; startedAt: number; agent: string }> = [];
+	private usageRecords = new Map<string, UsageRecord>();
 
 	constructor(cwd: string, prompt: string) {
 		const slug = prompt
@@ -155,7 +299,8 @@ export class HarnessTracker {
 			.replace(/^-|-$/g, "")
 			.slice(0, 30) || "harness";
 		const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-		this.runDir = join(cwd, ".pi", "harness-runs", `${timestamp}-${slug}`);
+		this.runId = `${timestamp}-${slug}`;
+		this.runDir = join(cwd, ".pi", "harness-runs", this.runId);
 		try {
 			mkdirSync(this.runDir, { recursive: true });
 		} catch {
@@ -175,11 +320,83 @@ export class HarnessTracker {
 		this.write(name, JSON.stringify(data, null, 2));
 	}
 
-	startPhase(phase: string, agent: string) {
-		this.phaseLog.push({ phase, startedAt: Date.now(), agent });
+	private appendNdjson(path: string, data: UnknownRecord) {
+		try {
+			appendFileSync(path, `${JSON.stringify({ time: new Date().toISOString(), ...data })}\n`, "utf-8");
+		} catch {
+			// best-effort
+		}
 	}
 
-	/** Save a full agent session transcript after prompt completes. */
+	private updateRootUsage() {
+		const sessions = [...this.usageRecords.values()];
+		const totals = sessions.reduce<UsageSummary>(
+			(acc, item) => ({
+				inputTokens: acc.inputTokens + item.inputTokens,
+				outputTokens: acc.outputTokens + item.outputTokens,
+				cacheReadTokens: acc.cacheReadTokens + item.cacheReadTokens,
+				cacheWriteTokens: acc.cacheWriteTokens + item.cacheWriteTokens,
+				thinkingTokens: acc.thinkingTokens + item.thinkingTokens,
+				totalTokens: acc.totalTokens + item.totalTokens,
+				totalCost: Math.round((acc.totalCost + item.totalCost) * 10000) / 10000,
+				turns: acc.turns + item.turns,
+			}),
+			{ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, thinkingTokens: 0, totalTokens: 0, totalCost: 0, turns: 0 },
+		);
+		this.writeJSON("USAGE.json", { totals, sessions });
+	}
+
+	recordEvent(event: UnknownRecord) {
+		this.appendNdjson(join(this.runDir, "EVENTS.ndjson"), event);
+	}
+
+	startPhase(phase: string, agent: string) {
+		this.phaseLog.push({ phase, startedAt: Date.now(), agent });
+		this.recordEvent({ event: "phase_start", phase, agent });
+	}
+
+	savePrompt(name: string, content: string) {
+		try {
+			const dir = join(this.runDir, "PROMPTS");
+			mkdirSync(dir, { recursive: true });
+			const fileName = name.endsWith(".txt") ? name : `${name}.txt`;
+			writeFileSync(join(dir, fileName), content, "utf-8");
+		} catch {
+			// best-effort
+		}
+	}
+
+	saveSystemPrompt(subDir: string, role: string, systemPrompt: string) {
+		const dir = join(this.runDir, subDir);
+		try {
+			mkdirSync(dir, { recursive: true });
+			writeFileSync(join(dir, "SYSTEM-PROMPT.txt"), systemPrompt, "utf-8");
+		} catch {
+			// best-effort
+		}
+	}
+
+	/** Start live event logging for an agent session. Returns an unsubscribe function. */
+	startEventLog(subDir: string, role: string, session: AgentSession, meta: { phase: string; agent: string }): () => void {
+		const dir = join(this.runDir, subDir);
+		try {
+			mkdirSync(dir, { recursive: true });
+		} catch {
+			return () => {};
+		}
+		const sessionEventsPath = join(dir, "EVENTS.ndjson");
+		const rootEventsPath = join(this.runDir, "EVENTS.ndjson");
+		const base = { runId: this.runId, subDir, role, phase: meta.phase, agent: meta.agent };
+		const writeEvent = (payload: UnknownRecord) => {
+			const event = { ...base, ...payload };
+			this.appendNdjson(rootEventsPath, event);
+			this.appendNdjson(sessionEventsPath, event);
+		};
+		writeEvent({ event: "session_start" });
+		return session.subscribe((event) => writeEvent(eventPayload(event)));
+	}
+
+	/** Save post-run inspectable outputs. Conversation transcripts are intentionally not written. */
 	saveSession(subDir: string, role: string, session: AgentSession, systemPrompt: string) {
 		const dir = join(this.runDir, subDir);
 		try {
@@ -188,57 +405,33 @@ export class HarnessTracker {
 			return;
 		}
 
-		// Write system prompt used
-		writeFileSync(join(dir, `${role}-system-prompt.txt`), systemPrompt, "utf-8");
+		this.saveSystemPrompt(subDir, role, systemPrompt);
 
-		// Write full conversation transcript
-		const transcript = session.messages.map((m: any) => ({
-			role: m.role,
-			timestamp: m.timestamp,
-			content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-			toolName: m.toolName,
-			toolCallId: m.toolCallId,
-		}) as any);
-		this.writeJSON(`${subDir}/${role}-conversation.json`, transcript);
-
-		// Write last assistant output as readable text
 		const lastText = getLastAssistantText(session);
 		if (lastText) {
-			writeFileSync(join(dir, `${role}-output.txt`), lastText, "utf-8");
+			writeFileSync(join(dir, "OUTPUT.md"), lastText, "utf-8");
 		}
 
-		// Write usage summary
-		let totalInput = 0,
-			totalOutput = 0,
-			totalCost = 0;
-		for (const m of session.messages as any[]) {
-			if (m.usage) {
-				totalInput += m.usage.input || 0;
-				totalOutput += m.usage.output || 0;
-				totalCost += m.usage.cost?.total || 0;
-			}
-		}
-		this.writeJSON(`${subDir}/${role}-usage.json`, {
-			inputTokens: totalInput,
-			outputTokens: totalOutput,
-			totalCost: Math.round(totalCost * 10000) / 10000,
-			turns: session.messages.filter((m: any) => m.role === "assistant").length,
-		});
+		const usage = summarizeSessionUsage(session);
+		const record: UsageRecord = { id: `${subDir}/${role}`, subDir, role, ...usage };
+		writeFileSync(join(dir, "USAGE.json"), JSON.stringify(record, null, 2), "utf-8");
+		this.usageRecords.set(record.id, record);
+		this.updateRootUsage();
 	}
 
 	/** Write the spec from the planner. */
 	saveSpec(specText: string) {
-		this.write("spec.md", specText);
+		this.write("SPEC.md", specText);
 	}
 
 	/** Write final build report. */
 	saveReport(report: string) {
-		this.write("build-report.md", report);
+		this.write("BUILD-REPORT.md", report);
 	}
 
 	/** Write harness workspace/isolation metadata. */
 	saveWorkspace(workspace: HarnessWorkspace) {
-		this.writeJSON("workspace.json", workspace);
+		this.writeJSON("WORKSPACE.json", workspace);
 	}
 
 	/** Write timing summary. */
@@ -249,6 +442,6 @@ export class HarnessTracker {
 			agent: p.agent,
 			durationMs: Date.now() - p.startedAt,
 		}));
-		this.writeJSON("timing.json", { totalSeconds: Number(elapsed), phases });
+		this.writeJSON("TIMING.json", { totalSeconds: Number(elapsed), phases, runId: this.runId, runDir: basename(this.runDir) });
 	}
 }

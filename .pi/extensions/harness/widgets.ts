@@ -47,6 +47,8 @@ export interface WidgetState {
 	turnCount: number;
 	inputTokens: number;
 	outputTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
 	totalCost: number;
 	sprintTitle: string;
 	pattern: string;
@@ -103,20 +105,35 @@ function shortToolName(tool: string): string {
 }
 
 /** Accumulate usage metrics from an agent session's messages. */
-export function sessionUsage(session: AgentSession): Pick<WidgetState, "turnCount" | "inputTokens" | "outputTokens" | "totalCost"> {
+type MessageWithUsage = {
+	role?: unknown;
+	usage?: {
+		input?: number;
+		output?: number;
+		cacheRead?: number;
+		cacheWrite?: number;
+		cost?: { total?: number };
+	};
+};
+
+export function sessionUsage(session: AgentSession): Pick<WidgetState, "turnCount" | "inputTokens" | "outputTokens" | "cacheReadTokens" | "cacheWriteTokens" | "totalCost"> {
 	let inputTokens = 0;
 	let outputTokens = 0;
+	let cacheReadTokens = 0;
+	let cacheWriteTokens = 0;
 	let totalCost = 0;
 	let turnCount = 0;
-	for (const message of (session as any).messages) {
+	for (const message of session.messages as readonly MessageWithUsage[]) {
 		if (message.role === "assistant") turnCount++;
 		if (message.usage) {
 			inputTokens += message.usage.input || 0;
 			outputTokens += message.usage.output || 0;
+			cacheReadTokens += message.usage.cacheRead || 0;
+			cacheWriteTokens += message.usage.cacheWrite || 0;
 			totalCost += message.usage.cost?.total || 0;
 		}
 	}
-	return { turnCount, inputTokens, outputTokens, totalCost };
+	return { turnCount, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalCost };
 }
 
 // ─── HarnessWidget ───────────────────────────────────────────────────────────
@@ -150,6 +167,8 @@ export class HarnessWidget {
 			turnCount: 0,
 			inputTokens: 0,
 			outputTokens: 0,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
 			totalCost: 0,
 			sprintTitle: "",
 			pattern: "",
@@ -272,6 +291,7 @@ export class HarnessWidget {
 			`${this.c(theme, "muted", "↻")} ${s.turnCount}`,
 			`${this.c(theme, "muted", "↑")} ${formatTokens(s.inputTokens)}`,
 			`${this.c(theme, "muted", "↓")} ${formatTokens(s.outputTokens)}`,
+			`${this.c(theme, "muted", "cache")} ${formatTokens(s.cacheReadTokens)}/${formatTokens(s.cacheWriteTokens)}`,
 			`${this.c(theme, "muted", "¤")} ${formatCost(s.totalCost)}`,
 		].join(" · ");
 	}
@@ -330,7 +350,7 @@ export class HarnessWidget {
 		const s = this.state;
 		const sprint = s.total > 0 ? ` ${s.sprint || 0}/${s.total}` : "";
 		const agent = s.agentName ? ` · ${s.agentName}` : "";
-		const metrics = ` · ↻${s.turnCount} ↑${formatTokens(s.inputTokens)} ↓${formatTokens(s.outputTokens)} $${formatCost(s.totalCost).slice(1)}`;
+		const metrics = ` · ↻${s.turnCount} ↑${formatTokens(s.inputTokens)} ↓${formatTokens(s.outputTokens)} c${formatTokens(s.cacheReadTokens)}/${formatTokens(s.cacheWriteTokens)} $${formatCost(s.totalCost).slice(1)}`;
 		return [truncateToWidth(`${this.phaseIcon(theme)} harness${sprint} · ${this.phaseLabel()}${agent}${metrics}`, width, "…")];
 	}
 

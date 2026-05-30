@@ -43,6 +43,7 @@ import {
 import { HarnessWidget, type AgentRole } from "./widgets.js";
 import { createHarnessWorkspace, type HarnessWorkspace } from "./gitSafety.js";
 import { resolveSkillHints } from "./skills.js";
+import { startHarnessTmuxWatch, type HarnessTmuxWatch } from "./tmuxWatch.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ export interface HarnessRunParams {
 	generatorModel?: string;
 	evaluatorModel?: string;
 	inheritContext: boolean;
+	tmuxMode: "off" | "watch";
 }
 
 export interface HarnessContext {
@@ -216,6 +218,8 @@ async function runPlanningPhase(
 		turnCount: 0,
 		inputTokens: 0,
 		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
 		totalCost: 0,
 	});
 
@@ -230,8 +234,16 @@ async function runPlanningPhase(
 		runCwd,
 		widget,
 	});
+	tracker.savePrompt("planner-system", plannerDef.systemPrompt);
+	tracker.savePrompt("planner-user", prompt);
+	tracker.saveSystemPrompt("plan", "planner", plannerDef.systemPrompt);
+	const stopPlannerLog = tracker.startEventLog("plan", "planner", planner, { phase: "planning", agent: plannerAgentName });
 	throwIfAborted(signal);
-	await planner.prompt(prompt);
+	try {
+		await planner.prompt(prompt);
+	} finally {
+		stopPlannerLog();
+	}
 	const specText = getLastAssistantText(planner);
 	tracker.saveSession("plan", "planner", planner, plannerDef.systemPrompt);
 	tracker.saveSpec(specText);
@@ -287,6 +299,8 @@ async function runBuildEvaluatePhase(
 			turnCount: 0,
 			inputTokens: 0,
 			outputTokens: 0,
+			cacheReadTokens: 0,
+			cacheWriteTokens: 0,
 			totalCost: 0,
 		});
 
@@ -308,6 +322,7 @@ async function runBuildEvaluatePhase(
 		];
 		if (skillHints.workerText) sprintTask.push("", skillHints.workerText);
 		if (sprint.files) sprintTask.push("", `Files: ${sprint.files}`);
+		const generatorPrompt = sprintTask.join("\n");
 
 		const generator = await spawnAgent({
 			systemPrompt: generatorDef.systemPrompt,
@@ -319,9 +334,18 @@ async function runBuildEvaluatePhase(
 			runCwd,
 			widget,
 		});
+		const generatorSubDir = `sprint-${i + 1}`;
+		tracker.savePrompt(`generator-sprint-${i + 1}-system`, generatorDef.systemPrompt);
+		tracker.savePrompt(`generator-sprint-${i + 1}-user`, generatorPrompt);
+		tracker.saveSystemPrompt(generatorSubDir, "generator", generatorDef.systemPrompt);
+		const stopGeneratorLog = tracker.startEventLog(generatorSubDir, "generator", generator, { phase: "generating", agent: generatorAgentName });
 		throwIfAborted(signal);
-		await generator.prompt(sprintTask.join("\n"));
-		tracker.saveSession(`sprint-${i + 1}`, "generator", generator, generatorDef.systemPrompt);
+		try {
+			await generator.prompt(generatorPrompt);
+		} finally {
+			stopGeneratorLog();
+		}
+		tracker.saveSession(generatorSubDir, "generator", generator, generatorDef.systemPrompt);
 		generator.dispose();
 
 		if (params.pattern === "pipeline") {
@@ -353,6 +377,8 @@ async function runBuildEvaluatePhase(
 				turnCount: 0,
 				inputTokens: 0,
 				outputTokens: 0,
+				cacheReadTokens: 0,
+				cacheWriteTokens: 0,
 				totalCost: 0,
 			});
 
@@ -367,15 +393,23 @@ async function runBuildEvaluatePhase(
 				runCwd,
 				widget,
 			});
+			const evaluatorPrompt = [`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria, ...(skillHints.reviewerText ? ["", skillHints.reviewerText] : [])].join("\n");
+			const evaluatorSubDir = `sprint-${i + 1}/evaluator-iter-${iteration + 1}`;
+			tracker.savePrompt(`evaluator-sprint-${i + 1}-iter-${iteration + 1}-system`, evaluatorDef.systemPrompt);
+			tracker.savePrompt(`evaluator-sprint-${i + 1}-iter-${iteration + 1}-user`, evaluatorPrompt);
+			tracker.saveSystemPrompt(evaluatorSubDir, "evaluator", evaluatorDef.systemPrompt);
+			const stopEvaluatorLog = tracker.startEventLog(evaluatorSubDir, "evaluator", evaluator, { phase: "evaluating", agent: evaluatorAgentName });
 			throwIfAborted(signal);
-			await evaluator.prompt(
-				[`Test Sprint ${i + 1}: ${sprint.title}`, "", "Criteria:", sprint.criteria, ...(skillHints.reviewerText ? ["", skillHints.reviewerText] : [])].join("\n"),
-			);
+			try {
+				await evaluator.prompt(evaluatorPrompt);
+			} finally {
+				stopEvaluatorLog();
+			}
 			evalText = getLastAssistantText(evaluator);
 			const evalResult = parseEvalOutput(evalText);
 			passed = evalResult.verdict === "PASS";
 			const failedCriteria = evalResult.criteria.filter((c) => !c.passes);
-			tracker.saveSession(`sprint-${i + 1}`, `evaluator-iter-${iteration + 1}`, evaluator, evaluatorDef.systemPrompt);
+			tracker.saveSession(evaluatorSubDir, "evaluator", evaluator, evaluatorDef.systemPrompt);
 			evaluator.dispose();
 
 			notify(
@@ -417,6 +451,8 @@ async function runBuildEvaluatePhase(
 				turnCount: 0,
 				inputTokens: 0,
 				outputTokens: 0,
+				cacheReadTokens: 0,
+				cacheWriteTokens: 0,
 				totalCost: 0,
 			});
 
@@ -431,15 +467,25 @@ async function runBuildEvaluatePhase(
 				runCwd,
 				widget,
 			});
-			throwIfAborted(signal);
-			await fixer.prompt([
+			const fixerPrompt = [
 				`Sprint ${i + 1}: ${sprint.title} FAILED evaluation.`,
 				"",
 				"Fix these issues:",
 				evalText,
 				...(skillHints.workerText ? ["", skillHints.workerText] : []),
-			].join("\n"));
-			tracker.saveSession(`sprint-${i + 1}`, `generator-iter-${iteration + 1}`, fixer, generatorDef.systemPrompt);
+			].join("\n");
+			const fixerSubDir = `sprint-${i + 1}/generator-iter-${iteration + 1}`;
+			tracker.savePrompt(`generator-sprint-${i + 1}-iter-${iteration + 1}-system`, generatorDef.systemPrompt);
+			tracker.savePrompt(`generator-sprint-${i + 1}-iter-${iteration + 1}-user`, fixerPrompt);
+			tracker.saveSystemPrompt(fixerSubDir, "generator", generatorDef.systemPrompt);
+			const stopFixerLog = tracker.startEventLog(fixerSubDir, "generator", fixer, { phase: "fixing", agent: generatorAgentName });
+			throwIfAborted(signal);
+			try {
+				await fixer.prompt(fixerPrompt);
+			} finally {
+				stopFixerLog();
+			}
+			tracker.saveSession(fixerSubDir, "generator", fixer, generatorDef.systemPrompt);
 			fixer.dispose();
 		}
 
@@ -464,6 +510,7 @@ function buildFinalReport(
 	tracker: HarnessTracker,
 	workspace: HarnessWorkspace,
 	workflowSlug: string | null,
+	watch: HarnessTmuxWatch,
 ): string {
 	const allPassed = results.every((r) => r.passed);
 	const reportLines = results
@@ -477,7 +524,9 @@ function buildFinalReport(
 		`**Status**: ${allPassed ? "[✓] All sprints passed" : "[!] Some sprints failed"}`,
 		`**Sprints**: ${sprints.length}`,
 		workflowSlug ? `**Workflow**: .pi/workflows/${workflowSlug}.mjs` : "",
-		`**Run dir**: .pi/harness-runs/${tracker.runDir.split("/").pop()}`,
+		`**Run dir**: .pi/harness-runs/${tracker.runId}`,
+		watch.attachCommand ? `**Watch**: ${watch.attachCommand}` : params.tmuxMode === "off" ? "**Watch**: off" : watch.warning ? `**Watch**: ${watch.warning}` : "",
+		watch.warning && watch.attachCommand ? `**Tmux note**: ${watch.warning}` : "",
 		workspace.isolated ? `**Workspace**: ${workspace.worktreePath}` : "**Workspace**: current cwd (isolated worktree unavailable)",
 		"|--------|-------|--------|------------|",
 		reportLines,
@@ -512,6 +561,14 @@ export async function orchestrateHarnessRun(
 
 	// Tracker for full run artifacts
 	const tracker = new HarnessTracker(projectRoot, params.prompt);
+	tracker.recordEvent({ event: "run_start", pattern: params.pattern, prompt: params.prompt, tmuxMode: params.tmuxMode });
+	const watch = params.tmuxMode === "watch" ? startHarnessTmuxWatch(projectRoot, tracker.runDir, tracker.runId) : {};
+	if (watch.attachCommand) {
+		notify(onUpdate, `[watch] Harness tmux session: ${watch.attachCommand}`, { phase: "watch", tmuxSession: watch.sessionName, attachCommand: watch.attachCommand });
+		if (watch.warning) notify(onUpdate, `[tmux] ${watch.warning}`, { phase: "watch", warning: watch.warning });
+	} else if (watch.warning) {
+		notify(onUpdate, `[warn] ${watch.warning}`, { phase: "watch", warning: watch.warning });
+	}
 	const workspace = await createHarnessWorkspace(projectRoot, params.prompt);
 	const runCwd = workspace.cwd;
 	tracker.saveWorkspace(workspace);
@@ -647,6 +704,8 @@ export async function orchestrateHarnessRun(
 		agentRole: "",
 		agentModel: "",
 		agentThinking: "",
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
 	});
 
 	// Generate reusable workflow script
@@ -655,8 +714,9 @@ export async function orchestrateHarnessRun(
 	// Save tracking artifacts
 	tracker.saveTiming();
 
-	const finalReport = buildFinalReport(params, results, specText, sprints, tracker, workspace, workflowSlug);
+	const finalReport = buildFinalReport(params, results, specText, sprints, tracker, workspace, workflowSlug, watch);
 	tracker.saveReport(finalReport);
+	tracker.recordEvent({ event: "run_end", passed: allPassed });
 	widget.clear();
 
 	return {

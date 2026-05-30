@@ -5,6 +5,7 @@
  */
 
 import { strict as assert } from "node:assert";
+import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -97,12 +98,12 @@ function teardown() {
 }
 
 {
-	const t = "HarnessTracker.saveSpec writes spec.md";
+	const t = "HarnessTracker.saveSpec writes SPEC.md";
 	const dir = setup();
 
 	const tracker = new HarnessTracker(dir, "Save spec test");
 	tracker.saveSpec("# Test Spec\nSprint 1: Do things");
-	const specPath = join(tracker.runDir, "spec.md");
+	const specPath = join(tracker.runDir, "SPEC.md");
 	assert.ok(existsSync(specPath), t);
 	const content = readFileSync(specPath, "utf-8");
 	assert.ok(content.includes("Test Spec"), t);
@@ -111,24 +112,38 @@ function teardown() {
 }
 
 {
-	const t = "HarnessTracker.saveReport writes build-report.md";
+	const t = "HarnessTracker.savePrompt writes canonical PROMPTS files";
+	const dir = setup();
+
+	const tracker = new HarnessTracker(dir, "Prompt test");
+	tracker.savePrompt("planner-system", "system prompt");
+	tracker.savePrompt("planner-user.txt", "user prompt");
+
+	assert.equal(readFileSync(join(tracker.runDir, "PROMPTS", "planner-system.txt"), "utf-8"), "system prompt", t);
+	assert.equal(readFileSync(join(tracker.runDir, "PROMPTS", "planner-user.txt"), "utf-8"), "user prompt", t);
+
+	teardown();
+}
+
+{
+	const t = "HarnessTracker.saveReport writes BUILD-REPORT.md";
 	const dir = setup();
 
 	const tracker = new HarnessTracker(dir, "Report test");
 	tracker.saveReport("# Build Report\nAll passed.");
-	const reportPath = join(tracker.runDir, "build-report.md");
+	const reportPath = join(tracker.runDir, "BUILD-REPORT.md");
 	assert.ok(existsSync(reportPath), t);
 
 	teardown();
 }
 
 {
-	const t = "HarnessTracker.saveWorkspace writes workspace.json";
+	const t = "HarnessTracker.saveWorkspace writes WORKSPACE.json";
 	const dir = setup();
 
 	const tracker = new HarnessTracker(dir, "Workspace test");
 	tracker.saveWorkspace({ cwd: "/test", isolated: false });
-	const wsPath = join(tracker.runDir, "workspace.json");
+	const wsPath = join(tracker.runDir, "WORKSPACE.json");
 	assert.ok(existsSync(wsPath), t);
 	const ws = JSON.parse(readFileSync(wsPath, "utf-8"));
 	assert.equal(ws.cwd, "/test", t);
@@ -137,17 +152,53 @@ function teardown() {
 }
 
 {
-	const t = "HarnessTracker.saveTiming writes timing.json";
+	const t = "HarnessTracker.saveTiming writes TIMING.json";
 	const dir = setup();
 
 	const tracker = new HarnessTracker(dir, "Timing test");
 	tracker.startPhase("planning", "planner-agent");
 	tracker.saveTiming();
-	const timingPath = join(tracker.runDir, "timing.json");
+	const timingPath = join(tracker.runDir, "TIMING.json");
 	assert.ok(existsSync(timingPath), t);
 	const timing = JSON.parse(readFileSync(timingPath, "utf-8"));
 	assert.ok(typeof timing.totalSeconds === "number", t);
 	assert.ok(Array.isArray(timing.phases), t);
+
+	teardown();
+}
+
+{
+	const t = "HarnessTracker.saveSession writes output and cache-aware usage without transcript";
+	const dir = setup();
+	const tracker = new HarnessTracker(dir, "Session test");
+	const session = {
+		messages: [
+			{ role: "user", content: "hello" },
+			{
+				role: "assistant",
+				content: "done",
+				usage: {
+					input: 10,
+					output: 5,
+					cacheRead: 3,
+					cacheWrite: 2,
+					totalTokens: 20,
+					cost: { total: 0.0012 },
+				},
+			},
+		],
+	};
+
+	tracker.saveSession("plan", "planner", session as unknown as AgentSession, "system prompt");
+
+	assert.ok(existsSync(join(tracker.runDir, "plan", "OUTPUT.md")), t);
+	assert.ok(existsSync(join(tracker.runDir, "plan", "USAGE.json")), t);
+	assert.ok(!existsSync(join(tracker.runDir, "plan", "planner-conversation.json")), t);
+	const usage = JSON.parse(readFileSync(join(tracker.runDir, "plan", "USAGE.json"), "utf-8"));
+	assert.equal(usage.cacheReadTokens, 3, t);
+	assert.equal(usage.cacheWriteTokens, 2, t);
+	const rootUsage = JSON.parse(readFileSync(join(tracker.runDir, "USAGE.json"), "utf-8"));
+	assert.equal(rootUsage.totals.cacheReadTokens, 3, t);
 
 	teardown();
 }
@@ -163,6 +214,7 @@ function teardown() {
 		description: "Do the thing",
 		criteria: "- [ ] Criterion",
 		files: "test.ts",
+		skills: [],
 	};
 	const results = [{ sprint: "Test Sprint", iterations: 1, passed: true, evalOutput: "All good" }];
 
@@ -195,6 +247,7 @@ function teardown() {
 		description: "desc",
 		criteria: "- [ ] C1",
 		files: "f.ts",
+		skills: [],
 	};
 	const results = [{ sprint: "Sprint One", iterations: 1, passed: true, evalOutput: "OK" }];
 

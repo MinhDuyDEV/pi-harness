@@ -97,6 +97,15 @@ export default function (pi: ExtensionAPI) {
 					default: false,
 				}),
 			),
+			tmuxMode: Type.Optional(
+				Type.Union([
+					Type.Literal("watch"),
+					Type.Literal("off"),
+				], {
+					description: 'Tmux observability mode. "watch" starts non-interactive panes tailing harness event logs/artifacts/outputs. "off" disables tmux. Default: watch.',
+					default: "watch",
+				}),
+			),
 		}),
 
 		async execute(_toolCallId, params, _signal, onUpdate, ctx) {
@@ -125,6 +134,7 @@ export default function (pi: ExtensionAPI) {
 					generatorModel: params.generatorModel,
 					evaluatorModel: params.evaluatorModel,
 					inheritContext: params.inheritContext ?? false,
+					tmuxMode: params.tmuxMode ?? "watch",
 				},
 				{
 					cwd,
