@@ -12,8 +12,9 @@
 3. **User intent** — do what was asked, simply and directly
 4. **Agency preservation** — "likely difficult" ≠ "impossible" ≠ "don't try"
 5. This `AGENTS.md`
-6. Memory (`memory-search`)
-7. Project files and codebase evidence
+6. **Skills** — load the relevant `.pi/skills/<name>/SKILL.md` before implementing when the task description matches a skill's purpose; skills provide specialized, pre-verified workflows
+7. Memory (`memory-search`)
+8. Project files and codebase evidence
 
 If sources conflict, state the conflict explicitly. Official docs > code > blog posts > AI-generated content.
 
@@ -95,8 +96,17 @@ Reject changes that worsen overall code health even if they appear to work.
 
 ---
 
+## Skills Protocol
+Before implementing any non-trivial task, check the available skills list in the system prompt. If a skill's description matches the current task, `read` that skill's `SKILL.md` and follow its instructions before proceeding. Skills provide pre-verified, specialized workflows — using them is faster and safer than implementing from scratch.
+
+When the task spans multiple domains, load all matching skills. If skill instructions conflict, ask the user for guidance.
+
+Do not skip this step for tasks that clearly match a skill's purpose. The skill list is curated — if a skill exists for your task, it should be used.
+
+---
+
 ## Plan Quality Gate
-Non-trivial implementation plans must contain a `## Discovery` section with substantive research findings. No boilerplate. Skip this gate for mechanical edits and obvious one-file fixes.
+Non-trivial implementation plans must be written to `.pi/plans/<id>/PLAN.md` and contain a `## Discovery` section with substantive research findings. Track implementation progress in `.pi/plans/<id>/PROGRESS.md` or a root-level `TODO.md`. Skip this gate for mechanical edits and obvious one-file fixes.
 
 ---
 

@@ -155,6 +155,13 @@ done
 
 Read only context files that are in or above the target scope, or clearly govern the files being changed. Do not import unrelated skill/template `AGENTS.md` files just because they exist elsewhere in the repo.
 
+## Skills Loading
+Before implementing any non-trivial task, scan the available skills list provided at session start. If a skill's description matches the current task, load its `SKILL.md` (at the path listed) and follow its instructions before proceeding. Skills take priority over ad-hoc implementation — they encode pre-verified, specialized workflows specific to the task domain.
+
+When the task covers multiple domains, load all matching skills. If instructions conflict between loaded skills, ask the user for guidance.
+
+---
+
 ## Layer 1: File/Tmux/Self-Spawn Workflows
 
 Pi in this project should stay Mario-style minimal by default: direct tools first, then visible file artifacts, then tmux/self-spawn only when isolation is genuinely useful.
@@ -188,6 +195,11 @@ Before using harness, tmux self-spawn, or any heavy external integration, ask:
 - Can a file artifact (`PLAN.md`, `TODO.md`, `PROGRESS.md`, `REVIEW.md`) replace hidden runtime state?
 - Would tmux make the process more observable?
 - Will `.pi/cli` output be written under `.pi/plans/<id>/` or another explicit artifact path and independently verified before being trusted?
+
+## Plan and Progress Artifacts
+Before starting non-trivial implementation (beyond a mechanical one-file fix), write a plan to `.pi/plans/<id>/PLAN.md` outlining the approach, files to change, and verification criteria. Track progress during implementation in `.pi/plans/<id>/PROGRESS.md` or a root-level `TODO.md`.
+
+These artifacts make work visible, reviewable, and resumable across sessions. They replace hidden internal state with durable, inspectable records. Skip this for: one-line fixes, docs-only changes, config tweaks, and trivial test additions.
 
 ## Delegation Rules
 
