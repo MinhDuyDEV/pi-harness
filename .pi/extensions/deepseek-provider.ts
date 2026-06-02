@@ -91,7 +91,10 @@ const DEFAULT_MAX_TOKENS = 64_000;
 // deepseek-v4-flash-nonthinking is V4 Flash with thinking disabled (~2-3x cheaper output,
 // no reasoning trace). deepseek-v4-flash auto-detects thinking mode.
 
-const CTX_1M = 1_048_576;
+// Advertised 1M, but effective reliable context is ~256K for multi-hop retrieval.
+// MRCR 8-needle: stays above 0.82 through 256K, drops to 0.59 at 1M.
+// DCP uses this to calculate nudge thresholds — reported as effective ceiling.
+const CTX_EFFECTIVE = 262_144; // 256K
 const MAX_OUT_384K = 393_216;
 
 const PER_TOKEN: Record<
@@ -126,7 +129,7 @@ const DEEPSEEK_MODELS: ProviderModelConfig[] = [
     },
     input: ["text"] as const,
     cost: PER_TOKEN.v4flash,
-    contextWindow: CTX_1M,
+    contextWindow: CTX_EFFECTIVE,
     maxTokens: MAX_OUT_384K,
   },
   {
@@ -135,7 +138,7 @@ const DEEPSEEK_MODELS: ProviderModelConfig[] = [
     reasoning: false,
     input: ["text"] as const,
     cost: PER_TOKEN.v4flash,
-    contextWindow: CTX_1M,
+    contextWindow: CTX_EFFECTIVE,
     maxTokens: MAX_OUT_384K,
   },
   {
@@ -151,7 +154,7 @@ const DEEPSEEK_MODELS: ProviderModelConfig[] = [
     },
     input: ["text"] as const,
     cost: PER_TOKEN.v4pro,
-    contextWindow: CTX_1M,
+    contextWindow: CTX_EFFECTIVE,
     maxTokens: MAX_OUT_384K,
   },
 ];
