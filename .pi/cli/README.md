@@ -7,7 +7,7 @@ Use this directory for small scripts that:
 - run through `bash` or another local command from Pi;
 - do not require background services unless the user explicitly starts them;
 - take explicit file/path arguments instead of reading hidden runtime state;
-- write durable outputs under `.pi/plans/<id>/` when used for handoffs;
+- write durable outputs under `.pi/artifacts/<id>/` when used for handoffs;
 - are safe to inspect, rerun, and verify independently.
 
 Do **not** put Pi extension tools here. Extension tools belong in `.pi/extensions/` so Pi can register them through the extension runtime.
@@ -18,9 +18,9 @@ Before adding a helper, prefer direct shell commands. Add a script only when the
 
 Browser and UI verification are the main use case for `.pi/cli/` because they benefit from repeatable commands and saved artifacts.
 
-- `browser-devtools.mjs` — connects to an existing Chrome DevTools endpoint, inspects page/console/network state, and writes `.pi/plans/<id>/BROWSER-DEVTOOLS.md`.
-- `playwright-flow.mjs` — runs a scripted browser flow with Playwright, saves screenshots/traces/logs, and writes `.pi/plans/<id>/PLAYWRIGHT-FLOW.md`.
-- `browser-screenshot.mjs` — captures deterministic responsive screenshots and writes `.pi/plans/<id>/SCREENSHOTS.md` plus `.pi/plans/<id>/screenshots/*.png`.
+- `browser-devtools.mjs` — connects to an existing Chrome DevTools endpoint, inspects page/console/network state, and writes `.pi/artifacts/<id>/BROWSER-DEVTOOLS.md`.
+- `playwright-flow.mjs` — runs a scripted browser flow with Playwright, saves screenshots/traces/logs, and writes `.pi/artifacts/<id>/PLAYWRIGHT-FLOW.md`.
+- `browser-screenshot.mjs` — captures deterministic responsive screenshots and writes `.pi/artifacts/<id>/SCREENSHOTS.md` plus `.pi/artifacts/<id>/screenshots/*.png`.
 
 Examples:
 

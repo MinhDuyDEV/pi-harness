@@ -36,7 +36,7 @@ Usage:
 
 Options:
   --endpoint <url>   DevTools HTTP endpoint. Default: ${DEFAULT_ENDPOINT}
-  --work-id <id>     Write .pi/plans/<id>/BROWSER-DEVTOOLS.md
+  --work-id <id>     Write .pi/artifacts/<id>/BROWSER-DEVTOOLS.md
   --artifact <path>  Write markdown report to an explicit path
   --url <url>        Navigate selected tab before inspection
   --page <index>     Page index from /json/list. Default: 0
@@ -48,7 +48,7 @@ Options:
 
 function artifactPath(args) {
 	if (args.artifact) return args.artifact;
-	if (args.workId) return join(".pi", "plans", args.workId, "BROWSER-DEVTOOLS.md");
+	if (args.workId) return join(".pi", "artifacts", args.workId, "BROWSER-DEVTOOLS.md");
 	return undefined;
 }
 

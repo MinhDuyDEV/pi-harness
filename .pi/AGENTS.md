@@ -106,7 +106,7 @@ Do not skip this step for tasks that clearly match a skill's purpose. The skill 
 ---
 
 ## Plan Quality Gate
-Non-trivial implementation plans must be written to `.pi/plans/<id>/PLAN.md` and contain a `## Discovery` section with substantive research findings. Track implementation progress in `.pi/plans/<id>/PROGRESS.md` or a root-level `TODO.md`. Skip this gate for mechanical edits and obvious one-file fixes.
+Non-trivial implementation plans must be written to `.pi/artifacts/<id>/PLAN.md` and contain a `## Discovery` section with substantive research findings. Track implementation progress in `.pi/artifacts/<id>/PROGRESS.md` or a root-level `TODO.md`. Skip this gate for mechanical edits and obvious one-file fixes.
 
 ---
 

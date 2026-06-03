@@ -63,7 +63,7 @@ For each selected module, produce three interface designs in a visible artifact:
 2. **Composable interface** — small orthogonal building blocks.
 3. **Domain-driven interface** — public API reflects domain concepts, not infrastructure.
 
-Write alternatives to `.pi/plans/<id>/INTERFACE-OPTIONS.md` or `docs/adr/<id>-INTERFACE-OPTIONS.md`. If independent fresh-context critique is worth the cost, explicitly self-spawn Pi in tmux/print mode with that artifact and require a written review file.
+Write alternatives to `.pi/artifacts/<id>/INTERFACE-OPTIONS.md` or `docs/adr/<id>-INTERFACE-OPTIONS.md`. If independent fresh-context critique is worth the cost, explicitly self-spawn Pi in tmux/print mode with that artifact and require a written review file.
 
 ## Phase 4: Synthesize
 

@@ -6,7 +6,7 @@ agentType: planner
 
 # Plan: $ARGUMENTS
 
-Create a detailed, verifiable implementation plan for `.pi/plans/<work-id>/SPEC.md`.
+Create a detailed, verifiable implementation plan for `.pi/artifacts/<work-id>/SPEC.md`.
 
 > **Workflow:** `/create` → `/plan <id>` (optional for complex work) → `/ship <id>`
 >
@@ -24,14 +24,14 @@ skill({ name: "planning-and-task-breakdown" });
 
 | Argument | Default | Description |
 | --- | --- | --- |
-| `<work-id>` | required | Directory name under `.pi/plans/` |
-| `--split` | false | Create phase files under `.pi/plans/<id>/phases/` for large work |
+| `<work-id>` | required | Directory name under `.pi/artifacts/` |
+| `--split` | false | Create phase files under `.pi/artifacts/<id>/phases/` for large work |
 
 ## Core Rules
 
-- Keep the plan self-contained under `.pi/plans/$ARGUMENTS/`.
-- Read `.pi/plans/$ARGUMENTS/SPEC.md` before planning.
-- Write durable outputs to `.pi/plans/$ARGUMENTS/` only.
+- Keep the plan self-contained under `.pi/artifacts/$ARGUMENTS/`.
+- Read `.pi/artifacts/$ARGUMENTS/SPEC.md` before planning.
+- Write durable outputs to `.pi/artifacts/$ARGUMENTS/` only.
 - Direct tools first; use tmux/self-spawn only when fresh context is worth the overhead.
 - Every task must have exact files, proof command, and rollback/safety notes.
 - Keep tasks vertical: each task should produce a verifiable user- or system-visible outcome.
@@ -41,7 +41,7 @@ skill({ name: "planning-and-task-breakdown" });
 Load what the repository already knows before planning.
 
 ```bash
-WORK_DIR=.pi/plans/$ARGUMENTS
+WORK_DIR=.pi/artifacts/$ARGUMENTS
 ls "$WORK_DIR"
 [ -f "$WORK_DIR/SPEC.md" ] && sed -n '1,220p' "$WORK_DIR/SPEC.md"
 git log --oneline -20
@@ -51,20 +51,20 @@ srcwalk discover "$ARGUMENTS" 2>/dev/null || true
 
 Search memory for relevant bugfixes, prior plans, and constraints. Incorporate useful findings directly into the plan and avoid re-solving settled decisions.
 
-If research needs fresh context, write `.pi/plans/$ARGUMENTS/RESEARCH-BRIEF.md`, run an explicit tmux/`pi --print-turn` session against that file, and require the result in `.pi/plans/$ARGUMENTS/RESEARCH.md` before trusting it.
+If research needs fresh context, write `.pi/artifacts/$ARGUMENTS/RESEARCH-BRIEF.md`, run an explicit tmux/`pi --print-turn` session against that file, and require the result in `.pi/artifacts/$ARGUMENTS/RESEARCH.md` before trusting it.
 
 ## Phase 1: Guards
 
 Verify:
 
-- `.pi/plans/$ARGUMENTS/SPEC.md` exists.
-- Existing `.pi/plans/$ARGUMENTS/PLAN.md` is not overwritten without user confirmation.
+- `.pi/artifacts/$ARGUMENTS/SPEC.md` exists.
+- Existing `.pi/artifacts/$ARGUMENTS/PLAN.md` is not overwritten without user confirmation.
 - The spec has goal, non-goals, success criteria, and verification expectations.
 - The current git tree has no unrelated changes that would be mixed into implementation.
 
 ```bash
 git status --porcelain
-find .pi/plans/$ARGUMENTS -maxdepth 2 -type f | sort
+find .pi/artifacts/$ARGUMENTS -maxdepth 2 -type f | sort
 ```
 
 ## Phase 2: Discovery Level
@@ -140,7 +140,7 @@ Wave 2: B
 Wave 3: C
 ```
 
-## Phase 6: Write `.pi/plans/$ARGUMENTS/PLAN.md`
+## Phase 6: Write `.pi/artifacts/$ARGUMENTS/PLAN.md`
 
 Required structure:
 
@@ -148,7 +148,7 @@ Required structure:
 # [Feature] Implementation Plan
 
 **Work ID:** $ARGUMENTS
-**Spec:** `.pi/plans/$ARGUMENTS/SPEC.md`
+**Spec:** `.pi/artifacts/$ARGUMENTS/SPEC.md`
 **Goal:** [outcome-shaped]
 **Discovery Level:** [0-3] - [rationale]
 **Context Budget:** [estimate]
@@ -172,14 +172,14 @@ Required structure:
 - **Failure policy:** stop after two failed attempts on same approach
 ```
 
-If `--split` is used, also create `.pi/plans/$ARGUMENTS/phases/PHASE-<n>.md` and link those files from the main plan.
+If `--split` is used, also create `.pi/artifacts/$ARGUMENTS/phases/PHASE-<n>.md` and link those files from the main plan.
 
 ## Phase 7: Safety Gate
 
 Scan the plan for forbidden patterns before execution:
 
 ```bash
-PLAN=.pi/plans/$ARGUMENTS/PLAN.md
+PLAN=.pi/artifacts/$ARGUMENTS/PLAN.md
 grep -inF "git add ." "$PLAN" || true
 grep -inF "git add -A" "$PLAN" || true
 grep -inF -- "--no-verify" "$PLAN" || true
@@ -200,7 +200,7 @@ Report:
 2. Must-have truths and key risks.
 3. Task count and dependency waves.
 4. Files expected to change.
-5. Plan path: `.pi/plans/$ARGUMENTS/PLAN.md`.
+5. Plan path: `.pi/artifacts/$ARGUMENTS/PLAN.md`.
 6. Next command: `/ship $ARGUMENTS`.
 
 ## Related Commands

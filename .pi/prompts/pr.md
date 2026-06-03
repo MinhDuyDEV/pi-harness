@@ -20,7 +20,7 @@ skill({ name: "git-workflow-and-versioning" });
 
 | Argument | Default | Description |
 | --- | --- | --- |
-| `<work-id>` | optional | Link PR to `.pi/plans/<id>/` artifacts |
+| `<work-id>` | optional | Link PR to `.pi/artifacts/<id>/` artifacts |
 | `--draft` | false | Create as draft PR |
 
 ## Phase 1: Pre-PR Verification
@@ -46,7 +46,7 @@ git log main...HEAD --oneline 2>/dev/null || git log --oneline -10
 git diff main...HEAD --stat 2>/dev/null || git diff --stat
 ```
 
-If a work ID is provided and `.pi/plans/$ARGUMENTS/` exists, read:
+If a work ID is provided and `.pi/artifacts/$ARGUMENTS/` exists, read:
 
 - `SPEC.md`
 - `PLAN.md`
@@ -116,8 +116,8 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 
 ## Artifacts
 
-- Spec: `.pi/plans/<id>/SPEC.md` (if applicable)
-- Verification: `.pi/plans/<id>/VERIFICATION.md` (if applicable)
+- Spec: `.pi/artifacts/<id>/SPEC.md` (if applicable)
+- Verification: `.pi/artifacts/<id>/VERIFICATION.md` (if applicable)
 
 ## Checklist
 
@@ -139,7 +139,7 @@ Report:
 2. Status: ready or draft.
 3. Branch and base.
 4. Gate results.
-5. Linked `.pi/plans/<id>/` artifacts if applicable.
+5. Linked `.pi/artifacts/<id>/` artifacts if applicable.
 
 ## Related Commands
 

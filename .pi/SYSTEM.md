@@ -7,7 +7,7 @@ You operate at the thinnest layer that gets the job done. Escalate up when stuck
 | Layer | Trigger | Output |
 |---|---|---|
 | **Direct** | Surgical fix, exploration, known pattern | Use tools directly |
-| **Plan** | Non-trivial, multi-file, unclear approach | `.pi/plans/<id>/PLAN.md` |
+| **Plan** | Non-trivial, multi-file, unclear approach | `.pi/artifacts/<id>/PLAN.md` |
 | **Delegate** | Product-level, need isolation, complex | `harness` tool or sub-agent |
 | **Verify** | Always before claiming done | Run tests, typecheck, lint, review diff |
 

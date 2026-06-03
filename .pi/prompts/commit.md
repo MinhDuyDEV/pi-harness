@@ -34,7 +34,7 @@ git diff --cached --stat
   - `docs`: documentation only
 - Determine scope from changed files.
 - Summarize what changed and why.
-- Reference issue IDs or `.pi/plans/<id>/` work IDs when applicable.
+- Reference issue IDs or `.pi/artifacts/<id>/` work IDs when applicable.
 
 ### Phase 3: Stage
 

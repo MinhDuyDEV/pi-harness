@@ -44,7 +44,7 @@ Usage:
 
 Options:
   --url <url>             Page URL to capture. Required
-  --work-id <id>          Save under .pi/plans/<id>/screenshots/ and write SCREENSHOTS.md
+  --work-id <id>          Save under .pi/artifacts/<id>/screenshots/ and write SCREENSHOTS.md
   --out-dir <dir>         Explicit screenshot output directory
   --report <path>         Explicit markdown report path
   --browser <name>        chromium | firefox | webkit. Default: chromium
@@ -64,8 +64,8 @@ async function loadPlaywright() {
 }
 
 function paths(args) {
-	const outDir = args.outDir ?? (args.workId ? join(".pi", "plans", args.workId, "screenshots") : join(process.cwd(), ".pi", "browser-artifacts", "screenshots"));
-	const report = args.report ?? (args.workId ? join(".pi", "plans", args.workId, "SCREENSHOTS.md") : join(outDir, "SCREENSHOTS.md"));
+	const outDir = args.outDir ?? (args.workId ? join(".pi", "artifacts", args.workId, "screenshots") : join(process.cwd(), ".pi", "browser-artifacts", "screenshots"));
+	const report = args.report ?? (args.workId ? join(".pi", "artifacts", args.workId, "SCREENSHOTS.md") : join(outDir, "SCREENSHOTS.md"));
 	return { outDir, report };
 }
 

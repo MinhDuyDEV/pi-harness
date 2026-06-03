@@ -11,6 +11,7 @@ docs/
 .pi/sandbox/
 .pi/docs/
 .pi/workflows/
+.pi/artifacts/
 
 # Node / package manager noise
 node_modules/

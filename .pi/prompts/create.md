@@ -5,7 +5,7 @@ argument-hint: "<description> [--type epic|feature|task|bug] [--spec-only]"
 
 # Create: $ARGUMENTS
 
-Create a durable work artifact under `.pi/plans/<id>/` with visible files and explicit next steps.
+Create a durable work artifact under `.pi/artifacts/<id>/` with visible files and explicit next steps.
 
 > **Workflow:** `/create` → `/plan <id>` when needed → `/ship <id>`
 >
@@ -20,7 +20,7 @@ skill({ name: "using-git-worktrees" }); // only if isolated workspace is request
 
 ## Rules
 
-- Keep all planning state in visible files under `.pi/plans/<id>/`.
+- Keep all planning state in visible files under `.pi/artifacts/<id>/`.
 - Do not implement code in this command.
 - Prefer direct repo inspection, memory search, and visible files.
 - If research needs fresh context, write a brief file and explicitly self-spawn Pi via tmux/`pi --print-turn`; require written output before trusting it.
@@ -30,11 +30,11 @@ skill({ name: "using-git-worktrees" }); // only if isolated workspace is request
 ```bash
 git status --porcelain
 git branch --show-current
-find .pi/plans -maxdepth 2 -name SPEC.md -print 2>/dev/null
+find .pi/artifacts -maxdepth 2 -name SPEC.md -print 2>/dev/null
 ```
 
 - If uncommitted changes exist, ask whether to continue.
-- If a similar `.pi/plans/<id>/SPEC.md` exists, stop and recommend `/ship <id>` or `/plan <id>`.
+- If a similar `.pi/artifacts/<id>/SPEC.md` exists, stop and recommend `/ship <id>` or `/plan <id>`.
 - If current branch is `main`/`master`, recommend a feature branch or worktree.
 
 ## Phase 2: Choose ID and Type
@@ -43,7 +43,7 @@ Derive a stable slug ID from the title:
 
 ```bash
 WORK_ID=$(printf '%s' "$TITLE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g' | cut -c1-48)
-mkdir -p ".pi/plans/$WORK_ID"
+mkdir -p ".pi/artifacts/$WORK_ID"
 ```
 
 Classify type:
@@ -66,7 +66,7 @@ Use `srcwalk_*` tools when available for code discovery. Record important findin
 
 ## Phase 4: Write Spec
 
-Write `.pi/plans/$WORK_ID/SPEC.md`.
+Write `.pi/artifacts/$WORK_ID/SPEC.md`.
 
 ### Lite Spec
 
@@ -150,7 +150,7 @@ If not `--spec-only`, ask whether to use current branch, create a feature branch
 Report:
 
 1. Work ID
-2. Spec path: `.pi/plans/<id>/SPEC.md`
+2. Spec path: `.pi/artifacts/<id>/SPEC.md`
 3. Type and status
 4. Task count and success criteria
 5. Recommended next command: `/plan <id>` or `/ship <id>`

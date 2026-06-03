@@ -33,7 +33,7 @@ Usage:
   .pi/cli/playwright-flow.mjs --artifact /tmp/FLOW.md --url http://localhost:3000 --step 'click=button[type=submit]'
 
 Options:
-  --work-id <id>         Write .pi/plans/<id>/PLAYWRIGHT-FLOW.md
+  --work-id <id>         Write .pi/artifacts/<id>/PLAYWRIGHT-FLOW.md
   --artifact <path>      Write markdown report to an explicit path
   --url <url>            Initial URL to open
   --browser <name>       chromium | firefox | webkit. Default: chromium
@@ -59,7 +59,7 @@ Step syntax:
 
 function artifactPath(args) {
 	if (args.artifact) return args.artifact;
-	if (args.workId) return join(".pi", "plans", args.workId, "PLAYWRIGHT-FLOW.md");
+	if (args.workId) return join(".pi", "artifacts", args.workId, "PLAYWRIGHT-FLOW.md");
 	return undefined;
 }
 

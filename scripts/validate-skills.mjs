@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// final smoke test
 
 /**
  * validate-skills.mjs
@@ -503,7 +504,7 @@ async function main() {
 
     console.log(`\n─── Summary ───`);
     console.log(`Skills scanned: ${skillCount}`);
-    console.log(`Clean:          ${cleanCount}`);
+    console.log(`Clean:          ${cleanCount}/${skillCount}`);
     console.log(`Errors:         ${errors}`);
     console.log(`Warnings:       ${warnings}`);
     console.log(`Time:           ${elapsed}ms`);

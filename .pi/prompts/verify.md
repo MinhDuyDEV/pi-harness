@@ -19,7 +19,7 @@ skill({ name: "code-review-and-quality" });
 
 | Argument | Default | Description |
 | --- | --- | --- |
-| `<work-id|path>` | required | Work directory under `.pi/plans/` or file/directory path |
+| `<work-id|path>` | required | Work directory under `.pi/artifacts/` or file/directory path |
 | `--quick` | false | Gates only, skip coherence checks |
 | `--full` | false | Force full verification mode |
 | `--fix` | false | Run project auto-fix command if available |
@@ -29,7 +29,7 @@ skill({ name: "code-review-and-quality" });
 
 | Input | Detection | Action |
 | --- | --- | --- |
-| Work ID | `.pi/plans/$ARGUMENTS/` exists | Verify implementation against `SPEC.md` and `PLAN.md` |
+| Work ID | `.pi/artifacts/$ARGUMENTS/` exists | Verify implementation against `SPEC.md` and `PLAN.md` |
 | Path | file/directory exists | Verify that path and related changes |
 | Empty-like broad request | otherwise | Stop and ask for a work ID or path |
 
@@ -43,14 +43,14 @@ skill({ name: "code-review-and-quality" });
 
 ## Phase 0: Cache Check
 
-Use a local cache under `.pi/plans/_VERIFY.log` only when not in `--full` or `--no-cache` mode.
+Use a local cache under `.pi/artifacts/_VERIFY.log` only when not in `--full` or `--no-cache` mode.
 
 ```bash
 CURRENT_STAMP=$(printf '%s\n%s' \
   "$(git rev-parse HEAD)" \
   "$(git diff HEAD)" \
   | shasum -a 256 | cut -d' ' -f1)
-LAST_STAMP=$(tail -1 .pi/plans/_VERIFY.log 2>/dev/null | awk '{print $1}')
+LAST_STAMP=$(tail -1 .pi/artifacts/_VERIFY.log 2>/dev/null | awk '{print $1}')
 ```
 
 If the stamp matches and the user did not request fresh verification, report cached status clearly. Otherwise run gates.
@@ -60,7 +60,7 @@ If the stamp matches and the user did not request fresh verification, report cac
 For a work ID:
 
 ```bash
-WORK_DIR=.pi/plans/$ARGUMENTS
+WORK_DIR=.pi/artifacts/$ARGUMENTS
 find "$WORK_DIR" -maxdepth 2 -type f | sort
 ```
 
@@ -108,8 +108,8 @@ If `--fix` is present, run the project’s established auto-fix command only aft
 When gates pass, append:
 
 ```bash
-mkdir -p .pi/plans
-echo "$CURRENT_STAMP $(date -u +%Y-%m-%dT%H:%M:%SZ) PASS" >> .pi/plans/_VERIFY.log
+mkdir -p .pi/artifacts
+echo "$CURRENT_STAMP $(date -u +%Y-%m-%dT%H:%M:%SZ) PASS" >> .pi/artifacts/_VERIFY.log
 ```
 
 ## Phase 4: Coherence (Skip with `--quick`)
@@ -125,7 +125,7 @@ Flag contradictions with exact file references.
 
 ## Phase 5: Write Artifact
 
-For a work ID, write `.pi/plans/$ARGUMENTS/VERIFICATION.md`:
+For a work ID, write `.pi/artifacts/$ARGUMENTS/VERIFICATION.md`:
 
 ```markdown
 # Verification: $ARGUMENTS

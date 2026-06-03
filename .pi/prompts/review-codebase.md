@@ -20,7 +20,7 @@ skill({ name: "verification-before-completion" });
 | Input | Detection | Action |
 | --- | --- | --- |
 | No arguments | default | Review uncommitted changes |
-| Work ID | `.pi/plans/$ARGUMENTS/` exists | Review current implementation against that spec |
+| Work ID | `.pi/artifacts/$ARGUMENTS/` exists | Review current implementation against that spec |
 | File/directory | path exists | Review that scope |
 | Commit hash | SHA pattern | Review `git show <sha>` |
 | PR URL/number | GitHub URL or number marker | Use `gh pr diff` |
@@ -44,14 +44,14 @@ git diff
 
 For each changed file, read the full file or relevant symbol sections.
 
-If a work ID is provided, read `.pi/plans/$ARGUMENTS/SPEC.md` and any `PLAN.md` / `VERIFICATION.md` files.
+If a work ID is provided, read `.pi/artifacts/$ARGUMENTS/SPEC.md` and any `PLAN.md` / `VERIFICATION.md` files.
 
 ## Phase 2: Scope
 
 | Input | Scope | How to Get Code |
 | --- | --- | --- |
 | Path | That path only | `read`, `srcwalk_read`, `grep` |
-| Work ID | Implementation vs spec | `.pi/plans/<id>/SPEC.md` + git diff |
+| Work ID | Implementation vs spec | `.pi/artifacts/<id>/SPEC.md` + git diff |
 | PR | PR changes | `gh pr diff` |
 | `all` or empty | Recent/local changes | `git diff main...HEAD` or current diff |
 

@@ -5,7 +5,7 @@ argument-hint: "<work-id>"
 
 # Ship: $ARGUMENTS
 
-Implement `.pi/plans/<work-id>/SPEC.md` or `.pi/plans/<work-id>/PLAN.md`, verify the result, review the diff, and update the run artifacts.
+Implement `.pi/artifacts/<work-id>/SPEC.md` or `.pi/artifacts/<work-id>/PLAN.md`, verify the result, review the diff, and update the run artifacts.
 
 > **Workflow:** `/create` → `/plan <id>` (optional) → `/ship <id>`
 
@@ -23,7 +23,7 @@ skill({ name: "code-review-and-quality" });
 
 - Direct implementation in this session is the default.
 - Use tmux/self-spawn only for independent, file-disjoint work with written prompts and written outputs.
-- Keep execution state in `.pi/plans/$ARGUMENTS/` artifacts and current-session notes.
+- Keep execution state in `.pi/artifacts/$ARGUMENTS/` artifacts and current-session notes.
 - Read files before editing; verify every meaningful change.
 - Never stage with `git add .`; stage explicit files only when the user asks for a commit.
 - Do not mix unrelated dirty work into the shipped scope.
@@ -31,7 +31,7 @@ skill({ name: "code-review-and-quality" });
 ## Phase 1: Guards
 
 ```bash
-WORK_DIR=.pi/plans/$ARGUMENTS
+WORK_DIR=.pi/artifacts/$ARGUMENTS
 test -d "$WORK_DIR"
 test -f "$WORK_DIR/SPEC.md"
 find "$WORK_DIR" -maxdepth 2 -type f | sort
@@ -40,13 +40,13 @@ git status --porcelain
 
 Read, in order when present:
 
-1. `.pi/plans/$ARGUMENTS/SPEC.md`
-2. `.pi/plans/$ARGUMENTS/PLAN.md`
-3. `.pi/plans/$ARGUMENTS/RESEARCH.md`
-4. `.pi/plans/$ARGUMENTS/DESIGN.md`
-5. `.pi/plans/$ARGUMENTS/PROGRESS.md`
+1. `.pi/artifacts/$ARGUMENTS/SPEC.md`
+2. `.pi/artifacts/$ARGUMENTS/PLAN.md`
+3. `.pi/artifacts/$ARGUMENTS/RESEARCH.md`
+4. `.pi/artifacts/$ARGUMENTS/DESIGN.md`
+5. `.pi/artifacts/$ARGUMENTS/PROGRESS.md`
 
-Create or update `.pi/plans/$ARGUMENTS/RUN-REPORT.md` before implementation begins.
+Create or update `.pi/artifacts/$ARGUMENTS/RUN-REPORT.md` before implementation begins.
 
 Minimum report fields:
 
@@ -57,8 +57,8 @@ Minimum report fields:
 in_progress
 
 ## Inputs
-- Spec: `.pi/plans/$ARGUMENTS/SPEC.md`
-- Plan: `.pi/plans/$ARGUMENTS/PLAN.md` if present
+- Spec: `.pi/artifacts/$ARGUMENTS/SPEC.md`
+- Plan: `.pi/artifacts/$ARGUMENTS/PLAN.md` if present
 
 ## Execution Log
 | Time | Step | Evidence |
@@ -84,7 +84,7 @@ If the plan contains waves:
 
 1. Execute one wave at a time.
 2. Multi-task waves are sequential unless tasks are independent and file-disjoint.
-3. For tmux/self-spawn, write `.pi/plans/$ARGUMENTS/WORKER-<n>.md` first and require `.pi/plans/$ARGUMENTS/WORKER-<n>-OUTPUT.md` back.
+3. For tmux/self-spawn, write `.pi/artifacts/$ARGUMENTS/WORKER-<n>.md` first and require `.pi/artifacts/$ARGUMENTS/WORKER-<n>-OUTPUT.md` back.
 4. Re-read outputs, inspect diffs, and verify before accepting them.
 
 ## Phase 3: Task Loop
@@ -97,8 +97,8 @@ For each task:
 4. Implement the smallest working change.
 5. Run the task verification command.
 6. If verification fails twice on the same approach, stop and report the blocker.
-7. Append progress to `.pi/plans/$ARGUMENTS/PROGRESS.md`.
-8. Update `.pi/plans/$ARGUMENTS/RUN-REPORT.md` with files changed and evidence.
+7. Append progress to `.pi/artifacts/$ARGUMENTS/PROGRESS.md`.
+8. Update `.pi/artifacts/$ARGUMENTS/RUN-REPORT.md` with files changed and evidence.
 
 Checkpoint types:
 
@@ -121,7 +121,7 @@ Minimum evidence:
 - Goal-backward checks against `SPEC.md` success criteria.
 - Diff review scoped to files changed for this work item.
 
-Record exact commands and results in `.pi/plans/$ARGUMENTS/RUN-REPORT.md`.
+Record exact commands and results in `.pi/artifacts/$ARGUMENTS/RUN-REPORT.md`.
 
 ## Phase 5: Review
 
@@ -137,7 +137,7 @@ git diff
 
 Check:
 
-- Correctness against `.pi/plans/$ARGUMENTS/SPEC.md`.
+- Correctness against `.pi/artifacts/$ARGUMENTS/SPEC.md`.
 - Security and data-handling risks.
 - Type safety and test coverage.
 - Simplicity: no speculative abstractions or unrelated cleanup.
@@ -146,18 +146,18 @@ Check:
 If an independent review is worth the overhead, use a visible tmux/print workflow:
 
 ```bash
-mkdir -p .pi/plans/$ARGUMENTS
-pi --name "review-$ARGUMENTS" --print-turn "Read .pi/plans/$ARGUMENTS/SPEC.md and the current git diff. Write review findings to .pi/plans/$ARGUMENTS/REVIEW.md."
+mkdir -p .pi/artifacts/$ARGUMENTS
+pi --name "review-$ARGUMENTS" --print-turn "Read .pi/artifacts/$ARGUMENTS/SPEC.md and the current git diff. Write review findings to .pi/artifacts/$ARGUMENTS/REVIEW.md."
 ```
 
-Then read `.pi/plans/$ARGUMENTS/REVIEW.md`, verify findings, and fix only scoped issues.
+Then read `.pi/artifacts/$ARGUMENTS/REVIEW.md`, verify findings, and fix only scoped issues.
 
 ## Phase 6: Handoff
 
 Before claiming done:
 
-- `.pi/plans/$ARGUMENTS/PROGRESS.md` is current.
-- `.pi/plans/$ARGUMENTS/RUN-REPORT.md` has fresh verification evidence.
+- `.pi/artifacts/$ARGUMENTS/PROGRESS.md` is current.
+- `.pi/artifacts/$ARGUMENTS/RUN-REPORT.md` has fresh verification evidence.
 - `git status --short` is understood and unrelated dirty files are called out.
 - The final response lists changed files, verification commands, and remaining risks.
 

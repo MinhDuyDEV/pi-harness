@@ -31,7 +31,7 @@ srcwalk overview . 2>/dev/null || true
 srcwalk discover "$ARGUMENTS" 2>/dev/null || true
 ```
 
-Return what exists today, patterns used, and files involved. If exploration is large enough to deserve fresh context, write `.pi/plans/<id>/EXPLORE-BRIEF.md` and explicitly run tmux/`pi --print-turn`; require `.pi/plans/<id>/EXPLORATION.md` as output before trusting it.
+Return what exists today, patterns used, and files involved. If exploration is large enough to deserve fresh context, write `.pi/artifacts/<id>/EXPLORE-BRIEF.md` and explicitly run tmux/`pi --print-turn`; require `.pi/artifacts/<id>/EXPLORATION.md` as output before trusting it.
 
 ## Phase 2: Frame the Problem
 
@@ -101,7 +101,7 @@ Rules:
 `/create "[description based on chosen approach]"`
 ```
 
-If a matching work directory already exists, save to `.pi/plans/<id>/EXPLORATION.md`; otherwise display inline and do not create files unless the user asks.
+If a matching work directory already exists, save to `.pi/artifacts/<id>/EXPLORATION.md`; otherwise display inline and do not create files unless the user asks.
 
 ## Phase 6: Ask User
 

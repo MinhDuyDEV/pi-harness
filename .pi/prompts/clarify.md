@@ -18,7 +18,7 @@ skill({ name: "source-driven-development" });
 
 | Argument | Default | Description |
 | --- | --- | --- |
-| `<request-or-work-id>` | required | Freeform request text or a directory under `.pi/plans/` |
+| `<request-or-work-id>` | required | Freeform request text or a directory under `.pi/artifacts/` |
 | `--quick` | false | Ask the smallest set of questions needed to choose the next command |
 | `--deep` | false | Clarify non-goals, risks, interfaces, and success criteria before handoff |
 
@@ -47,7 +47,7 @@ If both flags appear, `--deep` wins.
 ## Phase 1: Ground
 
 1. Identify unknowns blocking execution.
-2. If `$ARGUMENTS` maps to `.pi/plans/$ARGUMENTS/`, read available artifacts:
+2. If `$ARGUMENTS` maps to `.pi/artifacts/$ARGUMENTS/`, read available artifacts:
    - `SPEC.md`
    - `PLAN.md`
    - `RESEARCH.md`

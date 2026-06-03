@@ -64,7 +64,7 @@ For `--quick`, provide direction and key decisions only.
 
 ## Phase 4: Save Artifact When Relevant
 
-If a matching work directory exists, write `.pi/plans/<id>/DESIGN.md`. Otherwise report inline unless the user asks for a file.
+If a matching work directory exists, write `.pi/artifacts/<id>/DESIGN.md`. Otherwise report inline unless the user asks for a file.
 
 ## Phase 5: Record Decision
 

@@ -46,7 +46,7 @@
     "selectedBg": "base",
     "userMessageBg": "base",
     "userMessageText": "text",
-    "customMessageBg": "base",
+    "customMessageBg": "surface0",
     "customMessageText": "text",
     "customMessageLabel": "mauve",
     "toolPendingBg": "warp",
