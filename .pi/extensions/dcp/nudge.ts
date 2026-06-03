@@ -5,11 +5,13 @@
  * Three zones: below min (no nudge), between min and max (gentle),
  * above max (critical). Fires a pending nudge that gets injected
  * on the next before_agent_start event.
+ *
+ * P3: Block-aware nudges — suggests which compression block to merge
+ * and includes quality metrics when available.
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { DCPConfig } from "./config.js";
-import type { SessionState } from "./compress.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +23,10 @@ export interface NudgeState {
   autoCompactTriggered: boolean;
   lastContextPercent: number | null;
   lastContextTokens: number | null;
+  /** P3: Number of existing compression blocks (for block-aware messages) */
+  blockCount: number;
+  /** P3: Quality status line to include in nudges */
+  qualityStatus: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -29,7 +35,7 @@ export interface NudgeState {
 
 export class NudgeManager {
   private config: DCPConfig;
-  private state: NudgeState;
+  protected state: NudgeState;
   private currentTurn = 0;
 
   constructor(config: DCPConfig) {
@@ -40,6 +46,8 @@ export class NudgeManager {
       autoCompactTriggered: false,
       lastContextPercent: null,
       lastContextTokens: null,
+      blockCount: 0,
+      qualityStatus: "",
     };
   }
 
@@ -52,6 +60,14 @@ export class NudgeManager {
   recordCompress(): void {
     this.state.lastNudgeTurn = this.currentTurn;
     this.state.autoCompactTriggered = false;
+  }
+
+  /**
+   * P3: Update block count and quality status (called externally by index.ts)
+   */
+  updateBlockContext(blockCount: number, qualityStatus: string): void {
+    this.state.blockCount = blockCount;
+    this.state.qualityStatus = qualityStatus;
   }
 
   /**
@@ -88,11 +104,7 @@ export class NudgeManager {
 
     // Zone 3: Above effective max — critical nudge
     if (contextPercent >= config.maxContextLimit) {
-      // Auto-compact already produced the critical pressure signal. Do not fall
-      // through to gentle nudges while still above max; that creates duplicate
-      // messages with a weaker tone for the same unresolved pressure event.
       if (this.state.autoCompactTriggered) return null;
-
       this.state.pendingNudge = this.buildCriticalNudge(contextTokens, contextPercent);
       this.state.lastNudgeTurn = this.currentTurn;
       return this.state.pendingNudge;
@@ -128,6 +140,8 @@ export class NudgeManager {
       autoCompactTriggered: false,
       lastContextPercent: this.state.lastContextPercent,
       lastContextTokens: this.state.lastContextTokens,
+      blockCount: this.state.blockCount,
+      qualityStatus: this.state.qualityStatus,
     };
   }
 
@@ -141,35 +155,49 @@ export class NudgeManager {
     return { ...this.state };
   }
 
-  // ── Nudge message builders ──
+  // ── P3: Nudge message builders ──
 
-  private buildStatusText(): string {
-    const tokens = this.state.lastContextTokens;
-    const percent = this.state.lastContextPercent;
-    if (tokens === null) return "DCP: waiting for data";
-    const pct = percent !== null ? `${Math.round(percent)}%` : "?%";
-    return `DCP: ${Math.round(tokens / 1000)}k tokens (${pct})`;
+  /**
+   * Build block-aware action suggestion.
+   * Tells the LLM which old block to re-compress with structured fields.
+   */
+  private buildActionSuggestion(): string {
+    const bc = this.state.blockCount;
+    if (bc <= 1) return "Use `compress` with structured fields (files_read, files_modified, decisions, next_steps).";
+    return `Use \`compress\` on the oldest block (b1) adding structured fields.`;
   }
 
   private buildGentleNudge(tokens: number, percent: number): string {
-    return [
+    const parts = [
       `[DCP] Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%).`,
-      "Consider using `compress` to crystallize completed conversation ranges.",
-    ].join(" ");
+      this.buildActionSuggestion(),
+    ];
+    if (this.state.qualityStatus) {
+      parts.push(`Quality: ${this.state.qualityStatus}`);
+    }
+    return parts.join(" ");
   }
 
   private buildStrongNudge(tokens: number, percent: number): string {
-    return [
+    const parts = [
       `[DCP] Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%).`,
-      "Consider using `compress` soon to reduce context pressure.",
-    ].join(" ");
+      this.buildActionSuggestion(),
+    ];
+    if (this.state.qualityStatus) {
+      parts.push(`Quality: ${this.state.qualityStatus}`);
+    }
+    return parts.join(" ");
   }
 
   private buildCriticalNudge(tokens: number, percent: number): string {
-    return [
+    const parts = [
       `[DCP] CRITICAL: Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%) — approaching limit.`,
-      "Please `compress` the largest completed conversation range now.",
-    ].join(" ");
+      this.buildActionSuggestion(),
+    ];
+    if (this.state.qualityStatus) {
+      parts.push(`Quality: ${this.state.qualityStatus}`);
+    }
+    return parts.join(" ");
   }
 
   /** Build status string for /dcp command */
@@ -177,7 +205,8 @@ export class NudgeManager {
     const s = this.state;
     if (s.lastContextTokens === null) return "DCP: inactive (no context data)";
     const pct = s.lastContextPercent !== null ? ` (${Math.round(s.lastContextPercent)}%)` : "";
-    const nudge = s.pendingNudge ? " ⚠️ pending" : "";
-    return `DCP: ${Math.round(s.lastContextTokens / 1000)}k tokens${pct}${nudge}`;
+    const nudge = s.pendingNudge ? " \uF071 pending" : "";
+    const qual = s.qualityStatus ? ` | ${s.qualityStatus}` : "";
+    return `DCP: ${Math.round(s.lastContextTokens / 1000)}k tokens${pct}${nudge}${qual}`;
   }
 }

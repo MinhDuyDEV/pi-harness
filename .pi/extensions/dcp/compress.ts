@@ -23,7 +23,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
-import type { DCPConfig } from "./config.js";
+import type { DCPConfig, ProbeConfig } from "./config.js";
 
 // ---------------------------------------------------------------------------
 // Custom message types (internal to DCP extension)
@@ -58,6 +58,104 @@ interface BranchSummaryMessage {
 }
 
 // ---------------------------------------------------------------------------
+// Structured summary types (P0: Factory-style structured fields)
+// ---------------------------------------------------------------------------
+
+/** Structured fields for a compression event */
+export interface StructuredSummaryFields {
+  files_read: string[];
+  files_modified: string[];
+  decisions: string[];
+  next_steps: string[];
+}
+
+/**
+ * Persistent session summary — accumulated across all compressions.
+ * Factory pattern: anchored iterative summarization.
+ */
+export interface PersistentSessionSummary {
+  /** All files ever read, deduplicated (most recent first) */
+  files_read: string[];
+  /** All files ever modified, deduplicated (most recent first) */
+  files_modified: string[];
+  /** Accumulated decisions with provenance */
+  decisions: Array<{ text: string; block_id: number; timestamp: number }>;
+  /** Accumulated narrative segments ordered by time */
+  narrative_parts: Array<{ text: string; block_id: number }>;
+  /** Current next steps (from most recent compress) */
+  next_steps: Array<{ text: string; block_id: number; timestamp: number }>;
+  last_updated: number;
+  merged_block_ids: number[];
+  topic: string;
+}
+
+// ---------------------------------------------------------------------------
+// Artifact tracking types (P1: file-path harvesting from tool calls)
+// ---------------------------------------------------------------------------
+
+export interface ArtifactTrackerEntry {
+  lastSeen: number;
+  accessCount: number;
+  toolName: string;
+  /** Whether this file was in a compressed range */
+  wasCompressed: boolean;
+}
+
+/** Tools whose path arguments should be tracked as "read" operations */
+const READ_TOOLS = new Set([
+  "read", "grep", "find", "ls", "multi_grep", "grepsearch",
+  "srcwalk_read", "srcwalk_search", "srcwalk_files", "srcwalk_deps",
+  "srcwalk_map", "srcwalk_callers", "srcwalk_callees", "srcwalk_flow",
+  "srcwalk_impact", "web_fetch", "webclaw_scrape", "webclaw_batch",
+  "memory-search", "observation", "context7",
+]);
+
+/** Tools whose path arguments should be tracked as "modify" operations */
+const MODIFY_TOOLS = new Set([
+  "write", "edit",
+]);
+
+// ---------------------------------------------------------------------------
+// Quality metrics types (P1: regression detection)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Probe evaluation types (P1 enhancement: probe-based quality evaluation)
+// ---------------------------------------------------------------------------
+
+export interface ProbeResult {
+  name: string;
+  pass: boolean;
+  score: number;
+  detail: string;
+}
+
+export interface ProbeEvaluationResult {
+  probes: ProbeResult[];
+  overallScore: number;
+  allPassed: boolean;
+  summaryTokens: number;
+  fieldsCount: number;
+}
+
+export interface RegressionEvent {
+  blockId: number;
+  file: string;
+  turnGap: number;
+  timestamp: number;
+}
+
+export interface QualityMetricsData {
+  reReadsAfterCompress: number;
+  totalCompressions: number;
+  cleanCompressions: number;
+  regressionLog: RegressionEvent[];
+  lastProbeResults?: ProbeEvaluationResult;
+  avgProbeScore: number;
+  failedProbes: number;
+}
+
+// ---------------------------------------------------------------------------
 // In-memory block storage
 // ---------------------------------------------------------------------------
 
@@ -78,14 +176,54 @@ export interface SessionState {
   totalStrippedTokens: number;
   /** Cumulative items pruned by dedup/purge */
   totalPrunedCount: number;
+  /** P0: Persistent merged summary across all compressions */
+  persistentSummary: PersistentSessionSummary;
+  /** P1: Artifact tracking per file */
+  artifactTracker: Map<string, ArtifactTrackerEntry>;
+  /** P1: Quality / regression metrics */
+  qualityMetrics: QualityMetricsData;
+  /** P2: Guard: files in most recent compression (for re-read detection) */
+  recentCompressFiles: { files: string[]; turn: number } | null;
+  /** Current turn counter */
+  currentTurn: number;
 }
 
 const sessions = new Map<string, SessionState>();
 
+function emptyPersistentSummary(): PersistentSessionSummary {
+  return {
+    files_read: [],
+    files_modified: [],
+    decisions: [],
+    narrative_parts: [],
+    next_steps: [],
+    last_updated: 0,
+    merged_block_ids: [],
+    topic: "session",
+  };
+}
+
 function getState(sessionId: string): SessionState {
   let s = sessions.get(sessionId);
   if (!s) {
-    s = { blocks: [], nextBlockId: 1, totalStrippedTokens: 0, totalPrunedCount: 0 };
+    s = {
+      blocks: [],
+      nextBlockId: 1,
+      totalStrippedTokens: 0,
+      totalPrunedCount: 0,
+      persistentSummary: emptyPersistentSummary(),
+      artifactTracker: new Map(),
+      qualityMetrics: {
+        reReadsAfterCompress: 0,
+        totalCompressions: 0,
+        cleanCompressions: 0,
+        regressionLog: [],
+        avgProbeScore: 0,
+        failedProbes: 0,
+      },
+      recentCompressFiles: null,
+      currentTurn: 0,
+    };
     sessions.set(sessionId, s);
   }
   return s;
@@ -132,7 +270,514 @@ export function getStats(sessionId: string) {
     totalStrippedTokens: s.totalStrippedTokens,
     totalPrunedCount: s.totalPrunedCount,
     summaryTokens: s.blocks.reduce((sum, b) => sum + b.summaryTokens, 0),
+    qualityMetrics: s.qualityMetrics,
   };
+}
+
+// ---------------------------------------------------------------------------
+// P0: Persistent summary merging (anchored iterative summarization)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse comma-separated string into trimmed, non-empty array.
+ */
+function parseCSV(value: string | undefined | null): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
+ * Merge structured fields into the persistent session summary.
+ * Factory pattern: anchored iterative summarization.
+ */
+export function mergeIntoPersistentSummary(
+  sessionId: string,
+  fields: StructuredSummaryFields,
+  topic: string,
+  blockId: number,
+): PersistentSessionSummary {
+  const ps = getState(sessionId).persistentSummary;
+
+  // Merge files (deduplicated, newest-first ordering)
+  const newReads = fields.files_read.filter((f) => !ps.files_read.includes(f));
+  const newModifies = fields.files_modified.filter((f) => !ps.files_modified.includes(f));
+  if (newReads.length > 0) ps.files_read = [...newReads, ...ps.files_read];
+  if (newModifies.length > 0) ps.files_modified = [...newModifies, ...ps.files_modified];
+
+  // Merge decisions (dedup by exact text match)
+  const existingDecisionTexts = new Set(ps.decisions.map((d) => d.text));
+  for (const d of fields.decisions) {
+    if (!existingDecisionTexts.has(d)) {
+      ps.decisions.push({ text: d, block_id: blockId, timestamp: Date.now() });
+      existingDecisionTexts.add(d);
+    }
+  }
+
+  // Append next steps (newest tells current direction)
+  for (const ns of fields.next_steps) {
+    ps.next_steps.push({ text: ns, block_id: blockId, timestamp: Date.now() });
+  }
+
+  // Update topic to most recent
+  ps.topic = topic;
+  ps.merged_block_ids.push(blockId);
+  ps.last_updated = Date.now();
+
+  return ps;
+}
+
+// ---------------------------------------------------------------------------
+// P1: Probe-based compression quality evaluation
+// ---------------------------------------------------------------------------
+
+/**
+ * Run quality probes on a compression event.
+ * Returns per-probe scores and overall quality assessment.
+ */
+export function evaluateCompressionProbes(
+  fields: StructuredSummaryFields,
+  narrative: string,
+  summaryTokens: number,
+  config: ProbeConfig,
+): ProbeEvaluationResult {
+  const probes: ProbeResult[] = [];
+
+  // 1. File coverage probe: are files_read and files_modified populated?
+  const hasReads = fields.files_read.length > 0;
+  const hasModifies = fields.files_modified.length > 0;
+  let fileCoverageScore: number;
+  if (hasReads && hasModifies) {
+    fileCoverageScore = 100;
+  } else if (hasReads || hasModifies) {
+    fileCoverageScore = 50;
+  } else {
+    fileCoverageScore = 0;
+  }
+  probes.push({
+    name: "file-coverage",
+    pass: fileCoverageScore >= config.minFileCoverage,
+    score: fileCoverageScore,
+    detail: hasReads && hasModifies
+      ? `${fields.files_read.length} read, ${fields.files_modified.length} modified`
+      : hasReads
+        ? `${fields.files_read.length} read, no modified files`
+        : hasModifies
+          ? `no read files, ${fields.files_modified.length} modified`
+          : "no file paths provided",
+  });
+
+  // 2. Decision coverage probe: how many decisions captured?
+  const decisionCount = fields.decisions.length;
+  let decisionScore: number;
+  if (decisionCount >= 3) {
+    decisionScore = 100;
+  } else if (decisionCount >= 1) {
+    decisionScore = 50;
+  } else {
+    decisionScore = 0;
+  }
+  probes.push({
+    name: "decision-coverage",
+    pass: decisionScore >= config.minDecisionCoverage,
+    score: decisionScore,
+    detail: decisionCount >= 1
+      ? `${decisionCount} decision${decisionCount !== 1 ? "s" : ""} captured`
+      : "no decisions recorded",
+  });
+
+  // 3. Narrative depth probe: is the summary substantive?
+  const narrativeLen = narrative.length;
+  let narrativeScore: number;
+  if (narrativeLen > 500) {
+    narrativeScore = 100;
+  } else if (narrativeLen > 200) {
+    narrativeScore = 60;
+  } else if (narrativeLen > 50) {
+    narrativeScore = 30;
+  } else {
+    narrativeScore = 0;
+  }
+  probes.push({
+    name: "narrative-depth",
+    pass: narrativeScore >= config.minNarrativeDepth,
+    score: narrativeScore,
+    detail: narrativeLen > 0
+      ? `${narrativeLen} characters`
+      : "empty narrative",
+  });
+
+  // 4. Structure completeness probe: % of 4 structured fields filled
+  const filledFields = [
+    fields.files_read.length > 0,
+    fields.files_modified.length > 0,
+    fields.decisions.length > 0,
+    fields.next_steps.length > 0,
+  ];
+  const filledCount = filledFields.filter(Boolean).length;
+  const structScore = Math.round((filledCount / 4) * 100);
+  probes.push({
+    name: "structure-completeness",
+    pass: structScore >= config.minStructureCompleteness,
+    score: structScore,
+    detail: `${filledCount}/4 structured fields populated`,
+  });
+
+  const overallScore = Math.round(
+    probes.reduce((sum, p) => sum + p.score, 0) / probes.length,
+  );
+  const allPassed = probes.every((p) => p.pass);
+
+  return {
+    probes,
+    overallScore,
+    allPassed,
+    summaryTokens,
+    fieldsCount: filledCount,
+  };
+}
+
+/**
+ * Store probe evaluation results in session quality metrics.
+ */
+export function recordProbeResults(
+  sessionId: string,
+  result: ProbeEvaluationResult,
+): void {
+  const state = getState(sessionId);
+  state.qualityMetrics.lastProbeResults = result;
+  if (!result.allPassed) {
+    state.qualityMetrics.failedProbes++;
+  }
+  // Running average
+  const n = state.qualityMetrics.totalCompressions;
+  if (n > 0) {
+    const prevAvg = state.qualityMetrics.avgProbeScore;
+    state.qualityMetrics.avgProbeScore = (prevAvg * (n - 1) + result.overallScore) / n;
+  } else {
+    state.qualityMetrics.avgProbeScore = result.overallScore;
+  }
+}
+
+/**
+ * Build a structured context message from the persistent summary.
+ * This is what gets injected into the LLM context after compression.
+ */
+export function buildCompressedSummaryMessage(summary: PersistentSessionSummary): string {
+  const parts: string[] = [];
+
+  // Header
+  const mergedLabel = summary.merged_block_ids.length === 1
+    ? `b${summary.merged_block_ids[0]}`
+    : `b${summary.merged_block_ids[0]}–b${summary.merged_block_ids[summary.merged_block_ids.length - 1]}`;
+  parts.push(`\uF07C Session Context (${mergedLabel})`);
+
+  // Topic
+  if (summary.topic && summary.topic !== "session") {
+    parts.push(`  Topic: ${summary.topic}`);
+  }
+
+  // Files read
+  if (summary.files_read.length > 0) {
+    parts.push("", "\uF15B Files Read:");
+    for (const f of summary.files_read) {
+      parts.push(`  \u2022 ${f}`);
+    }
+  }
+
+  // Files modified
+  if (summary.files_modified.length > 0) {
+    parts.push("", "\uF15C Files Modified:");
+    for (const f of summary.files_modified) {
+      parts.push(`  \u2022 ${f}`);
+    }
+  }
+
+  // Decisions
+  if (summary.decisions.length > 0) {
+    parts.push("", "\uF0E7 Decisions Made:");
+    for (const d of summary.decisions) {
+      parts.push(`  \u2022 ${d.text}`);
+    }
+  }
+
+  // Next steps
+  if (summary.next_steps.length > 0) {
+    const latest = summary.next_steps[summary.next_steps.length - 1];
+    parts.push("", "\uF140 Next Steps:");
+    parts.push(`  \u2022 ${latest.text}`);
+    if (summary.next_steps.length > 1) {
+      parts.push(`  (${summary.next_steps.length - 1} prior step groups archived)`);
+    }
+  }
+
+  // Narrative segments
+  if (summary.narrative_parts.length > 0) {
+    parts.push("", "\uF0EA Summary:");
+    for (const np of summary.narrative_parts) {
+      parts.push("");
+      parts.push(`From b${np.block_id}:`);
+      parts.push(np.text);
+    }
+  }
+
+  return parts.join("\n");
+}
+
+// ---------------------------------------------------------------------------
+// P0/P1: Extract structured fields from compress tool call arguments
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract structured fields from compress tool params.
+ * Handles both the new structured fields and the old freeform summary fallback.
+ */
+function extractStructuredFields(
+  params: Record<string, unknown>,
+  config: DCPConfig,
+): { fields: StructuredSummaryFields; narrative: string } {
+  const fields: StructuredSummaryFields = {
+    files_read: parseCSV(params.files_read as string | undefined),
+    files_modified: parseCSV(params.files_modified as string | undefined),
+    decisions: parseCSV(params.decisions as string | undefined),
+    next_steps: parseCSV(params.next_steps as string | undefined),
+  };
+
+  const narrative = (params.summary as string) ?? "";
+
+  // Auto-extract file paths from summary text when structured fields are empty
+  if (config.structuredSummary.autoExtractPaths) {
+    if (fields.files_read.length === 0 && fields.files_modified.length === 0) {
+      const filePattern = /(?:\b(?:src|lib|app|test|config|public)\/[^\s,)]+(?:\.[a-z]+)?\b)|(?:\b[a-zA-Z0-9_-]+\/[a-zA-Z0-9._\/-]+\.[a-z]+\b)/g;
+      const matches = narrative.match(filePattern);
+      if (matches) {
+        const readContext = /read|open|look|check|examine|review/i;
+        const modContext = /modify|edit|write|change|update|fix|add|create|delete|refactor/i;
+        for (const m of [...new Set(matches)]) {
+          const idx = narrative.indexOf(m);
+          const start = Math.max(0, idx - 60);
+          const lineContext = narrative.substring(start, idx + m.length + 60);
+          if (modContext.test(lineContext)) {
+            if (!fields.files_modified.includes(m)) fields.files_modified.push(m);
+          } else if (readContext.test(lineContext)) {
+            if (!fields.files_read.includes(m)) fields.files_read.push(m);
+          } else {
+            if (!fields.files_read.includes(m)) fields.files_read.push(m);
+          }
+        }
+      }
+    }
+  }
+
+  return { fields, narrative };
+}
+
+// ---------------------------------------------------------------------------
+// P1: Artifact tracking
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract file path(s) from tool call arguments.
+ */
+function extractPathFromArgs(toolName: string, args: Record<string, unknown>): string[] {
+  const paths: string[] = [];
+
+  if (typeof args.path === "string" && args.path.trim()) {
+    paths.push(args.path.trim());
+  }
+  if (typeof args.scope === "string" && args.scope.trim()) {
+    paths.push(args.scope.trim());
+  }
+  if ((toolName === "grep" || toolName === "find") && typeof args.pattern === "string" && args.pattern.trim()) {
+    paths.push(args.pattern.trim());
+  }
+  if (Array.isArray(args.paths)) {
+    for (const p of args.paths) {
+      if (typeof p === "string" && p.trim()) paths.push(p.trim());
+    }
+  }
+
+  return paths.map((p) => p.replace(/^\.\//, "").replace(/\/+$/, ""));
+}
+
+/**
+ * Track a tool call for artifact tracking.
+ * Called from index.ts on `tool_result` events.
+ */
+export function trackToolCall(
+  sessionId: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  maxFiles?: number,
+): void {
+  if (!READ_TOOLS.has(toolName) && !MODIFY_TOOLS.has(toolName)) return;
+
+  const state = getState(sessionId);
+  const paths = extractPathFromArgs(toolName, args);
+  const category = MODIFY_TOOLS.has(toolName) ? "modified" : "read";
+  const limit = maxFiles ?? 200;
+
+  for (const rawPath of paths) {
+    const path = rawPath.replace(/^\.\//, "").replace(/\/+$/, "");
+    if (!path || path === "." || path === "..") continue;
+
+    const existing = state.artifactTracker.get(path);
+    if (existing) {
+      existing.lastSeen = Date.now();
+      existing.accessCount++;
+    } else if (state.artifactTracker.size < limit) {
+      state.artifactTracker.set(path, {
+        lastSeen: Date.now(),
+        accessCount: 1,
+        toolName,
+        wasCompressed: false,
+      });
+    }
+
+    // Also merge into persistent summary
+    const ps = state.persistentSummary;
+    if (category === "read") {
+      if (!ps.files_read.includes(path)) ps.files_read.push(path);
+    } else {
+      if (!ps.files_modified.includes(path)) ps.files_modified.push(path);
+    }
+  }
+}
+
+/**
+ * Get current artifact tracker state.
+ */
+export function getArtifactTracker(sessionId: string): { files_read: string[]; files_modified: string[] } {
+  const ps = getState(sessionId).persistentSummary;
+  return {
+    files_read: [...ps.files_read],
+    files_modified: [...ps.files_modified],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// P1: Quality metrics / regression detection
+// ---------------------------------------------------------------------------
+
+/**
+ * Record a compress event for quality tracking.
+ */
+export function recordCompressEvent(
+  sessionId: string,
+  blockId: number,
+  fields: StructuredSummaryFields,
+): void {
+  const state = getState(sessionId);
+  state.qualityMetrics.totalCompressions++;
+  state.qualityMetrics.cleanCompressions++;
+  state.recentCompressFiles = {
+    files: [...new Set([...fields.files_read, ...fields.files_modified])],
+    turn: state.currentTurn,
+  };
+
+  for (const f of [...fields.files_read, ...fields.files_modified]) {
+    const entry = state.artifactTracker.get(f);
+    if (entry) entry.wasCompressed = true;
+  }
+}
+
+/**
+ * Check for compression regression: agent re-reading files that were
+ * in a compressed block within the regression window.
+ */
+export function checkCompressionRegression(
+  messages: Message[],
+  sessionId: string,
+  config?: DCPConfig,
+): void {
+  const state = getState(sessionId);
+  if (!state.recentCompressFiles) return;
+
+  const regressionWindow = config?.qualityMetrics?.regressionWindow ?? 5;
+  const turnGap = state.currentTurn - state.recentCompressFiles.turn;
+  if (turnGap > regressionWindow) {
+    state.recentCompressFiles = null;
+    return;
+  }
+
+  const compressedFiles = new Set(state.recentCompressFiles.files);
+
+  for (const msg of messages) {
+    if (msg.role !== "assistant") continue;
+    const asst = msg as AssistantMessage;
+    if (!Array.isArray(asst.content)) continue;
+    for (const part of asst.content) {
+      if (part.type !== "toolCall") continue;
+      const tc = part as ToolCall;
+      if (!READ_TOOLS.has(tc.name)) continue;
+
+      const paths = extractPathFromArgs(tc.name, tc.arguments as Record<string, unknown>);
+      for (const p of paths) {
+        if (compressedFiles.has(p)) {
+          state.qualityMetrics.reReadsAfterCompress++;
+          state.qualityMetrics.cleanCompressions = 0;
+          state.qualityMetrics.regressionLog.push({
+            blockId: state.blocks.length,
+            file: p,
+            turnGap,
+            timestamp: Date.now(),
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Get quality metrics.
+ */
+export function getQualityMetrics(sessionId: string): QualityMetricsData {
+  return { ...getState(sessionId).qualityMetrics };
+}
+
+/**
+ * Increment turn counter.
+ */
+export function incrementTurn(sessionId: string): void {
+  getState(sessionId).currentTurn++;
+}
+
+/**
+ * Get persistent summary (for /dcp command).
+ */
+export function getPersistentSummary(sessionId: string): PersistentSessionSummary {
+  return { ...getState(sessionId).persistentSummary };
+}
+
+/**
+ * Get quality status line with probe info.
+ */
+export function getQualityStatus(sessionId: string): string {
+  const qm = getState(sessionId).qualityMetrics;
+  if (qm.totalCompressions === 0) return "";
+  const reReadPct = qm.totalCompressions > 0
+    ? Math.round((qm.reReadsAfterCompress / qm.totalCompressions) * 100)
+    : 0;
+  const streak = qm.cleanCompressions > 0 ? ` (${qm.cleanCompressions}\uF00C streak)` : "";
+  let status = `Regression: ${qm.reReadsAfterCompress}/${qm.totalCompressions} (${reReadPct}%)${streak}`;
+
+  // Add probe score if available
+  if (qm.lastProbeResults) {
+    const pct = qm.lastProbeResults.overallScore;
+    const icon = qm.lastProbeResults.allPassed ? "\uF00C" : "\uF071";
+    status += ` | Probe: ${pct}% ${icon}`;
+  } else if (qm.avgProbeScore > 0) {
+    status += ` | Avg probe: ${Math.round(qm.avgProbeScore)}%`;
+  }
+
+  // Failed probes count
+  if (qm.failedProbes > 0) {
+    status += ` | Failed: ${qm.failedProbes}`;
+  }
+
+  return status;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,10 +870,11 @@ function extractToolOps(messages: Message[]): ToolOp[] {
  * Strategy 1: Compress-range stripping.
  *
  * Find compress tool results, identify the message range before each call,
- * and replace those messages with a compact summary message.
+ * and replace those messages with a structured summary from the persistent summary.
  */
 function applyCompressStrip(
   messages: Message[],
+  sessionId: string,
   config: DCPConfig,
 ): { messages: Message[]; prunedTokens: number; prunedCount: number } {
   const ops = extractToolOps(messages);
@@ -339,7 +985,7 @@ function applyCompressStrip(
     prunedTokens += strippedTokens;
   }
 
-  // Rebuild message array
+  // Rebuild message array — inject structured persistent summary instead of raw text
   const newMessages: Message[] = [];
   const injectionMap = new Map<number, typeof injections>();
   for (const inj of injections) {
@@ -347,14 +993,21 @@ function applyCompressStrip(
     injectionMap.get(inj.atIndex)!.push(inj);
   }
 
+  // Fetch the persistent summary for structured message formatting
+  const summary = getState(sessionId).persistentSummary;
+
   for (let i = 0; i < messages.length; i++) {
     const injects = injectionMap.get(i);
     if (injects) {
       for (const inj of injects) {
+        // Use the structured persistent summary if available; fall back to raw text
+        const structured = summary.merged_block_ids.length > 0
+          ? buildCompressedSummaryMessage(summary)
+          : inj.summary;
         newMessages.push({
           role: "custom",
           customType: "dcp-compressed-summary",
-          content: inj.summary,
+          content: structured,
           display: false,
           timestamp: Date.now(),
         } as DCPCompressedSummaryMessage);
@@ -370,10 +1023,12 @@ function applyCompressStrip(
 // ── Step 2: Deduplication ───────────────────────────────────────────────
 
 /**
- * Strategy 2: Deduplication.
+ * Strategy 2: Deduplication (P3: smarter — read-only safe check).
  *
  * When the same tool is called with the same arguments multiple times,
  * strip the arguments from older calls and replace result content with a short marker.
+ * Only dedup READ_TOOLS (read-only, deterministic) or protected tools with same results.
+ * Mutating tools with same args may have different results — skip those.
  */
 function applyDedup(
   messages: Message[],
@@ -387,6 +1042,10 @@ function applyDedup(
 
   for (const op of ops) {
     if (op.type !== "call" || !op.toolName || protectedSet.has(op.toolName)) continue;
+    // Only dedup read-only (deterministic) tools — mutating tools with same args
+    // may have different results (e.g., write, edit, compress)
+    if (!READ_TOOLS.has(op.toolName)) continue;
+
     // Hash the arguments
     const asst = messages[op.messageIndex] as AssistantMessage;
     const tc = asst.content[op.contentIndex] as ToolCall;
@@ -484,9 +1143,14 @@ export function processContextMessages(
 ): Message[] {
   const state = getState(sessionId);
 
-  // 1. Compress-strip
+  // P2: Check for regression (re-reads of recently compressed files)
+  if (config.qualityMetrics.enabled && config.qualityMetrics.trackReReads) {
+    checkCompressionRegression(messages, sessionId, config);
+  }
+
+  // 1. Compress-strip — now receives sessionId for persistent summary injection
   const { messages: afterStrip, prunedTokens: stripTokens, prunedCount: stripCount } =
-    applyCompressStrip(messages, config);
+    applyCompressStrip(messages, sessionId, config);
 
   // 2. Dedup
   const { prunedTokens: dedupTokens, prunedCount: dedupCount } =
@@ -507,16 +1171,30 @@ export function processContextMessages(
 // ---------------------------------------------------------------------------
 
 const COMPRESS_TOOL_DESCRIPTION = [
-  "Collapse a range in the conversation into a detailed summary.",
+  "Collapse a range in the conversation into a detailed summary with structured fields.",
   "",
   "COMPRESSION MODES",
   '- "range" (default): Select a conversation range by start/end boundaries → replace with summary.',
   '- "message" (experimental): Use when sessions are dense with no clear phase boundaries.',
   "",
-  "THE SUMMARY",
-  "Your summary must be EXHAUSTIVE. Capture file paths, function signatures, decisions made, constraints discovered, key findings — EVERYTHING that maintains context integrity. This is not a brief note — it is an authoritative record so faithful that the original conversation adds no value.",
+  "STRUCTURED FIELDS (PREFERRED)",
+  "Provide these comma-separated fields to ensure critical context survives compression:",
+  "- files_read: files you examined during this phase",
+  "- files_modified: files you changed (write/edit)",
+  "- decisions: key decisions made with rationale (e.g. 'Used X instead of Y because Z')",
+  "- next_steps: what remains to be done after this phase",
   "",
-  "Yet be LEAN. Strip away failed attempts, verbose tool outputs, back-and-forth exploration. What remains should be pure signal.",
+  "These structured fields are merged into a persistent session summary that grows",
+  "across compressions — you don't need to repeat prior context.",
+  "",
+  "THE SUMMARY",
+  "The `summary` field is your prose narrative. It must be EXHAUSTIVE: capture file paths,",
+  "function signatures, decisions made, constraints discovered, key findings — EVERYTHING",
+  "that maintains context integrity. This is not a brief note — it is an authoritative record",
+  "so faithful that the original conversation adds no value.",
+  "",
+  "Yet be LEAN. Strip away failed attempts, verbose tool outputs, back-and-forth exploration.",
+  "What remains should be pure signal.",
   "",
   "WHEN TO USE",
   "- Research concluded and findings are clear",
@@ -536,15 +1214,21 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
     name: "compress",
     label: "Compress Context",
     description: COMPRESS_TOOL_DESCRIPTION,
-    promptSnippet: "Collapse a conversation range into a dense, exhaustive summary.",
+    promptSnippet: "Collapse a conversation range into a dense, exhaustive summary with structured fields.",
     promptGuidelines: [
       "Compress completed research or implementation phases to free context space.",
       "Before compressing, verify the range is truly closed — never compress work you may need exact details from.",
+      "Use the structured fields (files_read, files_modified, decisions, next_steps) whenever possible.",
       "Write exhaustive summaries that capture file paths, function signatures, decisions, and constraints.",
     ],
     parameters: Type.Object({
       topic: Type.String({ description: "Short label (3-5 words) — e.g., 'Auth System Exploration'" }),
-      summary: Type.String({ description: "Complete technical summary of the compressed range. Must be exhaustive." }),
+      summary: Type.String({ description: "Complete technical prose summary of the compressed range. Must be exhaustive." }),
+      // P0: Structured fields for Factory-style anchored summarization
+      files_read: Type.Optional(Type.String({ description: "Comma-separated files read during this phase" })),
+      files_modified: Type.Optional(Type.String({ description: "Comma-separated files modified during this phase" })),
+      decisions: Type.Optional(Type.String({ description: "Comma-separated key decisions made (e.g. 'Used X instead of Y because Z')" })),
+      next_steps: Type.Optional(Type.String({ description: "Comma-separated next steps / task state" })),
       startId: Type.Optional(Type.String({ description: "Start boundary description. Omit in batch mode." })),
       endId: Type.Optional(Type.String({ description: "End boundary description. Omit in batch mode." })),
       mode: Type.Optional(
@@ -557,7 +1241,17 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
     }),
     async execute(
       _toolCallId: string,
-      params: { topic: string; summary: string; startId?: string; endId?: string; mode?: string },
+      params: {
+        topic: string;
+        summary: string;
+        files_read?: string;
+        files_modified?: string;
+        decisions?: string;
+        next_steps?: string;
+        startId?: string;
+        endId?: string;
+        mode?: string;
+      },
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: ExtensionContext,
@@ -566,7 +1260,13 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       if (!params.summary?.trim()) throw new Error("summary is required");
 
       const mode = params.mode ?? config.compress.mode;
-      const sessionId = ctx.cwd; // Use cwd as session key
+      const sessionId = ctx.cwd;
+
+      // P0: Extract structured fields and narrative
+      const { fields, narrative } = extractStructuredFields(
+        params as Record<string, unknown>,
+        config,
+      );
 
       // Resolve start/end labels
       const startLabel = params.startId?.trim()
@@ -580,9 +1280,24 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       // Store the compression block
       const block = addBlock(sessionId, params.topic.trim(), params.summary.trim(), startLabel, endLabel);
 
-      // Build response showing prior blocks for iterative reference
+      // P0: Merge into persistent summary (anchored iterative summarization)
+      mergeIntoPersistentSummary(sessionId, fields, block.topic, block.blockId);
+
+      // Also append narrative to persistent summary
+      const ps = getState(sessionId).persistentSummary;
+      ps.narrative_parts.push({ text: narrative, block_id: block.blockId });
+
+      // P1: Record compress event for quality tracking
+      recordCompressEvent(sessionId, block.blockId, fields);
+
+      // P1: Run probe-based evaluation
+      if (config.probeEvaluation?.enabled) {
+        const probeResult = evaluateCompressionProbes(fields, narrative, block.summaryTokens, config.probeEvaluation);
+        recordProbeResults(sessionId, probeResult);
+      }
+
+      // Build response with persistent summary preview
       const allBlocks = getBlocks(sessionId);
-      const priorBlocks = allBlocks.filter((b) => b.blockId !== block.blockId);
       const stats = getStats(sessionId);
 
       const lines: string[] = [
@@ -593,28 +1308,66 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
         `Summary tokens: ~${block.summaryTokens}`,
         `Active compressions: ${allBlocks.length}`,
         `Total summary buffer: ~${stats.summaryTokens} tokens`,
+        `Merged blocks: ${ps.merged_block_ids.join(", ")}`,
         "",
         "The following is the authoritative summary of the compressed range:",
         "",
-        params.summary,
+        narrative,
       ];
 
-      if (priorBlocks.length > 0) {
-        lines.push("", "--- Prior compression summaries (build on these, don't repeat) ---");
-        for (const prior of priorBlocks) {
-          const truncated = prior.summary.length > 500
-            ? prior.summary.slice(0, 500) + "... [truncated]"
-            : prior.summary;
-          lines.push(`[b${prior.blockId}: ${prior.topic}] (~${prior.summaryTokens} tokens)`);
-          lines.push(truncated);
-          lines.push("");
+      // Show any structured fields that were provided
+      const structuredParts: string[] = [];
+      if (fields.files_read.length > 0) {
+        structuredParts.push(`Files read: ${fields.files_read.join(", ")}`);
+      }
+      if (fields.files_modified.length > 0) {
+        structuredParts.push(`Files modified: ${fields.files_modified.join(", ")}`);
+      }
+      if (fields.decisions.length > 0) {
+        structuredParts.push(`Decisions: ${fields.decisions.join("; ")}`);
+      }
+      if (fields.next_steps.length > 0) {
+        structuredParts.push(`Next steps: ${fields.next_steps.join("; ")}`);
+      }
+      if (structuredParts.length > 0) {
+        lines.push("", "--- Structured fields ---");
+        lines.push(...structuredParts);
+      }
+
+      // Show quality metrics if available
+      const qualityStatus = getQualityStatus(sessionId);
+      if (qualityStatus) {
+        lines.push("", `Quality: ${qualityStatus}`);
+      }
+
+      // P1: Add probe results to response if configured
+      if (config.probeEvaluation?.enabled && config.probeEvaluation.showInResponse) {
+        const qm = getQualityMetrics(sessionId);
+        if (qm.lastProbeResults) {
+          const probeLines: string[] = [
+            "",
+            "--- Compression quality probes ---",
+          ];
+          for (const p of qm.lastProbeResults.probes) {
+            const icon = p.pass ? "\uF00C" : "\uF071";
+            probeLines.push(`  ${icon} ${p.name}: ${p.score}/100 — ${p.detail}`);
+          }
+          const overallIcon = qm.lastProbeResults.allPassed ? "\uF00C" : "\uF071";
+          probeLines.push(`  ${overallIcon} Overall: ${qm.lastProbeResults.overallScore}/100`);
+          lines.push(...probeLines);
         }
-        lines.push("Tip: Reference prior block findings by [bN] instead of repeating them.");
       }
 
       return {
         content: [{ type: "text", text: lines.join("\n") }],
-        details: { blockId: block.blockId, topic: block.topic, mode, summaryTokens: block.summaryTokens },
+        details: {
+          blockId: block.blockId,
+          topic: block.topic,
+          mode,
+          summaryTokens: block.summaryTokens,
+          files: fields,
+          quality: getQualityMetrics(sessionId),
+        },
       };
     },
   });

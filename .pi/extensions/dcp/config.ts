@@ -51,12 +51,52 @@ export interface AutoCompactConfig {
   thresholdPercent: number;
 }
 
+export interface StructuredSummaryConfig {
+  enabled: boolean;
+  /** Auto-extract file paths from summary text as fallback when LLM doesn't provide structured fields */
+  autoExtractPaths: boolean;
+}
+
+export interface ArtifactTrackingConfig {
+  enabled: boolean;
+  /** Max files to track per session (LRU eviction) */
+  maxFiles: number;
+}
+
+export interface ProbeConfig {
+  enabled: boolean;
+  /** Minimum score (0-100) for file coverage probe */
+  minFileCoverage: number;
+  /** Minimum score (0-100) for decision coverage probe */
+  minDecisionCoverage: number;
+  /** Minimum score (0-100) for narrative depth probe */
+  minNarrativeDepth: number;
+  /** Minimum score (0-100) for structure completeness probe */
+  minStructureCompleteness: number;
+  /** Show probe results in compress tool response */
+  showInResponse: boolean;
+  /** Include probe quality feedback in nudges when probes fail */
+  nudgeOnFailure: boolean;
+}
+
+export interface QualityMetricsConfig {
+  enabled: boolean;
+  /** Turns after which a compress regression guard expires */
+  regressionWindow: number;
+  /** Track re-reads as quality signal */
+  trackReReads: boolean;
+}
+
 export interface DCPConfig {
   enabled: boolean;
   compress: CompressConfig;
   dedup: DedupConfig;
   purgeErrors: PurgeErrorsConfig;
   autoCompact: AutoCompactConfig;
+  structuredSummary: StructuredSummaryConfig;
+  artifactTracking: ArtifactTrackingConfig;
+  probeEvaluation: ProbeConfig;
+  qualityMetrics: QualityMetricsConfig;
   debug: boolean;
 }
 
@@ -95,5 +135,27 @@ export const DEFAULT_CONFIG: DCPConfig = {
   autoCompact: {
     enabled: true,
     thresholdPercent: 80,
+  },
+  structuredSummary: {
+    enabled: true,
+    autoExtractPaths: true,
+  },
+  artifactTracking: {
+    enabled: true,
+    maxFiles: 200,
+  },
+  probeEvaluation: {
+    enabled: true,
+    minFileCoverage: 50,
+    minDecisionCoverage: 50,
+    minNarrativeDepth: 60,
+    minStructureCompleteness: 60,
+    showInResponse: true,
+    nudgeOnFailure: true,
+  },
+  qualityMetrics: {
+    enabled: true,
+    regressionWindow: 5,
+    trackReReads: true,
   },
 };

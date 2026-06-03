@@ -2,7 +2,11 @@
  * DCP Extension — Entry Point
  *
  * Thin wiring layer that connects the compress tool, nudge system,
- * and context event handler into Pi's extension API.
+ * artifact tracking, quality metrics, and context event handler
+ * into Pi's extension API.
+ *
+ * P0-P3: Wires structured summaries, artifact tracking, regression detection,
+ * block-aware nudges, and enhanced /dcp status.
  */
 
 import type {
@@ -20,9 +24,16 @@ import { DEFAULT_CONFIG, type DCPConfig } from "./config.js";
 import {
   cleanupSession,
   getBlocks,
+  getPersistentSummary,
+  getQualityMetrics,
+  getQualityStatus,
   getStats,
   processContextMessages,
   registerCompressTool,
+  trackToolCall,
+  incrementTurn,
+  buildCompressedSummaryMessage,
+  getArtifactTracker,
 } from "./compress.js";
 import { NudgeManager } from "./nudge.js";
 
@@ -39,23 +50,28 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
   function ensureInitialized(ctx: ExtensionContext): void {
     if (initialized) return;
-    // Register the compress tool lazily so it has ctx access
     registerCompressTool(pi, config);
     initialized = true;
   }
 
   // ── Event: input — track turns ──────────────────────────────────────
-  pi.on("input", (event: InputEvent) => {
+  pi.on("input", (event: InputEvent, ctx: ExtensionContext) => {
     // Skip mid-stream steers — only count idle prompts and follow-ups
     if (event.streamingBehavior === "steer") return;
     nudge.incTurn();
+    // P2: Increment turn for regression detection
+    incrementTurn(ctx.cwd);
   });
 
-  // ── Event: tool_result — detect compress calls ──────────────────────
-  pi.on("tool_result", (event: ToolResultEvent) => {
+  // ── Event: tool_result — detect compress + track artifacts ──────────
+  pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
     try {
       if (event.toolName === "compress") {
         nudge.recordCompress();
+      }
+      // P1: Track all relevant tool calls for artifact tracking
+      if (config.artifactTracking.enabled && event.toolName && event.args) {
+        trackToolCall(ctx.cwd, event.toolName, event.args, config.artifactTracking.maxFiles);
       }
     } catch {
       // best-effort
@@ -76,6 +92,12 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   pi.on("before_agent_start", (_event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
     try {
       ensureInitialized(ctx);
+      // P3: Update nudge block context before checking
+      const sessionId = ctx.cwd;
+      const blocks = getBlocks(sessionId);
+      const qualityStatus = getQualityStatus(sessionId);
+      nudge.updateBlockContext(blocks.length, qualityStatus);
+
       const nudgeMsg = nudge.consumeNudge();
       if (nudgeMsg) {
         return {
@@ -95,8 +117,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   pi.on("context", (event: ContextEvent, ctx: ExtensionContext) => {
     try {
       ensureInitialized(ctx);
-      const sessionId = ctx.cwd; // use cwd as session identifier
-      // ContextEvent.messages is AgentMessage[] (internal), but processContextMessages handles all message types
+      const sessionId = ctx.cwd;
       const pruned = processContextMessages(event.messages as Message[], sessionId, config);
       return { messages: pruned };
     } catch {
@@ -113,16 +134,12 @@ export default function dcpExtension(pi: ExtensionAPI): void {
       const preparation = event.preparation;
       if (!preparation || blocks.length === 0) return;
 
-      // Enrich pi's native compaction by providing a CompactionResult
-      // that includes DCP block summaries as context. This replaces pi's
-      // own summarization with one that has DCP awareness.
       const model = ctx.model;
       if (!model) return;
 
       const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
       if (!auth.ok || !auth.apiKey) return;
 
-      // Build DCP-enriched compaction via pi's native compact function
       const { compact } = await import("@earendil-works/pi-coding-agent");
       const result = await compact(
         preparation,
@@ -135,12 +152,11 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
       if (!result) return;
 
-      // Append DCP block summaries to the compaction summary
-      const enrichment = blocks.map(
-        (b) => `[DCP b${b.blockId}: ${b.topic}]\n${b.summary}`,
-      ).join("\n\n");
+      // P0: Use persistent summary for enrichment instead of raw blocks
+      const ps = getPersistentSummary(sessionId);
+      const enrichment = buildCompressedSummaryMessage(ps);
 
-      result.summary += `\n\n## DCP Compression Blocks\n\n${enrichment}`;
+      result.summary += `\n\n## DCP Persistent Summary\n\n${enrichment}`;
 
       return { compaction: result };
     } catch {
@@ -153,9 +169,9 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     cleanupSession(process.cwd());
   });
 
-  // ── Command: /dcp — status display ──────────────────────────────────
+  // ── Command: /dcp — enhanced status display ─────────────────────────
   pi.registerCommand("dcp", {
-    description: "DCP status — compression blocks, context usage, and nudges",
+    description: "DCP status — compression blocks, artifact tracking, quality metrics, and nudges",
     async handler(_args: string, ctx: ExtensionContext) {
       ensureInitialized(ctx);
       const sessionId = ctx.cwd;
@@ -177,8 +193,103 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         `Total summary buffer: ~${stats.summaryTokens} tokens`,
         `Total stripped: ~${stats.totalStrippedTokens} tokens across ${stats.totalPrunedCount} items`,
         "",
-        nudgeState.pendingNudge ? `⚠️ Pending nudge: "${nudgeState.pendingNudge}"` : "No pending nudge",
       ];
+
+      // P1: Quality metrics
+      if (config.qualityMetrics.enabled) {
+        const qm = stats.qualityMetrics;
+        if (qm.totalCompressions > 0) {
+          const reReadPct = Math.round((qm.reReadsAfterCompress / qm.totalCompressions) * 100);
+          lines.push("### Quality Metrics");
+          lines.push(`  Compressions: ${qm.totalCompressions}`);
+          lines.push(`  Re-reads after compress: ${qm.reReadsAfterCompress} (${reReadPct}%)`);
+          lines.push(`  Clean streak: ${qm.cleanCompressions}`);
+          if (qm.regressionLog.length > 0) {
+            lines.push("  Recent regressions:");
+            const recent = qm.regressionLog.slice(-3);
+            for (const r of recent) {
+              lines.push(`    b${r.blockId} → ${r.file} (gap: ${r.turnGap} turns)`);
+            }
+          }
+          lines.push("");
+        }
+      }
+
+      // P1: Probe evaluation results
+      if (config.probeEvaluation?.enabled && stats.qualityMetrics.lastProbeResults) {
+        const pr = stats.qualityMetrics.lastProbeResults;
+        lines.push("### Probe Evaluation (last compression)");
+        for (const p of pr.probes) {
+          const icon = p.pass ? "\uF00C" : "\uF071";
+          lines.push(`  ${icon} ${p.name}: ${p.score}/100 — ${p.detail}`);
+        }
+        const overallIcon = pr.allPassed ? "\uF00C" : "\uF071";
+        lines.push(`  ${overallIcon} Overall: ${pr.overallScore}/100`);
+        if (stats.qualityMetrics.avgProbeScore > 0) {
+          lines.push(`  Running average: ${Math.round(stats.qualityMetrics.avgProbeScore)}/100`);
+        }
+        if (stats.qualityMetrics.failedProbes > 0) {
+          lines.push(`  Failed compressions: ${stats.qualityMetrics.failedProbes}`);
+        }
+        lines.push("");
+      } else if (config.probeEvaluation?.enabled && stats.qualityMetrics.totalCompressions > 0) {
+        // Show aggregate if no latest result
+        if (stats.qualityMetrics.avgProbeScore > 0) {
+          lines.push("### Probe Evaluation");
+          lines.push(`  Running average: ${Math.round(stats.qualityMetrics.avgProbeScore)}/100`);
+          if (stats.qualityMetrics.failedProbes > 0) {
+            lines.push(`  Failed compressions: ${stats.qualityMetrics.failedProbes}`);
+          }
+          lines.push("");
+        }
+      }
+
+      // P1: Artifact tracking
+      if (config.artifactTracking.enabled) {
+        const artifacts = getArtifactTracker(sessionId);
+        const totalTracked = artifacts.files_read.length + artifacts.files_modified.length;
+        if (totalTracked > 0) {
+          lines.push("### Artifact Tracking");
+          if (artifacts.files_read.length > 0) {
+            lines.push(`  Files read (${artifacts.files_read.length}):`);
+            for (const f of artifacts.files_read.slice(0, 10)) {
+              lines.push(`    • ${f}`);
+            }
+            if (artifacts.files_read.length > 10) {
+              lines.push(`    … and ${artifacts.files_read.length - 10} more`);
+            }
+          }
+          if (artifacts.files_modified.length > 0) {
+            lines.push(`  Files modified (${artifacts.files_modified.length}):`);
+            for (const f of artifacts.files_modified.slice(0, 5)) {
+              lines.push(`    • ${f}`);
+            }
+            if (artifacts.files_modified.length > 5) {
+              lines.push(`    … and ${artifacts.files_modified.length - 5} more`);
+            }
+          }
+          lines.push("");
+        }
+      }
+
+      // P0: Persistent summary preview
+      if (config.structuredSummary.enabled) {
+        const ps = getPersistentSummary(sessionId);
+        if (ps.merged_block_ids.length > 0) {
+          lines.push("### Persistent Summary");
+          lines.push(`  Merged blocks: ${ps.merged_block_ids.join(", ")}`);
+          lines.push(`  Files tracked: ${ps.files_read.length} read, ${ps.files_modified.length} modified`);
+          lines.push(`  Decisions: ${ps.decisions.length}`);
+          lines.push(`  Narrative segments: ${ps.narrative_parts.length}`);
+          lines.push(`  Last updated: ${new Date(ps.last_updated).toLocaleTimeString()}`);
+          lines.push("");
+        }
+      }
+
+      // Nudge state
+      lines.push(nudgeState.pendingNudge
+        ? `\uF071 Pending nudge: "${nudgeState.pendingNudge}"`
+        : "No pending nudge");
 
       const output = lines.filter(Boolean).join("\n");
       if (ctx.hasUI) ctx.ui.notify(output);
