@@ -20,24 +20,27 @@ This pulls in the delegation stack (`@tintinweb/pi-subagents`, `@tintinweb/pi-ta
 
 ## What's Included
 
-### Extensions (12)
+### Extensions (15)
 
-Custom tools that register into pi's tool system:
+Extensions auto-loaded from `.pi/extensions/`:
 
 | Extension | Purpose |
 |-----------|---------|
 | `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive) |
 | `copilot-provider` | GitHub Copilot provider with rate-limit fallback |
+| `deepseek-provider` | DeepSeek provider with thinking mode support (reasoning_content) |
+| `mimo-provider` | Xiaomi MiMo provider via OpenAI-compatible API |
 | `usage-tracker` | Token usage tracking via `/usage` command |
-| `guardrails` | Bounded safety guardrails for agent behavior |
-| `tilth` | Tree-sitter AST-aware code search and smart file reading |
-| `lsp` | Language Server Protocol integration (definition, references, hover) |
+| `guard` | Blocks dangerous patterns before tool execution |
+| `safety` | Unified safety module with composable rule system |
+| `srcwalk` | Code intelligence via `srcwalk` binary |
+| `webclaw` | Web scraping via `webclaw` CLI binary |
+| `tps` | Tokens-per-second tracking during streaming |
 | `memory` | Persistent knowledge pipeline (observations, distillations, handoffs) |
 | `dcp` | Dynamic context pruning — compress conversation to stay under token limits |
-| `tui` | Fixed-editor compositor with scrolling chat, right sidebar, selection copy, streaming wave animation, and performance diagnostics — overrides Pi's default TUI layout |
-| `context7` | Library documentation lookup |
-| `exa-search` | Web and code search via Exa AI |
-| `grepsearch` | Real-world code examples from GitHub via grep.app |
+| `openpi-bridge` | Bridge for custom tool execution |
+| `harness` | Multi-agent build harness (planner → generator ↔ evaluator) |
+| `tui` | Fixed-editor compositor with scrollable chat, sticky editor/footer, right sidebar, selection-to-clipboard, animated streaming prompt — overrides Pi's default TUI layout |
 
 ### Agents (7)
 
