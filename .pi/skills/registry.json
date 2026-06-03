@@ -1,8 +1,8 @@
 {
   "generated_by": "registry sync from .pi/skills/*/SKILL.md",
-  "active_skill_count": 64,
+  "active_skill_count": 65,
   "core_skill_count": 33,
-  "optional_skill_count": 31,
+  "optional_skill_count": 32,
   "routing_schema_version": 1,
   "routing_notes": "role_usage is a conservative hint for harness skill selection; it is not an auto-load instruction.",
   "skills": [
@@ -306,6 +306,18 @@
       "tools": [],
       "status": "optional",
       "pack": "integrations"
+    },
+    {
+      "name": "customize-pi",
+      "path": "skills/customize-pi/SKILL.md",
+      "description": "Use when optimizing Pi configuration — settings.json tuning, provider setup, context window limits, compaction, keybindings, extensions, skills, packages, model cycling, or troubleshooting Pi behavior. Covers the full customization surface from quick tweaks to architecture decisions.",
+      "version": "1.0.0",
+      "tags": ["workflow", "integration"],
+      "dependencies": [],
+      "agent_types": ["planner", "worker", "reviewer"],
+      "tools": [],
+      "status": "optional",
+      "pack": "core"
     },
     {
       "name": "debugging-and-error-recovery",
