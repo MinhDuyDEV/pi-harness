@@ -91,9 +91,12 @@ const DEFAULT_MAX_TOKENS = 64_000;
 // deepseek-v4-flash-nonthinking is V4 Flash with thinking disabled (~2-3x cheaper output,
 // no reasoning trace). deepseek-v4-flash auto-detects thinking mode.
 
-// Advertised 1M, but effective reliable context is ~256K for multi-hop retrieval.
-// MRCR 8-needle: stays above 0.82 through 256K, drops to 0.59 at 1M.
-// DCP uses this to calculate nudge thresholds — reported as effective ceiling.
+// Effective reliable context window.
+// DeepSeek V4 advertises 1M, but MRCR 8-needle retrieval accuracy stays
+// above 0.82 through 256K, then drops to 0.59 at 1M (source: DeepSeek V4
+// technical report, Figure 9 — huggingface.co/blog/deepseekv4).
+// For agentic coding where retrieval precision matters, 256K is the
+// practical sweet spot. DCP uses this for nudge threshold calculations.
 const CTX_EFFECTIVE = 262_144; // 256K
 const MAX_OUT_384K = 393_216;
 

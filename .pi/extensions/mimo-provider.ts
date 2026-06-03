@@ -76,7 +76,7 @@ const MIMO_MODELS = [
       cacheRead: 0.0028,
       cacheWrite: 0,
     },
-    contextWindow: 200_000,  // effective (1M advertised; see header comment)
+    contextWindow: 262_144,  // effective (1M advertised; reliable within 256K via Hybrid SWA)
     maxTokens: 131_072,
   },
   {
@@ -98,7 +98,7 @@ const MIMO_MODELS = [
       cacheRead: 0.0036,
       cacheWrite: 0,
     },
-    contextWindow: 200_000,  // effective (1M advertised; see header comment)
+    contextWindow: 262_144,  // effective (1M advertised; reliable within 256K via Hybrid SWA)
     maxTokens: 131_072,
   },
   // --- V2 series (previous gen) ---
