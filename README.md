@@ -20,7 +20,7 @@ This pulls in the delegation stack (`@tintinweb/pi-subagents`, `@tintinweb/pi-ta
 
 ## What's Included
 
-### Extensions (11)
+### Extensions (12)
 
 Custom tools that register into pi's tool system:
 
@@ -34,6 +34,7 @@ Custom tools that register into pi's tool system:
 | `lsp` | Language Server Protocol integration (definition, references, hover) |
 | `memory` | Persistent knowledge pipeline (observations, distillations, handoffs) |
 | `dcp` | Dynamic context pruning — compress conversation to stay under token limits |
+| `tui` | Fixed-editor compositor with scrolling chat, right sidebar, selection copy, streaming wave animation, and performance diagnostics — overrides Pi's default TUI layout |
 | `context7` | Library documentation lookup |
 | `exa-search` | Web and code search via Exa AI |
 | `grepsearch` | Real-world code examples from GitHub via grep.app |
