@@ -55,6 +55,17 @@ Before non-trivial implementation, write `.pi/artifacts/<id>/PLAN.md` with a `##
 
 TODO.md creation and checkbox protocol is defined in `AGENTS.md` Hard Constraints — follow it.
 
+## Quality Loop
+
+After any non-trivial implementation, run an iterative fix-verify loop (see `quality-loop` skill):
+
+1. Run all quality gates (typecheck → lint → tests → TODO.md → stubs)
+2. If any fail: auto-fix, re-run gates, repeat
+3. Max 3 iterations (harness) or 2 iterations (direct worker)
+4. Report outcome with iteration count and remaining issues
+
+Skip only for: one-line fixes, docs-only, config tweaks, trivial tests that cannot break existing behavior.
+
 For complex handoffs, write shared context to `.pi/artifacts/<id>/WORKER-CONTEXT.md`, then point a spawned session to it:
 
 ```
