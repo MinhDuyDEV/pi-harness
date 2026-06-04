@@ -1,7 +1,7 @@
 {
   "generated_by": "registry sync from .pi/skills/*/SKILL.md",
-  "active_skill_count": 66,
-  "core_skill_count": 33,
+  "active_skill_count": 67,
+  "core_skill_count": 34,
   "optional_skill_count": 33,
   "routing_schema_version": 1,
   "routing_notes": "role_usage is a conservative hint for harness skill selection; it is not an auto-load instruction.",
@@ -1072,6 +1072,30 @@
         "explore design before committing",
         "compare UI or logic options"
       ]
+    },
+    {
+      "name": "quality-loop",
+      "path": "skills/quality-loop/SKILL.md",
+      "description": "After implementation, run an iterative fix-verify loop until all quality gates pass or max iterations reached. Wraps verification into a loop that auto-fixes issues and re-verifies \u2014 prevents the single-shot verification failure mode where a fix introduces new issues.",
+      "version": "1.0.0",
+      "tags": [
+        "workflow",
+        "code-quality",
+        "verification"
+      ],
+      "dependencies": [
+        "verification-before-completion"
+      ],
+      "agent_types": [
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "bash",
+        "srcwalk_search"
+      ],
+      "status": "core",
+      "pack": "core"
     },
     {
       "name": "react-best-practices",

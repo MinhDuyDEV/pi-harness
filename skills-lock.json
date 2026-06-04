@@ -83,6 +83,11 @@
       "source": "~/.pi/agent/skills/customize-pi/",
       "sourceType": "local",
       "trust": "pinned"
+    },
+    "quality-loop": {
+      "source": ".pi/skills/quality-loop/",
+      "sourceType": "local",
+      "trust": "pinned"
     }
   }
 }

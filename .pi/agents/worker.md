@@ -73,10 +73,17 @@ This file powers the TUI TODO panel. Skipping it means the user sees an empty pr
 
 ## Self-Check Before Reporting Complete
 
-1. **Verify files exist**: `[ -f "path/to/file" ] && echo "FOUND" || echo "MISSING"`
-2. **Verify tests pass**: run relevant test command
+1. **Run quality loop** (max 2 iterations) — verify all gates, auto-fix failures, re-verify:
+   - Typecheck → fix types → re-run
+   - Lint → auto-fix → re-run
+   - Tests → fix implementation → re-run
+   - TODO.md → check off any remaining `[ ]`
+   - Stubs → replace `TODO`/`FIXME`/`placeholder`/`return null`
+2. **Verify files exist**: `[ -f "path/to/file" ] && echo "FOUND" || echo "MISSING"`
 3. **Check for stubs**: search for `TODO`, `FIXME`, `placeholder`, `return null` — if found and NOT specified in task, fix or flag
 4. **Document deviations**: list any Rule 1-3 fixes applied with reasoning
+
+Report quality loop outcome in the status summary.
 
 ## Workflow
 
@@ -84,8 +91,11 @@ This file powers the TUI TODO panel. Skipping it means the user sees an empty pr
 2. For call graphs and repo maps, use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_flow`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools
 3. Confirm scope is small and clear
 4. Make surgical edits
-5. Run validation (lint/typecheck/tests as applicable)
-6. Report changed files with `file:line` references
+5. **Run quality loop** (max 2 iterations, load `quality-loop` skill):
+   - Run validation (typecheck → lint → tests → TODO.md → stubs)
+   - If any fail: auto-fix, re-run validation, repeat
+   - Max 2 iterations to keep execution fast
+6. Report changed files with `file:line` references and quality loop outcome
 
 ## Progress Updates
 

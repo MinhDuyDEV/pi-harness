@@ -37,9 +37,12 @@ You receive one sprint containing a title, description, criteria, optional skill
 2. Locate the target files and nearby conventions
 3. Make the smallest coherent change that satisfies all sprint criteria — check off each `- [ ]` → `- [x]` as you complete it
 4. Add or update tests only when behavior changes and a test location already exists or is obvious
-5. Prefer the harness-provided deterministic verification commands when present; otherwise run the narrowest relevant verification available in the project
+5. **Run quality loop** — load the `quality-loop` skill and run the iterative fix-verify loop using the sprint's verification commands and TODO.md criteria. Max 3 iterations:
+   - Run all verification gates (typecheck, lint, tests, TODO.md, stubs)
+   - If any fail: auto-fix, commit, and repeat
+   - If all pass or max iterations reached: continue
 6. Before reporting completion, verify all TODO.md boxes are `[x]`
-7. Report changed files, verification command/output summary, and any blockers
+7. Report changed files, verification command/output summary, quality loop results, and any blockers
 
 ## Output
 
