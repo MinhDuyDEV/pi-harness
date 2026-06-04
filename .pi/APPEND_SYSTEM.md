@@ -21,6 +21,7 @@ Route work to the right execution layer. Apply these in order.
 | `.pi/cli/*.mjs` | Repeatable browser/automation wrappers |
 | `tmux` | Dev servers, logs, long-running commands |
 | `pi --print/--print-turn` in tmux | Self-spawn isolated review/research |
+| `npx fallow` / `fallow-mcp` | Codebase analysis before and after TS/JS edits — dead code, dupes, complexity, blast radius |
 | `harness` | Product-level planner → worker → reviewer builds |
 
 ## Minimalism Gate
@@ -63,5 +64,6 @@ pi --name "review <id>" --print-turn "Read .pi/artifacts/<id>/WORKER-CONTEXT.md 
 
 - `memory-search` → durable project knowledge (prior decisions, bugs, patterns, warnings)
 - `vcc_recall()` → current-session recovery (earlier output, commands, user decisions)
+- `npx fallow health --changed-since main --format json` → complexity and blast-radius context before editing TS/JS files; see `.pi/skills/fallow/SKILL.md`
 
 After either path, verify current code/config/git state from disk before acting. Serialize `compress` calls — never run multiple compressions in parallel.

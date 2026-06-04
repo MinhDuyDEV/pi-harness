@@ -21,7 +21,7 @@ import {
 } from "./config.js";
 import { getMemoryDB } from "./db.js";
 import { parseConcepts, TYPE_ICONS } from "./helpers.js";
-import { upsertMemoryFile, getMemoryFile } from "./maintenance.js";
+import { upsertMemoryFile, getMemoryFile } from "./storage.js";
 
 // ---------------------------------------------------------------------------
 // Types

@@ -11,7 +11,7 @@
 import type { ObservationRow } from "./config.js";
 import { getMemoryDB } from "./db.js";
 import { TYPE_ICONS, parseConcepts } from "./helpers.js";
-import { upsertMemoryFile } from "./maintenance.js";
+import { upsertMemoryFile } from "./storage.js";
 
 // ============================================================================
 // Types

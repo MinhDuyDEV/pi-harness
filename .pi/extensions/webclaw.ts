@@ -17,11 +17,14 @@
  * has stronger native tools and models for those jobs.
  */
 
-import { execFile } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { truncateHead } from "@earendil-works/pi-coding-agent";
 import { buildSubprocessEnv } from "./security/env-policy.js";
+import {
+	execFilePromise,
+	isAbortError,
+} from "./util.js";
 
 type OutputFormat = "llm" | "markdown" | "text" | "json" | "html";
 
@@ -39,56 +42,17 @@ function truncateOutput(text: string): string {
 	return truncated.content;
 }
 
-function isAbortError(error: unknown): boolean {
-	const candidate = error as { name?: string; code?: string } | undefined;
-	return candidate?.name === "AbortError" || candidate?.code === "ABORT_ERR";
-}
-
 function runWebclaw(
 	args: string[],
 	signal?: AbortSignal,
 	timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const child = execFile(
-			WEBCLAW_BIN,
-			args,
-			{
-				env: buildSubprocessEnv("webclaw"),
-				timeout: timeoutMs,
-				maxBuffer: MAX_BUFFER_BYTES,
-				signal,
-			},
-			(error, stdout, stderr) => {
-				if (error) {
-					if (isAbortError(error)) {
-						reject(new DOMException("Cancelled", "AbortError"));
-						return;
-					}
-
-					const stderrText = (stderr || "").trim();
-					reject(
-						new Error(
-							stderrText || error.message || `webclaw failed: ${WEBCLAW_BIN} ${args.join(" ")}`,
-						),
-					);
-					return;
-				}
-
-				resolve((stdout || "").trim());
-			},
-		);
-
-		if (signal) {
-			const onAbort = () => {
-				try {
-					child.kill("SIGTERM");
-				} catch {
-					// best effort
-				}
-			};
-			signal.addEventListener("abort", onAbort, { once: true });
-		}
+	return execFilePromise({
+		bin: WEBCLAW_BIN,
+		args,
+		env: buildSubprocessEnv("webclaw"),
+		timeoutMs,
+		signal,
 	});
 }
 

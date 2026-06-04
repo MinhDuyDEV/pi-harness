@@ -11,6 +11,10 @@
  * - Never retries on abort
  */
 
+// ─── Imports ──────────────────────────────────────────────
+
+import { isAbortError } from "../util.js";
+
 // ─── Types ──────────────────────────────────────────────────
 
 export interface RetryOptions {
@@ -138,13 +142,6 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
       else signal.addEventListener("abort", onAbort, { once: true });
     }
   });
-}
-
-function isAbortError(err: unknown): boolean {
-  if (!err || typeof err !== "object") return false;
-  // Handle both DOMException and various library AbortError shapes
-  const name = (err as { name?: unknown }).name;
-  return name === "AbortError" || name === "TimeoutError";
 }
 
 function messageOf(err: unknown): string {

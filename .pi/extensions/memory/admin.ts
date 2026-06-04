@@ -1,12 +1,12 @@
 import { Type } from "@sinclair/typebox";
 
 import { generateMemoryIndex } from "./index-generator.js";
+import { upsertMemoryFile } from "./storage.js";
 import {
 	archiveOldObservations,
 	checkFTS5Available,
 	getDatabaseSizes,
 	runFullMaintenance,
-	upsertMemoryFile,
 } from "./maintenance.js";
 import {
 	getAllObservations,

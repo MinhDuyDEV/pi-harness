@@ -22,7 +22,6 @@
  *   - PI_SRCWALK_BIN=/absolute/path/to/srcwalk  (default: "srcwalk" on PATH)
  */
 
-import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -34,9 +33,10 @@ import {
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
 import { buildSubprocessEnv } from "./security/env-policy.js";
-
-const DEFAULT_TIMEOUT_MS = 30_000;
-const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
+import {
+	execFilePromise,
+	isAbortError,
+} from "./util.js";
 
 type ToolArgs = Record<string, unknown>;
 
@@ -108,56 +108,15 @@ function resolveSrcwalkBin(): string {
 function run(args: string[], signal?: AbortSignal): Promise<string> {
 	const srcwalkBin = resolveSrcwalkBin();
 
-	return new Promise((resolve, reject) => {
-		const child = execFile(
-			srcwalkBin,
-			args,
-			{
-				env: buildSubprocessEnv("srcwalk"),
-				timeout: DEFAULT_TIMEOUT_MS,
-				maxBuffer: MAX_BUFFER_BYTES,
-				signal,
-			},
-			(error, stdout, stderr) => {
-				if (error) {
-					if (isAbortError(error)) {
-						reject(new DOMException("Cancelled", "AbortError"));
-						return;
-					}
-					if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-						reject(
-							new Error(
-								`srcwalk binary \`${srcwalkBin}\` not found on PATH. ` +
-									`Install via: npm install -g srcwalk  or  cargo install srcwalk --locked\n` +
-									`Or set PI_SRCWALK_BIN to override, e.g. PI_SRCWALK_BIN=$HOME/.cargo/bin/srcwalk`,
-							),
-						);
-						return;
-					}
-					const stderrText = (stderr || "").trim();
-					reject(
-						new Error(
-							stderrText ||
-								error.message ||
-								`srcwalk failed: ${srcwalkBin} ${args.join(" ")}`,
-						),
-					);
-					return;
-				}
-				resolve((stdout || "").trim());
-			},
-		);
-
-		if (signal) {
-			const onAbort = () => {
-				try {
-					child.kill("SIGTERM");
-				} catch {
-					// best effort
-				}
-			};
-			signal.addEventListener("abort", onAbort, { once: true });
-		}
+	return execFilePromise({
+		bin: srcwalkBin,
+		args,
+		env: buildSubprocessEnv("srcwalk"),
+		signal,
+		onNotFound: () =>
+			`srcwalk binary \`${srcwalkBin}\` not found on PATH. ` +
+			"Install via: npm install -g srcwalk  or  cargo install srcwalk --locked\n" +
+			"Or set PI_SRCWALK_BIN to override, e.g. PI_SRCWALK_BIN=$HOME/.cargo/bin/srcwalk",
 	});
 }
 

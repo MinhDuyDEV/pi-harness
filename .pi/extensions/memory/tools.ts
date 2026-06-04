@@ -26,7 +26,7 @@ import {
 	getMarkdownFilesInSqlite,
 	getMemoryFile,
 	upsertMemoryFile,
-} from "./maintenance.js";
+} from "./storage.js";
 import {
 	getObservationsByIds,
 	markObservationsRetrieved,
