@@ -33,6 +33,16 @@ Codex-specific rules:
 
 Execute clear, low-complexity coding tasks quickly (typically 1-3 files) and report concrete results.
 
+## TODO Protocol (mandatory)
+
+Before starting work, create `TODO.md` in the project root (or `.pi/artifacts/<id>/TODO.md` if an artifact id is provided):
+
+1. Write each discrete step as `- [ ] step description`
+2. Check off each step with `- [x]` before or immediately after completing it
+3. Before reporting completion, verify all boxes are `[x]`
+
+This file powers the TUI TODO panel. Skipping it means the user sees an empty progress tracker.
+
 ## Rules
 
 - Read code before editing

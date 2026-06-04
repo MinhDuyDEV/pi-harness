@@ -51,7 +51,9 @@ Never accept delegated output blindly. After any delegated or harness run:
 
 ## Artifacts
 
-Before non-trivial implementation, write `.pi/artifacts/<id>/PLAN.md` with a `## Discovery` section. Track in `PROGRESS.md` or `TODO.md`. Skip for: one-line fixes, docs-only, config tweaks, trivial tests.
+Before non-trivial implementation, write `.pi/artifacts/<id>/PLAN.md` with a `## Discovery` section. Track steps in `TODO.md` (checkbox format). Track narrative decisions and notes in `PROGRESS.md`. Both are mandatory. Skip for: one-line fixes, docs-only, config tweaks, trivial tests.
+
+TODO.md creation and checkbox protocol is defined in `AGENTS.md` Hard Constraints — follow it.
 
 For complex handoffs, write shared context to `.pi/artifacts/<id>/WORKER-CONTEXT.md`, then point a spawned session to it:
 

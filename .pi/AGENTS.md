@@ -106,7 +106,7 @@ Do not skip this step for tasks that clearly match a skill's purpose. The skill 
 ---
 
 ## Plan Quality Gate
-Non-trivial implementation plans must be written to `.pi/artifacts/<id>/PLAN.md` and contain a `## Discovery` section with substantive research findings. Track implementation progress in `.pi/artifacts/<id>/PROGRESS.md` or a root-level `TODO.md`. Skip this gate for mechanical edits and obvious one-file fixes.
+Non-trivial implementation plans must be written to `.pi/artifacts/<id>/PLAN.md` and contain a `## Discovery` section with substantive research findings. Track implementation steps in `TODO.md` (checkbox format). Track narrative decisions and notes in `PROGRESS.md`. Both are mandatory for non-trivial work. Skip this gate for mechanical edits and obvious one-file fixes.
 
 ---
 
@@ -120,6 +120,25 @@ Non-trivial implementation plans must be written to `.pi/artifacts/<id>/PLAN.md`
 | Honesty | Never fabricate tool output; never guess URLs; label inferences; state source conflicts |
 | Paths | Use absolute paths for file operations |
 | Reversibility | Ask first before destructive or irreversible actions |
+| TODO Tracking | Create and maintain `TODO.md` for any multi-step work (see below) |
+
+### TODO Protocol (mandatory)
+
+For any task requiring **2+ tool calls or spanning multiple files**, you MUST:
+
+1. **Before starting work** — create `.pi/artifacts/<id>/TODO.md` (or `TODO.md` at project root for harness/sprint work)
+2. **Write each discrete step** as `- [ ] step description` — one checkbox per atomic action
+3. **Before each step**, check it off: change `- [ ]` to `- [x]`
+4. **Before claiming completion**, verify every box is `[x]` — no exceptions
+
+Format:
+```markdown
+- [ ] Step 1: description
+- [ ] Step 2: description
+- [ ] Step 3: description
+```
+
+This is NOT optional. Models that skip this violate the protocol. The TUI TODO panel depends on this file existing and being maintained.
 
 ---
 

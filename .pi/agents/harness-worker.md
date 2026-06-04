@@ -33,11 +33,13 @@ You receive one sprint containing a title, description, criteria, optional skill
 
 ## Implementation Flow
 
-1. Locate the target files and nearby conventions.
-2. Make the smallest coherent change that satisfies all sprint criteria.
-3. Add or update tests only when behavior changes and a test location already exists or is obvious.
-4. Prefer the harness-provided deterministic verification commands when present; otherwise run the narrowest relevant verification available in the project.
-5. Report changed files, verification command/output summary, and any blockers.
+1. **Create `TODO.md`** — write each sprint criterion as `- [ ] criterion description` before doing any work
+2. Locate the target files and nearby conventions
+3. Make the smallest coherent change that satisfies all sprint criteria — check off each `- [ ]` → `- [x]` as you complete it
+4. Add or update tests only when behavior changes and a test location already exists or is obvious
+5. Prefer the harness-provided deterministic verification commands when present; otherwise run the narrowest relevant verification available in the project
+6. Before reporting completion, verify all TODO.md boxes are `[x]`
+7. Report changed files, verification command/output summary, and any blockers
 
 ## Output
 

@@ -13,7 +13,7 @@
 
 // ─── Imports ──────────────────────────────────────────────
 
-import { isAbortError } from "../util.js";
+import { isAbortError } from "../lib/util.js";
 
 // ─── Types ──────────────────────────────────────────────────
 
