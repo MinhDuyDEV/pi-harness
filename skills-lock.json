@@ -73,6 +73,16 @@
       "sourceType": "github",
       "skillPath": "skills/engineering/zoom-out/SKILL.md",
       "computedHash": "8357aeaece3b709c442eab67e64b86844e05e2f1ea95b109565eba50b6def36e"
+    },
+    "fallow": {
+      "source": "~/.pi/agent/skills/fallow/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "customize-pi": {
+      "source": "~/.pi/agent/skills/customize-pi/",
+      "sourceType": "local",
+      "trust": "pinned"
     }
   }
 }
