@@ -31,7 +31,7 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 - Return absolute paths in final output
 - Cite `file:line` evidence for every finding
 - Use `srcwalk_search` (AST-aware) for quick symbol lookup and definitions
-- Use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_flow`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools, no separate skill load needed
+- Use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_context`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools, no separate skill load needed
 - Stop when you can answer with concrete evidence — don't over-explore
 - Target ≤3 tool calls per symbol: search → read section → done
 - Bash is enabled **only** for read-only operations — do not use bash to modify files
@@ -48,11 +48,14 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 | Transitive callers (N hops) | `srcwalk_callers(depth: N)`            |
 | What function calls         | `srcwalk_callees`                      |
 | Ordered call sites + args   | `srcwalk_callees(detailed: true)`      |
-| Quick function orientation  | `srcwalk_flow`                         |
+| Quick function orientation  | `srcwalk_context`                      |
+| Context packet (Flow Map)   | `srcwalk_context({ target: ... })`     |
 | Heuristic impact triage     | `srcwalk_impact` (verify with callers) |
 | Repo shape / token budget   | `srcwalk_map`                          |
 | File structure by glob      | `srcwalk_files`                        |
 | File blast radius           | `srcwalk_deps`                         |
+| Review staged/committed     | `srcwalk_review`                       |
+| Compare two targets         | `srcwalk_compare`                      |
 | Broad text search           | `grep` (fallback)                      |
 
 ## Workflow

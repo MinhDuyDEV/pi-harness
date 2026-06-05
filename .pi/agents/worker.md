@@ -88,7 +88,7 @@ Report quality loop outcome in the status summary.
 ## Workflow
 
 1. Read relevant files (prefer `srcwalk_search` over grep)
-2. For call graphs and repo maps, use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_flow`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools
+2. For call graphs and repo maps, use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_context`, `srcwalk_impact`, `srcwalk_map` directly — these are first-class Pi tools
 3. Confirm scope is small and clear
 4. Make surgical edits
 5. **Run quality loop** (max 2 iterations, load `quality-loop` skill):

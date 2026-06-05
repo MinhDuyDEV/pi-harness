@@ -1342,8 +1342,10 @@
         "srcwalk_map",
         "srcwalk_callers",
         "srcwalk_callees",
-        "srcwalk_flow",
-        "srcwalk_impact"
+        "srcwalk_context",
+        "srcwalk_impact",
+        "srcwalk_review",
+        "srcwalk_compare"
       ],
       "status": "core",
       "pack": "core"
