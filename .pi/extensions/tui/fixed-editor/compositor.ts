@@ -756,13 +756,11 @@ export class FixedEditorCompositor {
     let buf = "";
 
     const mainWidth = this.getMainWidth(width);
-    const sidebarRows = this.getSidebarRows(width, rawRows);
     for (let i = 0; i < cluster.lines.length; i++) {
-      const sidebarRow = startRow + i - 1;
       buf += moveCursor(startRow + i, 1);
       buf += clearLine();
       const main = sanitizeLine(this.renderSelectionHighlight(cluster.lines[i] ?? "", i, "cluster"), mainWidth);
-      buf += padLineToWidth(main, mainWidth) + this.renderSidebarRow(sidebarRows[sidebarRow] ?? "", sidebarRow);
+      buf += padLineToWidth(main, width);
     }
 
     // Hardware cursor
@@ -784,6 +782,21 @@ export class FixedEditorCompositor {
    * the cluster area to show stale/garbage content until the next paint,
    * visible as "footer flashing".
    */
+  private paintSidebarOverlay(width: number, rawRows: number): string {
+    const sidebarWidth = this.getSidebarWidth(width);
+    if (sidebarWidth <= 0) return "";
+    const sidebarRows = this.getSidebarRows(width, rawRows);
+    const overlayCol = width - sidebarWidth + 1;
+    let buf = "";
+    for (let i = 0; i < Math.min(sidebarRows.length, rawRows); i++) {
+      const row = sidebarRows[i];
+      if (!row || visibleWidth(stripAnsi(row)) === 0) continue;
+      buf += moveCursor(i + 1, overlayCol);
+      buf += this.renderSidebarRow(row, i);
+    }
+    return buf;
+  }
+
   private repaintFixedCluster(): void {
     if (this.disposed || this.painting || this.hasVisibleOverlay()) return;
 
@@ -799,6 +812,7 @@ export class FixedEditorCompositor {
         beginSynchronizedOutput() +
           disableAutoWrap() +
           this.paintCluster(cluster, rawRows, width) +
+          this.paintSidebarOverlay(width, rawRows) +
           enableAutoWrap() +
           enableMouseReporting() +
           endSynchronizedOutput(),
@@ -843,9 +857,11 @@ export class FixedEditorCompositor {
       const scrollBottom = rawRows - clusterHeight;
       this.syncScrollRegion(scrollBottom);
 
-      // During render pass, write data only — repaintFixedCluster() paints cluster afterward.
-      // Outside render pass, append cluster paint to data.
-      const body = this.renderPassActive ? data : data + this.paintCluster(cluster, rawRows, width);
+      // During render pass, write data only — repaintFixedCluster() paints cluster + sidebar afterward.
+      // Outside render pass, append cluster paint and sidebar overlay to data.
+      const body = this.renderPassActive
+        ? data
+        : data + this.paintCluster(cluster, rawRows, width) + this.paintSidebarOverlay(width, rawRows);
       this.originalWrite(
         beginSynchronizedOutput() +
           disableAutoWrap() +
@@ -905,13 +921,13 @@ export class FixedEditorCompositor {
       visible.push("");
     }
 
-    const sidebarRows = this.getSidebarRows(width, rawRows);
+    this.getSidebarRows(width, rawRows);
     this.visibleRootStart = globalStart;
     this.visibleScrollableRows = scrollableRows;
     this.visibleRootLines = visible;
     const rendered = visible.map((line, index) => {
       const main = this.renderScrollableLine(line, globalStart + index, index, mainWidth);
-      return padLineToWidth(main, mainWidth) + this.renderSidebarRow(sidebarRows[index] ?? "", index);
+      return padLineToWidth(main, mainWidth);
     });
 
     if (this.canCacheRootFrame()) {
@@ -1037,6 +1053,8 @@ export class FixedEditorCompositor {
         buffer += clearLine() + sanitizeLine(visible[row] ?? "", width);
       }
       buffer += this.paintCluster(cluster, rawRows, width);
+      buffer += this.paintSidebarOverlay(width, rawRows);
+
       this.originalWrite(
         beginSynchronizedOutput() +
           disableAutoWrap() +

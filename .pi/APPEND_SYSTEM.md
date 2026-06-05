@@ -51,9 +51,18 @@ Never accept delegated output blindly. After any delegated or harness run:
 
 ## Artifacts
 
-Before non-trivial implementation, write `.pi/artifacts/<id>/PLAN.md` with a `## Discovery` section. Track steps in `TODO.md` (checkbox format). Track narrative decisions and notes in `PROGRESS.md`. Both are mandatory. Skip for: one-line fixes, docs-only, config tweaks, trivial tests.
+**For EVERY non-trivial request or subtask** (2+ tool calls or multiple files), create a fresh artifact:
 
-TODO.md creation and checkbox protocol is defined in `AGENTS.md` Hard Constraints — follow it.
+1. Create `.pi/artifacts/<id>/` with a short kebab-case id describing the task
+2. Write `.pi/artifacts/<id>/PLAN.md` with a `## Discovery` section
+3. Write `.pi/artifacts/<id>/TODO.md` with checkbox steps
+4. Track decisions and notes in `.pi/artifacts/<id>/PROGRESS.md`
+
+Skip for: one-line fixes, docs-only, config tweaks, trivial tests.
+
+The TODO.md creation and checkbox protocol is defined in `AGENTS.md` Hard Constraints — follow it for every artifact.
+
+**Do not reuse a previous artifact id.** Each new request gets a new id. If a request is a continuation of prior work, create a new artifact with a new id and reference the previous one in PROGRESS.md.
 
 ## Quality Loop
 

@@ -124,12 +124,13 @@ Non-trivial implementation plans must be written to `.pi/artifacts/<id>/PLAN.md`
 
 ### TODO Protocol (mandatory)
 
-For any task requiring **2+ tool calls or spanning multiple files**, you MUST:
+**Every new user request** that requires **2+ tool calls or spans multiple files** gets its OWN TODO.md. A fresh artifact id, a fresh TODO.md. Do not reuse or extend a previous artifact.
 
-1. **Before starting work** — create `.pi/artifacts/<id>/TODO.md` (or `TODO.md` at project root for harness/sprint work)
+1. **Before starting work** — create `.pi/artifacts/<id>/TODO.md` (or `TODO.md` at project root for harness/sprint work) with a new kebab-case id for each task
 2. **Write each discrete step** as `- [ ] step description` — one checkbox per atomic action
 3. **Before each step**, check it off: change `- [ ]` to `- [x]`
 4. **Before claiming completion**, verify every box is `[x]` — no exceptions
+5. **When the user makes a new request** — even if related to prior work — create a NEW artifact with a new id; reference the previous artifact in PROGRESS.md if needed
 
 Format:
 ```markdown

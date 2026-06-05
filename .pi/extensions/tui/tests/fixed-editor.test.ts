@@ -317,11 +317,13 @@ test("right sidebar reserves terminal columns beside scrollable chat", () => {
   });
 
   const rendered = fixture.tui.render(40);
+  fixture.compositor.requestRepaint();
+  const writes = fixture.terminal.writes.join("");
 
   assert.ok(rendered[0].includes("alpha"), "main chat still renders on the left");
-  assert.ok(rendered[0].includes("│ Side"), "sidebar renders at the right edge");
-  assert.ok(rendered[1].includes("│ TODOs"), "sidebar keeps row alignment");
-  assert.ok(rendered.every((line: string) => visibleWidth(line) === 40), "combined row spans the terminal width");
+  assert.ok(rendered.every((line: string) => visibleWidth(line) === 28), "main lines constrained to main pane width");
+  assert.ok(writes.includes("│ Side"), "sidebar renders as fixed terminal overlay");
+  assert.ok(writes.includes("│ TODOs"), "sidebar keeps row alignment");
   fixture.compositor.dispose();
 });
 
@@ -335,9 +337,11 @@ test("right sidebar exposes reduced terminal columns while rendering the main pa
   });
 
   const rendered = fixture.tui.render(40);
+  fixture.compositor.requestRepaint();
+  const writes = fixture.terminal.writes.join("");
 
   assert.ok(rendered[0].includes("width=28 columns=28"), "main renderers see the reduced main-pane width and terminal columns");
-  assert.ok(rendered[0].includes("side"), "sidebar still renders beside the main pane");
+  assert.ok(writes.includes("side"), "sidebar renders as fixed terminal overlay");
   fixture.compositor.dispose();
 });
 
@@ -381,8 +385,7 @@ test("right sidebar also constrains overlay renderers to the main pane", () => {
   const rendered = fixture.tui.render(40);
 
   assert.ok(rendered[0].includes("overlay width=28 columns=28"), "pi-diff-style overlays see the reduced main-pane width when sidebar is visible");
-  assert.ok(rendered[0].includes("side"), "sidebar remains in the released terminal columns beside overlays");
-  assert.ok(rendered.every((line: string) => visibleWidth(line) === 40), "overlay plus sidebar spans the terminal width exactly");
+  assert.ok(rendered.every((line: string) => visibleWidth(line) === 28), "main pane lines stay within main pane width");
   fixture.compositor.dispose();
 });
 

@@ -29,6 +29,9 @@ export interface SidebarState {
   totalCostUsd: number;
   cwd: string;
   piVersion: string;
+  contextFilesCount: number;
+  activeSkillsCount: number;
+  thinkingLevel: string;
 }
 
 export function createDefaultSidebarState(): SidebarState {
@@ -45,6 +48,9 @@ export function createDefaultSidebarState(): SidebarState {
     totalCostUsd: 0,
     cwd: "",
     piVersion: "",
+    contextFilesCount: 0,
+    activeSkillsCount: 0,
+    thinkingLevel: "",
   };
 }
 
@@ -74,7 +80,7 @@ export function renderSidebar(state: SidebarState, width: number, height: number
     lines.push(formatLine(line, decorate));
   };
   push("Session", labelText);
-  push(state.modelLabel || "no model");
+  push(modelLine(state));
   push(contextLine(state));
   push();
 
@@ -114,9 +120,24 @@ function color(ansi: string, text: string): string {
   return `${ansi}${text}${RESET}`;
 }
 
+function modelLine(state: SidebarState): string {
+  const model = state.modelLabel || "no model";
+  if (state.thinkingLevel && state.thinkingLevel.length > 0) {
+    return `${model} · ${state.thinkingLevel}`;
+  }
+  return model;
+}
+
 function contextLine(state: SidebarState): string {
   const pct = state.contextWindow > 0 ? ((state.tokenCount / state.contextWindow) * 100).toFixed(1) : "0.0";
-  return `${fmtNum(state.tokenCount)} (${pct}%) · ${formatCost(state.totalCostUsd)}`;
+  let line = `${fmtNum(state.tokenCount)} (${pct}%) · ${formatCost(state.totalCostUsd)}`;
+  if (state.contextFilesCount > 0 || state.activeSkillsCount > 0) {
+    const parts: string[] = [];
+    if (state.contextFilesCount > 0) parts.push(`${state.contextFilesCount} file` + (state.contextFilesCount !== 1 ? "s" : ""));
+    if (state.activeSkillsCount > 0) parts.push(`${state.activeSkillsCount} skill` + (state.activeSkillsCount !== 1 ? "s" : ""));
+    line += ` · ${parts.join(" ")}`;
+  }
+  return line;
 }
 
 function fmtNum(n: number): string {

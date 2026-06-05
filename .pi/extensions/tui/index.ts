@@ -19,6 +19,7 @@ import {
   refreshGitInfo,
   invalidateGitStatus,
   getCachedGitInfo,
+  type GitInfo,
 } from "./git-status.ts";
 import { AmpBoxEditor } from "./editor.ts";
 import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.ts";
@@ -128,6 +129,9 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       ctx.ui.setWorkingIndicator();
     }
 
+    // Editor wave animation is TUI-only — no editor in RPC/JSON/print modes.
+    if (ctx.mode !== "tui") return;
+
     // Start lightweight wave animation for editor prompt character.
     streamPromptAnimFrame = 0;
     setEditorStreamingPrompt(STREAMING_PROMPT_FRAMES[0]);
@@ -160,13 +164,13 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
   // ── Refresh UI ───────────────────────────────────────────────────────────
   function ensureFooter(ctx: ExtensionContext) {
-    if (!ctx.hasUI || footerInstalled) return;
+    if (ctx.mode !== "tui" || footerInstalled) return;
     ctx.ui.setFooter(createFooterRenderer(footer));
     footerInstalled = true;
   }
 
   function refreshUI(ctx: ExtensionContext) {
-    if (!ctx.hasUI) return;
+    if (ctx.mode !== "tui") return;
     ensureFooter(ctx);
 
     if (ctx.model) {
@@ -179,7 +183,10 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     }
     footer.hasPendingMessages = queue.state.hasPending;
     footer.cwd = ctx.cwd;
-    footer.git = getCachedGitInfo();
+    // Keep last known git info as sidebar fallback during async refresh gaps.
+    const freshGit = getCachedGitInfo();
+    if (freshGit) lastKnownGit = freshGit;
+    footer.git = freshGit ?? lastKnownGit;
 
     sidebar.todos = todosState;
     sidebar.queue = queue.state;
@@ -188,6 +195,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     sidebar.tokenCount = footer.tokenCount;
     sidebar.contextWindow = footer.contextWindow;
     sidebar.totalCostUsd = footer.totalCostUsd;
+    sidebar.thinkingLevel = footer.thinkingLevel;
     sidebar.cwd = ctx.cwd;
     sidebar.piVersion = VERSION;
     const terminalWidth = typeof tuiRef?.terminal?.columns === "number" ? tuiRef.terminal.columns : 0;
@@ -237,6 +245,9 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   }
 
   // ── Editor reference (for cursor blink cleanup) ──────────────────────────
+  // Stable git info fallback — survives async refresh gaps after invalidation.
+  let lastKnownGit: GitInfo | null = null;
+
   let currentEditor: AmpBoxEditor | null = null;
   let compositor: FixedEditorCompositor | null = null;
   let tuiRef: any = null;
@@ -284,7 +295,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     updateGit(ctx);
 
     // Set boxed editor with $ / $$ prompt
-    if (ctx.hasUI) {
+    if (ctx.mode === "tui") {
       ctx.ui.setEditorComponent((tui, theme, kb) => {
         tuiRef = tui;
         currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme);
@@ -345,7 +356,15 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     scheduleRefresh(ctx);
   });
 
-  pi.on("before_agent_start", async (_event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
+    // Track loaded context files and skills for sidebar display.
+    const opts = event.systemPromptOptions;
+    if (opts) {
+      sidebar.contextFilesCount = opts.contextFiles?.length ?? 0;
+      sidebar.activeSkillsCount = opts.skills?.length ?? 0;
+      scheduleRefresh(ctx);
+    }
+
     const openItems = todosState.items.filter((item) => !item.done);
     if (openItems.length === 0) return;
     const lines = openItems.map((item) => `- [ ] ${item.text}`);
@@ -507,7 +526,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
 
   function reconnectEditor(ctx: ExtensionContext) {
-    if (!ctx.hasUI) return;
+    if (ctx.mode !== "tui") return;
     ctx.ui.setEditorComponent((tui, theme, kb) => {
       tuiRef = tui;
       currentEditor?.dispose();
