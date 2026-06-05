@@ -23,6 +23,8 @@ export interface CompressConfig {
   maxContextLimit: number;
   /** How many turns between nudges (1 = every turn, 5 = every 5th) */
   nudgeFrequency: number;
+  /** Turns to suppress ALL nudges after a compress event */
+  compressNudgeCooldown: number;
   /** Nudge tone: "strong" (WARNING) or "soft" (gentle reminder) */
   nudgeForce: NudgeForce;
   /** Tools whose outputs are preserved in compression summaries */
@@ -118,6 +120,7 @@ export const DEFAULT_CONFIG: DCPConfig = {
     maxContextLimit: 80,
     minContextLimit: 65,
     nudgeFrequency: 5,
+    compressNudgeCooldown: 3,
     nudgeForce: "soft",
     protectedTools: [...DEFAULT_PROTECTED_TOOLS],
     protectUserMessages: false,

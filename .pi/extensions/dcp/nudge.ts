@@ -27,6 +27,8 @@ export interface NudgeState {
   blockCount: number;
   /** P3: Quality status line to include in nudges */
   qualityStatus: string;
+  /** Suppress all nudges until this turn (set after compress) */
+  suppressUntilTurn: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +50,7 @@ export class NudgeManager {
       lastContextTokens: null,
       blockCount: 0,
       qualityStatus: "",
+      suppressUntilTurn: 0,
     };
   }
 
@@ -60,6 +63,7 @@ export class NudgeManager {
   recordCompress(): void {
     this.state.lastNudgeTurn = this.currentTurn;
     this.state.autoCompactTriggered = false;
+    this.state.suppressUntilTurn = this.currentTurn + this.config.compress.compressNudgeCooldown;
   }
 
   /**
@@ -91,6 +95,9 @@ export class NudgeManager {
 
     this.state.lastContextTokens = contextTokens;
     this.state.lastContextPercent = contextPercent;
+
+    // Suppression: don't nudge right after a compress
+    if (this.currentTurn < this.state.suppressUntilTurn) return null;
 
     // Zone 1: Below minimum — no pressure
     if (contextPercent < config.minContextLimit) return null;
@@ -142,6 +149,7 @@ export class NudgeManager {
       lastContextTokens: this.state.lastContextTokens,
       blockCount: this.state.blockCount,
       qualityStatus: this.state.qualityStatus,
+      suppressUntilTurn: this.state.suppressUntilTurn,
     };
   }
 
