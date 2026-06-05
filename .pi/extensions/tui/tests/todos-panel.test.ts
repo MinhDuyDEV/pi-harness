@@ -88,13 +88,13 @@ test("hasOpenTodos is false when every parsed task is complete", () => {
 
 test("todos widget renders missing TODO.md empty state", () => {
   assert.deepEqual(renderTodos({ items: [], sourceCount: 0 }), [
-    "<muted>  TODOs — No TODO.md files found in .pi/artifacts/</muted>",
+    " <muted>TODOs — No TODO.md files found in .pi/artifacts/</muted>",
   ]);
 });
 
 test("todos widget renders all-done state when source files have no open items", () => {
   assert.deepEqual(renderTodos({ items: [], sourceCount: 2 }), [
-    "<muted>  TODOs — 2 file(s), all done</muted>",
+    " <muted>TODOs — 2 file(s), all done</muted>",
   ]);
 });
 
@@ -108,7 +108,8 @@ test("todos widget renders only open checklist items", () => {
   });
 
   assert.deepEqual(lines, [
-    "  TODOs — 1 file(s):",
-    "    <warning>☐</warning> Ship footer metrics",
+    " TODOs — 1 file(s):",
+    "   <warning>☐</warning> Ship footer metrics",
+    "",
   ]);
 });

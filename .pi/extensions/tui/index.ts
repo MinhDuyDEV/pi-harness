@@ -254,6 +254,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   let fixedEditorContainer: any = null;
   let fixedStatusContainer: any = null;
   let fixedWidgetContainerAbove: any = null;
+  let fixedQueueContainer: any = null;
   let fixedWidgetContainerBelow: any = null;
   let fixedFooterContainer: any = null;
   let fixedEditorEnabled = true;
@@ -324,6 +325,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     fixedEditorContainer = null;
     fixedStatusContainer = null;
     fixedWidgetContainerAbove = null;
+    fixedQueueContainer = null;
     fixedWidgetContainerBelow = null;
     fixedFooterContainer = null;
     fixedEditorEnabled = false;
@@ -582,6 +584,11 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     )
       ? children[editorContainerMatch.index - 2]
       : null;
+    const nextQueueContainer = isRenderable(
+      children[editorContainerMatch.index - 3],
+    )
+      ? children[editorContainerMatch.index - 3]
+      : null;
     const nextWidgetContainerAbove = isRenderable(
       children[editorContainerMatch.index - 1],
     )
@@ -600,18 +607,21 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     const changed =
       fixedEditorContainer !== nextEditorContainer ||
       fixedStatusContainer !== nextStatusContainer ||
+      fixedQueueContainer !== nextQueueContainer ||
       fixedWidgetContainerAbove !== nextWidgetContainerAbove ||
       fixedWidgetContainerBelow !== nextWidgetContainerBelow ||
       fixedFooterContainer !== nextFooterContainer;
 
     fixedEditorContainer = nextEditorContainer;
     fixedStatusContainer = nextStatusContainer;
+    fixedQueueContainer = nextQueueContainer;
     fixedWidgetContainerAbove = nextWidgetContainerAbove;
     fixedWidgetContainerBelow = nextWidgetContainerBelow;
     fixedFooterContainer = nextFooterContainer;
 
     compositor.retainHiddenRenderables([
       fixedStatusContainer,
+      fixedQueueContainer,
       fixedWidgetContainerAbove,
       fixedEditorContainer,
       fixedWidgetContainerBelow,
@@ -619,6 +629,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     ]);
 
     if (fixedStatusContainer) compositor.hideRenderable(fixedStatusContainer);
+    if (fixedQueueContainer) compositor.hideRenderable(fixedQueueContainer);
     if (fixedWidgetContainerAbove)
       compositor.hideRenderable(fixedWidgetContainerAbove);
     if (fixedEditorContainer) compositor.hideRenderable(fixedEditorContainer);
@@ -690,10 +701,16 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       getEditorText: () => currentEditor?.getText() ?? "",
       getStatusLines: (width: number) =>
         renderHiddenLines(fixedStatusContainer, width, true),
-      getAboveWidgetLines: (width: number) =>
-        renderHiddenLines(fixedWidgetContainerAbove, width),
-      getBelowWidgetLines: (width: number) =>
-        renderHiddenLines(fixedWidgetContainerBelow, width),
+      getAboveWidgetLines: (width: number) => {
+        syncFixedRenderables(false);
+        const queueLines = renderHiddenLines(fixedQueueContainer, width);
+        const widgetLines = renderHiddenLines(fixedWidgetContainerAbove, width);
+        return [...queueLines, ...widgetLines];
+      },
+      getBelowWidgetLines: (width: number) => {
+        syncFixedRenderables(false);
+        return renderHiddenLines(fixedWidgetContainerBelow, width);
+      },
       getFooterLines: (width: number) =>
         renderHiddenLines(fixedFooterContainer, width, true),
       getRenderStateKey: fixedRenderStateKey,

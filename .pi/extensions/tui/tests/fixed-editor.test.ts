@@ -360,7 +360,7 @@ test("right sidebar exposes reduced process stdout columns while rendering the m
 
     const rendered = fixture.tui.render(40);
 
-    assert.ok(rendered[0].includes("width=28 stdout=28"), "pi-diff-style process.stdout.columns consumers see the reduced main-pane width");
+    assert.ok(rendered[0].includes("width=28 stdout=28"), "process.stdout.columns consumers see the reduced main-pane width");
     fixture.compositor.dispose();
   } finally {
     if (stdoutDescriptor) {
@@ -384,7 +384,7 @@ test("right sidebar also constrains overlay renderers to the main pane", () => {
 
   const rendered = fixture.tui.render(40);
 
-  assert.ok(rendered[0].includes("overlay width=28 columns=28"), "pi-diff-style overlays see the reduced main-pane width when sidebar is visible");
+  assert.ok(rendered[0].includes("overlay width=28 columns=28"), "overlays see the reduced main-pane width when sidebar is visible");
   assert.ok(rendered.every((line: string) => visibleWidth(line) === 28), "main pane lines stay within main pane width");
   fixture.compositor.dispose();
 });

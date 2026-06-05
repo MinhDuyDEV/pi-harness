@@ -148,16 +148,17 @@ export function renderTodosWidget(state: TodosState, _tui: TUI, theme: Theme): T
 
   if (!hasOpenTodos(state)) {
     if (state.sourceCount === 0) {
-      return new Text(theme.fg("muted", "  TODOs — No TODO.md files found in .pi/artifacts/"), 0, 0);
+      return new Text(theme.fg("muted", "TODOs — No TODO.md files found in .pi/artifacts/"), 1, 0);
     }
-    return new Text(theme.fg("muted", `  TODOs — ${state.sourceCount} file(s), all done`), 0, 0);
+    return new Text(theme.fg("muted", `TODOs — ${state.sourceCount} file(s), all done`), 1, 0);
   }
 
-  lines.push(`  TODOs — ${state.sourceCount} file(s):`);
+  lines.push(`TODOs — ${state.sourceCount} file(s):`);
 
   for (const item of state.items.filter((todo) => !todo.done)) {
-    lines.push(`    ${theme.fg("warning", "☐")} ${item.text}`);
+    lines.push(`  ${theme.fg("warning", "☐")} ${item.text}`);
   }
 
-  return new Text(lines.join("\n"), 0, 0);
+  lines.push("");
+  return new Text(lines.join("\n"), 1, 0);
 }
