@@ -9,10 +9,11 @@
   "packages": [
     "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@marckrenn/pi-sub-bar",
-    "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-pretty",
+    "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
-    "npm:@sting8k/pi-vcc"
+    "npm:@sting8k/pi-vcc",
+    "npm:@tintinweb/pi-subagents"
   ],
   "compaction": {
     "enabled": true,

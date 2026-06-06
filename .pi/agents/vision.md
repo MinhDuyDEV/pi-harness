@@ -1,9 +1,9 @@
 ---
 description: Read-only visual analysis specialist for UI/UX review, accessibility audits, and design-system consistency checks.
-model: mimo-v2.5
+model: opencode-go/mimo-v2.5
 thinking: high
 max_turns: 35
-disallowed_tools: edit, write
+disallowed_tools: edit
 prompt_mode: append
 skills: mockup-to-code, accessibility-audit
 ---

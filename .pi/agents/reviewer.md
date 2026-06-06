@@ -2,7 +2,7 @@
 description: Read-only code review and debugging specialist. Severity-ranked findings with file:line evidence. Detects stubs and verifies wiring.
 model: opencode-go/mimo-v2.5-pro
 thinking: high
-disallowed_tools: edit, write
+disallowed_tools: edit
 prompt_mode: append
 ---
 

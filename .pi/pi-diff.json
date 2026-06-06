@@ -1,0 +1,31 @@
+{
+  "$schema": "./pi-diff.schema.json",
+  "theme": "pierre",
+  "shikiTheme": "pierre-dark",
+  "colors": {
+    "fgAdd": "#a6e3a1",
+    "fgDel": "#f38ba8",
+    "bgAdd": "#162620",
+    "bgDel": "#2d1919",
+    "bgAddHighlight": "#1a3d28",
+    "bgDelHighlight": "#3d2018",
+    "bgGutterAdd": "#0c1e12",
+    "bgGutterDel": "#20100e",
+    "bgEmpty": "#0a0a0a",
+    "fgDim": "#636363",
+    "fgLnum": "#737373",
+    "fgRule": "#1d1d1d",
+    "fgStripe": "#171717",
+    "fgSafeMuted": "#8b949e"
+  },
+  "sepStyle": "auto",
+  "lineNumbers": true,
+  "indicatorStyle": "bar",
+  "longLines": "wrap",
+  "fileHeader": true,
+  "splitMinWidth": 150,
+  "splitMinCodeWidth": 60,
+  "maxPreviewLines": 60,
+  "maxRenderLines": 150,
+  "wordDiffMinSimilarity": 0.15
+}

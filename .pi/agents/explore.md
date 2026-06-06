@@ -1,8 +1,8 @@
 ---
 description: Read-only codebase cartographer. Finds files, symbols, usage patterns, and call paths without modifying anything.
-model: opencode-go/deepseek-chat
+model: opencode-go/deepseek-v4-flash
 thinking: off
-disallowed_tools: edit, write
+disallowed_tools: edit
 prompt_mode: append
 ---
 

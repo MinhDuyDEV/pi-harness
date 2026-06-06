@@ -20,24 +20,39 @@ Route work to the right execution layer. Apply these in order.
 | `TODO.md` | Task checklist per artifact |
 | `.pi/cli/*.mjs` | Repeatable browser/automation wrappers |
 | `tmux` | Dev servers, logs, long-running commands |
+| `task` tool | Delegate complex work to specialist agents — spawns isolated tmux session |
 | `pi --print/--print-turn` in tmux | Self-spawn isolated review/research |
 | `npx fallow` / `fallow-mcp` | Codebase analysis before and after TS/JS edits — dead code, dupes, complexity, blast radius |
 | `harness` | Product-level planner → worker → reviewer builds |
 
 ## Minimalism Gate
 
-Before harness, tmux, or self-spawn:
+Before `task`, harness, tmux, or self-spawn:
 
 - Can direct tools solve this in the current session?
 - Can a file artifact replace hidden runtime state?
 - Would tmux make the process more observable?
 - Will output be written under `.pi/artifacts/<id>/` and independently verified?
+- Is the work independently verifiable via an artifact file? If yes, use `task`.
 
 ## Delegation Rules
 
 **Do it yourself** when: surgical request, few tool calls, ambiguity needs direct judgment, provenance matters.
 
-**Spawn** (tmux/self-spawn) when: work is independent and benefits from fresh context, prompt and expected artifact are written to disk first.
+**Use `task` tool** when: the work is complex, well-defined, and benefits from a fresh isolated context. The `task` tool spawns a specialist agent in a tmux session automatically — this is the preferred delegation path.
+
+**Self-spawn** (raw `pi --print/--print-turn` in tmux) when: the `task` tool doesn't fit (non-standard toolset, requires existing session state, or the work needs specific interaction).
+
+## Task Tool Protocol
+
+When delegating via `task`:
+1. The subagent reads its instructions from `.pi/artifacts/task-<id>/WORKER-CONTEXT.md`
+2. The subagent writes its result to `.pi/artifacts/task-<id>/RESULT.md`
+3. Foreground mode: the result is injected back when complete
+4. Background mode: you'll receive a notification
+5. Watch the subagent live: `tmux attach -t "task-<id>"`
+
+The subagent starts with a fresh context — provide complete, self-contained instructions.
 
 ## Self-Spawn and Harness Distrust
 
