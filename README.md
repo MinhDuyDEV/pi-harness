@@ -56,11 +56,21 @@ Specialist agent definitions in `.pi/agents/`:
 | `vision` | UI/UX and accessibility analysis |
 | `painter` | Image generation and editing |
 
-### Prompts (24)
+### Prompts (7)
 
-Slash-command workflows in `.pi/prompts/`:
+Slash-command workflows in `.pi/prompts/`. Each core command has flag-based sub-tracks — no separate prompt file needed.
 
-`/init` `/plan` `/design` `/create` `/ship` `/review` `/review-codebase` `/research` `/test` `/fix` `/refactor` `/explain` `/commit` `/pr` `/verify` `/status` `/start` `/resume` `/handoff` `/lfg` `/compound` `/ui-review` `/init-context` `/init-user`
+| Command | Flags | Coverage |
+|---------|-------|----------|
+| `/create` | `--design`, `--spec-only`, `--type` | Clarify ambiguity → design exploration → spec writing → workspace setup |
+| `/fix` | `--refactor`, `--scope` | Bug fix (default) or refactoring with scope levels |
+| `/init` | `--context`, `--user`, `--all`, `--deep` | Core setup, planning context (roadmap/state), or user profile |
+| `/plan` | `--split`, `--architecture` | Implementation plan with institutional research, goal-backward analysis, safety gate |
+| `/research` | `--quick`, `--thorough`, `--alternatives` | Evidence-gathering or alternatives/tradeoffs generation |
+| `/ship` | `--pr` | Execute tasks wave-by-wave, verify, commit, optionally create PR |
+| `/verify` | `--quick`, `--full`, `--fix`, `--test`, `--review`, `--ui-review` | Gates, completeness tracking, test writing, code review, UI audit |
+
+**Merged into core:** clarify, explore, design, commit, pr, test, refactor, review-codebase, ui-review, improve-architecture — all now available as flags on the 7 core commands above.
 
 ### Skills (76)
 
