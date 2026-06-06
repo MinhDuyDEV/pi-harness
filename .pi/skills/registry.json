@@ -1,7 +1,7 @@
 {
   "generated_by": "registry sync from .pi/skills/*/SKILL.md",
-  "active_skill_count": 67,
-  "core_skill_count": 34,
+  "active_skill_count": 72,
+  "core_skill_count": 39,
   "optional_skill_count": 33,
   "routing_schema_version": 1,
   "routing_notes": "role_usage is a conservative hint for harness skill selection; it is not an auto-load instruction.",
@@ -1667,6 +1667,199 @@
         "tunnel vision",
         "need broader context",
         "explain system context"
+      ]
+    },
+    {
+      "name": "inference-service",
+      "path": "skills/inference-service/SKILL.md",
+      "description": "Use when building, reviewing, or debugging inference service backends in TypeScript/JavaScript — covers request ingestion architecture, batching strategies, semantic caching, SSE streaming, circuit breakers, fallback chains, rate limiting, GPU observability, and graceful degradation. MUST load before designing inference service architecture or writing any inference-serving code.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "infrastructure",
+        "backend"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "inference service architecture",
+        "inference-serving code",
+        "model serving backend",
+        "LLM serving",
+        "vLLM",
+        "TGI",
+        "ONNX Runtime Node",
+        "Redis Streams inference",
+        "semantic cache",
+        "inference circuit breaker",
+        "SSE streaming"
+      ]
+    },
+    {
+      "name": "opencode-ts-service",
+      "path": "skills/opencode-ts-service/SKILL.md",
+      "description": "Use when starting a new TypeScript project from scratch, organizing a codebase following OpenCode-style patterns, setting up Effect TS service architecture, or structuring TypeScript services with proper module conventions, type-safe error handling, and dependency injection. MUST load before writing any new service or module for a project following Effect-based architecture.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "typescript",
+        "backend"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "new TypeScript project",
+        "project structure",
+        "Effect TS service",
+        "Context.Tag",
+        "Effect Layer",
+        "Schema.TaggedErrorClass",
+        "module organization",
+        "namespace projection",
+        "OpenCode patterns",
+        "Effect service architecture",
+        "TypeScript monorepo setup",
+        "Effect platform"
+      ]
+    },
+    {
+      "name": "opencode-ts-package",
+      "path": "skills/opencode-ts-package/SKILL.md",
+      "description": "Use when creating a new npm package in a TypeScript monorepo, setting up package.json exports and build configuration, structuring internal vs published packages, handling platform-specific code with conditional imports, or configuring workspace/catalog dependency management. MUST load before creating a new package or modifying package.json in an Effect-based monorepo.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "typescript",
+        "devops"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "new npm package",
+        "package.json configuration",
+        "TypeScript monorepo",
+        "exports map",
+        "conditional imports",
+        "workspace protocol",
+        "catalog protocol",
+        "published library",
+        "internal package",
+        "Bun package setup",
+        "platform-specific code"
+      ]
+    },
+    {
+      "name": "effect-schema",
+      "path": "skills/effect-schema/SKILL.md",
+      "description": "Use when defining data validation schemas, domain types, branded primitives, or typed errors with Effect Schema in a TypeScript project. Covers Schema.Struct vs Schema.Class, Schema.TaggedErrorClass for domain errors, branded types for type-safe primitives, decodeUnknownEffect pipeline, filters, transformations, JSON Schema/OpenAPI generation, and Zod replacement patterns. MUST load before writing any Schema definitions in an Effect-based codebase.",
+      "version": "1.0.0",
+      "tags": [
+        "typescript",
+        "validation",
+        "backend"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Effect Schema",
+        "Schema.Class",
+        "Schema.Struct",
+        "Schema.TaggedErrorClass",
+        "branded types",
+        "data validation",
+        "decodeUnknownEffect",
+        "JSON Schema generation",
+        "Effect error handling",
+        "Zod replacement"
+      ]
+    },
+    {
+      "name": "effect-http-api",
+      "path": "skills/effect-http-api/SKILL.md",
+      "description": "Use when building HTTP APIs with Effect HttpApi — defining typed endpoints and groups, implementing handlers with Effect services, mapping service errors to HTTP errors with proper status codes, adding SSE streaming endpoints, implementing auth middleware with typed provides, generating OpenAPI documentation, and serving production HTTP servers. MUST load before writing any HttpApi endpoint or handler.",
+      "version": "1.0.0",
+      "tags": [
+        "backend",
+        "http",
+        "api"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Effect HttpApi",
+        "HttpApi endpoint",
+        "HttpApiGroup",
+        "typed HTTP API",
+        "SSE streaming",
+        "OpenAPI generation",
+        "HttpApi middleware",
+        "effect HTTP server",
+        "schema-first API"
       ]
     }
   ]
