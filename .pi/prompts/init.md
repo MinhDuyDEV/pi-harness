@@ -1,43 +1,68 @@
 ---
-description: Initialize core project setup — AGENTS.md, tech-stack, git conventions, and vocabulary
-argument-hint: "[--deep]"
+description: Initialize project setup — AGENTS.md, tech-stack, planning context, user profile, and vocabulary
+argument-hint: "[--deep] [--context|--user|--all]"
 ---
 
 # Init: $ARGUMENTS
 
-Core project setup. Creates AGENTS.md, detects tech stack, establishes git conventions, and sets up project vocabulary. Run once per project.
+Initialize project setup. Run once per project.
 
 > **AGENTS.md is the most important context file for AI agents** (Pocock). Getting init right reduces every future ambiguity error.
 >
-> **Next steps:** `/review-codebase` for deep codebase analysis
+> **Next step for fresh projects:** `/create "first feature"` to start building.
+> **Next step for existing codebases:** `/verify --review` for code review, or `/verify --test` to add test coverage.
 
 ## Load Skills
 
 ```typescript
-skill({ name: "context-engineering" });    // AGENTS.md structure and optimization
-skill({ name: "memory-system" });           // Persist detected values
-skill({ name: "ubiquitous-language" });     // Establish project vocabulary
+skill({ name: "brainstorming" });
 skill({ name: "git-workflow-and-versioning" }); // Git conventions
+skill({ name: "verification-before-completion" }); // Mode 1 validation
 ```
 
-## Options
+## Idempotency Rules
 
-| Argument | Default | Description                               |
-| -------- | ------- | ----------------------------------------- |
-| `--deep` | false   | Comprehensive research (~100+ tool calls) |
+| File | Rule |
+|---|---|
+| `AGENTS.md` | Improve in-place — never overwrite blindly |
+| `.pi/memory/project/tech-stack.md` | Overwrite with detected values (auto-regenerated) |
+| `.pi/memory/project/roadmap.md` | Skip if exists, ask before overwrite |
+| `.pi/memory/project/user.md` | Skip if exists, ask before overwrite |
+
+## Parse Arguments
+
+| Argument | Default | Description |
+|---|---|---|
+| `--deep` | false | Comprehensive research for AGENTS.md (~100+ tool calls) |
+| `--context` | false | Init planning context (roadmap.md, state.md) |
+| `--user` | false | Init user profile (user.md) |
+| `--all` | false | Full init: AGENTS.md + context + user profile |
+
+**Mode rules:**
+- No flags (default): Core project setup — AGENTS.md + tech-stack.md + vocabulary + git conventions
+- `--context`: Planning context (roadmap.md, state.md)
+- `--user`: User profile (user.md)
+- `--all`: Everything
+- `--deep` applies to AGENTS.md generation only
+
+**Brownfield auto-detection:** Existing codebase = any `src/`, `lib/`, or `app/` directory with source files. Affects Mode 1 discovery scope.
 
 ## Before You Init
 
-- **Don't overwrite blindly** — if AGENTS.md exists, improve it, don't replace
-- **Validate every command** — test each detected build/test/lint command actually runs
-- **Establish vocabulary early** — terms set here become the ubiquitous language for all future agents
-- **Keep it minimal** — every line in AGENTS.md is a constraint on future agents. Less is more.
+- Don't overwrite blindly — if AGENTS.md exists, improve it, don't replace
+- Validate every command — test each detected build/test/lint command actually runs
+- Establish vocabulary early — terms set here become the ubiquitous language for all future agents
+- Keep it minimal — every line in AGENTS.md is a constraint on future agents. Less is more
 
-## Phase 1: Detect Project
+---
+
+## Mode 1: Core Setup (Default)
+
+### Phase 1: Detect Project
 
 Detect and validate:
 
-- Package manager and dependencies with versions
+- Package manager, dependencies (with versions)
 - Build, test, lint, dev commands — **validate each actually works**
 - CI/CD configuration and conventions
 - Existing AI rules (`.cursor/rules/`, `.cursorrules`, `.github/copilot-instructions.md`)
@@ -45,9 +70,13 @@ Detect and validate:
 - Top-level directory structure
 - Existing domain vocabulary from type names, module names, route names
 
-With `--deep`: Also analyze git history, source patterns, subsystem candidates.
+With `--deep`:
+- Analyze git history (last 50 commits for patterns)
+- Map source directory structure and subsystem candidates
+- Identify common patterns (error handling, logging, data flow)
+- Detect testing patterns and coverage gaps
 
-## Phase 2: Preview Detection
+### Phase 2: Preview Detection
 
 After detecting project, show summary and ask for confirmation:
 
@@ -56,11 +85,11 @@ ask_user_question({
   questions: [
     {
       header: "Preview",
-      question: `Detected: ${detectedTechStack}. Create AGENTS.md?`,
+      question: `Detected: {tech stack summary}. Create AGENTS.md and tech-stack.md?`,
       options: [
-        { label: "Yes, create it (Recommended)" },
-        { label: "Show me what you'll write first" },
-        { label: "Cancel" },
+        { label: "Yes, create both (Recommended)" },
+        { label: "AGENTS.md only — skip tech-stack.md" },
+        { label: "Cancel — don't write anything" },
       ],
       multiSelect: false,
     },
@@ -68,9 +97,7 @@ ask_user_question({
 });
 ```
 
-**If "Show me":** Display detected values without writing files, then ask again.
-
-## Phase 3: Create AGENTS.md
+### Phase 3: Create AGENTS.md
 
 Create `./AGENTS.md` — **target <60 lines** (max 150). Keep it index-style and concise:
 
@@ -88,7 +115,29 @@ Create `./AGENTS.md` — **target <60 lines** (max 150). Keep it index-style and
 
 If AGENTS.md exists, improve it — never overwrite blindly.
 
-## Phase 4: Set Git Conventions
+### Phase 4: Create tech-stack.md
+
+Write detected values to `.pi/memory/project/tech-stack.md`:
+
+```markdown
+# Tech Stack
+
+- **Framework:** [framework vX]
+- **Language:** [language vX]
+- **Runtime:** [runtime vX]
+- **Styling:** [styling solution]
+- **Components:** [component library]
+- **Database:** [database/ORM]
+- **State Management:** [tool]
+- **Testing:** [framework vX]
+- **Build:** `npm run build`
+- **Test:** `npm test`
+- **Lint:** `npm run lint`
+- **Typecheck:** `npm run typecheck`
+- **Dev:** `npm run dev`
+```
+
+### Phase 5: Set Git Conventions
 
 Establish project git conventions based on detected patterns:
 
@@ -99,7 +148,7 @@ Establish project git conventions based on detected patterns:
 
 Record these in AGENTS.md under a `## Git` section (2-3 lines max).
 
-## Phase 5: Establish Vocabulary
+### Phase 6: Establish Vocabulary
 
 Extract and record the project's key domain terms as the start of a ubiquitous language:
 
@@ -121,21 +170,7 @@ Record 5-10 key terms in AGENTS.md as a `## Glossary` section (1-2 lines each):
 
 This directly reduces the "AI does the wrong thing" failure mode (Pocock).
 
-## Phase 6: Create tech-stack.md
-
-From template `.pi/memory/_templates/tech-stack.md`:
-
-Read the template from `.pi/memory/_templates/tech-stack.md` and write it to `.pi/memory/project/tech-stack.md`.
-
-Fill detected values:
-
-- Framework, language, runtime
-- Styling, components, design system
-- Database, ORM, state management
-- Testing tools
-- Verification commands
-
-## Phase 7: Detect Broken Windows
+### Phase 7: Detect Broken Windows
 
 Flag any existing issues that should be fixed early (before they normalize):
 
@@ -145,11 +180,11 @@ Flag any existing issues that should be fixed early (before they normalize):
 - Mixed conventions (tabs vs spaces, semicolons vs nosemi)
 - Untracked generated files in source control
 
-Log findings — don't fix them unless the user asks. This is the "broken windows" principle (Pragmatic Programmer): flagging them early contains the decay.
+**Do not fix them** — just log findings. This is the "broken windows" principle (Pragmatic Programmer): flagging early contains the decay.
 
-## Phase 8: Subsystems (--deep only)
+### Phase 8: Subsystem Candidates (`--deep` only)
 
-Identify candidates for nested AGENTS.md:
+Identify candidates for nested AGENTS.md files:
 
 - `packages/*/` in monorepos
 - `frontend/` vs `backend/` directories
@@ -157,25 +192,156 @@ Identify candidates for nested AGENTS.md:
 
 Ask user before creating nested files.
 
-## Phase 9: Persist to Memory
-
-Store the init results for cross-session retrieval:
+### Phase 9: Persist to Memory
 
 ```typescript
 observation({
   type: "decision",
-  title: "Project init: [name]",
-  narrative: "Project setup complete. Tech stack: [detected]. Vocabulary: [key terms]. Branching: [convention].",
+  title: "Project init — [tech stack summary]",
+  narrative: "Core setup completed: AGENTS.md, tech-stack.md created for [language/framework] project. Vocabulary established: [key terms]. Git conventions set: [convention].",
   concepts: "project-init, tech-stack, [framework], [language]",
   confidence: "high",
   files_modified: "AGENTS.md, .pi/memory/project/tech-stack.md",
 });
 ```
 
-## Phase 10: Verify and Report
+---
 
-Verify:
+## Mode 2: Planning Context (`--context`)
 
+Initialize project planning context with roadmap and state files.
+
+### Phase 1: Discovery (brownfield)
+
+If the project has existing code (brownfield — see auto-detection above), analyze:
+
+```bash
+git log --oneline -30
+git branch --show-current
+find . -maxdepth 3 -type f | sed 's#^./##' | grep -v node_modules | sort | head -200
+```
+
+Search memory for prior decisions, roadmap items, known constraints.
+
+### Phase 2: Requirements Gathering
+
+```typescript
+ask_user_question({
+  questions: [
+    {
+      header: "Project vision",
+      question: "What is the project vision? (1-2 sentences)",
+      options: [{ label: "Let me type it", description: "I'll provide custom input" }],
+      multiSelect: false,
+    },
+    {
+      header: "Target users",
+      question: "Who are the primary users?",
+      options: [
+        { label: "Developers", description: "Tooling, libraries, CLI" },
+        { label: "End users", description: "Consumer-facing application" },
+        { label: "Internal team", description: "Internal tool or service" },
+      ],
+      multiSelect: true,
+    },
+    {
+      header: "Success criteria",
+      question: "What defines success? (select all that apply)",
+      options: [
+        { label: "Stability", description: "Reliability and correctness first" },
+        { label: "Speed", description: "Performance and low latency" },
+        { label: "UX", description: "User experience and polish" },
+        { label: "Maintainability", description: "Code quality and extensibility" },
+      ],
+      multiSelect: true,
+    },
+  ],
+});
+```
+
+### Phase 3: Create Files
+
+Create `.pi/memory/project/roadmap.md`:
+
+```markdown
+# Roadmap
+
+## Vision
+[1-2 sentences from user]
+
+## Target Users
+- ...
+
+## Feature Roadmap
+- ...
+```
+
+Create `.pi/memory/project/state.md`:
+
+```markdown
+# State
+
+## Current Status
+Initial setup
+
+## Active Decisions
+(none)
+
+## Next Priorities
+- ...
+```
+
+---
+
+## Mode 3: User Profile (`--user`)
+
+Create personalized user profile at `.pi/memory/project/user.md`.
+
+### Phase 1: Gather Preferences
+
+```typescript
+ask_user_question({
+  questions: [
+    {
+      header: "Identity",
+      question: "What is your name and role?",
+      options: [{ label: "Set name and role", description: "Tell me your details" }],
+      multiSelect: false,
+    },
+    {
+      header: "Communication",
+      question: "How detailed should responses be?",
+      options: [
+        { label: "Concise (Recommended)", description: "Short, direct answers" },
+        { label: "Detailed", description: "Full explanations and reasoning" },
+        { label: "Mixed", description: "Depends on context" },
+      ],
+      multiSelect: false,
+    },
+    {
+      header: "Git workflow",
+      question: "How should git commits be handled?",
+      options: [
+        { label: "Ask first (Recommended)", description: "Always confirm before commit/push" },
+        { label: "Auto-commit", description: "Commit directly after completion" },
+      ],
+      multiSelect: false,
+    },
+  ],
+});
+```
+
+### Phase 2: Create user.md
+
+Write to `.pi/memory/project/user.md` with the captured preferences.
+
+---
+
+## Mode 4: Verify and Report
+
+Before claiming done, verify mode-specific checks:
+
+### Core Setup (default)
 - [ ] AGENTS.md is <60 lines (or justified for complexity)
 - [ ] Commands validated and actually work
 - [ ] Boundaries include explicit Never rules
@@ -186,14 +352,22 @@ Verify:
 - [ ] Broken windows flagged if found
 - [ ] Init results persisted to memory
 
+### Planning Context (`--context`)
+- [ ] roadmap.md created
+- [ ] state.md created
+
+### User Profile (`--user`)
+- [ ] user.md created with preferences
+
 Output:
 
-1. Files created (with line counts)
+1. Mode executed and files created (with line counts)
 2. Tech stack detected
 3. Commands validated (yes/no per command)
 4. Domain terms recorded
 5. Git conventions set
 6. Broken windows flagged (if any)
 7. Suggested next steps:
-   - `/review-codebase` — Deep codebase analysis
-   - `/create "first feature"` — Start building
+   - `/verify --review` — Code review
+   - `/verify --test` — Test coverage
+   - `/create "first feature"` — Start building with a spec
