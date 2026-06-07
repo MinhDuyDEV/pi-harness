@@ -1,3 +1,8 @@
+---
+name: opencode-ts-service
+description: "Use when starting a new TypeScript project from scratch, organizing a codebase following OpenCode-style patterns, setting up Effect TS service architecture, or structuring TypeScript services with proper module conventions, type-safe error handling, and dependency injection. MUST load before writing any new service or module for a project following Effect-based architecture."
+---
+
 # OpenCode-Style TypeScript Project
 
 ## Overview

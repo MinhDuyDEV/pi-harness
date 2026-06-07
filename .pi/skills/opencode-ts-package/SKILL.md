@@ -1,8 +1,13 @@
+---
+name: opencode-ts-package
+description: "Use when creating a new npm package in a TypeScript monorepo, setting up package.json exports and build configuration, structuring internal vs published packages, handling platform-specific code with conditional imports, or configuring workspace/catalog dependency management. MUST load before creating a new package or modifying package.json in an Effect-based monorepo."
+---
+
 # OpenCode-Style TypeScript Package
 
 ## Overview
 
-How to structure, build, and publish TypeScript packages following OpenCode's conventions. This covers the difference between internal packages (source-only, no build) and published packages (compiled to dist), exports maps, conditional imports for platform-specific code, workspace/catalog dependency management, and the file/directory conventions used across 30+ packages in a multi-package monorepo.
+How to structure, build, and publish TypeScript packages following OpenCode’s conventions. This covers the difference between internal packages (source-only, no build) and published packages (compiled to dist), exports maps, conditional imports for platform-specific code, workspace/catalog dependency management, and the file/directory conventions used across 30+ packages in a multi-package monorepo.
 
 This is the "how to set up a package" companion to the `opencode-ts-service` skill (which covers how to organize code within a package).
 
@@ -53,7 +58,7 @@ The critical distinction: **internal packages run from source** (exports point t
 }
 ```
 
-The `$schema` field is not optional — it enables IDE autocompletion for package.json. Every single OpenCode package.json has it.
+The `$schema` field is not optional - it enables IDE autocompletion for package.json. Every single OpenCode package.json has it.
 
 ### Internal package (source-only)
 
@@ -83,8 +88,8 @@ The `$schema` field is not optional — it enables IDE autocompletion for packag
 ```
 
 Key rules:
-- `private: true` — never publish internal packages
-- `exports` map with `./* -> ./src/*.ts` — any file in src/ is importable
+- `private: true` - never publish internal packages
+- `exports` map with `./* -> ./src/*.ts` - any file in src/ is importable
 - No `version` field (internal packages are versioned by the monorepo)
 - No `build` script (Bun runs TypeScript natively)
 - `imports` for platform-specific code only when needed
@@ -117,7 +122,7 @@ Key differences from internal:
 - Has `version` field (for npm publishing)
 - No `private: true`
 - `exports` points to `./src/*.ts` for development (Bun resolves from source)
-- `files: ["dist"]` — only the compiled output is published to npm
+- `files: ["dist"]` - only the compiled output is published to npm
 - Has a `build` script that runs `bun tsc`
 
 **Important:** The build step compiles to `dist/` but the publish script rewrites the exports to point to `dist/` paths. The `package.json` you ship to npm has different `exports` than the one in your repo. This is handled by your publish script.
@@ -139,9 +144,9 @@ OpenCode's `exports` map is the central contract for how consumers import from a
 ```
 
 **Rules:**
-- Every entry point is explicit — no accidental `import from "pkg/src/internal/leaky"`
+- Every entry point is explicit - no accidental `import from "pkg/src/internal/leaky"`
 - Internal packages use `./*` for convenience; published packages list every entry
-- Entry points map to `.ts` files (Bun) — no `.js` extension confusion
+- Entry points map to `.ts` files (Bun) - no `.js` extension confusion
 - Subdirectories have their own entry: `./submodule: "./src/submodule/index.ts"`
 - No `./dist/` in exports (the publish script transforms these)
 
@@ -174,7 +179,7 @@ OpenCode uses Bun's `imports` field for platform-specific code. This is how they
 ```
 
 ```typescript
-// Consumer — clean, no platform branching
+// Consumer - clean, no platform branching
 import { db } from "#sqlite"
 import { spawnPty } from "#pty"
 ```
@@ -185,7 +190,7 @@ import { spawnPty } from "#pty"
 - The bundler/runtime picks the right file based on the condition
 - `default` falls back to Bun implementation
 - Use this pattern for: database drivers, PTY/terminal, file watching, filesystem operations
-- Do NOT use this for business logic — only for platform-API differences
+- Do NOT use this for business logic - only for platform-API differences
 
 **The interface contract:**
 
@@ -229,7 +234,7 @@ export const db = {
 }
 ```
 
-Key: `noEmit: true` — Bun handles execution, tsc only type-checks.
+Key: `noEmit: true` - Bun handles execution, tsc only type-checks.
 
 ### Published library (compiled)
 
@@ -251,11 +256,11 @@ Key: `noEmit: true` — Bun handles execution, tsc only type-checks.
 ```
 
 Key differences:
-- `outDir: "dist"` — compiled output goes here
-- `declaration: true` — generates `.d.ts` files for consumers
-- `composite: true` — enables project references in a monorepo
-- `extends: "@tsconfig/node22/tsconfig.json"` — standard Node config base
-- No `noEmit` — we WANT tsc to emit files
+- `outDir: "dist"` - compiled output goes here
+- `declaration: true` - generates `.d.ts` files for consumers
+- `composite: true` - enables project references in a monorepo
+- `extends: "@tsconfig/node22/tsconfig.json"` - standard Node config base
+- No `noEmit` - we WANT tsc to emit files
 
 ---
 
@@ -389,7 +394,7 @@ Internal packages use `"workspace:*"` protocol:
 }
 ```
 
-`workspace:*` means "use whatever version is in the workspace" — no range resolution, always the local copy.
+`workspace:*` means "use whatever version is in the workspace" - no range resolution, always the local copy.
 
 ### Scripts at root vs package level
 
@@ -421,7 +426,7 @@ packages/
       server.ts          # Sub-entry: server
       submodule/         # Sub-entry as directory
         index.ts
-      internal/          # Private — not exported
+      internal/          # Private - not exported
         helpers.ts
     script/
       build.ts           # Build script
@@ -437,10 +442,10 @@ packages/
 
 Same as the `opencode-ts-service` skill:
 
-- Flat `src/` — no `src/app/`, `src/lib/`, `src/utils/`
+- Flat `src/` - no `src/app/`, `src/lib/`, `src/utils/`
 - One file per concept
 - Subdirectories only for modules that have their own sub-exports
-- Favor flat over nested — OpenCode's `packages/core/src/` has 40+ top-level files
+- Favor flat over nested - OpenCode's `packages/core/src/` has 40+ top-level files
 
 ### The `script/` directory
 
@@ -466,17 +471,17 @@ These run at build time, not runtime. They don't contribute to the published pac
 
 ### File names
 
-- **Service files**: `kebab-case.ts` — matches the module export name
-- **Test files**: `<name>.test.ts` — co-located with source
-- **Platform-specific**: `<name>.bun.ts`, `<name>.node.ts` — suffixed by platform
-- **SQL schema**: `<name>.sql.ts` — Drizzle convention
-- **Env declarations**: `<name>.d.ts` — ambient type declarations
+- **Service files**: `kebab-case.ts` - matches the module export name
+- **Test files**: `<name>.test.ts` - co-located with source
+- **Platform-specific**: `<name>.bun.ts`, `<name>.node.ts` - suffixed by platform
+- **SQL schema**: `<name>.sql.ts` - Drizzle convention
+- **Env declarations**: `<name>.d.ts` - ambient type declarations
 
 ### Entry points
 
-- `index.ts` — always the main entry for a directory module
-- `client.ts` / `server.ts` — separate client/server entry points
-- `<concept>.ts` — single-file modules at the top level
+- `index.ts` - always the main entry for a directory module
+- `client.ts` / `server.ts` - separate client/server entry points
+- `<concept>.ts` - single-file modules at the top level
 
 ---
 
@@ -517,7 +522,7 @@ These live in `dependencies` (not `devDependencies`) because they're needed at r
 }
 ```
 
-Platform-specific native modules (`@parcel/watcher-darwin-arm64`, etc.) go in `devDependencies` — Bun resolves the right binary automatically.
+Platform-specific native modules (`@parcel/watcher-darwin-arm64`, etc.) go in `devDependencies` - Bun resolves the right binary automatically.
 
 ---
 
@@ -525,7 +530,7 @@ Platform-specific native modules (`@parcel/watcher-darwin-arm64`, etc.) go in `d
 
 ### Test runner
 
-OpenCode uses **Bun test** (`bun test`) — no Jest, no Vitest.
+OpenCode uses **Bun test** (`bun test`) - no Jest, no Vitest.
 
 ```bash
 # Run all tests in the package
@@ -542,7 +547,7 @@ bun test --timeout 30000 --reporter=junit --reporter-outfile=.artifacts/unit/jun
 
 - Co-located: `foo.test.ts` next to `foo.ts`
 - Test the public interface (Effect services via test layers), not internals
-- No `jest.mock()` or `vi.mock()` — use `Layer.succeed` for test doubles
+- No `jest.mock()` or `vi.mock()` - use `Layer.succeed` for test doubles
 
 ### CI configuration
 
@@ -698,14 +703,14 @@ await $`bun tsc`
 | Hardcoding version in every package | Upgrade requires touching N files | Use `catalog:` protocol for shared deps |
 | Multiple TypeScript versions | Type mismatch across packages | Pin TypeScript in root catalog |
 
-## Red Flags — STOP and Fix
+## Red Flags - STOP and Fix
 
-- No `exports` map — Any consumer can import internal files. Add one.
-- No `files` filter on a published package — Publishing your tests and tsconfig. Add `"files": ["dist"]`.
-- Source files in `dist/` — Your tsc output doesn't match exports. Fix tsconfig `outDir` or rewrite exports.
-- `index.ts` barrel in a multi-module directory — Every import loads everything. Remove it.
-- Conditional `#imports` for domain logic — Platform branching belongs in adapters, not services.
-- `"main": "./index.js"` without `exports` — Use the modern exports map, not the legacy main field.
+- No `exports` map - Any consumer can import internal files. Add one.
+- No `files` filter on a published package - Publishing your tests and tsconfig. Add `"files": ["dist"]`.
+- Source files in `dist/` - Your tsc output doesn't match exports. Fix tsconfig `outDir` or rewrite exports.
+- `index.ts` barrel in a multi-module directory - Every import loads everything. Remove it.
+- Conditional `#imports` for domain logic - Platform branching belongs in adapters, not services.
+- `"main": "./index.js"` without `exports` - Use the modern exports map, not the legacy main field.
 
 ## Quick Reference
 

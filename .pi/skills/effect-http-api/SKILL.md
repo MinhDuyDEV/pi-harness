@@ -1,3 +1,8 @@
+---
+name: effect-http-api
+description: "Use when building HTTP APIs with Effect HttpApi — defining typed endpoints and groups, implementing handlers with Effect services, mapping service errors to HTTP errors with proper status codes, adding SSE streaming endpoints, implementing auth middleware with typed provides, generating OpenAPI documentation, and serving production HTTP servers. MUST load before writing any HttpApi endpoint or handler."
+---
+
 # Effect HttpApi
 
 ## Overview
