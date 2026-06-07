@@ -33,9 +33,15 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [".pi/skills/"],
-  "prompts": [".pi/prompts/"],
-  "extensions": [".pi/extensions/"],
+  "skills": [
+    ".pi/skills/"
+  ],
+  "prompts": [
+    ".pi/prompts/"
+  ],
+  "extensions": [
+    ".pi/extensions/"
+  ],
   "lastChangelogVersion": "0.78.1",
   "treeFilterMode": "default",
   "transport": "sse",
@@ -57,4 +63,3 @@
   "quietStartup": false,
   "doubleEscapeAction": "tree"
 }
-
