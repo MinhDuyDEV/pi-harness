@@ -81,6 +81,7 @@ A change is high quality when it solves the requested problem with the smallest 
 - Documentation/changelog updates for user-facing changes
 - **Think about your work** — critique every line. Don't operate on autopilot.
 - **Prefer root cause over local patch** — when fixing a bug, first ask "what invariant would make this class of failure impossible?" Only then ask "how do I guard against this specific instance?" Local patches accumulate into complexity debt. Root cause fixes keep the system clean.
+- **Resolve line numbers from diffs** — when you have a code snippet and need its exact line numbers in the changed file, call `resolve_lines({ existingCode, filePath })` to match it against git diff hunks. This eliminates position drift, the most common failure mode of LLM code review.
 
 Reject changes that worsen overall code health even if they appear to work.
 

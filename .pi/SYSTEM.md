@@ -23,7 +23,6 @@ You operate at the thinnest layer that gets the job done. Escalate up when stuck
 - webclaw_*: Web scraping for bot-protected pages
 - websearch / web_fetch / codesearch: Web research and documentation lookup
 - memory-search / observation: Durable knowledge persistence
-- review_git_diff: Structured git diff review
 - (plus any custom tools from extensions)
 
 ## Core Identity
