@@ -12,6 +12,17 @@ import type { TextContent } from "@earendil-works/pi-ai";
 
 export type HarnessRiskLane = "tiny" | "normal" | "high-risk";
 
+/**
+ * Sprint result verdict:
+ *   PASS         — verification commands ran and passed
+ *   FAIL         — verification commands failed OR evaluator said FAIL
+ *   ATTESTED     — no verification commands, but LLM evaluator said PASS
+ *   UNVERIFIABLE — no verification commands and no evaluator ran (pipeline mode)
+ */
+export type SprintVerdict = "PASS" | "FAIL" | "ATTESTED" | "UNVERIFIABLE";
+
+export type EvalConfidence = "high" | "medium" | "low";
+
 export interface Sprint {
 	number: number;
 	title: string;
@@ -33,6 +44,8 @@ export interface SprintResult {
 	sprint: string;
 	iterations: number;
 	passed: boolean;
+	verdict: SprintVerdict;
+	confidence: EvalConfidence;
 	evalOutput: string;
 	verification?: VerificationSummary;
 }
@@ -48,7 +61,7 @@ export interface VerificationCommandResult {
 }
 
 export interface VerificationSummary {
-	status: "passed" | "failed" | "skipped";
+	status: "passed" | "failed" | "skipped" | "unverifiable";
 	results: VerificationCommandResult[];
 }
 
@@ -56,6 +69,7 @@ export interface EvalCriterionResult {
 	description?: string;
 	passes: boolean;
 	evidence: string;
+	confidence?: EvalConfidence;
 }
 
 // ─── Format Instructions ─────────────────────────────────────────────────────
@@ -67,10 +81,11 @@ export const HARNESS_FORMAT_INSTRUCTIONS = `
 
 This harness enforces a strict sprint manifest format. If you do not follow it, your output will be rejected.
 
-Required fields per sprint: Description, Lane, Risk Flags, Context Needed, Proof Required, Criteria, Files.
-Optional: Skills, Verification Commands.
+Required fields per sprint: Description, Lane, Risk Flags, Context Needed, Proof Required, Criteria, Verification Commands, Files.
 
-Use Lane: tiny, normal, or high-risk. Risk Flags, Context Needed, Proof Required, Skills, and Verification Commands may be bullet lists or comma-separated inline values.
+Every sprint MUST include at least one deterministic verification command (test, typecheck, lint, build, or equivalent). If the sprint truly has no feasible deterministic check, use a command that documents manual verification (e.g. \`echo "manually verified: see criteria"\`).
+
+Use Lane: tiny, normal, or high-risk. Risk Flags, Context Needed, Proof Required, and Skills may be bullet lists or comma-separated inline values.
 
 Start with \`## Sprint 1:\`. Output only sprint sections. No commentary.`;
 
@@ -83,18 +98,27 @@ Output your evaluation as structured JSON. No other commentary.
 
 {
   "verdict": "PASS" or "FAIL",
+  "confidence": "high" or "medium" or "low",
   "criteria": [
     {
       "id": "c1",
       "description": "What was tested",
       "passes": true or false,
-      "evidence": "Specific file:line or command evidence"
+      "evidence": "Specific file:line or command evidence",
+      "confidence": "high" or "medium" or "low"
     }
   ],
   "summary": "One-line summary"
 }
 
-Only output JSON. No other text, no markdown. A PASS requires every sprint criterion to appear in criteria with passes=true and non-empty evidence.`;
+Only output JSON. No other text, no markdown.
+
+Confidence rules:
+- high: evidence is deterministic (test output, typecheck, verified command exit codes)
+- medium: evidence is structural (code inspection, diff review, file:line references)
+- low: evidence is speculative (looks correct, seems fine, no concrete verification)
+
+A PASS requires every sprint criterion to appear in criteria with passes=true and non-empty evidence.`;
 
 // ─── Text Helpers ─────────────────────────────────────────────────────────────
 
@@ -180,6 +204,8 @@ export function parseSprints(text: string): Sprint[] {
 		const files = filesMatch?.[1]?.trim() ?? "";
 		if (!description || !criteria || !riskLane || !files) continue;
 		const ownedFiles = files.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+		// verificationRequired means the sprint needs verification per policy (lane, proof type).
+		// Sprint.verificationCommands.length > 0 determines if commands were actually declared.
 		const verificationRequired = riskLane === "high-risk" || proofRequired.some((item) => !/^(manual|manual review|review|none|n\/?a)$/i.test(item.trim()));
 		sprints.push({ number: num, title, description, riskLane, riskFlags, contextNeeded, proofRequired, criteria, files, ownedFiles, skills, verificationCommands, verificationRequired, dependencies });
 	}
@@ -266,20 +292,38 @@ function normalizeEvalCriteria(value: unknown): EvalCriterionResult[] {
 				: typeof record.id === "string"
 					? record.id
 					: undefined;
+		const confidenceRaw = record.confidence;
+		let confidence: "high" | "medium" | "low" | undefined;
+		if (confidenceRaw === "high" || confidenceRaw === "medium" || confidenceRaw === "low") confidence = confidenceRaw;
 		return {
 			description,
 			passes: record.passes === true,
 			evidence: typeof record.evidence === "string" ? record.evidence.trim() : "",
+			confidence,
 		};
 	});
 }
 
-function failEval(criteria: EvalCriterionResult[], summary: string, evidence: string): { verdict: "FAIL"; criteria: EvalCriterionResult[]; summary: string } {
+function failEval(criteria: EvalCriterionResult[], summary: string, evidence: string, confidence: EvalConfidence = "low"): { verdict: "FAIL"; confidence: EvalConfidence; criteria: EvalCriterionResult[]; summary: string } {
 	return {
 		verdict: "FAIL",
+		confidence,
 		criteria: [...criteria, { passes: false, evidence }],
 		summary,
 	};
+}
+
+function averageConfidence(criteria: EvalCriterionResult[]): EvalConfidence {
+	if (criteria.length === 0) return "low";
+	const scores = criteria.map((c) => {
+		if (c.confidence === "high") return 3;
+		if (c.confidence === "medium") return 2;
+		return 1; // low or undefined
+	});
+	const avg = scores.reduce((sum, s) => sum + s, 0) / scores.length;
+	if (avg >= 2.5) return "high";
+	if (avg >= 1.5) return "medium";
+	return "low";
 }
 
 /**
@@ -288,6 +332,7 @@ function failEval(criteria: EvalCriterionResult[], summary: string, evidence: st
  */
 export function parseEvalOutput(text: string, expectedCriteria?: readonly string[] | string): {
 	verdict: "PASS" | "FAIL";
+	confidence: EvalConfidence;
 	criteria: EvalCriterionResult[];
 	summary: string;
 } {
@@ -298,20 +343,25 @@ export function parseEvalOutput(text: string, expectedCriteria?: readonly string
 			const parsed = JSON.parse(candidate) as Record<string, unknown>;
 			const criteria = normalizeEvalCriteria(parsed.criteria);
 			const summary = typeof parsed.summary === "string" ? parsed.summary : "";
-			if (parsed.verdict !== "PASS") return { verdict: "FAIL", criteria, summary };
+			const rawConfidence = parsed.confidence;
+			const evalConfidence: EvalConfidence = rawConfidence === "high" || rawConfidence === "medium" || rawConfidence === "low"
+				? rawConfidence
+				: averageConfidence(criteria);
+			if (parsed.verdict !== "PASS") return { verdict: "FAIL", confidence: evalConfidence, criteria, summary };
 			if (criteria.length === 0) return failEval(criteria, summary, "Evaluator returned PASS with no criteria evidence.");
 			if (expected.length > 0 && criteria.length < expected.length) {
 				return failEval(criteria, summary, `Evaluator returned PASS but covered ${criteria.length}/${expected.length} expected criteria.`);
 			}
 			const weak = criteria.find((criterion) => !criterion.passes || criterion.evidence.length === 0);
 			if (weak) return failEval(criteria, summary, "Evaluator returned PASS with failing or missing-evidence criteria.");
-			return { verdict: "PASS", criteria, summary };
+			return { verdict: "PASS", confidence: evalConfidence, criteria, summary };
 		} catch {
 			// Try the next balanced object.
 		}
 	}
 	return {
 		verdict: "FAIL",
+		confidence: "low",
 		criteria: [{ passes: false, evidence: `Evaluator did not return valid harness JSON. Output: ${text.slice(0, 200)}` }],
 		summary: text.slice(0, 100),
 	};

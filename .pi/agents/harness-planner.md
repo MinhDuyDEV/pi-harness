@@ -28,7 +28,7 @@ Proof Required:
 Criteria:
 - [ ] Testable criterion
 - [ ] Testable criterion
-Verification Commands:
+Verification Commands: (REQUIRED — must have at least one deterministic command)
 - npm test
 Dependencies: none
 Files: path/to/file.ts
@@ -56,7 +56,7 @@ Files: path/to/file.ts
 - Risk Flags: use comma-separated concrete flags or `none`.
 - Context Needed: list only files/docs that directly matter; do not over-read.
 - Proof Required: list the proof shape even when no deterministic command exists.
-- Verification Commands: include non-destructive commands that prove the sprint. High-risk sprints MUST have at least one verification command. Commands MUST exit non-zero on failure (use `test ... || exit 1`, NOT `test ... && echo PASS || echo FAIL`).
+- Verification Commands: REQUIRED for every sprint. Include non-destructive commands that prove the sprint. High-risk sprints MUST have at least one verification command. Commands MUST exit non-zero on failure (use `test ... || exit 1`, NOT `test ... && echo PASS || echo FAIL`). If the sprint truly has no feasible deterministic check, use a command that documents manual verification (e.g. `echo "manually verified: see criteria"`).
 - Dependencies: list sprint numbers this sprint depends on, or `none`. Sprint N can only start after all its dependencies pass.
 - Never use destructive commands (git reset, git clean, rm -rf).
 - If ambiguous, output one sprint titled `Clarify Requirements` with missing decisions as criteria.

@@ -100,6 +100,8 @@ Proof Required:
 Criteria:
 - [ ] Create package.json
 - [ ] Add TypeScript config
+Verification Commands:
+- npm test
 Dependencies: none
 Files: package.json, tsconfig.json
 
@@ -113,6 +115,8 @@ Proof Required:
 - unit
 Criteria:
 - [ ] Write main module
+Verification Commands:
+- npm test
 Dependencies: 1
 Files: src/index.ts`;
 

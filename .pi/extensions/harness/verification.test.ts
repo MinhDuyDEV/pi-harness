@@ -14,9 +14,9 @@ import { runVerificationCommands } from "./verification.js";
 const root = mkdtempSync(join(tmpdir(), "pikit-harness-verification-"));
 try {
 	{
-		const t = "runVerificationCommands skips empty command lists";
+		const t = "runVerificationCommands returns unverifiable for empty command lists";
 		const summary = runVerificationCommands([], root);
-		assert.equal(summary.status, "skipped", t);
+		assert.equal(summary.status, "unverifiable", t);
 		assert.deepEqual(summary.results, [], t);
 	}
 

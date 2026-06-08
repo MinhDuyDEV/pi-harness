@@ -27,7 +27,7 @@ const SPINNER_INTERVAL_MS = 80;
 
 export type HarnessPhase = "initializing" | "planning" | "generating" | "evaluating" | "fixing" | "complete" | "failed" | "";
 export type AgentRole = "planner" | "generator" | "evaluator";
-export type VerificationGateStatus = "pending" | "running" | "passed" | "failed" | "skipped";
+export type VerificationGateStatus = "pending" | "running" | "passed" | "failed" | "skipped" | "unverifiable";
 export type ReviewStatus = "pending" | "running" | "passed" | "failed" | "skipped";
 export type WidgetTraceQualityStatus = "pending" | "weak" | "ok" | "strong";
 
@@ -129,6 +129,8 @@ function statusWord(status: VerificationGateStatus | ReviewStatus): string {
 			return "FAIL";
 		case "skipped":
 			return "SKIP";
+		case "unverifiable":
+			return "NONE";
 		default:
 			return "WAIT";
 	}
@@ -138,6 +140,7 @@ function statusColor(status: VerificationGateStatus | ReviewStatus): ThemeColor 
 	if (status === "passed") return "success";
 	if (status === "failed") return "error";
 	if (status === "running") return "accent";
+	if (status === "unverifiable") return "muted";
 	return "muted";
 }
 

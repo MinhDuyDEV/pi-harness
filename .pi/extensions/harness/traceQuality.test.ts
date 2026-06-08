@@ -33,6 +33,8 @@ function result(overrides: Partial<SprintResult> = {}): SprintResult {
 		sprint: "Safe Slice",
 		iterations: 1,
 		passed: true,
+		verdict: "PASS",
+		confidence: "high",
 		evalOutput: "{\"verdict\":\"PASS\"}",
 		verification: { status: "passed", results: [] },
 		...overrides,

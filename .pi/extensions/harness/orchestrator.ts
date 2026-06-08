@@ -394,7 +394,7 @@ async function runBuildEvaluatePhase(
 			tracker.appendState(`sprint ${i + 1} blocked`, detail);
 			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, verificationStatus: "failed", reviewStatus: "skipped", activeTools: [] });
 			tracker.recordEvent({ event: "sprint_blocked", sprint: i + 1, reason: "failed_dependencies", failedDependencies });
-			results.push({ sprint: sprint.title, iterations: 0, passed: false, evalOutput: detail, verification: { status: "failed", results: [] } });
+			results.push({ sprint: sprint.title, iterations: 0, passed: false, verdict: "FAIL", confidence: "low", evalOutput: detail, verification: { status: "failed", results: [] } });
 			continue;
 		}
 
@@ -406,7 +406,7 @@ async function runBuildEvaluatePhase(
 			tracker.appendState(`sprint ${i + 1} blocked`, detail);
 			widget.update({ passedSprints: passedSprintCount, failedSprints: failedSprintCount, verificationStatus: "failed", reviewStatus: "skipped", activeTools: [] });
 			tracker.recordEvent({ event: "sprint_blocked", sprint: i + 1, reason: "missing_verification_commands", riskLane: sprint.riskLane });
-			results.push({ sprint: sprint.title, iterations: 0, passed: false, evalOutput: detail, verification: { status: "failed", results: [] } });
+			results.push({ sprint: sprint.title, iterations: 0, passed: false, verdict: "FAIL", confidence: "low", evalOutput: detail, verification: { status: "failed", results: [] } });
 			continue;
 		}
 
@@ -420,10 +420,17 @@ async function runBuildEvaluatePhase(
 			const detail = `pipeline mode — no evaluator; ${formatVerificationSummary(verification)}`;
 			writeProgress(tracker.runDir, i + 1, sprint.title, pipelinePassed, detail);
 			tracker.appendState(`sprint ${i + 1} pipeline`, detail);
+			const hasVerifCommands = sprint.verificationCommands.length > 0;
+			let pipelineVerdict: "PASS" | "FAIL" | "UNVERIFIABLE";
+			if (!hasVerifCommands) pipelineVerdict = "UNVERIFIABLE";
+			else if (pipelinePassed) pipelineVerdict = "PASS";
+			else pipelineVerdict = "FAIL";
 			const sprintResult: SprintResult = {
 				sprint: sprint.title,
 				iterations: 1,
-				passed: pipelinePassed,
+				passed: pipelinePassed && hasVerifCommands,
+				verdict: pipelineVerdict,
+				confidence: "low",
 				evalOutput: "(pipeline mode — no evaluator)",
 				verification,
 			};
@@ -438,6 +445,7 @@ async function runBuildEvaluatePhase(
 		let evalText = "";
 		let iteration = 0;
 		let lastVerification = runVerificationCommands([], runCwd, DEFAULT_HARNESS_POLICY);
+		let lastEvalConfidence: "high" | "medium" | "low" = "low";
 
 		while (!passed && iteration < params.iterations) {
 			widget.update({
@@ -508,6 +516,7 @@ async function runBuildEvaluatePhase(
 			});
 			evalText = evalRun.outputText;
 			const evalResult = parseEvalOutput(evalText, sprint.criteria);
+			lastEvalConfidence = evalResult.confidence;
 			passed = evalResult.verdict === "PASS" && lastVerification.status !== "failed";
 			widget.update({ reviewStatus: passed ? "passed" : "failed" });
 			const failedCriteria = evalResult.criteria.filter((c) => !c.passes);
@@ -595,10 +604,34 @@ async function runBuildEvaluatePhase(
 			tracker.appendState(`sprint ${i + 1} fix iter ${iteration + 1}`, `Generator attempted fixes for sprint ${i + 1}.`);
 		}
 
+		// Determine verdict: PASS only when deterministic verification passed.
+		// ATTESTED when LLM said PASS but no verification commands exist.
+		const hasVerifCommands = sprint.verificationCommands.length > 0;
+		let sprintVerdict: "PASS" | "FAIL" | "ATTESTED" | "UNVERIFIABLE";
+		if (!passed) {
+			sprintVerdict = "FAIL";
+		} else if (hasVerifCommands) {
+			sprintVerdict = "PASS";
+		} else {
+			sprintVerdict = "ATTESTED";
+		}
+
+		// Flag low-confidence passes
+		if (sprintVerdict === "PASS" && lastEvalConfidence === "low") {
+			notify(onUpdate, `  [low-confidence] Sprint ${i + 1} passed but evaluator confidence is low. Review manually.`, {
+				phase: "evaluation",
+				sprint: i + 1,
+				warning: "low-confidence pass",
+				confidence: "low",
+			});
+		}
+
 		const sprintResult: SprintResult = {
 			sprint: sprint.title,
 			iterations: Math.max(1, iteration + 1),
 			passed,
+			verdict: sprintVerdict,
+			confidence: lastEvalConfidence,
 			evalOutput: evalText,
 			verification: lastVerification,
 		};
@@ -609,6 +642,17 @@ async function runBuildEvaluatePhase(
 	}
 
 	return { results, passedSprintCount, failedSprintCount };
+}
+
+// ─── Report Helpers ──────────────────────────────────────────────────────────
+
+function verdictDisplay(verdict: string, confidence?: string): string {
+	switch (verdict) {
+		case "PASS": return `[✓] PASS${confidence === "low" ? " (low conf)" : confidence === "medium" ? " (med conf)" : ""}`;
+		case "ATTESTED": return "[~] ATTESTED";
+		case "UNVERIFIABLE": return "[?] UNVERIFIABLE";
+		default: return "[x] FAIL";
+	}
 }
 
 // ─── Phase 3: Report ─────────────────────────────────────────────────────────
@@ -625,10 +669,21 @@ function buildFinalReport(
 	traceSummary: RunTraceQualitySummary,
 ): string {
 	const allPassed = results.every((r) => r.passed);
+	const attestedCount = results.filter((r) => r.verdict === "ATTESTED").length;
+	const unverifiableCount = results.filter((r) => r.verdict === "UNVERIFIABLE").length;
+	const lowConfCount = results.filter((r) => r.verdict === "PASS" && r.confidence === "low").length;
+	const statusFlags = [
+		allPassed ? "[✓] All sprints passed" : "[!] Some sprints failed",
+		attestedCount > 0 ? `${attestedCount} ATTESTED` : "",
+		unverifiableCount > 0 ? `${unverifiableCount} UNVERIFIABLE` : "",
+		lowConfCount > 0 ? `${lowConfCount} low-confidence` : "",
+	].filter(Boolean).join(" · ");
+
 	const reportLines = results
 		.map((r, i) => {
 			const trace = traceSummary.items[i]?.level ?? "weak";
-			return `| ${i + 1} | ${r.sprint} | ${r.passed ? "[✓] PASS" : "[x] FAIL"} | ${r.verification?.status ?? "unknown"} | ${trace} | ${r.iterations} |`;
+			const disp = verdictDisplay(r.verdict, r.confidence);
+			return `| ${i + 1} | ${r.sprint} | ${disp} | ${r.verification?.status ?? "unknown"} | ${trace} | ${r.iterations} |`;
 		})
 		.join("\n");
 	const frictionLines = traceSummary.friction.length > 0
@@ -646,15 +701,18 @@ function buildFinalReport(
 		watch.attachCommand ? `**Watch**: ${watch.attachCommand}` : params.tmuxMode === "off" ? "**Watch**: off" : watch.warning ? `**Watch**: ${watch.warning}` : "",
 		watch.warning && watch.attachCommand ? `**Tmux note**: ${watch.warning}` : "",
 		workspace.isolated ? `**Workspace**: worktree — ${workspace.worktreePath}` : `**Workspace**: current — ${workspace.cwd}`,
+		`**Trust**: ${attestedCount + unverifiableCount > 0 ? "mixed (see verdicts)" : lowConfCount > 0 ? "medium (low-confidence passes)" : "high (deterministic)"}`,
 		`**Trace quality**: ${traceSummary.level} (${traceSummary.score}/${traceSummary.maxScore})`,
 		"| Sprint | Title | Result | Verification | Trace | Iterations |",
 		"|--------|-------|--------|--------------|-------|------------|",
 		reportLines,
 		...frictionLines,
 		"",
-		allPassed
-			? "All sprints passed. Consider integration testing, deployment, and polish."
-			: "Some sprints failed. Review evaluation output and apply fixes.",
+		allPassed && attestedCount === 0 && unverifiableCount === 0
+			? "All sprints passed with deterministic verification. Consider integration testing, deployment, and polish."
+			: allPassed && (attestedCount > 0 || unverifiableCount > 0)
+				? "All sprints passed but some are ATTESTED or UNVERIFIABLE. Review non-deterministic results."
+				: "Some sprints failed. Review evaluation output and apply fixes.",
 	].join("\n");
 }
 
@@ -753,6 +811,35 @@ export async function orchestrateHarnessRun(
 		warnings,
 		modelRegistry,
 	);
+
+	// Cross-model enforcement: evaluator must be a different model than generator.
+	const genLabel = `${resolvedModels.generator.provider}/${resolvedModels.generator.id}`;
+	const evalLabel = `${resolvedModels.evaluator.provider}/${resolvedModels.evaluator.id}`;
+	if (genLabel === evalLabel) {
+		widget.clear();
+		const errorContent: TextContent = {
+			type: "text" as const,
+			text: [
+				"[x] Evaluator and generator use the same model.",
+				"",
+				"The evaluator must be a different model than the generator to provide",
+				"an independent cross-check. Both are resolved to:",
+				`  ${genLabel}`,
+				"",
+				"Fix: configure a different evaluator model in:",
+				"  - The harness evaluatorAgent parameter, or",
+				"  - .pi/agents/harness-reviewer.md frontmatter (model: field)",
+				"",
+				"The evaluator model should be from a different provider or a",
+				"significantly different model family to ensure honest evaluation.",
+			].join("\n"),
+		};
+		return {
+			content: [errorContent],
+			details: { phase: "failed", error: "Same model for evaluator and generator", generator: genLabel },
+			isError: true,
+		};
+	}
 
 	for (const warning of warnings) {
 		notify(onUpdate, `[warn] ${warning}`, { phase: "configuration", warning });

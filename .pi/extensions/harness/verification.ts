@@ -13,7 +13,7 @@ export function runVerificationCommands(
 	cwd: string,
 	policy: HarnessPolicy = DEFAULT_HARNESS_POLICY,
 ): VerificationSummary {
-	if (commands.length === 0) return { status: "skipped", results: [] };
+	if (commands.length === 0) return { status: "unverifiable", results: [] };
 
 	const results: VerificationCommandResult[] = [];
 	for (const command of commands) {
@@ -62,7 +62,8 @@ export function runVerificationCommands(
 }
 
 export function formatVerificationSummary(summary: VerificationSummary): string {
-	if (summary.status === "skipped") return "Verification commands: skipped (none provided).";
+	if (summary.status === "skipped") return "Verification commands: skipped (commands existed but were not run).";
+	if (summary.status === "unverifiable") return "Verification commands: unverifiable (no commands declared).";
 	return [
 		`Verification commands: ${summary.status.toUpperCase()}`,
 		...summary.results.map((result) => [

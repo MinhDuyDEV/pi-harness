@@ -49,7 +49,7 @@ export function assessSprintTrace(sprint: Sprint, result: SprintResult | undefin
 	const deterministicRequired = requiresDeterministicProof(sprint);
 	if (verificationStatus === "passed") {
 		score++;
-	} else if (verificationStatus === "skipped" && !deterministicRequired) {
+	} else if ((verificationStatus === "skipped" || verificationStatus === "unverifiable") && !deterministicRequired) {
 		score++;
 	} else if (verificationStatus === "failed") {
 		friction.push(`${prefix}: deterministic verification failed.`);
