@@ -1,8 +1,4 @@
-function hasNerdFonts(): boolean {
-  if (process.env.POWERLINE_NERD_FONTS === "1") return true;
-  if (process.env.POWERLINE_NERD_FONTS === "0") return false;
-  return true;
-}
+import { hasNerdFonts } from "./helpers.ts";
 
 const NF_ICON_PROMPT = hasNerdFonts() ? "\ueab6 " : "> ";
 

@@ -1,18 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { GitInfo } from "./git-status.ts";
-
-// ── Nerd Font detection ────────────────────────────────────────────────────
-
-function hasNerdFonts(): boolean {
-  if (process.env.POWERLINE_NERD_FONTS === "1") return true;
-  if (process.env.POWERLINE_NERD_FONTS === "0") return false;
-  // Default true — almost all modern terminals support Nerd Fonts.
-  // Set POWERLINE_NERD_FONTS=0 to disable.
-  return true;
-}
-
-const NF = hasNerdFonts();
+import { NF, formatCost, fmtNum } from "./helpers.ts";
 
 // ── Icon helpers ───────────────────────────────────────────────────────────
 
@@ -106,19 +95,7 @@ function tokenBar(tokens: number, cw: number, costUsd: number, theme: Theme): Se
   return { text, width: visibleWidth(text) };
 }
 
-function formatCost(usd: number): string {
-  const safeUsd = Math.max(0, usd);
-  if (safeUsd > 0 && safeUsd < 0.01) return `$${safeUsd.toFixed(4)}`;
-  return `$${safeUsd.toFixed(2)}`;
-}
-
 function fmtContextNum(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return "" + n;
-}
-
-function fmtNum(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
   if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
   return "" + n;

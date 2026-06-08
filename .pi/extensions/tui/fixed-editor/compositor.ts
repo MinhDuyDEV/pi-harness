@@ -14,6 +14,7 @@
 
 import { isKeyRelease, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { type FixedClusterInput, type FixedClusterOutput, renderFixedCluster } from "./cluster.ts";
+import { stripAnsi } from "../helpers.ts";
 
 const MAX_RETAINED_ROOT_LINES = 2000;
 // 0 = no streaming root-render cache. Every Pi render pass calls originalTuiRender
@@ -264,10 +265,6 @@ function overrideColumns(target: { columns?: number } | undefined, columns: numb
       return () => {};
     }
   }
-}
-
-function stripAnsi(line: string): string {
-  return line.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b[@-_]/g, "");
 }
 
 function sliceColumns(text: string, startCol: number, endCol: number): string {

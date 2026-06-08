@@ -2,6 +2,7 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { GitInfo } from "./git-status.ts";
 import type { QueueState } from "./queue-panel.ts";
 import { hasOpenTodos, type TodosState } from "./todos-panel.ts";
+import { formatCost, fmtNum } from "./helpers.ts";
 
 const RESET = "\x1b[0m";
 const LABEL = "\x1b[97m";
@@ -140,12 +141,6 @@ function contextLine(state: SidebarState): string {
   return line;
 }
 
-function fmtNum(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return String(n);
-}
-
 function bottomIdentityRows(state: SidebarState): string[] {
   return [
     formatSidebarPath(state.cwd, state.git?.branch),
@@ -157,12 +152,6 @@ function formatSidebarPath(cwd: string, branch?: string): string {
   const home = process.env.HOME;
   const path = home && cwd.startsWith(`${home}/`) ? `~${cwd.slice(home.length)}` : (cwd || "cwd unknown");
   return branch ? `${path}:${branch}` : path;
-}
-
-function formatCost(usd: number): string {
-  const safeUsd = Math.max(0, usd);
-  if (safeUsd > 0 && safeUsd < 0.01) return `$${safeUsd.toFixed(4)}`;
-  return `$${safeUsd.toFixed(2)}`;
 }
 
 function padRight(content: string, width: number): string {

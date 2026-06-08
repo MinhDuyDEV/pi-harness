@@ -11,6 +11,7 @@
  */
 
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { stripAnsi } from "../helpers.ts";
 
 export const CURSOR_MARKER = "\x1b_pi:c\x07";
 
@@ -50,10 +51,6 @@ function norm(lines: string[] | undefined, width: number): string[] {
 function takeTail(lines: string[], n: number): string[] {
   if (n <= 0) return [];
   return lines.length <= n ? lines : lines.slice(lines.length - n);
-}
-
-function stripAnsi(line: string): string {
-  return line.replace(/\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07]*(?:\x07|\x1b\\)|\x1b[@-_]/g, "");
 }
 
 /**
