@@ -392,24 +392,24 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     };
   });
 
-  // OSC 9;4 terminal progress bar (tab bar / window title area)
-  // Keepalive interval re-emits the sequence every 1s — most terminals
-  // stop showing the progress bar if the sequence isn't refreshed.
-  const TERMINAL_PROGRESS_ACTIVE = "\x1b]9;4;3\x07";
-  const TERMINAL_PROGRESS_CLEAR = "\x1b]9;4;0;\x07";
-  const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
+  // Terminal progress indicator: title bar with spinner (works in all terminals
+  // including WezTerm, iTerm2, Kitty, etc.). Updated every 800ms during streaming.
+  const TITLE_PROGRESS_INTERVAL_MS = 800;
+  const TITLE_PROGRESS_FRAMES = ["◐", "◓", "◑", "◒"]; // ◐ ◓ ◑ ◒
 
   function startTerminalProgress() {
-    writeSync(process.stdout.fd, TERMINAL_PROGRESS_ACTIVE);
     if (progressKeepalive) clearInterval(progressKeepalive);
+    let frame = 0;
+    writeSync(process.stdout.fd, `\x1b]0;${TITLE_PROGRESS_FRAMES[0]} \u25B6 ${footer.modelLabel}\x07`);
     progressKeepalive = setInterval(() => {
-      writeSync(process.stdout.fd, TERMINAL_PROGRESS_ACTIVE);
-    }, TERMINAL_PROGRESS_KEEPALIVE_MS);
+      frame = (frame + 1) % TITLE_PROGRESS_FRAMES.length;
+      writeSync(process.stdout.fd, `\x1b]0;${TITLE_PROGRESS_FRAMES[frame]} \u25B6 ${footer.modelLabel}\x07`);
+    }, TITLE_PROGRESS_INTERVAL_MS);
     progressKeepalive.unref?.();
   }
 
   function stopTerminalProgress() {
-    writeSync(process.stdout.fd, TERMINAL_PROGRESS_CLEAR);
+    writeSync(process.stdout.fd, "\x1b]0;\x07");
     if (progressKeepalive) {
       clearInterval(progressKeepalive);
       progressKeepalive = null;
