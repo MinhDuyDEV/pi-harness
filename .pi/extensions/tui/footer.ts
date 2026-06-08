@@ -15,9 +15,7 @@ function iCache(): string    { return NF ? "󰆼" : "cache"; }
 function iTurn(): string     { return NF ? "" : "turn"; }
 function sep(): string       { return "·"; }
 
-// ── Spinner frames for streaming indicator ───────────────────────────────
 
-export const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 // ── Footer state ───────────────────────────────────────────────────────────
 
@@ -47,8 +45,6 @@ export interface FooterState {
   cacheHitRate: number | undefined;
   /** Session cost in USD reported by model usage events. */
   totalCostUsd: number;
-  /** Current spinner frame index for streaming indicator (0 when not set). */
-  spinnerFrame: number;
 }
 
 export function createDefaultFooterState(): FooterState {
@@ -70,7 +66,6 @@ export function createDefaultFooterState(): FooterState {
     turnCacheWriteTokens: 0,
     cacheHitRate: undefined,
     totalCostUsd: 0,
-    spinnerFrame: 0,
   };
 }
 
@@ -213,10 +208,6 @@ export function createFooterRenderer(state: FooterState) {
 
       let modelText = "";
       modelText += theme.fg("accent", state.modelLabel || "no model");
-      if (state.isStreaming) {
-        const spinner = SPINNER_FRAMES[state.spinnerFrame % SPINNER_FRAMES.length];
-        modelText = theme.fg("warning", spinner) + " " + modelText;
-      }
       L.push(seg(modelText));
 
       if (state.thinkingLevel) {

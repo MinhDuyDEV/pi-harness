@@ -14,7 +14,7 @@ import {
   renderTodosWidget,
   type TodosState,
 } from "./todos-panel.ts";
-import { createDefaultFooterState, createFooterRenderer, SPINNER_FRAMES } from "./footer.ts";
+import { createDefaultFooterState, createFooterRenderer } from "./footer.ts";
 import {
   refreshGitInfo,
   invalidateGitStatus,
@@ -97,6 +97,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let clipboardStatusTimer: ReturnType<typeof setTimeout> | null = null;
+  let progressKeepalive: ReturnType<typeof setInterval> | null = null;
   let turnStartTime = 0;
 
   // ── Streaming prompt state ─────────────────────────────────────────────
@@ -145,10 +146,6 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
         if (!footer.isStreaming) return;
         streamPromptAnimFrame = (streamPromptAnimFrame + 1) % STREAMING_PROMPT_FRAMES.length;
         setEditorStreamingPrompt(STREAMING_PROMPT_FRAMES[streamPromptAnimFrame]);
-
-        // Animate footer spinner frame and request redraw.
-        footer.spinnerFrame = (footer.spinnerFrame + 1) % SPINNER_FRAMES.length;
-        footer.tui?.requestRender();
       }, STREAMING_PROMPT_INTERVAL_MS);
       streamPromptAnimTimer.unref?.();
     }
@@ -156,7 +153,6 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
   function stopFooterAnim(ctx: ExtensionContext) {
     setEditorStreamingPrompt(null);
-    footer.spinnerFrame = 0;
     if (streamPromptAnimTimer) {
       clearInterval(streamPromptAnimTimer);
       streamPromptAnimTimer = null;
@@ -353,6 +349,10 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       clearInterval(streamPromptAnimTimer);
       streamPromptAnimTimer = null;
     }
+    if (progressKeepalive) {
+      clearInterval(progressKeepalive);
+      progressKeepalive = null;
+    }
     try {
       ctx.ui.setEditorComponent(undefined);
       ctx.ui.setFooter(undefined);
@@ -392,12 +392,32 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   });
 
   // OSC 9;4 terminal progress bar (tab bar / window title area)
+  // Keepalive interval re-emits the sequence every 1s — most terminals
+  // stop showing the progress bar if the sequence isn't refreshed.
   const TERMINAL_PROGRESS_ACTIVE = "\x1b]9;4;3\x07";
   const TERMINAL_PROGRESS_CLEAR = "\x1b]9;4;0;\x07";
+  const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
+
+  function startTerminalProgress() {
+    process.stdout.write(TERMINAL_PROGRESS_ACTIVE);
+    if (progressKeepalive) clearInterval(progressKeepalive);
+    progressKeepalive = setInterval(() => {
+      process.stdout.write(TERMINAL_PROGRESS_ACTIVE);
+    }, TERMINAL_PROGRESS_KEEPALIVE_MS);
+    progressKeepalive.unref?.();
+  }
+
+  function stopTerminalProgress() {
+    process.stdout.write(TERMINAL_PROGRESS_CLEAR);
+    if (progressKeepalive) {
+      clearInterval(progressKeepalive);
+      progressKeepalive = null;
+    }
+  }
 
   pi.on("agent_start", async (_event, ctx) => {
     footer.isStreaming = true;
-    process.stdout.write(TERMINAL_PROGRESS_ACTIVE);
+    startTerminalProgress();
     startFooterAnim(ctx);
     scheduleRefresh(ctx);
   });
@@ -460,7 +480,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     queue.onAgentEnd();
     footer.isStreaming = false;
-    process.stdout.write(TERMINAL_PROGRESS_CLEAR);
+    stopTerminalProgress();
     if (turnStartTime > 0) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
