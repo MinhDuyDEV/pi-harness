@@ -20,7 +20,7 @@
   },
   "sepStyle": "auto",
   "lineNumbers": true,
-  "indicatorStyle": "bar",
+  "indicatorStyle": "none",
   "longLines": "wrap",
   "fileHeader": true,
   "splitMinWidth": 150,

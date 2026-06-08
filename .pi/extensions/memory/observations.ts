@@ -5,7 +5,7 @@ import type {
 	SearchIndexResult,
 } from "./config.js";
 import { MEMORY_CONFIG } from "./config.js";
-import { getMemoryDB, getObservationsMissingEmbeddings, isSqliteVecAvailable } from "./db.js";
+import { getMemoryDB, getObservationsMissingEmbeddings, getObservationsMissingTQEmbeddings, isSqliteVecAvailable, isTurboQuantAvailable } from "./db.js";
 import { embed } from "./embeddings.js";
 
 // ---------------------------------------------------------------------------
@@ -64,6 +64,12 @@ export function storeObservation(input: ObservationInput): number {
 	embedAndStoreVector(insertedId, embeddingText).catch(() => {
 		// Embedding is best-effort — never block observation creation
 	});
+	// Also store TQ quantized embedding if enabled
+	if (isTurboQuantAvailable()) {
+		embedAndStoreVectorTQ(insertedId, embeddingText).catch(() => {
+			// TQ embedding is best-effort
+		});
+	}
 
 	return insertedId;
 }
@@ -110,6 +116,137 @@ async function embedAndStoreVector(observationId: number, text: string): Promise
 		).run(buf);
 	} catch (err) {
 		console.warn(`[memory] Failed to store vector for observation #${observationId}:`, err);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// TurboQuant embedding (quantized storage)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate embedding, quantize with TurboQuant, and store in TQ table.
+ * Falls back silently if TurboQuant is unavailable or quantization fails.
+ */
+async function embedAndStoreVectorTQ(observationId: number, text: string): Promise<void> {
+	if (!isTurboQuantAvailable()) return;
+	if (!Number.isInteger(observationId) || observationId < 0) return;
+
+	const embedding = await embed(text);
+	if (!embedding) return;
+
+	try {
+		const dim = MEMORY_CONFIG.embedding.dimensions;
+		const bitWidth = MEMORY_CONFIG.embedding.quantization.bitWidth;
+		const { TurboQuant } = await import("./turboquant/index.js");
+		const tq = new TurboQuant(dim, bitWidth);
+
+		const vec = new Float32Array(embedding);
+		const packed = tq.compress(vec, 1);
+
+		const db = getMemoryDB();
+		// Replace any existing TQ embedding for this observation
+		db.prepare(`DELETE FROM observation_embeddings_tq WHERE obs_id = ?`).run(observationId);
+		db.prepare(
+			`INSERT INTO observation_embeddings_tq(obs_id, packed, norm, scale, dim, bit_width)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+		).run(
+			observationId,
+			Buffer.from(packed.codes.buffer),
+			packed.norms[0],
+			packed.scales[0],
+			dim,
+			bitWidth,
+		);
+	} catch (err) {
+		console.warn(`[memory] Failed to store TQ embedding for observation #${observationId}:`, err);
+	}
+}
+
+/**
+ * Search observations using TurboQuant quantized embeddings.
+ * Loads all TQ embeddings, decompresses, and brute-force cosine similarity.
+ * Used as a fallback when sqlite-vec is unavailable.
+ */
+export function searchObservationsVectorTQ(
+	queryEmbedding: number[],
+	limit: number,
+): VectorSearchResult[] {
+	if (!isTurboQuantAvailable()) return [];
+	if (!Number.isInteger(limit) || limit < 1) return [];
+
+	try {
+		const db = getMemoryDB();
+		const dim = MEMORY_CONFIG.embedding.dimensions;
+		const bitWidth = MEMORY_CONFIG.embedding.quantization.bitWidth;
+
+		const { TurboQuant } = require("./turboquant/index.js");
+		const tq = new TurboQuant(dim, bitWidth);
+
+		// Load all TQ embeddings
+		const rows = db
+			.prepare(
+				`SELECT e.obs_id, e.packed, e.norm, e.scale
+				 FROM observation_embeddings_tq e
+				 JOIN observations o ON o.id = e.obs_id
+				 WHERE o.superseded_by IS NULL AND o.maturity != 'deprecated'`,
+			)
+			.all() as {
+			obs_id: number;
+			packed: Buffer;
+			norm: number;
+			scale: number;
+		}[];
+
+		if (rows.length === 0) return [];
+
+		const queryVec = new Float32Array(queryEmbedding);
+		let queryNorm = 0;
+		for (let i = 0; i < queryVec.length; i++) {
+			queryNorm += queryVec[i] * queryVec[i];
+		}
+		queryNorm = Math.sqrt(queryNorm);
+		const queryInv = queryNorm > 1e-10 ? 1 / queryNorm : 0;
+
+		// Score each: decompress → cosine
+		const results: Array<{ id: number; distance: number }> = [];
+
+		for (const row of rows) {
+			const packedBatch = {
+				codes: new Uint8Array(row.packed.buffer, row.packed.byteOffset, row.packed.byteLength),
+				norms: new Float32Array([row.norm]),
+				scales: new Float32Array([row.scale]),
+				n: 1,
+				dim,
+				bitWidth,
+			};
+
+			// Decompress to approximate embedding
+			const recon = tq.decompress(packedBatch);
+
+			// Cosine similarity
+			let dot = 0;
+			let reconNorm = 0;
+			for (let i = 0; i < dim; i++) {
+				dot += queryVec[i] * recon[i];
+				reconNorm += recon[i] * recon[i];
+			}
+			reconNorm = Math.sqrt(reconNorm);
+
+			const cosine = queryNorm > 1e-10 && reconNorm > 1e-10
+				? dot * queryInv / reconNorm
+				: 0;
+			// Convert similarity (0-1) to distance (0-2) matching sqlite-vec convention
+			const distance = 1 - Math.max(-1, Math.min(1, cosine));
+
+			results.push({ id: row.obs_id, distance });
+		}
+
+		// Sort by distance (ascending) and take top-k
+		results.sort((a, b) => a.distance - b.distance);
+		return results.slice(0, limit);
+	} catch (err) {
+		console.warn("[memory] TQ vector search failed:", err);
+		return [];
 	}
 }
 
@@ -317,6 +454,16 @@ export async function searchObservationsHybrid(
 				}
 			}
 		}
+	} else if (isTurboQuantAvailable()) {
+		// Fall back to TurboQuant quantized search when sqlite-vec unavailable
+		const queryEmbedding = await embed(query);
+		if (queryEmbedding) {
+			const tqResults = searchObservationsVectorTQ(queryEmbedding, candidateLimit);
+			for (const vr of tqResults) {
+				const similarity = Math.max(0, 1 - vr.distance);
+				vectorMap.set(vr.id, similarity);
+			}
+		}
 	}
 
 	// 3. Merge results
@@ -463,6 +610,54 @@ export async function backfillEmbeddings(): Promise<number> {
 			} as ObservationInput);
 
 			await embedAndStoreVector(id, text);
+			success++;
+		} catch {
+			// Skip individual failures, continue backfill
+		}
+	}
+
+	return success;
+}
+
+/**
+ * Backfill TurboQuant embeddings for observations missing from TQ table.
+ * Runs asynchronously, never throws.
+ */
+export async function backfillTQEmbeddings(): Promise<number> {
+	if (!isTurboQuantAvailable()) return 0;
+
+	const missingIds = getObservationsMissingTQEmbeddings();
+	if (missingIds.length === 0) return 0;
+
+	let success = 0;
+
+	for (const id of missingIds) {
+		try {
+			const db = getMemoryDB();
+			const row = db
+				.prepare(
+					`SELECT title, subtitle, narrative, concepts, facts
+					 FROM observations WHERE id = ?`,
+				)
+				.get(id) as {
+				title: string;
+				subtitle: string | null;
+				narrative: string | null;
+				concepts: string | null;
+				facts: string | null;
+			} | undefined;
+
+			if (!row) continue;
+
+			const text = buildEmbeddingText({
+				title: row.title,
+				subtitle: row.subtitle ?? undefined,
+				narrative: row.narrative ?? undefined,
+				concepts: row.concepts?.split(",").map((s) => s.trim()) ?? undefined,
+				facts: row.facts?.split(",").map((s) => s.trim()) ?? undefined,
+			} as ObservationInput);
+
+			await embedAndStoreVectorTQ(id, text);
 			success++;
 		} catch {
 			// Skip individual failures, continue backfill

@@ -31,7 +31,7 @@ import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
 import { distillSession } from "./memory/distill.js";
 import { clearEmbeddings, embed, warmupEmbeddings } from "./memory/embeddings.js";
 import { checkpointWAL, getDatabaseSizes, optimizeFTS5 } from "./memory/maintenance.js";
-import { backfillEmbeddings, getObservationStats } from "./memory/observations.js";
+import { backfillEmbeddings, backfillTQEmbeddings, getObservationStats } from "./memory/observations.js";
 import { getRelevantKnowledge, storeTemporalMessage } from "./memory/pipeline.js";
 import { sanitize } from "./memory/sanitize.js";
 import { refreshAllScores } from "./memory/scoring.js";
@@ -80,6 +80,7 @@ export default function memoryExtension(pi: ExtensionAPI): void {
 
 	// 3. Backfill embeddings for pre-existing observations (async, non-blocking)
 	backfillEmbeddings().catch(() => {});
+	backfillTQEmbeddings().catch(() => {});
 
 	// 3. Register event handlers
 	let lastMaintenanceAt = 0;

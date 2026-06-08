@@ -1,4 +1,9 @@
 {
+  "enabledModels": [
+    "opencode*",
+    "opencode-go*",
+    "openai-codex*"
+  ],
   "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4-flash",
   "defaultThinkingLevel": "xhigh",
@@ -49,7 +54,8 @@
   "terminal": {
     "showTerminalProgress": true,
     "clearOnShrink": true,
-    "showImages": false
+    "showImages": false,
+    "autoResize": true
   },
   "collapseChangelog": false,
   "enableInstallTelemetry": false,

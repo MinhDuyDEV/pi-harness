@@ -267,16 +267,23 @@ function initializeSchema(db: DatabaseSync): void {
 			)
 			.get() as { version: number } | undefined;
 
-		if (row && row.version >= 5) return; // Already at v5
+		if (row && row.version >= 6) return; // Already at v6
+
+		if (row && row.version === 5) {
+			migrateV5ToV6(db);
+			return;
+		}
 
 		if (row && row.version === 4) {
 			migrateV4ToV5(db);
+			migrateV5ToV6(db);
 			return;
 		}
 
 		if (row && row.version === 3) {
 			migrateV3ToV4(db);
 			migrateV4ToV5(db);
+			migrateV5ToV6(db);
 			return;
 		}
 
@@ -284,6 +291,7 @@ function initializeSchema(db: DatabaseSync): void {
 			migrateV2ToV3(db);
 			migrateV3ToV4(db);
 			migrateV4ToV5(db);
+			migrateV5ToV6(db);
 			return;
 		}
 
@@ -292,6 +300,7 @@ function initializeSchema(db: DatabaseSync): void {
 			migrateV2ToV3(db);
 			migrateV3ToV4(db);
 			migrateV4ToV5(db);
+			migrateV5ToV6(db);
 			return;
 		}
 	} catch {
@@ -319,10 +328,13 @@ function initializeSchema(db: DatabaseSync): void {
 		}
 	}
 
+	// Create TurboQuant embeddings table (additive, safe to run every time)
+	migrateV5ToV6(db);
+
 	// Record version
 	db.prepare(
 		"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
-	).run(5, new Date().toISOString());
+	).run(6, new Date().toISOString());
 }
 
 function migrateV1ToV2(db: DatabaseSync): void {
@@ -549,4 +561,70 @@ export function getObservationsMissingEmbeddings(): number[] {
 	} catch {
 		return [];
 	}
+}
+
+/**
+ * Check whether TurboQuant module can be loaded.
+ * Returns false if the import fails (missing @huggingface/transformers, etc.)
+ * but the TQ code itself has zero dependencies.
+ */
+export function isTurboQuantAvailable(): boolean {
+	try {
+		// Lazy-check: just verify the TQ module entry point exists
+		// The actual module has zero npm dependencies (pure math).
+		return MEMORY_CONFIG.embedding.quantization.enabled;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Returns observation IDs that have no TQ embedding.
+ */
+export function getObservationsMissingTQEmbeddings(): number[] {
+	if (!isTurboQuantAvailable()) return [];
+
+	try {
+		const db = getMemoryDB();
+		const rows = db
+			.prepare(
+				`SELECT o.id FROM observations o
+				 WHERE o.superseded_by IS NULL AND o.maturity != 'deprecated'
+				   AND o.id NOT IN (SELECT obs_id FROM observation_embeddings_tq)
+				 ORDER BY o.id`,
+			)
+			.all() as { id: number }[];
+		return rows.map((r) => r.id);
+	} catch {
+		return [];
+	}
+}
+
+// ---------------------------------------------------------------------------
+// V6 Migration: TurboQuant embedding table
+// ---------------------------------------------------------------------------
+
+function migrateV5ToV6(db: DatabaseSync): void {
+	// Create TQ embeddings table (safe to run every time via IF NOT EXISTS)
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS observation_embeddings_tq (
+			obs_id INTEGER PRIMARY KEY,
+			packed BLOB NOT NULL,
+			norm REAL NOT NULL,
+			scale REAL NOT NULL,
+			dim INTEGER NOT NULL DEFAULT 384,
+			bit_width INTEGER NOT NULL DEFAULT 4,
+			created_at TEXT NOT NULL DEFAULT (datetime('now')),
+			FOREIGN KEY(obs_id) REFERENCES observations(id) ON DELETE CASCADE
+		);
+	`);
+	// Index for backfill detection
+	db.exec(`
+		CREATE INDEX IF NOT EXISTS idx_tq_embeddings_obs ON observation_embeddings_tq(obs_id);
+	`);
+
+	// Record migration (no-op if already recorded)
+	db.prepare(
+		"INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)",
+	).run(6, new Date().toISOString());
 }
