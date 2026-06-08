@@ -17,7 +17,8 @@
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
-    "npm:@sting8k/pi-vcc"
+    "npm:@sting8k/pi-vcc",
+    "npm:@marckrenn/pi-sub-core"
   ],
   "compaction": {
     "enabled": true,

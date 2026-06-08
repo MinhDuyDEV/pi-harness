@@ -733,7 +733,9 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       isStreaming: () => footer.isStreaming,
       keyboardScrollShortcuts: ampTuiSettings.keyboardScrollShortcuts,
       onCopySelection: (text: string) => {
-        void copyToClipboard(text).catch(() => {
+        void copyToClipboard(text).then(() => {
+          ctx.ui.notify("Copied", "info");
+        }).catch(() => {
           ctx.ui.setStatus("tui-copy", "Clipboard copy failed");
           if (clipboardStatusTimer) clearTimeout(clipboardStatusTimer);
           clipboardStatusTimer = setTimeout(() => {
