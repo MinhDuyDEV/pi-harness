@@ -389,10 +389,19 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
 
 
-  pi.on("agent_start", async (_event, ctx) => {
+    pi.on("agent_start", async (_event, ctx) => {
     footer.isStreaming = true;
+    // Terminal progress bar (OSC 9;4;3) — Ghostty uses ST (ESC\) as recommended terminator
+    // Pi core emits this too via setProgress(), but emitting here ensures
+    // it works even if the compositor shadows the core's process.stdout.write.
+    process.stdout.write("\x1b]9;4;3\x1b\\");
     startFooterAnim(ctx);
     scheduleRefresh(ctx);
+  });
+
+  pi.on("tool_start", async () => {
+    // Keepalive — Ghostty has a 15s timeout; re-emit every 5s
+    process.stdout.write("\x1b]9;4;3\x1b\\");
   });
 
   pi.on("turn_start", async (_event, ctx) => {
@@ -453,6 +462,8 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     queue.onAgentEnd();
     footer.isStreaming = false;
+    // Clear terminal progress bar
+    process.stdout.write("\x1b]9;4;0\x1b\\");
     if (turnStartTime > 0) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
