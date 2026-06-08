@@ -349,6 +349,10 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       clearInterval(streamPromptAnimTimer);
       streamPromptAnimTimer = null;
     }
+    if (progressKeepalive) {
+      clearInterval(progressKeepalive);
+      progressKeepalive = null;
+    }
     try {
       ctx.ui.setEditorComponent(undefined);
       ctx.ui.setFooter(undefined);
@@ -389,19 +393,25 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
 
 
-    pi.on("agent_start", async (_event, ctx) => {
+  const inTmux = !!process.env.TMUX;
+
+  /** Emit OSC 9;4 — if inside tmux, use passthrough DCS to bypass tmux processing. */
+  function emitOscProgress(sequence: string) {
+    if (inTmux) {
+      // Tmux passthrough: DCS tmux; <escaped-data> ST
+      // Each 0x1b in data is doubled to escape it.
+      const escaped = sequence.replace(/\x1b/g, "\x1b\x1b");
+      process.stdout.write(`\x1bPtmux;${escaped}\x1b\\`);
+    } else {
+      process.stdout.write(sequence);
+    }
+  }
+
+  pi.on("agent_start", async (_event, ctx) => {
     footer.isStreaming = true;
-    // Terminal progress bar (OSC 9;4;3) — Ghostty uses ST (ESC\) as recommended terminator
-    // Pi core emits this too via setProgress(), but emitting here ensures
-    // it works even if the compositor shadows the core's process.stdout.write.
-    process.stdout.write("\x1b]9;4;3\x1b\\");
+    emitOscProgress("\x1b]9;4;3\x1b\\");
     startFooterAnim(ctx);
     scheduleRefresh(ctx);
-  });
-
-  pi.on("tool_start", async () => {
-    // Keepalive — Ghostty has a 15s timeout; re-emit every 5s
-    process.stdout.write("\x1b]9;4;3\x1b\\");
   });
 
   pi.on("turn_start", async (_event, ctx) => {
@@ -462,8 +472,8 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     queue.onAgentEnd();
     footer.isStreaming = false;
-    // Clear terminal progress bar
-    process.stdout.write("\x1b]9;4;0\x1b\\");
+    // Clear terminal progress bar (via tmux passthrough if needed)
+    emitOscProgress("\x1b]9;4;0\x1b\\");
     if (turnStartTime > 0) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
