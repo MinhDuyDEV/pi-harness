@@ -39,6 +39,8 @@ export interface FooterState {
   turnCacheReadTokens: number;
   /** Cache-write tokens reported for the current turn. */
   turnCacheWriteTokens: number;
+  /** Cache hit rate percentage (0–100), or undefined when no cache activity. */
+  cacheHitRate: number | undefined;
   /** Session cost in USD reported by model usage events. */
   totalCostUsd: number;
 }
@@ -60,11 +62,14 @@ export function createDefaultFooterState(): FooterState {
     turnOutputTokens: 0,
     turnCacheReadTokens: 0,
     turnCacheWriteTokens: 0,
+    cacheHitRate: undefined,
     totalCostUsd: 0,
   };
 }
 
 // ── Segment helpers ────────────────────────────────────────────────────────
+
+function iCH(): string    { return NF ? "" : "CH"; }
 
 interface Seg {
   text: string;
@@ -112,12 +117,16 @@ function formatDuration(ms: number): string {
 }
 
 function turnStats(state: FooterState, theme: Theme): Seg {
-  const text = [
+  const parts = [
     `${iInput()} ${fmtNum(state.turnInputTokens)}`,
     `${iOutput()} ${fmtNum(state.turnOutputTokens)}`,
     `${iCache()} ${fmtNum(state.turnCacheReadTokens)}/${fmtNum(state.turnCacheWriteTokens)}`,
-    `${iTurn()} ${formatDuration(state.turnElapsed)}`,
-  ].join(" · ");
+  ];
+  if (state.cacheHitRate !== undefined) {
+    parts.push(`${iCH()} ${state.cacheHitRate.toFixed(0)}%`);
+  }
+  parts.push(`${iTurn()} ${formatDuration(state.turnElapsed)}`);
+  const text = parts.join(" · ");
   return seg(theme.fg("dim", `[${text}]`));
 }
 

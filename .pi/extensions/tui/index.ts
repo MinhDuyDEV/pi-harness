@@ -119,6 +119,10 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     footer.turnOutputTokens = metrics.output;
     footer.turnCacheReadTokens = metrics.cacheRead;
     footer.turnCacheWriteTokens = metrics.cacheWrite;
+    const totalCache = metrics.cacheRead + metrics.cacheWrite;
+    footer.cacheHitRate = totalCache > 0
+      ? Math.round((metrics.cacheRead / totalCache) * 100)
+      : undefined;
   }
 
   function startFooterAnim(ctx: ExtensionContext) {
@@ -275,6 +279,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     footer.turnOutputTokens = 0;
     footer.turnCacheReadTokens = 0;
     footer.turnCacheWriteTokens = 0;
+    footer.cacheHitRate = undefined;
     footer.totalCostUsd = 0;
     turnStartTime = 0;
 
@@ -664,6 +669,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       git: footer.git,
       turnCacheReadTokens: footer.turnCacheReadTokens,
       turnCacheWriteTokens: footer.turnCacheWriteTokens,
+      cacheHitRate: footer.cacheHitRate,
       costUsd: footer.totalCostUsd,
       todos: todosState.items.map((item) => `${item.done ? "x" : " "}:${item.text}`).join("|"),
       sidebar: {

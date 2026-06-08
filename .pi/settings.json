@@ -47,7 +47,7 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.78.1",
+  "lastChangelogVersion": "0.79.0",
   "treeFilterMode": "default",
   "transport": "sse",
   "hideThinkingBlock": false,
