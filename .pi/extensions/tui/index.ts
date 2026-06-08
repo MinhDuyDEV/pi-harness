@@ -1,4 +1,4 @@
-import { writeSync } from "node:fs";
+
 import {
   copyToClipboard,
   VERSION,
@@ -98,7 +98,6 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let clipboardStatusTimer: ReturnType<typeof setTimeout> | null = null;
-  let progressKeepalive: ReturnType<typeof setInterval> | null = null;
   let turnStartTime = 0;
 
   // ── Streaming prompt state ─────────────────────────────────────────────
@@ -350,10 +349,6 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       clearInterval(streamPromptAnimTimer);
       streamPromptAnimTimer = null;
     }
-    if (progressKeepalive) {
-      clearInterval(progressKeepalive);
-      progressKeepalive = null;
-    }
     try {
       ctx.ui.setEditorComponent(undefined);
       ctx.ui.setFooter(undefined);
@@ -392,33 +387,10 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     };
   });
 
-  // Terminal progress indicator: title bar with spinner (works in all terminals
-  // including WezTerm, iTerm2, Kitty, etc.). Updated every 800ms during streaming.
-  const TITLE_PROGRESS_INTERVAL_MS = 800;
-  const TITLE_PROGRESS_FRAMES = ["◐", "◓", "◑", "◒"]; // ◐ ◓ ◑ ◒
 
-  function startTerminalProgress() {
-    if (progressKeepalive) clearInterval(progressKeepalive);
-    let frame = 0;
-    writeSync(process.stdout.fd, `\x1b]0;${TITLE_PROGRESS_FRAMES[0]} \u25B6 ${footer.modelLabel}\x07`);
-    progressKeepalive = setInterval(() => {
-      frame = (frame + 1) % TITLE_PROGRESS_FRAMES.length;
-      writeSync(process.stdout.fd, `\x1b]0;${TITLE_PROGRESS_FRAMES[frame]} \u25B6 ${footer.modelLabel}\x07`);
-    }, TITLE_PROGRESS_INTERVAL_MS);
-    progressKeepalive.unref?.();
-  }
-
-  function stopTerminalProgress() {
-    writeSync(process.stdout.fd, "\x1b]0;\x07");
-    if (progressKeepalive) {
-      clearInterval(progressKeepalive);
-      progressKeepalive = null;
-    }
-  }
 
   pi.on("agent_start", async (_event, ctx) => {
     footer.isStreaming = true;
-    startTerminalProgress();
     startFooterAnim(ctx);
     scheduleRefresh(ctx);
   });
@@ -481,7 +453,6 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     queue.onAgentEnd();
     footer.isStreaming = false;
-    stopTerminalProgress();
     if (turnStartTime > 0) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
