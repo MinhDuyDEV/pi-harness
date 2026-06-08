@@ -31,6 +31,7 @@ const OUTPUT_FORMAT_GUIDE = `<status>success|failure|blocked|partial</status>
 <summary>One sentence: what was accomplished</summary>
 <findings>Key findings with file:line references</findings>
 <evidence>Verification evidence, commands run, output snippets</evidence>
+<confidence>high|medium|low (optional — how certain the findings are)</confidence>
 <files>Comma-separated absolute paths of files read/created (optional)</files>`;
 
 // Cached regex patterns for XML result parsing
@@ -38,6 +39,7 @@ const STATUS_RE = /<status>([\s\S]*?)<\/status>/i;
 const SUMMARY_RE = /<summary>([\s\S]*?)<\/summary>/i;
 const FINDINGS_RE = /<findings>([\s\S]*?)<\/findings>/i;
 const EVIDENCE_RE = /<evidence>([\s\S]*?)<\/evidence>/i;
+const CONFIDENCE_RE = /<confidence>([\s\S]*?)<\/confidence>/i;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,7 @@ interface ParsedResult {
   summary: string;
   findings: string;
   evidence: string;
+  confidence: string;
   raw: string;
 }
 
@@ -82,6 +85,7 @@ interface TaskDetails {
   summary?: string;
   findings?: string;
   evidence?: string;
+  confidence?: string;
   duration_ms?: number;
   turn_count?: number;
   tool_uses?: number;
@@ -188,15 +192,19 @@ function parseResultXml(raw: string): ParsedResult {
       summary: raw.slice(0, 500),
       findings: "",
       evidence: "",
+      confidence: "",
       raw,
     };
   }
+
+  const confidence = extractTag(raw, CONFIDENCE_RE);
 
   return {
     status: status || "unknown",
     summary: extractTag(raw, SUMMARY_RE) || "",
     findings: extractTag(raw, FINDINGS_RE) || "",
     evidence: extractTag(raw, EVIDENCE_RE) || "",
+    confidence: confidence || "",
     raw,
   };
 }
@@ -450,6 +458,7 @@ export default function (pi: ExtensionAPI) {
           summary: parsed.summary,
           findings: parsed.findings,
           evidence: parsed.evidence,
+          confidence: parsed.confidence,
           result: content,
           duration_ms: durationMs,
           tool_uses: toolUses,
@@ -479,6 +488,7 @@ export default function (pi: ExtensionAPI) {
     const status = (d.status as string) || "";
     const summary = (d.summary as string) || "";
     const findings = (d.findings as string) || "";
+    const confidence = (d.confidence as string) || "";
     const durationMs = (d.duration_ms as number) || 0;
     const toolUses = (d.tool_uses as number) || 0;
     const turns = (d.turn_count as number) || 0;
@@ -495,8 +505,13 @@ export default function (pi: ExtensionAPI) {
     const statsParts = [useStr, durStr].filter(Boolean);
     if (statsParts.length) {
       line += "\n" + theme.fg("dim", `${statsParts.join(" • ")}`);
-    } else if (expanded && summary) {
-      line += "\n" + theme.fg("muted", `  ${summary}`);
+    }
+
+    // ── Confidence line: shown when present
+    const confStr = confidence ? `${confidence.toUpperCase()}` : "";
+    if (confStr && (statsParts.length || expanded)) {
+      const confColor = confidence === "high" ? "success" : confidence === "low" ? "error" : "accent";
+      line += "\n" + theme.fg(confColor as any, `[${confStr}]`);
     }
 
     if (expanded) {
