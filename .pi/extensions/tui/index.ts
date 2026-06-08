@@ -14,7 +14,7 @@ import {
   renderTodosWidget,
   type TodosState,
 } from "./todos-panel.ts";
-import { createDefaultFooterState, createFooterRenderer } from "./footer.ts";
+import { createDefaultFooterState, createFooterRenderer, SPINNER_FRAMES } from "./footer.ts";
 import {
   refreshGitInfo,
   invalidateGitStatus,
@@ -145,6 +145,10 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
         if (!footer.isStreaming) return;
         streamPromptAnimFrame = (streamPromptAnimFrame + 1) % STREAMING_PROMPT_FRAMES.length;
         setEditorStreamingPrompt(STREAMING_PROMPT_FRAMES[streamPromptAnimFrame]);
+
+        // Animate footer spinner frame and request redraw.
+        footer.spinnerFrame = (footer.spinnerFrame + 1) % SPINNER_FRAMES.length;
+        footer.tui?.requestRender();
       }, STREAMING_PROMPT_INTERVAL_MS);
       streamPromptAnimTimer.unref?.();
     }
@@ -152,6 +156,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
 
   function stopFooterAnim(ctx: ExtensionContext) {
     setEditorStreamingPrompt(null);
+    footer.spinnerFrame = 0;
     if (streamPromptAnimTimer) {
       clearInterval(streamPromptAnimTimer);
       streamPromptAnimTimer = null;
@@ -386,8 +391,13 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     };
   });
 
+  // OSC 9;4 terminal progress bar (tab bar / window title area)
+  const TERMINAL_PROGRESS_ACTIVE = "\x1b]9;4;3\x07";
+  const TERMINAL_PROGRESS_CLEAR = "\x1b]9;4;0;\x07";
+
   pi.on("agent_start", async (_event, ctx) => {
     footer.isStreaming = true;
+    process.stdout.write(TERMINAL_PROGRESS_ACTIVE);
     startFooterAnim(ctx);
     scheduleRefresh(ctx);
   });
@@ -450,6 +460,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     queue.onAgentEnd();
     footer.isStreaming = false;
+    process.stdout.write(TERMINAL_PROGRESS_CLEAR);
     if (turnStartTime > 0) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
