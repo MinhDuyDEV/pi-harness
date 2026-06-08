@@ -12,9 +12,43 @@
  *  - Cluster cached until editor/footer/widget state or terminal size changes
  */
 
-import { isKeyRelease, matchesKey, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import { type FixedClusterInput, type FixedClusterOutput, renderFixedCluster } from "./cluster.ts";
 import { stripAnsi } from "../helpers.ts";
+import {
+  beginSynchronizedOutput,
+  clearLine,
+  disableAutoWrap,
+  disableMouseReporting,
+  emergencyTerminalModeReset,
+  enableAutoWrap,
+  enableMouseReporting,
+  endSynchronizedOutput,
+  hideCursor,
+  moveCursor,
+  overrideColumns,
+  padLineToWidth,
+  resetScrollRegion,
+  restoreCursor,
+  sanitizeLine,
+  saveCursor,
+  setScrollRegion,
+  showCursor,
+  sliceColumns,
+} from "./terminal-escape.ts";
+import {
+  type KeyboardScrollShortcuts,
+  type ScrollAction,
+  type SgrPacket,
+  DEFAULT_KEYBOARD_SCROLL_SHORTCUTS,
+  isLeftDrag,
+  isLeftPress,
+  isMouseRelease,
+  isRightPress,
+  mouseScrollDelta,
+  parseScrollAction,
+  parseSgrMouse,
+} from "./input.ts";
 
 const MAX_RETAINED_ROOT_LINES = 2000;
 // 0 = no streaming root-render cache. Every Pi render pass calls originalTuiRender
@@ -23,260 +57,15 @@ const MAX_RETAINED_ROOT_LINES = 2000;
 // Set to >0 (e.g. 32) to trade ~50% fewer full renders for slight visible delay.
 const STREAMING_ROOT_RENDER_THROTTLE_MS = 0;
 
-declare const process: {
-  once(event: "exit", listener: () => void): void;
-  removeListener(event: "exit", listener: () => void): void;
-  stdout?: { columns?: number };
-  stderr?: { columns?: number };
-};
+// Re-export for backward compatibility (used by index.ts)
+export { emergencyTerminalModeReset };
 
-// ── Terminal helpers ────────────────────────────────────────────────────────
-
-function setScrollRegion(top: number, bottom: number): string {
-  return `\x1b[${top};${bottom}r`;
-}
-function resetScrollRegion(): string {
-  return "\x1b[r";
-}
-function moveCursor(row: number, col: number): string {
-  return `\x1b[${row};${col}H`;
-}
-function clearLine(): string {
-  return "\x1b[2K";
-}
-function hideCursor(): string {
-  return "\x1b[?25l";
-}
-function showCursor(): string {
-  return "\x1b[?25h";
-}
-function saveCursor(): string {
-  return "\x1b[s";
-}
-function restoreCursor(): string {
-  return "\x1b[u";
-}
-function enableMouseReporting(): string {
-  return "\x1b[?1000h\x1b[?1002h\x1b[?1006h\x1b[?1007l";
-}
-function disableMouseReporting(): string {
-  return "\x1b[?1002l\x1b[?1000l\x1b[?1006l\x1b[?1007h";
-}
-function beginSynchronizedOutput(): string {
-  return "\x1b[?2026h";
-}
-function endSynchronizedOutput(): string {
-  return "\x1b[?2026l";
-}
-function disableAutoWrap(): string {
-  return "\x1b[?7l";
-}
-function enableAutoWrap(): string {
-  return "\x1b[?7h";
-}
-function enableAlternateScrollMode(): string {
-  return "\x1b[?1007h";
-}
-function resetExtendedKeyboardModes(): string {
-  return "\x1b[<999u\x1b[>4;0m";
-}
-
-export function emergencyTerminalModeReset(): string {
-  return beginSynchronizedOutput()
-    + resetScrollRegion()
-    + enableAutoWrap()
-    + showCursor()
-    + disableMouseReporting()
-    + enableAlternateScrollMode()
-    + resetExtendedKeyboardModes()
-    + endSynchronizedOutput();
-}
-
-// ── Keyboard scroll detection ───────────────────────────────────────────────
-
-interface KeyboardScrollShortcuts {
-  up: string;
-  down: string;
-  top?: string;
-  bottom?: string;
-}
-
-type ScrollAction =
-  | { kind: "scroll"; delta: number }
-  | { kind: "top" }
-  | { kind: "bottom" };
-
-const DEFAULT_KEYBOARD_SCROLL_SHORTCUTS: Required<KeyboardScrollShortcuts> = {
-  up: "super+up",
-  down: "super+down",
-  top: "super+home",
-  bottom: "super+end",
-};
 const DOUBLE_CLICK_MS = 500;
 const CONTEXT_MENU_MOUSE_REPORTING_PAUSE_MS = 1200;
 const CONTEXT_MENU_SELECTION_RESTORE_WINDOW_MS = 5000;
 const CONTEXT_MENU_CLIPBOARD_RESTORE_INTERVAL_MS = 100;
 const SCROLLBAR_TRACK = "\x1b[48;5;238m \x1b[0m";
 const SCROLLBAR_THUMB = "\x1b[48;5;244m \x1b[0m";
-
-const SUPER_SHORTCUT_PATTERNS = new Map<string, RegExp>([
-  ["super+up", /^\x1b\[(?:1;9(?::[12])?[AH]|574(?:19|23);9(?::[12])?u|7;9(?::[12])?~|27;9;65~)$/],
-  ["super+down", /^\x1b\[(?:1;9(?::[12])?[BF]|574(?:20|24);9(?::[12])?u|8;9(?::[12])?~|27;9;66~)$/],
-  ["super+home", /^\x1b\[(?:1;9(?::[12])?H|57423;9(?::[12])?u|7;9(?::[12])?~)$/],
-  ["super+end", /^\x1b\[(?:1;9(?::[12])?F|57424;9(?::[12])?u|8;9(?::[12])?~)$/],
-  ["super+pageup", /^\x1b\[(?:5;9(?::[12])?~|57421;9(?::[12])?u)$/],
-  ["super+pagedown", /^\x1b\[(?:6;9(?::[12])?~|57422;9(?::[12])?u)$/],
-]);
-
-function matchesConfiguredShortcut(data: string, shortcut: string): boolean {
-  const normalized = shortcut.toLowerCase();
-  if (normalized.includes("super+")) {
-    return SUPER_SHORTCUT_PATTERNS.get(normalized)?.test(data) ?? false;
-  }
-  return matchesKey(data, shortcut as Parameters<typeof matchesKey>[1]);
-}
-
-function parseScrollAction(
-  data: string,
-  shortcuts: KeyboardScrollShortcuts = DEFAULT_KEYBOARD_SCROLL_SHORTCUTS,
-): ScrollAction | null {
-  if (isKeyRelease(data)) return null;
-
-  const top = shortcuts.top ?? DEFAULT_KEYBOARD_SCROLL_SHORTCUTS.top;
-  const bottom = shortcuts.bottom ?? DEFAULT_KEYBOARD_SCROLL_SHORTCUTS.bottom;
-  if (
-    matchesConfiguredShortcut(data, top) ||
-    matchesKey(data, "ctrl+shift+home") ||
-    /^\x1b\[(?:1;6(?::[12])?H|57423;6(?::[12])?u|7;6(?::[12])?~)$/.test(data)
-  ) return { kind: "top" };
-  if (
-    matchesConfiguredShortcut(data, bottom) ||
-    matchesKey(data, "ctrl+shift+end") ||
-    /^\x1b\[(?:1;6(?::[12])?F|57424;6(?::[12])?u|8;6(?::[12])?~)$/.test(data)
-  ) return { kind: "bottom" };
-
-  if (
-    matchesConfiguredShortcut(data, shortcuts.up) ||
-    matchesKey(data, "pageUp") ||
-    matchesKey(data, "ctrl+shift+up") ||
-    /^\x1b\[(?:5;9(?::[12])?~|1;6(?::[12])?A|57421;9(?::[12])?u|57419;6(?::[12])?u)$/.test(data)
-  ) return { kind: "scroll", delta: 10 };
-  if (
-    matchesConfiguredShortcut(data, shortcuts.down) ||
-    matchesKey(data, "pageDown") ||
-    matchesKey(data, "ctrl+shift+down") ||
-    /^\x1b\[(?:6;9(?::[12])?~|1;6(?::[12])?B|57422;9(?::[12])?u|57420;6(?::[12])?u)$/.test(data)
-  ) return { kind: "scroll", delta: -10 };
-  return null;
-}
-
-// ── SGR mouse parsing ───────────────────────────────────────────────────────
-
-interface SgrPacket {
-  code: number;
-  col: number;
-  row: number;
-  final: "M" | "m";
-}
-
-function parseSgrMouse(input: string): SgrPacket[] | null {
-  const re = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g;
-  const packets: SgrPacket[] = [];
-  let last = 0;
-  for (const m of input.matchAll(re)) {
-    if (m.index !== last) return null;
-    last = m.index + m[0].length;
-    packets.push({
-      code: Number(m[1]),
-      col: Number(m[2]),
-      row: Number(m[3]),
-      final: m[4] as "M" | "m",
-    });
-  }
-  return packets.length > 0 && last === input.length ? packets : null;
-}
-
-function mouseBase(code: number): number {
-  return code & ~(4 | 8 | 16 | 32);
-}
-
-function mouseScrollDelta(pkt: SgrPacket): number {
-  if (pkt.final !== "M") return 0;
-  const b = mouseBase(pkt.code);
-  if (b === 64) return 3;
-  if (b === 65) return -3;
-  return 0;
-}
-
-function isLeftPress(pkt: SgrPacket): boolean {
-  return pkt.final === "M" && mouseBase(pkt.code) === 0 && (pkt.code & 32) === 0;
-}
-function isLeftDrag(pkt: SgrPacket): boolean {
-  return pkt.final === "M" && mouseBase(pkt.code) === 0 && (pkt.code & 32) !== 0;
-}
-function isRightPress(pkt: SgrPacket): boolean {
-  return pkt.final === "M" && mouseBase(pkt.code) === 2 && (pkt.code & 32) === 0;
-}
-function isMouseRelease(pkt: SgrPacket): boolean {
-  return pkt.final === "m";
-}
-
-// ── Utilities ───────────────────────────────────────────────────────────────
-
-function sanitizeLine(line: string, width: number): string {
-  const vw = visibleWidth(line);
-  if (vw <= width) return line;
-  return truncateToWidth(line, width, "", true);
-}
-
-function padLineToWidth(line: string, width: number): string {
-  const sanitized = sanitizeLine(line, width);
-  const padding = Math.max(0, width - visibleWidth(sanitized));
-  return sanitized + " ".repeat(padding);
-}
-
-function overrideColumns(target: { columns?: number } | undefined, columns: number): () => void {
-  if (!target) return () => {};
-  const descriptor = Object.getOwnPropertyDescriptor(target, "columns");
-  const previous = target.columns;
-  try {
-    Object.defineProperty(target, "columns", {
-      configurable: true,
-      get: () => columns,
-    });
-    return () => {
-      if (descriptor) {
-        Object.defineProperty(target, "columns", descriptor);
-      } else {
-        Reflect.deleteProperty(target, "columns");
-      }
-    };
-  } catch {
-    try {
-      target.columns = columns;
-      return () => {
-        try {
-          target.columns = previous;
-        } catch {
-          // Best-effort restoration for unusual terminal objects.
-        }
-      };
-    } catch {
-      return () => {};
-    }
-  }
-}
-
-function sliceColumns(text: string, startCol: number, endCol: number): string {
-  let col = 0;
-  let result = "";
-  for (const char of Array.from(text)) {
-    const width = Math.max(0, visibleWidth(char));
-    if (col >= startCol && col < endCol) result += char;
-    col += width;
-  }
-  return result;
-}
 
 // ── Renderable patch ────────────────────────────────────────────────────────
 
