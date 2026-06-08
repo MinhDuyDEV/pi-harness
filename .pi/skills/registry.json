@@ -1,8 +1,8 @@
 {
   "generated_by": "registry sync from .pi/skills/*/SKILL.md",
-  "active_skill_count": 72,
-  "core_skill_count": 39,
-  "optional_skill_count": 33,
+  "active_skill_count": 75,
+  "core_skill_count": 40,
+  "optional_skill_count": 35,
   "routing_schema_version": 1,
   "routing_notes": "role_usage is a conservative hint for harness skill selection; it is not an auto-load instruction.",
   "skills": [
@@ -68,6 +68,39 @@
       ]
     },
     {
+      "name": "aislop",
+      "path": "skills/aislop/SKILL.md",
+      "description": "Use when checking for AI-generated code slop \u2014 narrative comments, swallowed exceptions, console.log leftovers, as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind",
+      "version": "1.0.0",
+      "tags": [
+        "code-quality",
+        "static-analysis"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "bash"
+      ],
+      "status": "optional",
+      "pack": "code-quality",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "AI-generated code slop",
+        "narrative comments",
+        "swallowed exceptions",
+        "debug leftovers"
+      ]
+    },
+    {
       "name": "api-and-interface-design",
       "path": "skills/api-and-interface-design/SKILL.md",
       "description": "Use when designing REST/GraphQL APIs, SDK interfaces, or public module boundaries \u2014 covers contract-first design, versioning, error shapes, and backward compatibility",
@@ -85,6 +118,38 @@
       "tools": [],
       "status": "core",
       "pack": "core"
+    },
+    {
+      "name": "ast-grep",
+      "path": "skills/ast-grep/SKILL.md",
+      "description": "Use when searching for code patterns structurally, finding anti-patterns, enforcing conventions, or checking for specific AST patterns across the codebase \u2014 ast-grep is an AST-aware structural code search tool (like grep for syntax trees). Supports TS/JS, Rust, Go, Python, Java, and more.",
+      "version": "1.0.0",
+      "tags": [
+        "code-quality",
+        "static-analysis"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "bash"
+      ],
+      "status": "optional",
+      "pack": "code-quality",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "AST pattern search",
+        "structural code search",
+        "anti-pattern detection"
+      ]
     },
     {
       "name": "beads",
@@ -512,6 +577,27 @@
         "reproduce minimise hypothesise instrument fix",
         "multiple failed fix attempts"
       ]
+    },
+    {
+      "name": "diagnostics",
+      "path": "skills/diagnostics/SKILL.md",
+      "description": "Use when checking for code errors, type issues, or lint warnings after making changes, before committing, or when troubleshooting build failures",
+      "version": "1.1.0",
+      "tags": [
+        "code-quality",
+        "static-analysis"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "bash"
+      ],
+      "status": "core",
+      "pack": "core"
     },
     {
       "name": "documentation-and-adrs",
