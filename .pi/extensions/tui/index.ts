@@ -1,3 +1,4 @@
+import { writeSync } from "node:fs";
 import {
   copyToClipboard,
   VERSION,
@@ -399,16 +400,16 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
   const TERMINAL_PROGRESS_KEEPALIVE_MS = 1000;
 
   function startTerminalProgress() {
-    process.stdout.write(TERMINAL_PROGRESS_ACTIVE);
+    writeSync(process.stdout.fd, TERMINAL_PROGRESS_ACTIVE);
     if (progressKeepalive) clearInterval(progressKeepalive);
     progressKeepalive = setInterval(() => {
-      process.stdout.write(TERMINAL_PROGRESS_ACTIVE);
+      writeSync(process.stdout.fd, TERMINAL_PROGRESS_ACTIVE);
     }, TERMINAL_PROGRESS_KEEPALIVE_MS);
     progressKeepalive.unref?.();
   }
 
   function stopTerminalProgress() {
-    process.stdout.write(TERMINAL_PROGRESS_CLEAR);
+    writeSync(process.stdout.fd, TERMINAL_PROGRESS_CLEAR);
     if (progressKeepalive) {
       clearInterval(progressKeepalive);
       progressKeepalive = null;
