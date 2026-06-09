@@ -88,6 +88,46 @@
       "source": ".pi/skills/quality-loop/",
       "sourceType": "local",
       "trust": "pinned"
+    },
+    "aislop": {
+      "source": "~/.pi/agent/skills/aislop/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "ast-grep": {
+      "source": "~/.pi/agent/skills/ast-grep/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "diagnostics": {
+      "source": "~/.pi/agent/skills/diagnostics/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "effect-http-api": {
+      "source": "~/.pi/agent/skills/effect-http-api/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "effect-schema": {
+      "source": "~/.pi/agent/skills/effect-schema/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "inference-service": {
+      "source": "~/.pi/agent/skills/inference-service/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "opencode-ts-package": {
+      "source": "~/.pi/agent/skills/opencode-ts-package/",
+      "sourceType": "local",
+      "trust": "pinned"
+    },
+    "opencode-ts-service": {
+      "source": "~/.pi/agent/skills/opencode-ts-service/",
+      "sourceType": "local",
+      "trust": "pinned"
     }
   }
 }
