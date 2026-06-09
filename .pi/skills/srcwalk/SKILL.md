@@ -43,7 +43,7 @@ Do not pipe, truncate, or summarize `srcwalk guide`.
 
 | Tool | Srcwalk command | Purpose |
 |---|---|---|
-| `srcwalk_search` | `srcwalk discover` / `srcwalk trace callers` | AST-aware multi-mode search: symbol, content, regex, access evidence, callers |
+| `srcwalk_search` | `srcwalk discover` | AST-aware multi-mode search: symbol definitions, usages, text, file, access evidence |
 | `srcwalk_read` | `srcwalk <path>` | Smart file reading: outline or full with sections and context lines |
 | `srcwalk_files` | `srcwalk discover --as file` | Glob file finding with token estimates, grouped by dir, multi-scope |
 | `srcwalk_deps` | `srcwalk deps` | Blast-radius: dependency coupling, Markdown/HTML link extraction |
@@ -166,7 +166,7 @@ srcwalk_context({ target: "src/auth.ts:handleAuth" })                   // full 
 srcwalk_context({ symbol: "handleAuth", scope: "src" })                 // compact slice
 ```
 
-Use `srcwalk_search({ kind: "callers" })` for quick single-hop. Use `srcwalk_callers` when you need depth, filters, or aggregation.
+Use `srcwalk_callers` for reverse call graph (single-hop by default, multi-hop with `depth`).
 
 > Note: `--count-by` and `--depth` are mutually exclusive in `srcwalk_callers` — use one or the other, not both.
 

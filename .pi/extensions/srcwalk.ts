@@ -139,6 +139,7 @@ async function searchCompat(args: ToolArgs, signal?: AbortSignal): Promise<strin
   const scope = optionalString(args.scope);
   const scopes = readStringArray(args.scopes, "scopes");
   const exclude = optionalString(args.exclude);
+  const filter = optionalString(args.filter);
   const expand = optionalNumber(args.expand);
   const offset = optionalNumber(args.offset);
   const asAccess = optionalBoolean(args.asAccess);
@@ -149,8 +150,6 @@ async function searchCompat(args: ToolArgs, signal?: AbortSignal): Promise<strin
   let cmdArgs: string[];
   if (asAccess) {
     cmdArgs = ["discover", "--as", "access", query];
-  } else if (kind === "callers") {
-    cmdArgs = ["trace", "callers", query];
   } else {
     cmdArgs = ["discover", query];
   }
@@ -165,6 +164,7 @@ async function searchCompat(args: ToolArgs, signal?: AbortSignal): Promise<strin
   }
 
   if (exclude) cmdArgs.push("--exclude", exclude);
+  if (filter) cmdArgs.push("--filter", filter);
   if (matchMode === "any" || matchMode === "all") cmdArgs.push("--match", matchMode);
   if (expand !== undefined) cmdArgs.push("--expand", String(expand));
   if (offset !== undefined) cmdArgs.push("--offset", String(offset));
@@ -211,9 +211,13 @@ async function filesCompat(args: ToolArgs, signal?: AbortSignal): Promise<string
 async function depsCompat(args: ToolArgs, signal?: AbortSignal): Promise<string> {
   const targetPath = requireString(args.path, "path");
   const scope = optionalString(args.scope);
+  const limit = optionalNumber(args.limit);
+  const offset = optionalNumber(args.offset);
   const budget = optionalNumber(args.budget);
   const cmdArgs = ["deps", targetPath];
   if (scope) cmdArgs.push("--scope", scope);
+  if (limit !== undefined) cmdArgs.push("--limit", String(limit));
+  if (offset !== undefined) cmdArgs.push("--offset", String(offset));
   if (budget !== undefined) cmdArgs.push("--budget", String(budget));
 
   return run(cmdArgs, signal);
@@ -238,12 +242,14 @@ async function nativeCallers(args: ToolArgs, signal?: AbortSignal): Promise<stri
   const symbol = requireString(args.symbol, "symbol");
   const scope = optionalString(args.scope);
   const depth = optionalNumber(args.depth);
+  const expand = optionalNumber(args.expand);
   const filter = optionalString(args.filter);
   const countBy = optionalString(args.countBy);
   const budget = optionalNumber(args.budget);
   const cmdArgs = ["trace", "callers", symbol];
   if (scope) cmdArgs.push("--scope", scope);
   if (depth !== undefined) cmdArgs.push("--depth", String(depth));
+  if (expand !== undefined) cmdArgs.push("--expand", String(expand));
   if (filter) cmdArgs.push("--filter", filter);
   if (countBy) cmdArgs.push("--count-by", countBy);
   if (budget !== undefined) cmdArgs.push("--budget", String(budget));
@@ -308,6 +314,8 @@ async function nativeReview(args: ToolArgs, signal?: AbortSignal): Promise<strin
   const staged = optionalBoolean(args.staged);
   const base = optionalString(args.base);
   const scope = optionalString(args.scope);
+  const limit = optionalNumber(args.limit);
+  const offset = optionalNumber(args.offset);
   const budget = optionalNumber(args.budget);
 
   if (!staged && !base) {
@@ -318,6 +326,8 @@ async function nativeReview(args: ToolArgs, signal?: AbortSignal): Promise<strin
   if (staged) cmdArgs.push("--staged");
   if (base) cmdArgs.push(base);
   if (scope) cmdArgs.push("--scope", scope);
+  if (limit !== undefined) cmdArgs.push("--limit", String(limit));
+  if (offset !== undefined) cmdArgs.push("--offset", String(offset));
   if (budget !== undefined) cmdArgs.push("--budget", String(budget));
   return run(cmdArgs, signal);
 }
@@ -407,7 +417,7 @@ export default function srcwalkExtension(pi: ExtensionAPI): void {
       ),
       kind: Type.Optional(
         Type.String({
-          description: 'Search type: "symbol" (default), "content", "regex", "callers".',
+          description: 'Search type: "symbol" (default), "content", "regex". Use srcwalk_callers for reverse call graph.',
         }),
       ),
       asAccess: Type.Optional(
@@ -418,6 +428,11 @@ export default function srcwalkExtension(pi: ExtensionAPI): void {
       exclude: Type.Optional(
         Type.String({
           description: "Exclude file patterns, e.g. '*test*' or '{dist,build}/**'.",
+        }),
+      ),
+      filter: Type.Optional(
+        Type.String({
+          description: "Filter results with field:value qualifiers, e.g. 'kind:class' or 'kind:fn'.",
         }),
       ),
       matchMode: Type.Optional(
@@ -519,6 +534,16 @@ export default function srcwalkExtension(pi: ExtensionAPI): void {
         description: "File to check before making breaking changes.",
       }),
       scope: Type.Optional(Type.String({ description: "Directory to search for dependents." })),
+      limit: Type.Optional(
+        Type.Number({
+          description: "Max dependents to show.",
+        }),
+      ),
+      offset: Type.Optional(
+        Type.Number({
+          description: "Skip N dependents (default 0).",
+        }),
+      ),
       budget: Type.Optional(Type.Number({ description: "Max tokens. Truncates 'Used by' first." })),
     }),
     depsCompat,
@@ -561,6 +586,11 @@ export default function srcwalkExtension(pi: ExtensionAPI): void {
       symbol: Type.String({ description: "Symbol name to trace callers of." }),
       scope: Type.Optional(Type.String({ description: "Directory to search." })),
       depth: Type.Optional(Type.Number({ description: "BFS hop depth (default 1, max 5)." })),
+      expand: Type.Optional(
+        Type.Number({
+          description: "Show source context for top N callers (default: 2 when flag present).",
+        }),
+      ),
       filter: Type.Optional(
         Type.String({
           description: "Filter expression, e.g. 'args:3 receiver:mgr' or 'path:api'.",
@@ -673,6 +703,16 @@ export default function srcwalkExtension(pi: ExtensionAPI): void {
       scope: Type.Optional(
         Type.String({
           description: "Limit review to a subdirectory. Omit for full repo.",
+        }),
+      ),
+      limit: Type.Optional(
+        Type.Number({
+          description: "Max changed files to render.",
+        }),
+      ),
+      offset: Type.Optional(
+        Type.Number({
+          description: "Skip N changed files (default 0).",
         }),
       ),
       budget: Type.Optional(Type.Number({ description: "Max tokens in response." })),

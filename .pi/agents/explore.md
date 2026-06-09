@@ -42,7 +42,7 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 | --------------------------- | -------------------------------------- |
 | Find symbol definitions     | `srcwalk_search` (fast, AST-aware)     |
 | Cross-file symbol tracing   | `srcwalk_search` / `srcwalk_deps`      |
-| Find all references         | `srcwalk_search` (usages/callers)      |
+| Find all references         | `srcwalk_search` (definitions/usages)   |
 | Type info / doc comments    | `srcwalk_read` near definitions        |
 | Direct callers              | `srcwalk_callers`                      |
 | Transitive callers (N hops) | `srcwalk_callers(depth: N)`            |
@@ -61,7 +61,7 @@ Outcome: return concrete codebase evidence quickly, not a narrative tour. GPT-5.
 ## Workflow
 
 1. `srcwalk_search` for symbol definitions and usages (one call replaces multiple grep→read cycles)
-2. `srcwalk_callers` / `srcwalk_callees` for call graph tracing (prefer over `srcwalk_search(kind: "callers")` when depth or filters are needed)
+2. `srcwalk_callers` / `srcwalk_callees` for call graph tracing (use `srcwalk_callers` for reverse call graph; `srcwalk_callees` for forward)
 3. `srcwalk_map` for repo shape when starting a large exploration
 4. `srcwalk_deps` for dependency analysis
 5. `srcwalk_files` to discover file structure
