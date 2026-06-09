@@ -754,6 +754,10 @@ const AppLayer = Layer.mergeAll(
 - `Effect.runPromise` inside another effect — No. Keep effects pure, run at edge.
 - Importing from `zod` in new code — OpenCode is migrating to Effect Schema. Use `Schema.Class` and `Schema.TaggedErrorClass`.
 
+## Script Directory
+
+All command examples assume the agent's working directory is the project root (`{baseDir}`). Commands like `bun test`, `bun run tsc --noEmit`, and `bun run --watch src/index.ts` are run from `{baseDir}` directly. This skill does not ship executable scripts — all examples show CLI commands to run directly.
+
 ## Quick Reference
 
 ### One Module Template

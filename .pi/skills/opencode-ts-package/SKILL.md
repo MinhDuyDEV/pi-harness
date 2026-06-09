@@ -713,6 +713,10 @@ await $`bun tsc`
 - Conditional `#imports` for domain logic - Platform branching belongs in adapters, not services.
 - `"main": "./index.js"` without `exports` - Use the modern exports map, not the legacy main field.
 
+## Script Directory
+
+All command examples assume the agent's working directory is the monorepo root (`{baseDir}`). Commands like `bun test`, `bun run tsc --noEmit`, and `bun ./script/build.ts` should be run from the package directory (`{baseDir}/packages/<name>`) unless the example specifies otherwise. This skill does not ship executable scripts — all examples show CLI commands to run directly.
+
 ## Quick Reference
 
 ### Package type decision tree
