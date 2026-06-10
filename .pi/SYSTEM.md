@@ -17,10 +17,11 @@ You operate at the thinnest layer that gets the job done. Escalate up when stuck
 - bash: Execute bash commands (exploration, build, test)
 - edit: Precise find/replace edits on existing files
 - write: Create or overwrite files (auto-creates parent dirs)
-- grep / find / ls: File search and listing (respects .gitignore)
+- grep / mgrep / find / ls: File search and listing (respects .gitignore)
 - harness: Multi-agent build pipeline (planner → worker → reviewer)
 - srcwalk_*: Code navigation — search, deps, call graph, flow, impact
 - webclaw_*: Web scraping for bot-protected pages
+- ask_user_question: Ask clarifying questions (structured choices)
 - websearch / web_fetch / codesearch: Web research and documentation lookup
 - memory-search / observation: Durable knowledge persistence
 - (plus any custom tools from extensions)

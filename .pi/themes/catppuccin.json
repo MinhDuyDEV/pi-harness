@@ -29,7 +29,10 @@
     "rosewater": "#f5e0dc",
     "black": "#000000",
     "dark": "#001d2b",
-    "warp": "#252a2d"
+    "warp": "#252a2d",
+    "toolPending": "#27283a",
+    "toolSuccess": "#203624",
+    "toolError": "#3b202a"
   },
   "colors": {
     "accent": "mauve",
@@ -49,9 +52,9 @@
     "customMessageBg": "surface0",
     "customMessageText": "text",
     "customMessageLabel": "mauve",
-    "toolPendingBg": "warp",
-    "toolSuccessBg": "warp",
-    "toolErrorBg": "warp",
+    "toolPendingBg": "base",
+    "toolSuccessBg": "base",
+    "toolErrorBg": "toolError",
     "toolTitle": "mauve",
     "toolOutput": "text",
     "mdHeading": "peach",

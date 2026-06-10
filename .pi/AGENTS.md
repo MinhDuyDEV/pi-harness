@@ -101,12 +101,14 @@ Reject changes that worsen overall code health even if they appear to work.
 - Before meaningful edits and verification commands, send one sentence describing the immediate action. Make the call in the same turn.
 - Check prerequisite steps before acting — don't skip discovery because the final action seems obvious.
 - Track completeness: maintain an internal checklist. Mark blocked items as `[blocked]` with the exact blocker.
+- **For text searches and file operations, always use the dedicated `grep`/`mgrep`/`find`/`ls` built-in tools. Never use `bash` with grep/find/ls shell commands** — the dedicated tools respect .gitignore, return structured results, and are faster than spawning a subshell.
 
 ### Code Intelligence — Tool Selection
 
 | Question | Tool |
 |---|---|
 | Text search? | `grep` |
+| Multi-pattern text search? | `mgrep` |
 | Symbol/definition/caller analysis? | `srcwalk_*` |
 | Structural pattern? (empty catches, `as any`, `unwrap()`) | `ast-grep` (`sg`) |
 | Type/compile errors? | `diagnostics` tool |
