@@ -57,97 +57,32 @@ Before `task`, harness, tmux, or self-spawn:
 
 ### Call
 
-When you invoke `task(agent_type, prompt, description, background?)`:
-
 ```
 task(agent_type="explore", prompt="...", description="3-5 word summary")
 ```
 
-- `agent_type` — must match a `.md` file name in `.pi/agents/` (project) or `~/.pi/agent/agents/` (user global). Overrides: project wins over user.
-- `prompt` — complete, self-contained instructions. The sub-agent starts fresh with zero session history.
-- `description` — short label shown in the live widget and completion notification.
-- `background` — defaults to `false`, but **all tasks are background-only** (the tool always spawns a tmux pane and returns immediately). The flag is accepted but irrelevant.
+- `agent_type` — `.md` file in `.pi/agents/` (project) or `~/.pi/agent/agents/` (user global)
+- `prompt` — self-contained instructions; sub-agent starts with zero history
+- `description` — short label
+- All tasks are background-only (tmux split, returns immediately)
 
-### What happens
+### Output format
 
-1. Agent is resolved from `.pi/agents/*.md` by name (frontmatter: description, model, thinking, disallowed_tools)
-2. Artifact directory created: `.pi/artifacts/task-<id>/`
-3. Three handoff files written:
-   - `SYSTEM.md` — agent system prompt (from frontmatter body)
-   - `WORKER-CONTEXT.md` — your prompt, agent info, working directory, output format
-   - `USER-PROMPT.md` — entry point instructing sub-agent to read WORKER-CONTEXT.md
-4. `pi` CLI spawned in a **tmux split pane** (horizontal split) with:
-   - `--name task-<id>` — agent session name
-   - `--model` — from agent config
-   - `--tools` — filtered by `disallowed_tools`
-   - `--session-dir` — writes JSONL logs for live toolcall tracking
-   - `--append-system-prompt SYSTEM.md` — injects system prompt
-   - `PI_TASK_TOOL_DISABLED=1` — prevents recursive tool loading
-5. Tool returns immediately with `{ details: { background: true } }` — **no result content**
-
-### Watching live
-
-The tmux split pane is visible in your terminal — you see the sub-agent working in real time. No extra command needed. The pane title defaults to the tmux pane ID (not set by the extension).
-
-### Live widget
-
-A sticky widget appears above the editor showing all running tasks:
-```
-Agent - description  N toolcalls • elapsed
-```
-- Updates elapsed time every 1 second (via `requestRender()` timer)
-- Updates toolcall count every 3 seconds (via JSONL session polling)
-- Multiple tasks stack as separate lines
-
-### Completion
-
-When the sub-agent finishes writing `RESULT.md`, the extension:
-1. Reads the file from `.pi/artifacts/task-<id>/RESULT.md`
-2. Kills the tmux pane
-3. Parses the XML-tagged output:
-   ```
-   <status>success|failure|blocked|partial</status>
-   <summary>One sentence summary</summary>
-   <findings>Key findings with file:line references</findings>
-   <evidence>Verification evidence</evidence>
-   ```
-4. Sends a `task-complete` notification with agent name, description, elapsed time, toolcall count, status, summary, and findings
-
-### Notification format
-
-The notification appears in the TUI as:
-```
-agent - description
-N toolcalls • duration
-summary
-```
-
-Use `expanded` view to see full findings and evidence.
-
-### Output format (sub-agent requirement)
-
-**Every `task` delegation MUST instruct the sub-agent to write its result using this XML format:**
+**Every task delegation must instruct the sub-agent to write results in this XML format:**
 
 ```
 <status>success|failure|blocked|partial</status>
-<summary>One sentence: what was accomplished</summary>
+<summary>One sentence summary</summary>
 <findings>Key findings with file:line references</findings>
 <evidence>Verification evidence, commands run, output snippets</evidence>
 <files>Comma-separated absolute paths of files read/created (optional)</files>
 ```
 
-If the output lacks XML tags, the extension treats the entire output as `summary` with `status=unknown`.
+Without XML tags, the extension treats output as `summary` with `status=unknown`.
 
-### Concurrent tasks
+### Concurrency
 
-You can launch multiple tasks in parallel by making multiple `task` tool calls in a single message. Each gets its own tmux pane, artifact directory, and polling slot. All appear in the widget simultaneously.
-
-### Cleanup
-
-The extension cleans up on `session_shutdown`:
-- Stops the check interval and count interval
-- Removes the widget
-- **Does NOT** remove task artifact directories (they persist for inspection)
+Multiple `task()` calls in a single message run in parallel. Each gets its own tmux pane and artifact directory. Artifacts persist after session.
 
 ## Self-Spawn and Harness Distrust
 
@@ -192,10 +127,31 @@ mkdir -p .pi/artifacts/<id>
 pi --name "review <id>" --print-turn "Read .pi/artifacts/<id>/WORKER-CONTEXT.md and produce .pi/artifacts/<id>/REVIEW.md"
 ```
 
+## Fallow Gate (TS/JS only)
+
+Before claiming completion for TypeScript/JavaScript work, run `npx fallow`:
+
+1. **`npx fallow audit --format json --quiet`** — check `verdict`. If `"fail"`, resolve before proceeding.
+2. **`npx fallow`** — full analysis (dead code, duplication, health).
+3. **`npx fallow fix --dry-run`** — preview safe auto-fixes.
+
+If `npx fallow` is unavailable (tool not installed), skip silently. Do not substitute with AI-based analysis.
+
 ## Context Retrieval
 
 - `memory-search` → durable project knowledge (prior decisions, bugs, patterns, warnings)
 - `vcc_recall()` → current-session recovery (earlier output, commands, user decisions)
-- `npx fallow health --changed-since main --format json` → complexity and blast-radius context before editing TS/JS files; see `.pi/skills/fallow/SKILL.md`
+- `npx fallow health --changed-since main --format json` → complexity and blast-radius context before editing TS/JS files; see `.pi/agent/skills/fallow/SKILL.md`
 
 After either path, verify current code/config/git state from disk before acting. Serialize `compress` calls — never run multiple compressions in parallel.
+
+## Error Recovery
+
+When a tool call fails, build breaks, or result is partial:
+
+1. **Retry once** — same approach, same tool
+2. **Fallback** — alternative tool or approach
+3. **Escalate** — if 2 failures on the same step, stop and present: what was tried, what failed, and options with tradeoffs
+4. **Partial results** — save partial output before retrying the failed portion
+
+Do not silently continue after a failure. Log the failure mode and what was tried.

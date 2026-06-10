@@ -12,7 +12,7 @@
 3. **User intent** — do what was asked, simply and directly
 4. **Agency preservation** — "likely difficult" ≠ "impossible" ≠ "don't try"
 5. This `AGENTS.md`
-6. **Skills** — load the relevant `.pi/skills/<name>/SKILL.md` before implementing when the task description matches a skill's purpose; skills provide specialized, pre-verified workflows
+6. **Skills** — load the relevant `.pi/agent/skills/<name>/SKILL.md` before implementing when the task description matches a skill's purpose; skills provide specialized, pre-verified workflows
 7. Memory (`memory-search`)
 8. Project files and codebase evidence
 
@@ -55,7 +55,7 @@ If intent is clear and constraints permit, act. Escalate only when blocked or ma
 - Complexity is incremental — fight it with every change. **Don't live with broken windows:** if you find bad design in code you're changing, fix it. If you can't fix it now, isolate the damage.
 - Ask before removing intentional-looking behavior or code
 - Preserve external behavior by default; break compatibility only when explicitly requested
-- Delegate when work is large, uncertain, or cross-domain
+- Follow the routing policy in `APPEND_SYSTEM.md` for delegation decisions
 
 ### Complexity First
 
@@ -145,46 +145,30 @@ Non-trivial implementation plans must be written to `.pi/artifacts/<id>/PLAN.md`
 | Paths         | Use absolute paths for file operations                                                  |
 | Reversibility | Ask first before destructive or irreversible actions                                    |
 | Emoji Ban    | Never use emoji icons in code, comments, commit messages, UI copy, or any output            |
-| TODO Tracking | Create and maintain `TODO.md` for any multi-step work (see below)                       |
+| TODO Tracking | Create and maintain `TODO.md` for any multi-step work (see `APPEND_SYSTEM.md` Artifacts section) |
 
 ### TODO Protocol (mandatory)
 
-**Every new user request** that requires **2+ tool calls or spans multiple files** gets its OWN TODO.md. A fresh artifact id, a fresh TODO.md. Do not reuse or extend a previous artifact.
+Every non-trivial request gets a fresh `.pi/artifacts/<id>/` with `TODO.md`. See the Artifacts section in `APPEND_SYSTEM.md` for the full protocol.
 
-1. **Before starting work** — create `.pi/artifacts/<id>/TODO.md` (or `TODO.md` at project root for harness/sprint work) with a new kebab-case id for each task
-2. **Write each discrete step** as `- [ ] step description` — one checkbox per atomic action
-3. **Before each step**, check it off: change `- [ ]` to `- [x]`
-4. **Before claiming completion**, verify every box is `[x]` — no exceptions
-5. **When the user makes a new request** — even if related to prior work — create a NEW artifact with a new id; reference the previous artifact in PROGRESS.md if needed
+Format — one checkbox per atomic action:
 
-Format:
-
-```markdown
+```
 - [ ] Step 1: description
 - [ ] Step 2: description
-- [ ] Step 3: description
 ```
 
-This is NOT optional. Models that skip this violate the protocol. The TUI TODO panel depends on this file existing and being maintained.
-
----
-
-## Multi-Agent Safety
-
-- **Scope commits to your changes only** — never use `git add .`, stage specific files
-- **No speculative cleanup** — don't reformat or refactor files you didn't change
-- **Parallelize independent work** — serialize only for strict dependencies (same file, shared contracts, chained transforms)
-- During conflict resolution, only resolve conflicts in files you changed
+Check off before each step. Verify all `[x]` before claiming completion. Not optional — the TUI TODO panel depends on this file.
 
 ---
 
 ## Delegation Principle
 
-Delegate when specialist context, isolation, or parallelism improves correctness. Use the operational routing policy in `APPEND_SYSTEM.md` when present. After any delegated work, verify against the original task — don't trust summaries.
+Delegate when specialist context, isolation, or parallelism improves correctness. Use the operational routing policy in `APPEND_SYSTEM.md` when present.
 
 ## Harness Boundary
 
-Harness is an execution layer, not an authority. Harness features are enforcement mechanisms, not authority: the main agent defines intent, scope, and proof; the harness may execute, observe, isolate, and verify, but harness output is never accepted without independent inspection. Use harness for product-level builds when routed by `APPEND_SYSTEM.md` or explicitly requested. Do not use harness for small edits, docs, prompt/config changes, or harness internals unless explicitly requested. After harness runs, inspect diffs, reject unrelated changes, and verify before accepting output. Do not commit or push harness output unless the user asks.
+Harness is an execution layer, not an authority. The main agent defines intent, scope, and proof; harness output must be independently inspected (see Self-Spawn and Harness Distrust in `APPEND_SYSTEM.md`). Use only when routed by `APPEND_SYSTEM.md` or explicitly requested — never for small edits, configs, or agent internals.
 
 ---
 
