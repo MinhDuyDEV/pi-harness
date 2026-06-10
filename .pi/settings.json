@@ -1,9 +1,5 @@
 {
-  "enabledModels": [
-    "opencode*",
-    "opencode-go*",
-    "openai-codex*"
-  ],
+  "enabledModels": ["opencode*", "opencode-go*", "openai-codex*"],
   "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4-flash",
   "defaultThinkingLevel": "xhigh",
@@ -15,6 +11,7 @@
     "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@marckrenn/pi-sub-bar",
     "npm:@heyhuynhgiabuu/pi-pretty",
+    "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:@sting8k/pi-vcc",
     "npm:@marckrenn/pi-sub-core"
@@ -38,16 +35,9 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [
-    ".pi/skills/"
-  ],
-  "prompts": [
-    ".pi/prompts/"
-  ],
-  "extensions": [
-    ".pi/extensions/",
-    "/Users/huynhgiabuu/dev/projects/pi-diff"
-  ],
+  "skills": [".pi/skills/"],
+  "prompts": [".pi/prompts/"],
+  "extensions": [".pi/extensions/"],
   "lastChangelogVersion": "0.79.1",
   "treeFilterMode": "default",
   "transport": "sse",
@@ -71,3 +61,4 @@
   "doubleEscapeAction": "tree",
   "defaultProjectTrust": "always"
 }
+
