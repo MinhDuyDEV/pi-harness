@@ -203,6 +203,15 @@ export const MEMORY_CONFIG = {
     compressionTarget: 0.2,
     topTerms: 30,
   },
+  dream: {
+    enabled: true,
+    auto: true,
+    interval_days: 1,
+    minMessagesPerSession: 5,
+    maxMessages: 200,
+    topTerms: 10,
+    maxSessions: 5,
+  },
   pipeline: {
     /** Run distillation every N conversation turns. 0 = every turn. */
     everyNConversations: 5,

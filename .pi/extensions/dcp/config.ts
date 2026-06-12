@@ -89,6 +89,16 @@ export interface QualityMetricsConfig {
   trackReReads: boolean;
 }
 
+export interface ToolResultPruningConfig {
+  enabled: boolean;
+  /** Total estimated token threshold to trigger pruning (default: 40_000) */
+  thresholdTokens: number;
+  /** Number of most recent turns to protect from pruning */
+  protectedRecentTurns: number;
+  /** Override list of compactable tool names (defaults to built-in list) */
+  compactableTools: string[];
+}
+
 export interface DCPConfig {
   enabled: boolean;
   compress: CompressConfig;
@@ -98,6 +108,7 @@ export interface DCPConfig {
   structuredSummary: StructuredSummaryConfig;
   artifactTracking: ArtifactTrackingConfig;
   probeEvaluation: ProbeConfig;
+  toolResultPruning: ToolResultPruningConfig;
   qualityMetrics: QualityMetricsConfig;
   debug: boolean;
 }
@@ -155,6 +166,15 @@ export const DEFAULT_CONFIG: DCPConfig = {
     minStructureCompleteness: 60,
     showInResponse: true,
     nudgeOnFailure: true,
+  },
+  toolResultPruning: {
+    enabled: true,
+    thresholdTokens: 40_000,
+    protectedRecentTurns: 2,
+    compactableTools: [
+      "read", "bash", "grep", "find", "ls", "glob", "webfetch",
+      "websearch", "codesearch", "grepsearch", "multi_grep",
+    ],
   },
   qualityMetrics: {
     enabled: true,

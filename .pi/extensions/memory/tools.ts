@@ -109,7 +109,7 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 			_toolCallId: string,
 			params: Record<string, unknown>,
 			_signal: AbortSignal | undefined,
-			_onUpdate: ((text: string) => void) | undefined,
+    _onUpdate: ((partial: any) => void) | undefined,
 			ctx: any,
 		) {
 			// --- Feedback mode: observation #id marked helpful/harmful ---
@@ -219,7 +219,7 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 		description: "Compact memory diagnostics and explicitly gated maintenance.",
 		parameters: MemoryAdminParameters,
 		async execute(_toolCallId: string, params: MemoryAdminParams) {
-			return executeMemoryAdmin(params ?? {});
+			return executeMemoryAdmin(params ?? {}) as any;
 		},
 	});
 }

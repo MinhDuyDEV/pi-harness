@@ -70,8 +70,8 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         nudge.recordCompress();
       }
       // P1: Track all relevant tool calls for artifact tracking
-      if (config.artifactTracking.enabled && event.toolName && event.args) {
-        trackToolCall(ctx.cwd, event.toolName, event.args, config.artifactTracking.maxFiles);
+      if (config.artifactTracking.enabled && event.toolName && event.input) {
+        trackToolCall(ctx.cwd, event.toolName, event.input, config.artifactTracking.maxFiles);
       }
     } catch {
       // best-effort
@@ -293,7 +293,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
       const output = lines.filter(Boolean).join("\n");
       if (ctx.hasUI) ctx.ui.notify(output);
-      return output;
     },
   });
 }
