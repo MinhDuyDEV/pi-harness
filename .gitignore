@@ -10,7 +10,6 @@ docs/
 # Pi auto-generated sandbox profiles
 .pi/sandbox/
 .pi/docs/
-.pi/workflows/
 .pi/artifacts/
 
 # Node / package manager noise
@@ -25,6 +24,10 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+
+# Pi auto-generated checkpoints (session state)
+.pi/task-registry.json
+.pi/checkpoints/
 
 # Pi local caches / generated dirs
 .pi/harness-runs/
