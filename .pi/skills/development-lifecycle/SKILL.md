@@ -1,427 +1,211 @@
 ---
 name: development-lifecycle
-description: Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm → grill → ADR → specify → plan → implement → verify) and loads appropriate sub-skills at each stage.
-version: 1.0.0
-tags: [workflow, planning]
+description: "Orchestrates the full feature development lifecycle from idea to verified handoff. Use for significant features, risky refactors, migrations, or unclear product changes that need Compose-style structure: clarify/spec -> decide -> plan -> implement -> review -> verify."
+version: 2.0.0
+tags: [workflow, planning, compose]
 dependencies:
   - brainstorming
   - grill-me
   - documentation-and-adrs
   - spec-driven-development
+  - source-driven-development
+  - planning-and-task-breakdown
+  - test-driven-development
+  - testing-anti-patterns
+  - incremental-implementation
+  - code-review-and-quality
+  - deep-module-design
+  - security-and-hardening
+  - quality-loop
+  - verification-before-completion
+  - shipping-and-launch
 agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
----
+# Development Lifecycle
 
-# Development Lifecycle Orchestration
+This is the lightweight Compose-mode wrapper for Pi. It is **not** a runtime mode, workflow engine, or subagent. It tells the main agent when to use the full lifecycle and which existing skills/artifacts to use at each phase.
 
-## When to Use
+## Use When
 
-- Starting a new feature, migration, or refactor and need the full end-to-end workflow
-- You want phase-by-phase guidance with the correct sub-skill at each stage
+- Starting a new feature, migration, architecture change, or risky refactor
+- Requirements are unclear enough that coding first would create churn
+- Work touches multiple files or has user-visible behavior
+- You need explicit planning, review, and verification evidence before completion
 
-## When NOT to Use
+## Do Not Use When
 
-- You are already mid-phase and only need a specific sub-skill
-- The change is trivial and can skip the full lifecycle
+- One-line/mechanical fix
+- Obvious config tweak
+- Docs-only typo or small wording update
+- User explicitly asks for a quick prototype or investigation only
+- A more specific skill directly matches the task and lifecycle ceremony adds no value
 
-## Entry Decision — Engage Lifecycle or Not?
+## Entry Decision
 
-This decision tree fires when Behavioral Kernel rule #6 says "this might need a lifecycle." Use it to pick the right entry point.
+Announce the route before acting:
 
-```
-Is this request mechanically simple?
-├── YES → one-liner, known fix, obvious rename.
-│         Just implement. No lifecycle needed.
-│
-├── PARTIALLY → refactor, migration, or goal is clear
-│                but approach isn't.
-│         Start at Phase 2 (Grill) or Phase 3 (ADR).
-│         Skip brainstorming — idea is already formed.
-│
-├── NO → new feature, risky change, unclear requirements.
-│        Start at Phase 1 (Ideation). Full lifecycle.
-│
-└── UNSURE / I'M STRUGGLING → STOP CODING.
-         Start at Phase 2 (Grill).
-         Struggle means an upstream assumption is wrong.
-         Grilling will surface it cheaper than debugging.
+- **Mechanical** → implement directly, no lifecycle.
+- **Clear but non-trivial** → start at Phase 3: Plan.
+- **Unclear/risky/new feature** → start at Phase 1: Clarify/Spec.
+- **Architectural/refactor/migration** → start at Phase 2: Decide.
+- **Stuck or assumptions feel shaky** → stop coding and start Phase 1 or Grill.
 
-Is this a prototype or throwaway experiment?
-├── YES → skip the lifecycle. Move fast.
-└── NO → keep going through the decision tree above.
-```
+## Artifact Contract
 
-**Announce your decision up front.** Say either:
-- "This is mechanical — I'll implement directly."
-- "I'm using development-lifecycle for this — starting at Phase X."
-
-## Overview
-
-This skill orchestrates the complete feature development workflow, guiding you through each phase and loading the appropriate sub-skills automatically.
-
-**Note:** For quick skill routing by intent, use `docs/skills-registry.md`, `skills/registry.json`, or the `using-pi-skills` skill. This skill is for full end-to-end orchestration when you need phase-by-phase guidance.
-
-**Use when:** Starting any new feature, migration, refactor, or significant change.
-
-**Announce at start:** "I'm using development-lifecycle to guide this work through all phases."
-
-## The Lifecycle
+For lifecycle work, create a fresh artifact directory:
 
 ```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  IDEATION   │───▶│   GRILL     │───▶│   DECISION  │───▶│ SPECIFICATION│───▶│   PLANNING  │───▶│IMPLEMENTATION│
-│ brainstorming│   │  grill-me   │    │   ADR       │    │   prd.md    │    │  tasks.md   │    │executing-plans│
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-                          │                  │                  │                  │                  │
-                          └──────────────────┴──────────────────┴──────────────────┴──────────────────┤
-                                              │                                     ▼
-                                    ┌─────────────────┐                   ┌─────────────┐
-                                    │    RESEARCH     │                   │VERIFICATION │
-                                    │   (optional)    │                   │verification-│
-                                    │ /research cmd   │                   │before-      │
-                                    └─────────────────┘                   │completion   │
-                                                                          └─────────────┘
+.pi/artifacts/<id>/
+  SPEC.md       # requirements, scope, acceptance criteria
+  ADR.md        # optional; required for architecture/migration/risky decisions
+  PLAN.md       # implementation plan with Discovery section
+  TODO.md       # checkbox task list; one atomic action per line
+  PROGRESS.md   # narrative notes, decisions, blockers, verification evidence
+  REVIEW.md     # review findings and resolution status
+  VERIFY.md     # final verification commands and outputs
 ```
 
-**Note:** Research (`/research <bead-id>`) can happen at any phase when you need external information or deeper codebase understanding. It's not a sequential step but a parallel activity.
+Minimum required by project policy for non-trivial work: `PLAN.md`, `TODO.md`, `PROGRESS.md`. Add the rest when the phase exists.
 
-## Phase 1: Ideation (brainstorming)
+## Phase 1: Clarify / Specify
 
-### Phase 1 Checklist
+**Load when needed:** `brainstorming`, `spec-driven-development`, optionally `grill-me`.
 
-- [ ] Load `brainstorming`
-- [ ] Validate design with user
-- [ ] Write `.beads/artifacts/<bead-id>/design.md`
+Goal: turn vague intent into explicit scope.
 
-**When:** You have a rough idea but need to explore and refine it.
+Actions:
+1. Ask only outcome-changing questions.
+2. State assumptions if proceeding without answers.
+3. Define in/out of scope.
+4. Define acceptance criteria and verification signals.
+5. Write `.pi/artifacts/<id>/SPEC.md`.
 
-**Entry criteria:** User has an idea or problem to solve.
+Exit criteria:
+- Acceptance criteria are testable.
+- Major ambiguities are resolved or marked blocked.
 
-**Process:**
+## Phase 2: Decide / ADR
 
-1. Understand current project context
-2. Ask questions one at a time (prefer multiple choice)
-3. Explore 2-3 approaches with trade-offs
-4. Present design in 200-300 word sections
+**Load when needed:** `grill-me`, `documentation-and-adrs`, `source-driven-development` when external APIs/libraries matter.
 
-**Exit criteria:**
+Goal: make risky decisions explicit before code.
 
-- Design validated by user
-- Output: `.beads/artifacts/<bead-id>/design.md`
+Actions:
+1. Challenge assumptions, compatibility, migration, data model, and rollback risk.
+2. Compare 2-3 viable approaches when the choice matters.
+3. Choose the smallest maintainable design.
+4. Write `ADR.md` for architecture, migration, public API, storage, or irreversible decisions.
 
-**Template:** `.pi/templates/design.md` or `.pi/memory/_templates/design.md`
+Exit criteria:
+- Decision and tradeoffs are documented.
+- User approval is obtained when behavior or architecture materially changes.
 
----
+## Phase 3: Plan
 
-## Phase 2: Grill (grill-me)
+**Load when needed:** `planning-and-task-breakdown`, `test-driven-development`, `incremental-implementation`.
 
-### Phase 2 Checklist
+Goal: create an executable plan, not a vague roadmap.
 
-- [ ] Load `grill-me`
-- [ ] Question every assumption, ambiguity, and hand-wave
-- [ ] Resolve all open questions or flag blockers explicitly
-- [ ] Summarize: should this idea survive, be reworked, or be killed?
+Actions:
+1. Read current code before proposing edits.
+2. Search before creating new utilities or abstractions.
+3. Break work into thin verified slices.
+4. Name tests/commands that prove each slice.
+5. Write/update `PLAN.md` with `## Discovery` and `TODO.md` with checkboxes.
 
-**When:** The idea has been explored during brainstorming. Now it needs to be stress-tested before committing.
+Exit criteria:
+- Every TODO item is atomic and verifiable.
+- Verification commands are known before implementation.
 
-**Entry criteria:** Rough idea or validated design exists.
+## Phase 4: Implement
 
-**Process:**
+**Load when needed:** `incremental-implementation`, `test-driven-development`, `testing-anti-patterns` when tests/mocks are involved.
 
-1. Load `grill-me`
-2. Systematically interrogate the idea: ambiguity, hidden assumptions, missing constraints, hand-waving, integration risks
-3. For each question: present to user → get resolution → record decision
-4. Continue until questions repeat or added precision stops changing the plan
+Goal: build in the smallest safe slices.
 
-**Exit criteria:**
+Actions:
+1. Check off TODO step before starting it.
+2. Prefer test-first for behavior changes.
+3. Read target code before editing.
+4. Keep diffs scoped to the current request.
+5. Update `PROGRESS.md` with decisions, blockers, and evidence.
+6. Stop and re-plan after two failed attempts on the same approach.
 
-- All questions either resolved or flagged as blockers
-- Clear assessment: ready for ADR / needs rework / kill the idea
-- Recommended next step documented
+Exit criteria:
+- All TODO items for the implemented scope are checked.
+- Behavior changes have meaningful tests or a documented reason tests are impossible.
 
----
+## Phase 5: Review
 
-## Phase 3: Decision (ADR)
+**Load when needed:** `code-review-and-quality`, `deep-module-design`, `security-and-hardening` when relevant.
 
-### Phase 3 Checklist
+Goal: find correctness and design problems before claiming done.
 
-- [ ] Write Architecture Decision Record
-- [ ] Record: what was decided, why, what tradeoffs were accepted
-- [ ] Keep ADR as permanent artifact (unlike spec/PRD which may be disposable)
+Actions:
+1. Review diff, not memory.
+2. Check scope creep, duplication, dead code, defensive patching, and runtime edge cases.
+3. Write `REVIEW.md` for non-trivial work.
+4. Fix blocking review issues or explicitly mark deferred with rationale.
 
-**When:** Grilling is complete and the idea has survived scrutiny.
+Exit criteria:
+- No known blocking correctness, schema, security, or integration issues remain.
 
-**Entry criteria:** Grill summary exists with "ready for ADR" assessment.
+## Phase 6: Verify / Handoff
 
-**Process:**
+**Load when needed:** `quality-loop`, `verification-before-completion`, `shipping-and-launch` for commit/release/deploy.
 
-1. Capture every decision made during grilling
-2. Write ADR with: context, decision, rationale, consequences, tradeoffs accepted
-3. Present ADR to user for approval
-4. User edits and approves the ADR
-5. ADR becomes the contract: "this decision is buildable"
+Goal: evidence before assertions.
 
-**Exit criteria:**
+Actions:
+1. Run scoped tests first, then broader checks when practical.
+2. For TS/JS work, run the Fallow gate when available.
+3. Record exact commands and results in `VERIFY.md` or `PROGRESS.md`.
+4. If repo-wide checks fail due to pre-existing issues, prove touched files are clean and list what remains out of scope.
+5. Only then report completion.
 
-- ADR written and user-approved
-- Output: `.beads/artifacts/<bead-id>/adr.md`
-- Design document (from Phase 1) archived or merged into ADR
+Exit criteria:
+- Fresh verification evidence exists.
+- Remaining issues are explicit, scoped, and not hidden.
 
-**See Also:** `documentation-and-adrs` skill for ADR format
+## Delegation Rules
 
----
+Use `task` only when fresh context or parallel specialist review improves correctness:
 
-## Phase 4: Specification (prd)
+- Good: independent code review, focused research, parallel audit, isolated implementation slice.
+- Bad: trivial edits, interactive requirement discovery, tasks that need hidden current-session state.
 
-### Phase 4 Checklist
+Every delegated task must request the XML result format required by the project task protocol. Never trust delegated output blindly; inspect files, review diff, and verify yourself.
 
-- [ ] Confirm or create bead id
-- [ ] Write `.beads/artifacts/<bead-id>/prd.md` (or spec.md for technical work)
-- [ ] Decide: is this user-facing (PRD) or technical (spec)?
+## Phase Skipping
 
-**When:** ADR is approved, need formal requirements.
+Skip ceremony aggressively when it does not reduce risk:
 
-**Entry criteria:** Approved ADR exists.
+- Bug fix with known root cause → Plan briefly, implement, verify.
+- Small refactor → Plan + Implement + Verify.
+- Risky architecture/migration → Decide + Spec + Plan + Implement + Review + Verify.
+- Product feature → Clarify + Decide if needed + Spec + Plan + Implement + Review + Verify.
 
-**Process:**
+## Anti-Patterns
 
-1. For user-facing changes: write PRD (who this is for, what behavior changes, how we know it worked)
-2. For technical changes: write spec (behaviors being added/changed/removed, API boundaries, migration path)
-3. Both documents should reference the ADR
+- Creating a new workflow engine instead of using artifacts and skills.
+- Spawning a “compose subagent” to orchestrate work the main agent must own.
+- Writing plans without reading code.
+- Treating `TODO.md` as optional.
+- Claiming complete after one narrow command when broader gates are available.
+- Keeping ADRs or specs as ceremony after they stop reducing risk.
 
-**Exit criteria:**
-
-- PRD or spec with all sections completed
-- Output: `.beads/artifacts/<bead-id>/prd.md` or `.beads/artifacts/<bead-id>/spec.md`
-
-**Template:** `.pi/templates/prd.md` or `.pi/memory/_templates/prd.md`
-
-**Note:** The spec/PRD can be discarded after implementation. The ADR is the permanent record.
-
----
-
-## Phase 5: Task Conversion (prd-task)
-
-### Phase 3 Checklist
-
-- [ ] Read PRD from `.beads/artifacts/<bead-id>/prd.md`
-- [ ] Generate `.beads/artifacts/<bead-id>/prd.json`
-- [ ] Ensure `progress.txt` exists
-
-**When:** PRD is complete, need executable task list.
-
-**Entry criteria:** PRD exists at `.beads/artifacts/<bead-id>/prd.md`.
-
-**Process:**
-
-1. Read PRD and extract ## Tasks section
-2. Convert to JSON format with dependencies
-3. Create progress.txt for cross-iteration memory
-
-**Exit criteria:**
-
-- JSON task file created
-- Progress file initialized
-- Output: `.beads/artifacts/<bead-id>/prd.json`, `progress.txt`
-
----
-
-## Phase 6: Planning (writing-plans)
-
-### Phase 4 Checklist
-
-- [ ] Create bite-sized tasks with exact file paths
-- [ ] Include TDD steps and verification commands
-- [ ] Write `.beads/artifacts/<bead-id>/plan.md`
-
-**When:** Tasks defined, need detailed implementation instructions.
-
-**Entry criteria:** Task list exists (prd.json or tasks.md).
-
-**Process:**
-
-1. Create bite-sized steps (2-5 min each)
-2. Include exact file paths, complete code
-3. TDD: write failing test → verify fail → implement → verify pass → commit
-4. Add verification commands for each step
-
-**Exit criteria:**
-
-- Detailed plan ready for execution
-- Output: `.beads/artifacts/<bead-id>/plan.md`
-
-**Template:** `.pi/templates/tasks.md` or `.pi/memory/_templates/tasks.md` (for task structure reference)
-
----
-
-## Phase 7: Implementation (executing-plans)
-
-### Phase 5 Checklist
-
-- [ ] Load and review plan
-- [ ] Execute in batches with verification
-- [ ] Report for feedback between batches
-
-**When:** Plan is ready, time to build.
-
-**Entry criteria:** Plan exists at `.beads/artifacts/<bead-id>/plan.md`.
-
-**Process:**
-
-1. Load and review plan critically
-2. Execute in 3-task batches
-3. Report for feedback between batches
-4. Stop on blockers, don't guess
-
-**Exit criteria:**
-
-- All tasks completed
-- All verifications pass
-- Ready for final verification
-
----
-
-## Phase 8: Verification (verification-before-completion)
-
-### Phase 6 Checklist
-
-- [ ] Identify verification commands
-- [ ] Run full verification suite
-- [ ] Only then claim completion and close bead
-
-**When:** Implementation complete, before claiming done.
-
-**Entry criteria:** All implementation tasks marked complete.
-
-**Process:**
-
-1. IDENTIFY: What commands prove completion?
-2. RUN: Execute full verification suite fresh
-3. READ: Check output, count failures
-4. VERIFY: Does output confirm the claim?
-5. ONLY THEN: Claim completion
-
-**Exit criteria:**
-
-- All verification commands pass with evidence
-- Bead can be closed: `br close <bead-id>`
-
----
-
-## Phase Transitions
-
-### Skipping Phases
-
-For small changes, you can skip early phases. Use judgment — the less risky the change, the more you can skip:
-
-- **Bug fix / trivial change:** Skip to Phase 7 (implement directly with verification)
-- **Clear requirements, low risk:** Skip Phases 1-2, start at Phase 3 (ADR) or Phase 4 (Spec)
-- **Simple refactor:** Skip to Phase 6 (plan) or Phase 7 (execute)
-
-**When in doubt, don't skip grilling.** The cost of finding a bad decision after implementation is much higher than the cost of grilling upfront.
-
----
-
-## Templates Reference
-
-| Phase         | Template                 | Purpose                       |
-| ------------- | ------------------------ | ----------------------------- |
-| Phase         | Template (try first)      | Template (fallback)           | Purpose                       |
-| ------------- | ------------------------- | ----------------------------- | ----------------------------- |
-| Ideation      | `.pi/templates/design.md` | `.pi/memory/_templates/design.md` | Architecture decisions    |
-| Grill         | (none — free-form interrogation) | (none)                    | Adversarial idea review       |
-| Decision/ADR  | `.pi/templates/adr.md`    | `.pi/memory/_templates/adr.md`    | Permanent decision record  |
-| Specification | `.pi/templates/prd.md`    | `.pi/memory/_templates/prd.md`    | Requirements + task breakdown |
-| Planning      | `.pi/templates/tasks.md`  | `.pi/memory/_templates/tasks.md`  | Detailed task structure   |
-| Quick Ideas   | `.pi/templates/proposal.md` | `.pi/memory/_templates/proposal.md` | Lightweight change proposals |
-
----
-
-## Beads Integration
-
-Every phase should operate within a bead context:
-
-```bash
-# Create bead for new feature
-br create "Feature Name"
-
-# Check current bead status
-br show <bead-id>
-
-# Update status as you progress
-br update <bead-id> --status in_progress
-
-# Close when complete
-br close <bead-id> --reason "All verification passed"
-
-# Sync changes
-br sync --flush-only
-```
-
----
-
-## Example Full Workflow
+## Example Minimal Lifecycle
 
 ```
-User: "I want to add a dark mode toggle"
+.pi/artifacts/user-settings-panel/
+  SPEC.md      # settings panel behavior and acceptance criteria
+  PLAN.md      # discovery + implementation slices
+  TODO.md      # - [ ] Add route; - [ ] Add form; - [ ] Add tests
+  PROGRESS.md  # decisions and verification notes
+  REVIEW.md    # review findings
+  VERIFY.md    # test/lint/typecheck output
+```
 
-1. IDEATION
-   → skill({ name: "brainstorming" })
-   → Questions about scope, triggers, persistence
-   → Design decisions documented
-   → Output: .beads/artifacts/br-dark-mode/design.md
-
-2. GRILL
-   → skill({ name: "grill-me" })
-   → Challenge every assumption: what about system dark mode?
-     manual toggle? persistence? override per-page?
-   → Resolve: manual toggle only, persisted to localStorage,
-     override user preference but respect initial system value
-   → Assessment: ready for ADR
-   → Output: refined understanding, resolved questions
-
-3. DECISION (ADR)
-   → skill({ name: "documentation-and-adrs" })
-   → Write ADR: context, decision, rationale, consequences
-   → User approves ADR before moving on
-   → Output: .beads/artifacts/br-dark-mode/adr.md
-
-4. SPECIFICATION
-   → skill({ name: "prd" } or write spec)
-   → Full PRD/spec with requirements referencing ADR
-   → Output: .beads/artifacts/br-dark-mode/prd.md
-
-5. TASK CONVERSION
-   → skill({ name: "prd-task" })
-   → JSON task list with dependencies
-   → Output: .beads/artifacts/br-dark-mode/prd.json
-
-6. PLANNING
-   → skill({ name: "writing-plans" })
-   → Bite-sized implementation steps
-   → Output: .beads/artifacts/br-dark-mode/plan.md
-
-7. IMPLEMENTATION
-   → skill({ name: "executing-plans" })
-   → Execute in batches with feedback
-   → All code written and committed
-
-8. VERIFICATION
-   → skill({ name: "verification-before-completion" })
-   → Tests pass: ✓
-   → Lint clean: ✓
-   → Build succeeds: ✓
-   → br close br-dark-mode --reason "Dark mode implemented and verified"
-  ```
-
----
-
-## Key Principles
-
-1. **Phase-appropriate skills:** Load the right skill for each phase
-2. **Evidence at every gate:** No phase transition without verification
-3. **Templates guide structure:** Use templates for consistent output
-4. **Beads track progress:** Every feature gets a bead
-5. **Skip only when appropriate:** Small changes can skip early phases
+Final report should cite changed files, verification commands, and any remaining out-of-scope issues.

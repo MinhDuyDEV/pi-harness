@@ -552,7 +552,7 @@ export default function diagnosticsExtension(pi: ExtensionAPI): void {
       _signal: AbortSignal | undefined,
       _onUpdate: undefined,
       ctx: ExtensionContext,
-    ): Promise<AgentToolResult> {
+    ): Promise<AgentToolResult<Record<string, unknown>>> {
       // Run language diagnostics (tsc, cargo check, go vet, etc.)
       const diagBlocks = await runAll(ctx.cwd);
 
@@ -591,11 +591,11 @@ export default function diagnosticsExtension(pi: ExtensionAPI): void {
           );
         }
 
-        return { content: [{ type: "text" as const, text: parts.join("\n\n") }] };
+        return { content: [{ type: "text" as const, text: parts.join("\n\n") }], details: {} };
       }
 
       const text = allBlocks.join("\n\n");
-      return { content: [{ type: "text" as const, text }] };
+      return { content: [{ type: "text" as const, text }], details: {} };
     },
   });
 

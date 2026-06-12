@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
 
 import { writeProgress, HarnessTracker, generateWorkflowScript } from "./artifacts.js";
+import type { Sprint, SprintResult } from "./parsing.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -247,15 +248,23 @@ function teardown() {
 {
 	const t = "generateWorkflowScript writes workflow files and returns slug";
 	const dir = setup();
-	const sprint = {
+	const sprint: Sprint = {
 		number: 1,
 		title: "Test Sprint",
 		description: "Do the thing",
 		criteria: "- [ ] Criterion",
 		files: "test.ts",
 		skills: [],
+		riskLane: "tiny",
+		riskFlags: [],
+		contextNeeded: [],
+		proofRequired: [],
+		ownedFiles: [],
+		verificationCommands: [],
+		verificationRequired: true,
+		dependencies: [],
 	};
-	const results = [{ sprint: "Test Sprint", iterations: 1, passed: true, evalOutput: "All good" }];
+	const results = [{ sprint: "Test Sprint", iterations: 1, passed: true, evalOutput: "All good", verdict: "PASS" as const, confidence: "high" as const }];
 
 	const slug = generateWorkflowScript(dir, "test prompt", "spec", [sprint], "producer-reviewer", results);
 
@@ -283,15 +292,23 @@ function teardown() {
 	mkdirSync(templatesDir, { recursive: true });
 	writeFileSync(join(templatesDir, "harness-card.md"), "**Name:** __NAME__\n**Date:** __DATE__\n");
 
-	const sprint = {
+	const sprint: Sprint = {
 		number: 1,
 		title: "Sprint One",
 		description: "desc",
 		criteria: "- [ ] C1",
 		files: "f.ts",
 		skills: [],
+		riskLane: "tiny",
+		riskFlags: [],
+		contextNeeded: [],
+		proofRequired: [],
+		ownedFiles: [],
+		verificationCommands: [],
+		verificationRequired: true,
+		dependencies: [],
 	};
-	const results = [{ sprint: "Sprint One", iterations: 1, passed: true, evalOutput: "OK" }];
+	const results = [{ sprint: "Sprint One", iterations: 1, passed: true, evalOutput: "OK", verdict: "PASS" as const, confidence: "high" as const }];
 
 	const slug = generateWorkflowScript(dir, "template-test", "spec", [sprint], "producer-reviewer", results);
 	assert.ok(slug !== null, t);
