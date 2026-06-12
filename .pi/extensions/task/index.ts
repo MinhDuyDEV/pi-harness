@@ -18,7 +18,7 @@
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { execSync, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -27,7 +27,12 @@ import {
   type AgentConfig,
   type ParsedResult,
   ALL_TOOL_NAMES,
-  OUTPUT_FORMAT_GUIDE,
+  TASK_BACKGROUND_DEFAULT,
+  TASK_RESULT_XML_INSTRUCTIONS,
+  TASK_TOOL_DESCRIPTION,
+  buildTmuxSendKeysArgs,
+  formatBackgroundReceipt,
+  buildPiArgs,
   parseResultXml,
   formatMs,
   parseIdTimestamp,
@@ -35,8 +40,8 @@ import {
   discoverAgents,
   formatAgentList,
   countToolUses,
-  buildPiArgs,
 } from "./helpers.js";
+
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -117,7 +122,7 @@ function tmuxCmd(args: string[]): string {
 
 function hasTmux(): boolean {
   try {
-    execSync("tmux -V", { stdio: "ignore" });
+    execFileSync("tmux", ["-V"], { stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -156,10 +161,9 @@ function splitWindowPane(
     "-c",
     cwd,
   ]);
-  execSync(
-    `tmux send-keys -t "${paneId}" "${command.replace(/"/g, '\\"')}" Enter`,
-    { stdio: "ignore" },
-  );
+  execFileSync("tmux", buildTmuxSendKeysArgs(paneId, command), {
+    stdio: "ignore",
+  });
   return { paneId, originalPane };
 }
 
@@ -504,37 +508,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "task",
     label: "Task",
-    description: [
-      "Launch a new agent to handle complex, multistep tasks autonomously.",
-      "",
-      "Include relevant context from your current work in the prompt parameter —",
-      "this becomes the subagent's instructions. The prompt is the subagent's primary",
-      "input; the subagent knows nothing about what you've been doing except what you",
-      "put in the prompt.",
-      "",
-      "When NOT to use:",
-      "- To read a specific file path, use Read or Grep instead",
-      "- To search for a class definition like 'class Foo', use Grep instead",
-      "- To search code within 2-3 files, use Read instead",
-      "- If no available agent fits the task, use other tools directly",
-      "",
-      "Usage notes:",
-      "1. Provide complete context in the prompt — the subagent starts with a fresh context",
-      "2. Launch multiple agents concurrently when possible (use a single message with multiple tool calls)",
-      "3. Once you delegate work, do NOT duplicate it. Continue with non-overlapping tasks, or wait for the result",
-      "4. Foreground is the default (background: false). Use background mode for independent work that can run while you continue elsewhere",
-      "5. The agent's output should generally be trusted",
-      "6. Clearly tell the agent whether to write code or just research, since it doesn't know the user's intent",
-      "7. The result returned by the agent is not visible to the user. Send a concise summary back to the user",
-      "8. Pass task_id to resume a previous subagent session (continues with its prior context)",
-      "",
-      "Background mode (background: true):",
-      "- Launches the subagent asynchronously and returns immediately",
-      "- You will be notified automatically when it finishes",
-      "- DO NOT sleep, poll, ask the task for status, or duplicate its work",
-      "- Avoid working with the same files or topics the background task is using",
-      "- Work on non-overlapping tasks, or briefly tell the user what you launched and end your response",
-    ].join("\n"),
+    description: TASK_TOOL_DESCRIPTION,
     promptSnippet: "Delegate work to a specialist agent via the task tool",
     promptGuidelines: [
       "Delegate complex multi-step work to a specialist agent when the work benefits from isolated context",
@@ -543,6 +517,7 @@ export default function (pi: ExtensionAPI) {
       "Use agent_type to route to the right specialist",
       "Tell the agent whether to write code or just research",
       "For background tasks: DO NOT sleep, poll, or check on progress. You'll be notified",
+      "After delegated work completes, read changed files, review diff, verify scope, and run relevant checks",
       "Send the user a concise summary of the result since the agent's output is not user-visible",
     ],
     parameters: Type.Object({
@@ -670,7 +645,8 @@ export default function (pi: ExtensionAPI) {
       }
 
       const descText = params.description || "";
-      const isBackground = params.background !== false; // default true
+            const isBackground = params.background ?? TASK_BACKGROUND_DEFAULT;
+ // default true
 
       // ── Write durable task context ──────────────────────────────────────
       const contextPath = join(artifactDir, "CONTEXT.md");
@@ -692,7 +668,7 @@ export default function (pi: ExtensionAPI) {
         "Use this format:",
         "",
         "```",
-        OUTPUT_FORMAT_GUIDE,
+        TASK_RESULT_XML_INSTRUCTIONS,
         "```",
       ].join("\n");
       await writeFile(contextPath, contextContent, "utf-8");
@@ -702,7 +678,7 @@ export default function (pi: ExtensionAPI) {
         `Write your findings/output to ${resultPath}`,
         "",
         "Format:",
-        OUTPUT_FORMAT_GUIDE,
+        TASK_RESULT_XML_INSTRUCTIONS,
       ].join("\n");
 
       const sessionDir = join(artifactDir, "sessions");
@@ -862,7 +838,17 @@ export default function (pi: ExtensionAPI) {
       }
 
       return {
-        content: [],
+        content: [
+          {
+            type: "text" as const,
+            text: formatBackgroundReceipt({
+              taskId: id,
+              agentType: agent.name,
+              tmuxSession: sessionName,
+              artifactDir,
+            }),
+          },
+        ],
         details: {
           task_id: id,
           agent_type: agent.name,

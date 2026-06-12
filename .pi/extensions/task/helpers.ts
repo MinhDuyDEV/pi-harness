@@ -33,12 +33,44 @@ export interface ParsedResult {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const OUTPUT_FORMAT_GUIDE = `<status>success|failure|blocked|partial</status>
+export const TASK_BACKGROUND_DEFAULT = true;
+
+export const TASK_RESULT_XML_INSTRUCTIONS = `<status>success|failure|blocked|partial</status>
 <summary>One sentence: what was accomplished</summary>
 <findings>Key findings with file:line references</findings>
 <evidence>Verification evidence, commands run, output snippets</evidence>
 <confidence>high|medium|low (optional — how certain the findings are)</confidence>
 <files>Comma-separated absolute paths of files read/created (optional)</files>`;
+
+export const OUTPUT_FORMAT_GUIDE = TASK_RESULT_XML_INSTRUCTIONS;
+
+export const TASK_TOOL_DESCRIPTION = `Launch a new agent to handle complex, multistep tasks autonomously.
+
+Include relevant context from your current work in the prompt parameter —
+this becomes the subagent's instructions. The subagent knows nothing about what you've been doing except what you put in the prompt.
+
+When NOT to use:
+- To read a specific file path, use Read or Grep instead
+- To search for a class definition like 'class Foo', use Grep instead
+- To search code within 2-3 files, use Read instead
+- If no available agent fits the task, use other tools directly
+
+Usage notes:
+1. Provide complete context in the prompt — the subagent starts with a fresh context
+2. Launch multiple agents concurrently when possible (use a single message with multiple tool calls)
+3. Once you delegate work, do NOT duplicate it. Continue with non-overlapping tasks, or wait for the result
+4. Background is the default. Use background:false only when you need the caller to wait inline for the tmux task result
+5. Do not trust delegated output blindly. Read changed files, review the diff, verify scope, and run the relevant checks before claiming completion
+6. Clearly tell the agent whether to write code or just research, since it doesn't know the user's intent
+7. The result returned by the agent is not visible to the user. Send a concise summary back to the user
+8. Pass task_id to resume a previous subagent session (continues with its prior context)
+
+Background mode (background: true):
+- Launches the subagent asynchronously and returns immediately
+- You will be notified automatically when it finishes
+- DO NOT sleep, poll, ask the task for status, or duplicate its work while it runs in background
+- Avoid working with the same files or topics the background task is using
+- Work on non-overlapping tasks, or briefly tell the user what you launched and end your response`;
 
 // All built-in tool names
 export const ALL_TOOL_NAMES = ["read", "write", "edit", "bash", "grep", "find", "ls"];
@@ -109,6 +141,26 @@ export function parseIdTimestamp(id: string): number {
 
 export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
+}
+
+export function buildTmuxSendKeysArgs(paneId: string, command: string): string[] {
+  return ["send-keys", "-t", paneId, command, "Enter"];
+}
+
+export interface BackgroundReceiptInput {
+  taskId: string;
+  agentType: string;
+  tmuxSession: string;
+  artifactDir: string;
+}
+
+export function formatBackgroundReceipt(input: BackgroundReceiptInput): string {
+  return [
+    `Started task ${input.taskId} with ${input.agentType}.`,
+    `Tmux session: ${input.tmuxSession}.`,
+    `Artifact directory: ${input.artifactDir}.`,
+    "A completion notification will arrive automatically; do not poll or duplicate this work.",
+  ].join("\n");
 }
 
 // ─── Agent Discovery ─────────────────────────────────────────────────────────

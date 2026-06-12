@@ -14,6 +14,11 @@ import {
   formatMs,
   parseIdTimestamp,
   shellQuote,
+  buildTmuxSendKeysArgs,
+  formatBackgroundReceipt,
+  TASK_BACKGROUND_DEFAULT,
+  TASK_RESULT_XML_INSTRUCTIONS,
+  TASK_TOOL_DESCRIPTION,
   countToolUses,
   findPiDir,
   loadAgentsFromDir,
@@ -472,6 +477,49 @@ import {
     }
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// ─── Task tool hardening contracts ───────────────────────────────────────────
+
+{
+  const t = "buildTmuxSendKeysArgs keeps task command as one raw tmux argument";
+  const command = "cd '/tmp/safe path' && echo $(must-not-run) && echo `nope`";
+  assert.deepEqual(
+    buildTmuxSendKeysArgs("session:1.2", command),
+    ["send-keys", "-t", "session:1.2", command, "Enter"],
+    t,
+  );
+}
+
+{
+  const t = "formatBackgroundReceipt returns visible task launch details";
+  const receipt = formatBackgroundReceipt({
+    taskId: "task-123",
+    agentType: "explore",
+    tmuxSession: "pi-task-task-123",
+    artifactDir: "/tmp/.pi/tasks/task-123",
+  });
+  assert.ok(receipt.includes("Started task task-123"), t + " includes task id");
+  assert.ok(receipt.includes("explore"), t + " includes agent type");
+  assert.ok(receipt.includes("pi-task-task-123"), t + " includes session");
+  assert.ok(receipt.includes("/tmp/.pi/tasks/task-123"), t + " includes artifact dir");
+  assert.ok(receipt.includes("completion notification"), t + " explains notification");
+}
+
+{
+  const t = "task tool description matches background default and verification policy";
+  assert.equal(TASK_BACKGROUND_DEFAULT, true, t + " default is true");
+  assert.ok(TASK_TOOL_DESCRIPTION.includes("Background is the default"), t + " documents background default");
+  assert.ok(!TASK_TOOL_DESCRIPTION.includes("Foreground is the default"), t + " does not claim foreground default");
+  assert.ok(TASK_TOOL_DESCRIPTION.includes("Do not trust delegated output blindly"), t + " requires verification");
+}
+
+{
+  const t = "XML instructions preserve the required task result tags";
+  for (const tag of ["status", "summary", "findings", "evidence", "files"]) {
+    assert.ok(TASK_RESULT_XML_INSTRUCTIONS.includes(`<${tag}>`), `${t}: has opening ${tag}`);
+    assert.ok(TASK_RESULT_XML_INSTRUCTIONS.includes(`</${tag}>`), `${t}: has closing ${tag}`);
   }
 }
 
