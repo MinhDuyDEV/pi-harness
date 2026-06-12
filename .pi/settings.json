@@ -1,5 +1,4 @@
 {
-  "enabledModels": ["opencode*", "opencode-go*", "openai-codex*"],
   "defaultProvider": "opencode-go",
   "defaultModel": "deepseek-v4-flash",
   "defaultThinkingLevel": "xhigh",
@@ -35,15 +34,21 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [".pi/skills/"],
-  "prompts": [".pi/prompts/"],
-  "extensions": [".pi/extensions/"],
+  "skills": [
+    ".pi/skills/"
+  ],
+  "prompts": [
+    ".pi/prompts/"
+  ],
+  "extensions": [
+    ".pi/extensions/"
+  ],
   "lastChangelogVersion": "0.79.1",
   "treeFilterMode": "default",
   "transport": "sse",
   "hideThinkingBlock": false,
   "terminal": {
-    "showTerminalProgress": true,
+    "showTerminalProgress": false,
     "clearOnShrink": true,
     "showImages": false,
     "autoResize": true
@@ -55,10 +60,9 @@
     "fixedEditor": true
   },
   "theme": "catppuccin",
-  "showHardwareCursor": true,
+  "showHardwareCursor": false,
   "autocompleteMaxVisible": 10,
   "quietStartup": false,
   "doubleEscapeAction": "tree",
   "defaultProjectTrust": "always"
 }
-

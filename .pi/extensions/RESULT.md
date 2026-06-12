@@ -20,8 +20,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 
 | # | File | Lines | Purpose |
 |---|------|-------|---------|
-| 1 | `copilot-provider.ts` | 636 | GitHub Copilot custom provider — OAuth, X-Initiator header override, built-in API routing |
-| 2 | `deepseek-provider.ts` | 957 | DeepSeek provider — thinking mode, tool-call repair, retry, storm breaker |
+| 1 | `deepseek-provider.ts` | 957 | DeepSeek provider — thinking mode, tool-call repair, retry, storm breaker |
 | 3 | `guard.ts` | ~50 | Blocks dangerous patterns: pipe-to-shell (`curl\|bash`), enforces Conventional Commits |
 | 4 | `memory.ts` | ~400 | 4-tier persistent memory: capture → distill → curate → recall (SQLite + FTS5) |
 | 5 | `mimo-provider.ts` | 200 | Xiaomi MiMo OpenAI-compatible provider — flat pricing, thinking level mapping |
@@ -281,7 +280,6 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 - `/webclaw` — webclaw version check
 
 **Providers** (`pi.registerProvider`):
-- `github-copilot` (copilot-provider.ts)
 - `deepseek` (deepseek-provider.ts)
 - `mimo` (mimo-provider.ts)
 

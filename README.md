@@ -26,9 +26,8 @@ Extensions auto-loaded from `.pi/extensions/`:
 
 | Extension | Purpose |
 |-----------|---------|
-| `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive) |
-| `copilot-provider` | GitHub Copilot provider with rate-limit fallback |
-| `deepseek-provider` | DeepSeek provider with thinking mode support (reasoning_content) |
+ | `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive) |
+ | `deepseek-provider` | DeepSeek provider with thinking mode support (reasoning_content) |
 | `mimo-provider` | Xiaomi MiMo provider via OpenAI-compatible API |
 | `usage-tracker` | Token usage tracking via `/usage` command |
 | `guard` | Blocks dangerous patterns before tool execution |

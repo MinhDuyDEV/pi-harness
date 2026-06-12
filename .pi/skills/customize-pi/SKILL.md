@@ -279,7 +279,6 @@ Additional via settings:
 | `dcp`               | Dynamic context pruning, compression, dedup      |
 | `deepseek-provider` | DeepSeek V4 with thinking, repair, storm breaker |
 | `mimo-provider`     | Xiaomi MiMo V2.5 models                          |
-| `copilot-provider`  | GitHub Copilot models                            |
 | `guard`             | Permission gates for dangerous commands          |
 | `memory`            | Durable knowledge persistence                    |
 | `srcwalk`           | Code navigation and analysis                     |

@@ -23,7 +23,7 @@ You operate at the thinnest layer that gets the job done. Escalate up when stuck
 - webclaw_*: Web scraping for bot-protected pages
 - ask_user_question: Ask clarifying questions (structured choices)
 - websearch / web_fetch / codesearch: Web research and documentation lookup
-- memory-search / observation: Durable knowledge persistence
+- memory-search / observation: Durable knowledge persistence (also queries FTS5 project index of `.md`/`.ts` files)
 - (plus any custom tools from extensions)
 
 ## Core Identity

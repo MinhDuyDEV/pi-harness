@@ -23,6 +23,7 @@ Route work to the right execution layer. Apply these in order.
 | `task` tool | Delegate complex work to specialist agents — spawns pi in a tmux split pane, polls for completion |
 | `pi --print/--print-turn` in tmux | Self-spawn isolated review/research |
 | `npx fallow` / `fallow-mcp` | Codebase analysis before and after TS/JS edits — dead code, dupes, complexity, blast radius |
+| `.pi/checkpoints/` | Session state snapshots for rebuild context injection |
 | `harness` | Product-level planner → worker → reviewer builds |
 
 ## Minimalism Gate
@@ -139,7 +140,7 @@ If `npx fallow` is unavailable (tool not installed), skip silently. Do not subst
 
 ## Context Retrieval
 
-- `memory-search` → durable project knowledge (prior decisions, bugs, patterns, warnings)
+- `memory-search` → durable project knowledge (prior decisions, bugs, patterns, warnings) and FTS5 project index (`.md`/`.ts` files)
 - `vcc_recall()` → current-session recovery (earlier output, commands, user decisions)
 - `npx fallow health --changed-since main --format json` → complexity and blast-radius context before editing TS/JS files; see `.pi/agent/skills/fallow/SKILL.md`
 

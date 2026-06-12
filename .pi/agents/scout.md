@@ -2,7 +2,7 @@
 description: External research specialist. Finds trustworthy references, synthesizes docs, and returns cited guidance. Memory-first.
 model: opencode-go/deepseek-v4-flash
 thinking: high
-disallowed_tools: edit, write
+disallowed_tools: edit
 prompt_mode: append
 skills: source-driven-development, webclaw
 ---
