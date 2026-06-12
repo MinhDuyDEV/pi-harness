@@ -1,13 +1,15 @@
 # Task Extension Architecture
 
-**File**: `extensions/task/index.ts` (~780 lines)
+**File**: `extensions/task/index.ts` (~350 lines) + `extensions/task/helpers.ts` (~200 lines)
 **Purpose**: Delegate complex work to specialist sub-agents via isolated `pi` sessions in tmux.
 
 ---
 
 ## Overview
 
-The task extension registers a single `task` tool that spawns a self-contained `pi` CLI session in a tmux split pane. The sub-agent reads instructions from a handoff artifact (`WORKER-CONTEXT.md`) and writes results back to `RESULT.md`. A polling loop detects completion and fires a notification.
+The task extension registers a single `task` tool that spawns a self-contained `pi` CLI session in a tmux split pane. The sub-agent receives its system prompt from the selected `.pi/agents/<agent>.md` body, reads task context from `CONTEXT.md`, and writes results back to `RESULT.md`. A polling loop detects completion and fires a notification.
+
+Pure logic (parsing, formatting, agent discovery, JSONL counting) lives in `helpers.ts` for unit testability. Side-effectful code (tmux, extension registration, polling) stays in `index.ts`.
 
 ---
 
@@ -32,8 +34,7 @@ The task extension registers a single `task` tool that spawns a self-contained `
    │                                               │
    │  1. Resolve agent by name                     │
    │  2. Create artifact dir                       │
-   │  3. Write SYSTEM.md, WORKER-CONTEXT.md,       │
-   │     USER-PROMPT.md                            │
+   │  3. Write CONTEXT.md                         │
    │  4. Build pi CLI command with env, model,     │
    │     tools, session-dir flags                  │
    │  5. Spawn tmux split pane → runs pi           │
@@ -152,12 +153,21 @@ Agent - description  N toolcalls • elapsed
 
 ```
 .pi/artifacts/task-<id>/
-├── SYSTEM.md           # Agent system prompt (from agent .md frontmatter body)
-├── WORKER-CONTEXT.md   # Task instructions, prompt, output format
-├── USER-PROMPT.md      # Entry point: "Read WORKER-CONTEXT.md, write RESULT.md"
+├── CONTEXT.md          # Task instructions, prompt, output format, agent provenance
 ├── RESULT.md           # Output: <status><summary><findings><evidence>
 └── sessions/           # pi --session-dir output (JSONL files)
-    └── *.jsonl         # Used by countToolUses() for live metrics
+```
+
+### Command Construction
+
+```bash
+PI_TASK_TOOL_DISABLED=1 pi \
+  --name "task <agent>: <desc>" \
+  --model <agent.model>          # ← optional from frontmatter
+  --tools <allowed tools>         # ← filtered by disallowed_tools
+  --session-dir <artifactDir>/sessions  # ← JSONL output
+  --append-system-prompt "<agent.body>" # ← parsed body from agents/<agent>.md
+  "Read <artifactDir>/CONTEXT.md for your task..."
 ```
 
 ### 5. pi CLI Command Construction
@@ -168,8 +178,8 @@ PI_TASK_TOOL_DISABLED=1 pi        # ← recursive load guard
   --model <agent.model>           # ← from agent config
   --tools <allowed tools>         # ← filtered by disallowed_tools
   --session-dir <artifactDir>/sessions  # ← JSONL output
-  --append-system-prompt SYSTEM.md      # ← agent system prompt
-  @USER-PROMPT.md                 # ← instruction file
+  --append-system-prompt "<agent.body>" # ← parsed agent markdown body
+  "Read <artifactDir>/CONTEXT.md for your task..."
 ```
 
 ---
@@ -207,7 +217,7 @@ PI_TASK_TOOL_DISABLED=1 pi        # ← recursive load guard
 | **Separate `countInterval` (3s) from widget timer (1s)** | JSONL file reads are I/O-bound. Keeping them on a separate longer interval prevents blocking the widget's smooth elapsed animation. |
 | **`requestRender()` at 1s** | The pi-tui render cycle is request-driven, not continuous. Calling `requestRender()` on an interval is the correct pattern for time-based UI updates. |
 | **`PI_TASK_TOOL_DISABLED=1` env var** | Prevents recursive loading when the sub-agent `pi` process loads the same extension. Without this, spawning a sub-agent would try to register the `task` tool again. |
-| **Three-file handoff (SYSTEM.md + WORKER-CONTEXT.md + USER-PROMPT.md)** | Separates concerns: system prompt (agent identity), worker context (task instructions), user prompt (entry point). Makes debugging easier — each file is independently readable. |
+| **Minimal artifact handoff (CONTEXT.md + RESULT.md + sessions/)** | Keeps artifact root human-readable while passing agent identity directly from `agents/<agent>.md` to `--append-system-prompt`. Avoids duplicated system/user prompt wrapper files. |
 | **Widget is component factory, not `string[]`** | The first version used static `string[]` widgets. Switched to a component factory with `requestRender()` timer for smooth elapsed time updates instead of stale snapshots. |
 
 ---
@@ -222,7 +232,7 @@ execute() called
   │
   ├── discoverAgents() → find agent by name
   ├── mkdir artifact dir
-  ├── write 3 handoff files (SYSTEM, WORKER-CONTEXT, USER-PROMPT)
+  ├── write CONTEXT.md
   ├── build pi CLI command string
   ├── tmux split-window → run pi command
   ├── register BackgroundTask in Map

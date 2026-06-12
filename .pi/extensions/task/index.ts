@@ -8,59 +8,43 @@
  * Three agent sources:
  *   - .pi/agents/*.md        project-local agents
  *   - ~/.pi/agent/agents/*.md user-global agents (fallback)
+ *
+ * P0: Persistent task registry (appendEntry + JSON), --session resume,
+ *     sendMessage completion notification.
+ * P1: Foreground mode (background:false, inline subprocess), pane death
+ *     detection, 30-minute timeout.
  */
 
 import { mkdir, writeFile, readFile } from "node:fs/promises";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, dirname, basename, resolve } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { execSync, execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { Type } from "@sinclair/typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
+import {
+  type AgentConfig,
+  type ParsedResult,
+  ALL_TOOL_NAMES,
+  OUTPUT_FORMAT_GUIDE,
+  parseResultXml,
+  formatMs,
+  parseIdTimestamp,
+  shellQuote,
+  discoverAgents,
+  formatAgentList,
+  countToolUses,
+  buildPiArgs,
+} from "./helpers.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const BACKGROUND_CHECK_MS = 10_000; // 10 sec
-
-// All built-in tool names
-const ALL_TOOL_NAMES = ["read", "write", "edit", "bash", "grep", "find", "ls"];
-
-const OUTPUT_FORMAT_GUIDE = `<status>success|failure|blocked|partial</status>
-<summary>One sentence: what was accomplished</summary>
-<findings>Key findings with file:line references</findings>
-<evidence>Verification evidence, commands run, output snippets</evidence>
-<confidence>high|medium|low (optional — how certain the findings are)</confidence>
-<files>Comma-separated absolute paths of files read/created (optional)</files>`;
-
-// Cached regex patterns for XML result parsing
-const STATUS_RE = /<status>([\s\S]*?)<\/status>/i;
-const SUMMARY_RE = /<summary>([\s\S]*?)<\/summary>/i;
-const FINDINGS_RE = /<findings>([\s\S]*?)<\/findings>/i;
-const EVIDENCE_RE = /<evidence>([\s\S]*?)<\/evidence>/i;
-const CONFIDENCE_RE = /<confidence>([\s\S]*?)<\/confidence>/i;
+const BACKGROUND_CHECK_MS = 10_000; // poll every 10 sec
+const COUNT_POLL_MS = 3_000;       // update toolcall counts every 3 sec
+const TASK_TIMEOUT_MS = 30 * 60 * 1_000; // 30 minutes
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface AgentConfig {
-  name: string;
-  description: string;
-  model?: string;
-  thinking?: string;
-  disallowedTools?: string[];
-  body: string;
-  source: "project" | "user";
-}
-
-interface ParsedResult {
-  status: string;
-  summary: string;
-  findings: string;
-  evidence: string;
-  confidence: string;
-  raw: string;
-}
 
 interface BackgroundTask {
   dir: string;
@@ -72,6 +56,18 @@ interface BackgroundTask {
   startedAt: number;
   toolUses: number;
   turns: number;
+}
+
+/** Serializable subset for registry persistence. */
+interface RegistryEntry {
+  id: string;
+  agentType: string;
+  description: string;
+  sessionName: string;
+  startedAt: number;
+  paneId: string;
+  piDir: string;
+  dir: string;
 }
 
 /** Details attached to tool result for rendering. */
@@ -94,188 +90,23 @@ interface TaskDetails {
   tmux_session?: string;
 }
 
-// ─── Agent Discovery ─────────────────────────────────────────────────────────
+// ─── Registry helpers (durable JSON) ─────────────────────────────────────────
 
-function findPiDir(cwd: string): string | null {
-  let current = resolve(cwd);
-  while (true) {
-    // If current IS a .pi directory (e.g. cwd is inside a .pi folder),
-    // go up one level first to avoid matching a nested .pi/.pi/ dir.
-    if (basename(current) === ".pi") {
-      const parent = dirname(current);
-      if (parent === current) return current; // root — no parent
-      current = parent;
-      continue;
-    }
-    if (existsSync(join(current, ".pi"))) return join(current, ".pi");
-    const parent = dirname(current);
-    if (parent === current) return null;
-    current = parent;
-  }
-}
-
-function getGlobalAgentDir(): string {
-  const home = process.env.HOME || process.env.USERPROFILE || "";
-  return join(home, ".pi", "agent", "agents");
-}
-
-function loadAgentsFromDir(dir: string, source: "project" | "user"): AgentConfig[] {
-  const agents: AgentConfig[] = [];
-  if (!existsSync(dir)) return agents;
-
-  for (const entry of readdirSync(dir, { withFileTypes: true })) {
-    if (!entry.name.endsWith(".md")) continue;
-    if (!entry.isFile() && !entry.isSymbolicLink()) continue;
-
-    const filePath = join(dir, entry.name);
-    let content: string;
-    try {
-      content = readFileSync(filePath, "utf-8");
-    } catch {
-      continue;
-    }
-
-    const { frontmatter, body } = parseFrontmatter<Record<string, string>>(content);
-    if (!frontmatter.description) continue;
-
-    const name = basename(entry.name, ".md");
-    const disallowedRaw = frontmatter.disallowed_tools;
-    const disallowedTools = disallowedRaw
-      ? disallowedRaw
-          .split(",")
-          .map((t: string) => t.trim())
-          .filter(Boolean)
-      : undefined;
-
-    agents.push({
-      name,
-      description: frontmatter.description,
-      model: frontmatter.model,
-      thinking: frontmatter.thinking,
-      disallowedTools,
-      body,
-      source,
-    });
-  }
-  return agents;
-}
-
-function discoverAgents(cwd: string): { agents: AgentConfig[]; piDir: string } {
-  const piDir = findPiDir(cwd) || join(cwd, ".pi");
-  const projectDir = join(piDir, "agents");
-  const userDir = getGlobalAgentDir();
-
-  const projectAgents = loadAgentsFromDir(projectDir, "project");
-  const userAgents = loadAgentsFromDir(userDir, "user");
-
-  // Project agents override user agents with the same name
-  const agentMap = new Map<string, AgentConfig>();
-  for (const a of userAgents) agentMap.set(a.name, a);
-  for (const a of projectAgents) agentMap.set(a.name, a);
-
-  return { agents: Array.from(agentMap.values()), piDir };
-}
-
-function formatAgentList(agents: AgentConfig[]): string {
-  if (agents.length === 0) return "none available";
-  return agents.map((a) => `${a.name} (${a.source}): ${a.description}`).join("\n");
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function parseResultXml(raw: string): ParsedResult {
-  const status = extractTag(raw, STATUS_RE);
-
-  if (!status && !extractTag(raw, SUMMARY_RE) && !extractTag(raw, FINDINGS_RE) && !extractTag(raw, EVIDENCE_RE)) {
-    return {
-      status: "unknown",
-      summary: raw.slice(0, 500),
-      findings: "",
-      evidence: "",
-      confidence: "",
-      raw,
-    };
-  }
-
-  const confidence = extractTag(raw, CONFIDENCE_RE);
-
-  return {
-    status: status || "unknown",
-    summary: extractTag(raw, SUMMARY_RE) || "",
-    findings: extractTag(raw, FINDINGS_RE) || "",
-    evidence: extractTag(raw, EVIDENCE_RE) || "",
-    confidence: confidence || "",
-    raw,
-  };
-}
-
-function extractTag(raw: string, re: RegExp): string {
-  const m = raw.match(re);
-  return m ? m[1].trim() : "";
-}
-
-function formatMs(ms: number): string {
-  if (ms >= 60_000) return `${(ms / 60_000).toFixed(0)}m ${Math.floor((ms % 60_000) / 1_000)}s`;
-  if (ms >= 1_000) return `${(ms / 1_000).toFixed(1)}s`;
-  return `${ms}ms`;
-}
-
-function parseIdTimestamp(id: string): number {
+function readRegistry(piDir: string): RegistryEntry[] {
+  const path = join(piDir, "task-registry.json");
   try {
-    const ts36 = id.split("-")[0];
-    if (ts36) return parseInt(ts36, 36);
+    return JSON.parse(readFileSync(path, "utf-8"));
   } catch {
-    /* fall through */
+    return [];
   }
-  return Date.now();
 }
 
-// ─── JSONL Session Helpers ───────────────────────────────────────────────────
-
-/** Count tool uses and turns from pi JSONL session files. */
-function countToolUses(sessionDir: string): { toolUses: number; turns: number } {
-  let toolUses = 0;
-  let turns = 0;
-
-  try {
-    if (!existsSync(sessionDir)) return { toolUses, turns };
-
-    const files = readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl"));
-    for (const file of files) {
-      const content = readFileSync(join(sessionDir, file), "utf-8");
-      for (const rawLine of content.split("\n")) {
-        const line = rawLine.trim();
-        if (!line) continue;
-
-        try {
-          const entry = JSON.parse(line);
-          if (
-            entry.type === "message" &&
-            entry.message?.role === "assistant" &&
-            Array.isArray(entry.message.content)
-          ) {
-            turns++;
-            for (const block of entry.message.content) {
-              if (block.type === "toolCall") toolUses++;
-            }
-          }
-        } catch {
-          // Skip malformed lines
-        }
-      }
-    }
-  } catch {
-    // Session dir might not exist or be inaccessible
-  }
-
-  return { toolUses, turns };
+function writeRegistry(piDir: string, entries: RegistryEntry[]): void {
+  const path = join(piDir, "task-registry.json");
+  writeFileSync(path, JSON.stringify(entries, null, 2), "utf-8");
 }
 
 // ─── Tmux Helpers ────────────────────────────────────────────────────────────
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'"'"'`)}'`;
-}
 
 function tmuxCmd(args: string[]): string {
   return execFileSync("tmux", args, {
@@ -295,7 +126,9 @@ function hasTmux(): boolean {
 
 function paneExists(paneId: string): boolean {
   try {
-    return tmuxCmd(["list-panes", "-a", "-F", "#{pane_id}"]).split("\n").includes(paneId);
+    return tmuxCmd(["list-panes", "-a", "-F", "#{pane_id}"])
+      .split("\n")
+      .includes(paneId);
   } catch {
     return false;
   }
@@ -323,7 +156,6 @@ function splitWindowPane(
     "-c",
     cwd,
   ]);
-  // Send the command to the new pane (keys, not inline, to handle quoting cleanly)
   execSync(
     `tmux send-keys -t "${paneId}" "${command.replace(/"/g, '\\"')}" Enter`,
     { stdio: "ignore" },
@@ -338,26 +170,174 @@ function killAgentPane(paneId: string, originalPane: string | null): void {
     /* ignore */
   }
   try {
-    if (originalPane && paneExists(originalPane)) tmuxCmd(["select-pane", "-t", originalPane]);
+    if (originalPane && paneExists(originalPane))
+      tmuxCmd(["select-pane", "-t", originalPane]);
   } catch {
     /* ignore */
   }
 }
 
+// ─── Foreground polling (waits inline for RESULT.md) ───────────────────────
+
+const FOREGROUND_POLL_MS = 2_000;   // poll every 2 sec
+const FOREGROUND_TIMEOUT_MS = 10 * 60 * 1_000; // 10 min max for foreground
+
+async function waitForResult(
+  resultPath: string,
+  paneId: string,
+  originalPane: string | null,
+  signal: AbortSignal | undefined,
+  startedAt: number,
+): Promise<{ content: string; phase: "done" | "timeout" | "failed" }> {
+  while (true) {
+    // Check abort
+    if (signal?.aborted) {
+      killAgentPane(paneId, originalPane);
+      return { content: "Task aborted by caller.", phase: "failed" as const };
+    }
+
+    // Check timeout
+    if (Date.now() - startedAt > FOREGROUND_TIMEOUT_MS) {
+      killAgentPane(paneId, originalPane);
+      return { content: "Task timed out after 10 minutes.", phase: "timeout" as const };
+    }
+
+    // Check pane liveness
+    if (!paneExists(paneId)) {
+      killAgentPane(paneId, originalPane);
+      // Pane died — check if RESULT.md was written before death
+      try {
+        const c = await readFile(resultPath, "utf-8");
+        if (c.trim()) return { content: c, phase: "done" as const };
+      } catch {
+        /* file missing */
+      }
+      return {
+        content: "Agent pane terminated without producing a result.",
+        phase: "failed" as const,
+      };
+    }
+
+    // Check RESULT.md
+    try {
+      const c = await readFile(resultPath, "utf-8");
+      if (c.trim()) {
+        killAgentPane(paneId, originalPane);
+        return { content: c, phase: "done" as const };
+      }
+    } catch {
+      /* not ready yet */
+    }
+
+    await new Promise((r) => setTimeout(r, FOREGROUND_POLL_MS));
+  }
+}
+
+// ─── Process a completed task (sendMessage + registry cleanup) ──────────────
+
+function completeTask(
+  pi: ExtensionAPI,
+  id: string,
+  task: BackgroundTask,
+  content: string,
+  phase: "done" | "timeout" | "failed",
+  piDir: string,
+): void {
+  // Kill the tmux pane if still alive
+  killAgentPane(task.paneId, task.originalPane);
+
+  const parsed = parseResultXml(content);
+  const durationMs = Date.now() - task.startedAt;
+  const { toolUses, turns } = task;
+
+  const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
+  const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
+  const statsStr = [useStr, durStr].filter(Boolean).join(" • ");
+
+  // Send completion notification
+  pi.sendMessage({
+    customType: "task-complete",
+    content: [
+      `${task.agentType} - ${task.description}`,
+      statsStr ? `${statsStr}` : "",
+      "",
+      phase === "done"
+        ? parsed.summary || content.slice(0, 300)
+        : `[${phase}] ${content.slice(0, 300)}`,
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    display: true,
+    details: {
+      task_id: id,
+      agent_type: task.agentType,
+      description: task.description,
+      tmux_session: task.sessionName,
+      phase,
+      status: phase === "done" ? parsed.status : phase,
+      summary: parsed.summary || "",
+      findings: parsed.findings || "",
+      evidence: parsed.evidence || "",
+      confidence: parsed.confidence || "",
+      result: content,
+      duration_ms: durationMs,
+      tool_uses: toolUses,
+      turn_count: turns,
+    },
+  });
+
+  // Remove from registry
+  const entries = readRegistry(piDir).filter((e) => e.id !== id);
+  writeRegistry(piDir, entries);
+}
+
 // ─── Extension Entry Point ──────────────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
-  // ── Prevent recursive loading
-  if (process.env.PI_TASK_TOOL_DISABLED === "1") {
-    return;
-  }
+  // Prevent recursive loading
+  if (process.env.PI_TASK_TOOL_DISABLED === "1") return;
 
   // ── Background task tracker ────────────────────────────────────────────
   const backgroundTasks = new Map<string, BackgroundTask>();
-  // Track the first ExtensionContext for widget updates
   let widgetCtx: ExtensionContext | null = null;
 
-  /** Realtime widget component — updates elapsed time smoothly via 1s timer. */
+  // ── Restore active tasks from registry on load ──────────────────────────
+  const { piDir } = discoverAgents(process.cwd());
+  const registry = readRegistry(piDir);
+  const staleIds: string[] = [];
+  for (const entry of registry) {
+    // Only restore if artifact dir still exists
+    if (!existsSync(entry.dir)) {
+      staleIds.push(entry.id);
+      continue;
+    }
+
+    // Check if tmux pane is still alive
+    const paneAlive = entry.paneId ? paneExists(entry.paneId) : false;
+    if (!paneAlive) {
+      staleIds.push(entry.id);
+      continue;
+    }
+
+    const bgtask: BackgroundTask = {
+      dir: entry.dir,
+      agentType: entry.agentType,
+      sessionName: entry.sessionName,
+      paneId: entry.paneId,
+      originalPane: null,
+      description: entry.description,
+      startedAt: entry.startedAt,
+      toolUses: 0,
+      turns: 0,
+    };
+    backgroundTasks.set(entry.id, bgtask);
+  }
+  if (staleIds.length) {
+    writeRegistry(piDir, registry.filter((e) => !staleIds.includes(e.id)));
+  }
+
+  // ── Widget / timer setup ───────────────────────────────────────────────
+
   let widgetTimer: ReturnType<typeof setInterval> | null = null;
   function stopWidget() {
     if (widgetTimer) {
@@ -365,8 +345,7 @@ export default function (pi: ExtensionAPI) {
       widgetTimer = null;
     }
   }
-  /** Poll JSONL sessions every 3s to get live toolcall counts for running tasks. */
-  const COUNT_POLL_MS = 3_000;
+
   const countInterval = setInterval(() => {
     for (const task of Array.from(backgroundTasks.values())) {
       const { toolUses, turns } = countToolUses(join(task.dir, "sessions"));
@@ -381,17 +360,27 @@ export default function (pi: ExtensionAPI) {
     const now = Date.now();
     const lines: string[] = [];
     for (const [, task] of active) {
-      const agentName = task.agentType.charAt(0).toUpperCase() + task.agentType.slice(1);
+      const agentName =
+        task.agentType.charAt(0).toUpperCase() + task.agentType.slice(1);
       const elapsed = formatMs(now - task.startedAt);
-      const tc = task.toolUses > 0 ? `  ${task.turns || task.toolUses} toolcalls • ${elapsed}` : `  ${elapsed}`;
-      lines.push(truncateToWidth(`${agentName}${task.description ? ` - ${task.description}` : ""}${tc}`, 120));
+      const tc =
+        task.toolUses > 0
+          ? `  ${task.turns || task.toolUses} toolcalls • ${elapsed}`
+          : `  ${elapsed}`;
+      lines.push(
+        truncateToWidth(
+          `${agentName}${task.description ? ` - ${task.description}` : ""}${tc}`,
+          120,
+        ),
+      );
     }
     lines.push("");
     return lines;
   }
 
+  // ── Polling loop (background task completion, pane death, timeout) ──────
+
   const checkInterval = setInterval(async () => {
-    // If no active tasks, clean up widget and skip processing
     if (backgroundTasks.size === 0) {
       if (widgetCtx) {
         stopWidget();
@@ -401,22 +390,46 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    // Snapshot at start — iterate over IDs, not entries, so we can delete safely
+    const now = Date.now();
     const ids = Array.from(backgroundTasks.keys());
-    for (const id of ids) {
-      // Read + remove atomically: delete from map first, then process.
-      // This prevents concurrent interval ticks from both processing the same task.
-      const task = backgroundTasks.get(id);
-      if (!task) continue; // Already claimed by a concurrent tick
-      backgroundTasks.delete(id);
 
+    for (const id of ids) {
+      const task = backgroundTasks.get(id);
+      if (!task) continue;
+      backgroundTasks.delete(id); // Remove atomically
+
+      // ── Check timeout ────────────────────────────────────────────
+      if (now - task.startedAt > TASK_TIMEOUT_MS) {
+        killAgentPane(task.paneId, task.originalPane);
+        completeTask(pi, id, task, "Task timed out after 30 minutes", "timeout", piDir);
+        continue;
+      }
+
+      // ── Check pane liveness ──────────────────────────────────────
+      if (!paneExists(task.paneId)) {
+        // Pane dead — check if RESULT.md was produced before death
+        const resultPath = join(task.dir, "RESULT.md");
+        let content = "";
+        try {
+          content = await readFile(resultPath, "utf-8");
+        } catch {
+          /* file missing — task lost */
+        }
+        if (content.trim()) {
+          completeTask(pi, id, task, content, "done", piDir);
+        } else {
+          completeTask(pi, id, task, "Agent pane terminated without producing a result.", "failed", piDir);
+        }
+        continue;
+      }
+
+      // ── Check RESULT.md ─────────────────────────────────────────
       const resultPath = join(task.dir, "RESULT.md");
       let content: string;
       try {
         content = await readFile(resultPath, "utf-8");
       } catch {
-        // Not ready yet — put it back for next poll
-        backgroundTasks.set(id, task);
+        backgroundTasks.set(id, task); // Not ready yet
         continue;
       }
       if (content.trim().length === 0) {
@@ -424,49 +437,12 @@ export default function (pi: ExtensionAPI) {
         continue;
       }
 
-      // Kill the agent's tmux pane
-      killAgentPane(task.paneId, task.originalPane);
-
-      // Use in-memory toolcall counts (updated by 3s countInterval)
-      const { toolUses, turns } = task;
-
-      const parsed = parseResultXml(content);
-      const durationMs = Date.now() - parseIdTimestamp(id);
-
-      const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
-      const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
-      const statsStr = [useStr, durStr].filter(Boolean).join(" • ");
-
-      // Notify once
-      pi.sendMessage({
-        customType: "task-complete",
-        content: [
-          `${task.agentType} - ${task.description}`,
-          statsStr ? `${statsStr}` : "",
-          "",
-          parsed.summary || content.slice(0, 300),
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        display: true,
-        details: {
-          task_id: id,
-          agent_type: task.agentType,
-          description: task.description,
-          tmux_session: task.sessionName,
-          status: parsed.status,
-          summary: parsed.summary,
-          findings: parsed.findings,
-          evidence: parsed.evidence,
-          confidence: parsed.confidence,
-          result: content,
-          duration_ms: durationMs,
-          tool_uses: toolUses,
-          turn_count: turns,
-        },
-      });
+      // Result ready — complete
+      completeTask(pi, id, task, content, "done", piDir);
     }
   }, BACKGROUND_CHECK_MS);
+
+  // ── Cleanup on shutdown ────────────────────────────────────────────────
 
   pi.on("session_shutdown", () => {
     clearInterval(checkInterval);
@@ -478,14 +454,14 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  // ── Custom notification renderer for task completion ───────────────────
+  // ── Custom notification renderer ───────────────────────────────────────
+
   pi.registerMessageRenderer?.("task-complete", (message, { expanded }, theme) => {
     const d = message.details as Record<string, unknown> | undefined;
     if (!d) return undefined;
 
     const agentType = (d.agent_type as string) || "";
     const desc = (d.description as string) || "";
-    const status = (d.status as string) || "";
     const summary = (d.summary as string) || "";
     const findings = (d.findings as string) || "";
     const confidence = (d.confidence as string) || "";
@@ -493,24 +469,24 @@ export default function (pi: ExtensionAPI) {
     const toolUses = (d.tool_uses as number) || 0;
     const turns = (d.turn_count as number) || 0;
 
-    const isError = status === "failure" || status === "blocked" || status === "unknown";
-
-    // ── Title line: "Agent - description"
     let line = theme.fg("accent", agentType);
     if (desc) line += theme.fg("dim", ` - ${desc}`);
 
-    // ── Stats line: raw text "N toolcalls • duration"
     const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
     const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
     const statsParts = [useStr, durStr].filter(Boolean);
     if (statsParts.length) {
-      line += "\n" + theme.fg("dim", `${statsParts.join(" • ")}`);
+      line += "\n" + theme.fg("dim", statsParts.join(" • "));
     }
 
-    // ── Confidence line: shown when present
-    const confStr = confidence ? `${confidence.toUpperCase()}` : "";
+    const confStr = confidence ? confidence.toUpperCase() : "";
     if (confStr && (statsParts.length || expanded)) {
-      const confColor = confidence === "high" ? "success" : confidence === "low" ? "error" : "accent";
+      const confColor =
+        confidence === "high"
+          ? "success"
+          : confidence === "low"
+            ? "error"
+            : "accent";
       line += "\n" + theme.fg(confColor as any, `[${confStr}]`);
     }
 
@@ -519,61 +495,82 @@ export default function (pi: ExtensionAPI) {
       if (findings) line += "\n" + theme.fg("dim", findings);
     }
 
-    // Fall back to content text if we couldn't format anything
     if (!line.trim()) return undefined;
-
     return new Text(line, 0, 0);
   });
 
-  // ── Task Tool Registration ─────────────────────────────────────────────
+  // ── Tool Registration ──────────────────────────────────────────────────
+
   pi.registerTool({
     name: "task",
     label: "Task",
     description: [
-      "Delegate a complex, well-defined task to a specialist agent.",
-      "Spawns pi CLI in a tmux split pane so you can watch it live.",
-      "All tasks execute in background — you're notified on completion.",
+      "Launch a new agent to handle complex, multistep tasks autonomously.",
+      "",
+      "Include relevant context from your current work in the prompt parameter —",
+      "this becomes the subagent's instructions. The prompt is the subagent's primary",
+      "input; the subagent knows nothing about what you've been doing except what you",
+      "put in the prompt.",
       "",
       "When NOT to use:",
-      "- Single file read → use read tool",
-      "- Simple grep search → use grep tool",
-      "- Small edit → do it yourself",
-      "- No available agent fits → use other tools directly",
+      "- To read a specific file path, use Read or Grep instead",
+      "- To search for a class definition like 'class Foo', use Grep instead",
+      "- To search code within 2-3 files, use Read instead",
+      "- If no available agent fits the task, use other tools directly",
       "",
-      "Guidelines:",
-      "1. Provide complete context in the prompt — the subagent starts fresh",
-      "2. Do NOT duplicate work while the task runs in background",
-      "3. Launch multiple tasks concurrently in parallel",
-      "4. Use the agent_type to route to the right specialist",
-      "5. Specify whether the agent should write code or just research",
+      "Usage notes:",
+      "1. Provide complete context in the prompt — the subagent starts with a fresh context",
+      "2. Launch multiple agents concurrently when possible (use a single message with multiple tool calls)",
+      "3. Once you delegate work, do NOT duplicate it. Continue with non-overlapping tasks, or wait for the result",
+      "4. Foreground is the default (background: false). Use background mode for independent work that can run while you continue elsewhere",
+      "5. The agent's output should generally be trusted",
+      "6. Clearly tell the agent whether to write code or just research, since it doesn't know the user's intent",
+      "7. The result returned by the agent is not visible to the user. Send a concise summary back to the user",
+      "8. Pass task_id to resume a previous subagent session (continues with its prior context)",
+      "",
+      "Background mode (background: true):",
+      "- Launches the subagent asynchronously and returns immediately",
+      "- You will be notified automatically when it finishes",
+      "- DO NOT sleep, poll, ask the task for status, or duplicate its work",
+      "- Avoid working with the same files or topics the background task is using",
+      "- Work on non-overlapping tasks, or briefly tell the user what you launched and end your response",
     ].join("\n"),
     promptSnippet: "Delegate work to a specialist agent via the task tool",
     promptGuidelines: [
-      "Use task to delegate complex multi-step work to a specialist agent when the work benefits from isolated context",
-      "Launch multiple tasks concurrently by making multiple tool calls in a single message",
-      "Do NOT duplicate work you've delegated — wait for the result",
-      "Use the agent_type parameter to route work to the right specialist (explore, scout, reviewer, planner, worker, vision)",
+      "Delegate complex multi-step work to a specialist agent when the work benefits from isolated context",
+      "Launch multiple agents concurrently by making multiple tool calls in a single message",
+      "Do NOT duplicate work you've delegated — wait for the result or work on non-overlapping tasks",
+      "Use agent_type to route to the right specialist",
+      "Tell the agent whether to write code or just research",
+      "For background tasks: DO NOT sleep, poll, or check on progress. You'll be notified",
+      "Send the user a concise summary of the result since the agent's output is not user-visible",
     ],
     parameters: Type.Object({
       agent_type: Type.String({
-        description: "Which specialist agent to use for this task",
+        description: "The type of specialist agent to use for this task",
       }),
       prompt: Type.String({
         description: "The complete task for the agent to perform. Be detailed and self-contained.",
       }),
       description: Type.String({
-        description: "Short (3-5 word) summary of the task",
+        description: "A short (3-5 word) summary of the task",
       }),
+      task_id: Type.Optional(
+        Type.String({
+          description:
+            "Resume a previous task by ID (continues the same subagent session with its prior context instead of creating a fresh one)",
+        }),
+      ),
       background: Type.Optional(
         Type.Boolean({
-          description: "Run in background (async). You'll be notified when it completes.",
-          default: false,
+          description:
+            "Run in background (async). You will be notified when it completes. DO NOT sleep, poll, ask the task for status, or duplicate its work while it runs in background.",
+          default: true,
         }),
       ),
     }),
 
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
-      // ── Resolve agent ──────────────────────────────────────────
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const { agents, piDir } = discoverAgents(ctx.cwd);
       const agent = agents.find((a) => a.name === params.agent_type);
 
@@ -591,26 +588,92 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
-      const id = `${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`;
-      const sessionName = `task-${id}`;
-      const artifactDir = join(piDir, "artifacts", sessionName);
-      await mkdir(artifactDir, { recursive: true });
-      const resultPath = join(artifactDir, "RESULT.md");
+      // ── Resolve task identity: new or resume ───────────────────────────
+      let id: string;
+      let sessionName: string;
+      let artifactDir: string;
+      let resultPath: string;
+      let resume = false;
 
-      const descText = params.description || "";
+      if (params.task_id) {
+        // Look up the task in the persistent registry
+        const entries = readRegistry(piDir);
+        const entry = entries.find((e) => e.id === params.task_id);
+        if (!entry) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Unknown task_id: "${params.task_id}". No task with that ID found in the registry.`,
+              },
+            ],
+            details: { phase: "failed" as const, error: `Unknown task_id: ${params.task_id}` },
+            isError: true,
+          };
+        }
+        if (!existsSync(entry.dir)) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Task "${params.task_id}" artifact directory no longer exists: ${entry.dir}`,
+              },
+            ],
+            details: { phase: "failed" as const, error: "Task artifact dir missing" },
+            isError: true,
+          };
+        }
+        // Resume: reuse existing artifact dir and session name
+        id = entry.id;
+        sessionName = entry.sessionName;
+        artifactDir = entry.dir;
+        resultPath = join(artifactDir, "RESULT.md");
+        resume = true;
 
-      // ── Require tmux ───────────────────────────────────────────
-      if (!hasTmux()) {
-        return {
-          content: [{ type: "text" as const, text: "tmux is required for background tasks." }],
-          details: { phase: "failed" as const, error: "tmux not found" },
-          isError: true,
-        };
+        // If background and pane still alive, reattach to tracker
+        if (params.background !== false && entry.paneId && paneExists(entry.paneId)) {
+          const bgtask: BackgroundTask = {
+            dir: artifactDir,
+            agentType: agent.name,
+            sessionName,
+            paneId: entry.paneId,
+            originalPane: null,
+            description: params.description || entry.agentType,
+            startedAt: entry.startedAt,
+            toolUses: 0,
+            turns: 0,
+          };
+          backgroundTasks.set(id, bgtask);
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Resumed task "${params.task_id}". The subagent is running in background and will notify on completion.`,
+              },
+            ],
+            details: {
+              task_id: id,
+              agent_type: agent.name,
+              description: params.description,
+              tmux_session: sessionName,
+              background: true,
+            },
+          };
+        }
+      } else {
+        id = `${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`;
+        sessionName = `task-${id}`;
+        artifactDir = join(piDir, "artifacts", sessionName);
+        await mkdir(artifactDir, { recursive: true });
+        resultPath = join(artifactDir, "RESULT.md");
       }
 
-      // Write system prompt and worker context
-      await writeFile(join(artifactDir, "SYSTEM.md"), agent.body, "utf-8");
+      const descText = params.description || "";
+      const isBackground = params.background !== false; // default true
 
+      // ── Write durable task context ──────────────────────────────────────
+      const contextPath = join(artifactDir, "CONTEXT.md");
       const contextContent = [
         `# Task: ${descText}`,
         "",
@@ -632,45 +695,43 @@ export default function (pi: ExtensionAPI) {
         OUTPUT_FORMAT_GUIDE,
         "```",
       ].join("\n");
-      await writeFile(join(artifactDir, "WORKER-CONTEXT.md"), contextContent, "utf-8");
+      await writeFile(contextPath, contextContent, "utf-8");
 
       const promptContent = [
-        `Read ${join(artifactDir, "WORKER-CONTEXT.md")} for your task.`,
+        `Read ${contextPath} for your task.`,
         `Write your findings/output to ${resultPath}`,
         "",
         "Format:",
         OUTPUT_FORMAT_GUIDE,
       ].join("\n");
-      await writeFile(join(artifactDir, "USER-PROMPT.md"), promptContent, "utf-8");
 
-      const modelFlag = agent.model ? `--model ${shellQuote(agent.model)}` : "";
-      const disallowed = agent.disallowedTools;
-      const allowedTools = disallowed?.length
-        ? ALL_TOOL_NAMES.filter((t) => !disallowed.includes(t)).join(",")
-        : "";
-      const toolsFlag = allowedTools ? `--tools ${shellQuote(allowedTools)}` : "";
       const sessionDir = join(artifactDir, "sessions");
       await mkdir(sessionDir, { recursive: true });
 
-      const piArgs = [
-        "PI_TASK_TOOL_DISABLED=1",
-        "pi",
-        `--name ${shellQuote(sessionName)}`,
-        modelFlag,
-        toolsFlag,
-        `--session-dir ${shellQuote(sessionDir)}`,
-        `--append-system-prompt ${shellQuote(join(artifactDir, "SYSTEM.md"))}`,
-        shellQuote(`@${join(artifactDir, "USER-PROMPT.md")}`),
-      ]
-        .filter(Boolean)
-        .join(" ");
-      const shellCommand = `cd ${shellQuote(ctx.cwd)} && ${piArgs}`;
+      // ─── Build and run the sub-agent pi process ──────────────────────────
+      const piArgs = buildPiArgs(agent, sessionName, sessionDir, promptContent, resume);
+      const envPrefix = `PI_TASK_TOOL_DISABLED=1`;
 
-      // ── Spawn pi in a tmux split pane ──────────────────────────
+      // Both foreground and background use tmux — pi needs a real terminal (TTY)
+      if (!hasTmux()) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "tmux is required for task tool. Install tmux to use foreground or background tasks.",
+            },
+          ],
+          details: { phase: "failed" as const, error: "tmux not found" },
+          isError: true,
+        };
+      }
+
+      const shellCommand = `${envPrefix} pi ${piArgs.map((a) => shellQuote(a)).join(" ")}`;
+
       let paneId: string;
       let originalPane: string | null;
       try {
-        const splitResult = splitWindowPane(ctx.cwd, shellCommand);
+        const splitResult = splitWindowPane(ctx.cwd, `cd ${shellQuote(ctx.cwd)} && ${shellCommand}`);
         paneId = splitResult.paneId;
         originalPane = splitResult.originalPane;
       } catch {
@@ -686,6 +747,54 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
+      // ── FOREGROUND MODE: block until result, return directly ────────────
+      if (!isBackground) {
+        const startedAt = Date.now();
+        const { content, phase } = await waitForResult(
+          resultPath,
+          paneId,
+          originalPane,
+          signal,
+          startedAt,
+        );
+
+        const parsed = parseResultXml(content);
+        const durationMs = Date.now() - startedAt;
+        const { toolUses, turns } = countToolUses(sessionDir);
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: [
+                `${parsed.status || "done"}: ${parsed.summary || content.slice(0, 300)}`,
+                toolUses > 0 ? `\n${turns || toolUses} toolcalls` : "",
+                durationMs >= 1000 ? `\n${formatMs(durationMs)}` : "",
+              ]
+                .filter(Boolean)
+                .join(""),
+            },
+          ],
+          details: {
+            task_id: id,
+            agent_type: agent.name,
+            description: descText,
+            phase,
+            status: phase === "done" ? parsed.status || "done" : phase,
+            summary: parsed.summary || "",
+            findings: parsed.findings || "",
+            evidence: parsed.evidence || "",
+            confidence: parsed.confidence || "",
+            duration_ms: durationMs,
+            tool_uses: toolUses,
+            turn_count: turns,
+            background: false,
+          },
+        };
+      }
+
+// ── BACKGROUND MODE (default): add to tracker, return immediately ─────
+
       const bgtask: BackgroundTask = {
         dir: artifactDir,
         agentType: agent.name,
@@ -699,22 +808,47 @@ export default function (pi: ExtensionAPI) {
       };
       backgroundTasks.set(id, bgtask);
 
-      // Wire abort signal to kill the sub-agent pane
+      // ── P0: Persistent registry ────────────────────────────────────────
+      const entry: RegistryEntry = {
+        id,
+        agentType: agent.name,
+        description: descText,
+        sessionName,
+        startedAt: Date.now(),
+        paneId,
+        piDir,
+        dir: artifactDir,
+      };
+      // Write to JSON registry for on-load restore
+      const entries = readRegistry(piDir);
+      entries.push(entry);
+      writeRegistry(piDir, entries);
+      // Also persist to session store via appendEntry (audit trail)
+      pi.appendEntry("task-registry", entry);
+
+      // ── Abort signal handling ──────────────────────────────────────────
       if (signal) {
-        signal.addEventListener("abort", () => {
-        killAgentPane(paneId, originalPane);
-        backgroundTasks.delete(id);
-        if (backgroundTasks.size === 0) {
-          stopWidget();
-          if (widgetCtx) {
-            widgetCtx.ui.setWidget("task", undefined);
-            widgetCtx = null;
-          }
-        }
-        }, { once: true });
+        signal.addEventListener(
+          "abort",
+          () => {
+            killAgentPane(paneId, originalPane);
+            backgroundTasks.delete(id);
+            // Clean registry
+            const remaining = readRegistry(piDir).filter((e) => e.id !== id);
+            writeRegistry(piDir, remaining);
+            if (backgroundTasks.size === 0) {
+              stopWidget();
+              if (widgetCtx) {
+                widgetCtx.ui.setWidget("task", undefined);
+                widgetCtx = null;
+              }
+            }
+          },
+          { once: true },
+        );
       }
 
-      // Show sticky widget above editor with smooth 1s refresh
+      // ── Sticky widget ──────────────────────────────────────────────────
       if (!widgetCtx) {
         widgetCtx = ctx;
         widgetCtx.ui.setWidget("task", (tui, _theme) => {
@@ -740,7 +874,8 @@ export default function (pi: ExtensionAPI) {
     },
 
     renderCall(args, theme, _context) {
-      const agentName = ((args as Record<string, unknown>).agent_type as string) || "...";
+      const agentName =
+        ((args as Record<string, unknown>).agent_type as string) || "...";
       const desc = ((args as Record<string, unknown>).description as string) || "";
 
       let text = theme.fg("toolTitle", "");
@@ -756,18 +891,13 @@ export default function (pi: ExtensionAPI) {
       const agentType = d.agent_type || "";
       const desc = d.description || "";
 
-      // ── Background / running — hide result text (shown via widget above editor)
-      // Must return a real component, not undefined. Returning undefined causes
-      // ToolExecutionComponent to add undefined to the Box children, which throws
-      // TypeError during rendering.
       if (d.background) {
         return new Text("", 0, 0);
       }
 
-      // ── Error / timeout / aborted ──────────────────────────
       if (d.phase === "timeout" || d.phase === "aborted" || d.phase === "failed") {
         const line =
-          theme.fg("error", "✗") +
+          theme.fg("error", "x") +
           " " +
           theme.fg("accent", agentType) +
           " " +
@@ -775,9 +905,13 @@ export default function (pi: ExtensionAPI) {
         return new Text(line, 0, 0);
       }
 
-      // ── Completed ───────────────────────────────────────────
-      const isError = d.status === "failure" || d.status === "blocked" || d.status === "unknown";
-      const status = d.status || "completed";
+      const isError =
+        d.status === "failure" ||
+        d.status === "blocked" ||
+        d.status === "unknown" ||
+        d.status === "timeout" ||
+        d.status === "failed";
+
       const durationMs = d.duration_ms || 0;
       const toolUses = d.tool_uses || 0;
       const turns = d.turn_count || 0;
@@ -785,9 +919,11 @@ export default function (pi: ExtensionAPI) {
       const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
       const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
       const statsParts = [useStr, durStr].filter(Boolean);
-      const statsStr = statsParts.length ? " " + theme.fg("dim", statsParts.join(" • ")) : "";
+      const statsStr = statsParts.length
+        ? " " + theme.fg("dim", statsParts.join(" • "))
+        : "";
 
-      const icon = isError ? theme.fg("error", "✗") : theme.fg("success", "✓");
+      const icon = isError ? theme.fg("error", "x") : theme.fg("success", "v");
       let line = icon + " " + theme.fg("accent", agentType) + statsStr;
 
       if (expanded) {
@@ -796,11 +932,16 @@ export default function (pi: ExtensionAPI) {
         const e = d.evidence || "";
         if (s) line += "\n" + theme.fg("muted", s);
         if (f) line += "\n" + theme.fg("dim", f);
-        if (e) line += "\n" + theme.fg("muted", "Evidence: ") + theme.fg("dim", e);
+        if (e)
+          line +=
+            "\n" + theme.fg("muted", "Evidence: ") + theme.fg("dim", e);
       } else {
         const preview = (d.summary || "").slice(0, 80);
         if (preview) line += "\n" + theme.fg("dim", `  ⎿  ${preview}`);
-        else line += "\n" + theme.fg("dim", `  ⎿  ${isError ? status : "Done"}`);
+        else
+          line +=
+            "\n" +
+            theme.fg("dim", `  ⎿  ${isError ? d.status || "error" : "Done"}`);
       }
 
       return new Text(line, 0, 0);
