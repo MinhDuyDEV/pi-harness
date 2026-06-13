@@ -1,158 +1,66 @@
 # Workflow Routing
 
-Route work to the right execution layer. Apply these in order.
-
 ## Decision Priority
 
-1. **Fix/update/refactor existing code** → direct tools; do **not** use harness by default.
-2. **Build/create/make a product-level artifact, app, feature, or multi-file codebase** → `harness`.
-3. **Create/edit docs, diagrams, prompts, config, tests for existing behavior, or agent files** → direct tools unless the user explicitly asks for harness.
-4. **Modify the harness extension itself** → direct tools or an explicit file/tmux review workflow; do not recursively use harness unless the user explicitly asks.
-5. **Research/explore/review/plan/visual audit** → direct tools and visible `.pi/artifacts/<id>/` artifacts; self-spawn in tmux only when independent fresh context is worth the overhead.
-6. **Ambiguous or destructive request** → ask before acting.
+1. **Fix / update / refactor existing code** → direct tools. No harness, no task.
+2. **Build / create / make a product-level artifact, app, feature, or multi-file codebase** → `harness` or `task`.
+3. **Create / edit docs, diagrams, prompts, config, tests for existing behavior, or agent files** → direct tools unless user asks for harness.
+4. **Research / explore / review / plan / visual audit** → direct tools and visible `.pi/artifacts/<id>/` artifacts. Self-spawn in tmux only when independent fresh context is worth the overhead.
+5. **Modify the harness extension itself** → direct tools. Do not recursively use harness.
+6. **Ambiguous or destructive request** → ask first.
 
-## Primitive Table
+## Tool Selection
 
-| Primitive | Use For |
+| Question | Tool |
 |---|---|
-| Direct tools | Normal coding, review, edits, tests, research |
-| `.pi/artifacts/<id>/PLAN.md` / `PROGRESS.md` | Visible planning and tracking |
-| `TODO.md` | Task checklist per artifact |
-| `.pi/cli/*.mjs` | Repeatable browser/automation wrappers |
-| `tmux` | Dev servers, logs, long-running commands |
-| `task` tool | Delegate complex work to specialist agents — spawns pi in a tmux split pane, polls for completion |
-| `pi --print/--print-turn` in tmux | Self-spawn isolated review/research |
-| `npx fallow` / `fallow-mcp` | Codebase analysis before and after TS/JS edits — dead code, dupes, complexity, blast radius |
-| `.pi/checkpoints/` | Session state snapshots for rebuild context injection |
-| `harness` | Product-level planner → worker → reviewer builds |
+| Text search? | `grep` |
+| Multi-pattern text search? | `mgrep` |
+| Symbol / definition / caller analysis? | `srcwalk_*` |
+| Structural pattern (empty catch, `as any`, `unwrap()`)? | `ast-grep` (`sg`) |
+| Type / compile / lint errors? | `diagnostics` |
+| Dead code / complexity? | `diagnostics` (Fallow) |
+| AI slop (narrative comments, swallowed exceptions)? | `diagnostics` (aislop) or `bash aislop scan` |
+| Security audit? | `bash aislop scan` or `npx aislop scan` |
 
-## Minimalism Gate
+## Delegation
 
-Before `task`, harness, tmux, or self-spawn:
+- **Do it yourself** when surgical, few tool calls, ambiguity needs judgment, provenance matters.
+- **Use `task`** when work is complex, well-defined, benefits from fresh context, independently verifiable.
+- **Do NOT use `task`** when the task needs back-and-forth, current session state, is trivial (1-2 tool calls), or no matching agent exists.
+- Multiple `task()` calls in one message run in parallel; each gets its own tmux pane and artifact directory.
+- After any delegated or harness run: read changed files directly, review the diff, run verification, confirm scope, report evidence.
 
-- Can direct tools solve this in the current session?
-- Can a file artifact replace hidden runtime state?
-- Would tmux make the process more observable?
-- Will output be written under `.pi/artifacts/<id>/` and independently verified?
+## Skills
 
-## Delegation Rules
-
-**Do it yourself** when: surgical request, few tool calls, ambiguity needs direct judgment, provenance matters.
-
-**Use `task` tool** when:
-- Work is complex and well-defined
-- Benefits from fresh context (no session cruft)
-- Work is independently verifiable via a RESULT.md file
-- You want to watch the sub-agent work live
-- You want to run multiple sub-agents in parallel
-
-**Do NOT use `task` when:**
-- The task requires interactive back-and-forth with the caller (task is write-once, read-once)
-- The task needs access to the current session's memory, variables, or state
-- The task is trivial (1-2 tool calls) — direct tools are faster
-- No matching agent exists for the task type
-
-**Self-spawn** (raw `pi --print/--print-turn` in tmux) when: non-standard toolset needed, requires existing session state, or the task needs specific interaction that `task` doesn't support.
-
-## Task Tool Protocol
-
-### Call
-
-```
-task(agent_type="explore", prompt="...", description="3-5 word summary")
-```
-
-- `agent_type` — `.md` file in `.pi/agents/` (project) or `~/.pi/agent/agents/` (user global)
-- `prompt` — self-contained instructions; sub-agent starts with zero history
-- `description` — short label
-- All tasks are background-only (tmux split, returns immediately)
-
-### Output format
-
-**Every task delegation must instruct the sub-agent to write results in this XML format:**
-
-```
-<status>success|failure|blocked|partial</status>
-<summary>One sentence summary</summary>
-<findings>Key findings with file:line references</findings>
-<evidence>Verification evidence, commands run, output snippets</evidence>
-<files>Comma-separated absolute paths of files read/created (optional)</files>
-```
-
-Without XML tags, the extension treats output as `summary` with `status=unknown`.
-
-### Concurrency
-
-Multiple `task()` calls in a single message run in parallel. Each gets its own tmux pane and artifact directory. Artifacts persist after session.
-
-## Self-Spawn and Harness Distrust
-
-Never accept delegated output blindly. After any delegated or harness run:
-
-1. Read changed files directly.
-2. Review the diff.
-3. Run verification.
-4. Confirm scope was respected.
-5. Report verification evidence.
+Before implementing a non-trivial task, check the available skills list in the system prompt. If a skill's description matches, `read` that skill's `SKILL.md` and follow its instructions. When a task spans multiple domains, load all matching skills. If skill instructions conflict, ask the user.
 
 ## Artifacts
 
-**For EVERY non-trivial request or subtask** (2+ tool calls or multiple files), create a fresh artifact:
+For non-trivial work (2+ tool calls or multiple files), create `.pi/artifacts/<id>/` with a short kebab-case id. Write `TODO.md` with checkbox steps. Skip for: one-line fixes, docs-only, config tweaks, trivial tests. Do not reuse a previous artifact id; if a request is a continuation, create a new id and reference the previous in `PROGRESS.md`.
 
-1. Create `.pi/artifacts/<id>/` with a short kebab-case id describing the task
-2. Write `.pi/artifacts/<id>/PLAN.md` with a `## Discovery` section
-3. Write `.pi/artifacts/<id>/TODO.md` with checkbox steps
-4. Track decisions and notes in `.pi/artifacts/<id>/PROGRESS.md`
+## Artifacts vs Harness
 
-Skip for: one-line fixes, docs-only, config tweaks, trivial tests.
-
-The TODO.md creation and checkbox protocol is defined in `AGENTS.md` Hard Constraints — follow it for every artifact.
-
-**Do not reuse a previous artifact id.** Each new request gets a new id. If a request is a continuation of prior work, create a new artifact with a new id and reference the previous one in PROGRESS.md.
-
-## Quality Loop
-
-After any non-trivial implementation, run an iterative fix-verify loop (see `quality-loop` skill):
-
-1. Run all quality gates (typecheck → lint → tests → TODO.md → stubs)
-2. If any fail: auto-fix, re-run gates, repeat
-3. Max 3 iterations (harness) or 2 iterations (direct worker)
-4. Report outcome with iteration count and remaining issues
-
-Skip only for: one-line fixes, docs-only, config tweaks, trivial tests that cannot break existing behavior.
-
-For complex handoffs, write shared context to `.pi/artifacts/<id>/WORKER-CONTEXT.md`, then point a spawned session to it:
-
-```
-mkdir -p .pi/artifacts/<id>
-pi --name "review <id>" --print-turn "Read .pi/artifacts/<id>/WORKER-CONTEXT.md and produce .pi/artifacts/<id>/REVIEW.md"
-```
-
-## Fallow Gate (TS/JS only)
-
-Before claiming completion for TypeScript/JavaScript work, run `npx fallow`:
-
-1. **`npx fallow audit --format json --quiet`** — check `verdict`. If `"fail"`, resolve before proceeding.
-2. **`npx fallow`** — full analysis (dead code, duplication, health).
-3. **`npx fallow fix --dry-run`** — preview safe auto-fixes.
-
-If `npx fallow` is unavailable (tool not installed), skip silently. Do not substitute with AI-based analysis.
-
-## Context Retrieval
-
-- `memory-search` → durable project knowledge (prior decisions, bugs, patterns, warnings) and FTS5 project index (`.md`/`.ts` files)
-- `vcc_recall()` → current-session recovery (earlier output, commands, user decisions)
-- `npx fallow health --changed-since main --format json` → complexity and blast-radius context before editing TS/JS files; see `.pi/agent/skills/fallow/SKILL.md`
-
-After either path, verify current code/config/git state from disk before acting. Serialize `compress` calls — never run multiple compressions in parallel.
+Artifacts = visible planning for direct-tool work. Harness = product-level build pipeline. Use artifacts to plan; use harness to build a complete product.
 
 ## Error Recovery
 
-When a tool call fails, build breaks, or result is partial:
+1. **Retry once** — same approach, same tool.
+2. **Fallback** — alternative tool or approach.
+3. **Escalate** — if 2 failures on the same step, stop and present what was tried, what failed, and options with tradeoffs.
+4. Save partial output before retrying a failed portion.
 
-1. **Retry once** — same approach, same tool
-2. **Fallback** — alternative tool or approach
-3. **Escalate** — if 2 failures on the same step, stop and present: what was tried, what failed, and options with tradeoffs
-4. **Partial results** — save partial output before retrying the failed portion
+## Context Retrieval
 
-Do not silently continue after a failure. Log the failure mode and what was tried.
+- `memory-search` → durable project knowledge and FTS5 project index.
+- `vcc_recall` → current-session recovery (earlier output, commands, decisions).
+- `npx fallow health --changed-since main --format json` → complexity and blast-radius before TS/JS edits.
+
+After either path, verify current code/config/git state from disk before acting.
+
+## Web Retrieval Priority
+
+1. `context7` — official library/framework docs
+2. `websearch` / `codesearch` — discover URLs
+3. `web_fetch` — read result URL as markdown
+4. `webclaw_scrape` / `webclaw_batch` — when normal fetch is blocked
+5. Browser tools — only when JS rendering is required
