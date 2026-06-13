@@ -2,7 +2,7 @@
  * Safety Module — Context Normalization
  *
  * Single point that converts raw pi events into typed ToolCallContext.
- * Handles bash, write, edit, and TaskUpdate tools.
+ * Handles bash, read, write, edit, and TaskUpdate tools.
  */
 
 import type { ToolCallContext } from "./types.js";
@@ -31,12 +31,16 @@ function extractFileContent(
 		const raw = input.content;
 		return typeof raw === "string" ? raw : undefined;
 	}
-	// edit tool: join all newText from edits array
+	if (toolName !== "edit") return undefined;
+
 	const edits = input.edits;
 	if (!Array.isArray(edits)) return undefined;
-	const parts = edits
-		.map((e: any) => typeof e?.newText === "string" ? e.newText : "")
-		.filter(Boolean);
+	const parts: string[] = [];
+	for (const edit of edits) {
+		if (!edit || typeof edit !== "object") continue;
+		const newText = (edit as Record<string, unknown>).newText;
+		if (typeof newText === "string" && newText.length > 0) parts.push(newText);
+	}
 	return parts.length > 0 ? parts.join("\n") : undefined;
 }
 
@@ -91,7 +95,7 @@ function buildTaskUpdateContext(
 // ---------------------------------------------------------------------------
 
 /**
- * Build a ToolCallContext from a raw pi before_tool_call event.
+ * Build a ToolCallContext from a raw pi tool_call event.
  * Returns null if the event is malformed or irrelevant.
  */
 export function contextFromEvent(
@@ -112,7 +116,7 @@ export function contextFromEvent(
 		return buildBashContext(input, url, urls, cwd, sessionId);
 	}
 
-	if (toolName === "write" || toolName === "edit") {
+	if (toolName === "read" || toolName === "write" || toolName === "edit") {
 		return buildFileContext(input, toolName, url, urls, cwd, sessionId);
 	}
 

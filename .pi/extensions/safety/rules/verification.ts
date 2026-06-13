@@ -130,7 +130,7 @@ function parseVerificationOutput(command: string, output: string, exitCode?: num
 	const type = classifyCommand(command);
 	const result: VerificationResult = {
 		type,
-		passed: exitCode !== undefined ? exitCode === 0 : undefined as unknown as boolean,
+		passed: exitCode === 0,
 		command: command.slice(0, 200),
 		exitCode,
 		timestamp: Date.now(),
@@ -203,26 +203,16 @@ export class VerificationTracker {
 		return result;
 	}
 
-	hasEvidence(sessionId: string): boolean {
-		return (this.evidence.get(sessionId)?.length ?? 0) > 0;
-	}
-
-	/** Get structured results for a session. */
-	getResults(sessionId: string): VerificationResult[] {
-		return this.results.get(sessionId) ?? [];
-	}
-
 	/** Get the latest verification result for a session. */
 	getLatestResult(sessionId: string): VerificationResult | undefined {
 		const results = this.results.get(sessionId);
 		return results?.[results.length - 1];
 	}
 
-	/** Check if all verification results in a session passed. */
-	allPassed(sessionId: string): boolean {
-		const results = this.results.get(sessionId);
-		if (!results || results.length === 0) return false;
-		return results.every((r) => r.passed);
+	/** Check if the latest verification result is a successful gate. */
+	hasPassingResult(sessionId: string): boolean {
+		const latest = this.getLatestResult(sessionId);
+		return latest?.passed === true;
 	}
 }
 
@@ -235,12 +225,14 @@ export function verificationRules(tracker: VerificationTracker): RuleSet {
 			threat: "unverified-completion",
 			targets: ["taskupdate"],
 			check: (ctx) => {
-				// Only trigger on status=completed
 				if (!ctx.command?.includes("status=completed")) return null;
-				if (tracker.hasEvidence(ctx.sessionId)) return null;
+				if (tracker.hasPassingResult(ctx.sessionId)) return null;
 
-				return confirm("warn-complete-without-verification", "medium", "unverified-completion",
-					"Task marked as completed without evidence of verification. Run tests/build/typecheck/lint first.");
+				const latest = tracker.getLatestResult(ctx.sessionId);
+				const message = latest
+					? `Task marked as completed after failed verification: ${latest.command}. Fix failures before completing.`
+					: "Task marked as completed without passing verification evidence. Run tests/build/typecheck/lint first.";
+				return confirm("warn-complete-without-verification", "medium", "unverified-completion", message);
 			},
 		}),
 	];

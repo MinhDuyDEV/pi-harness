@@ -41,25 +41,38 @@ export function readCredential(name: string): string | undefined {
 	return isNonEmptyString(value) ? value.trim() : undefined;
 }
 
+function allowedEnvKeys(policy: EnvPolicyName): Set<string> {
+	return new Set([
+		...BASE_ENV_ALLOWLIST,
+		...POLICY_ENV_ALLOWLIST[policy],
+	]);
+}
+
+function assertAllowedOverrides(
+	policy: EnvPolicyName,
+	keys: Set<string>,
+	overrides: Record<string, string | undefined>,
+): void {
+	for (const key of Object.keys(overrides)) {
+		if (!keys.has(key)) throw new Error(`Environment override is not allowed by ${policy} policy: ${key}`);
+	}
+}
+
+function envValue(key: string, overrides: Record<string, string | undefined>): string | undefined {
+	return Object.hasOwn(overrides, key) ? overrides[key] : process.env[key];
+}
+
 export function buildSubprocessEnv(
 	policy: EnvPolicyName,
 	overrides: Record<string, string | undefined> = {},
 ): NodeJS.ProcessEnv {
 	const result: NodeJS.ProcessEnv = {};
-	const keys = new Set<string>([
-		...BASE_ENV_ALLOWLIST,
-		...POLICY_ENV_ALLOWLIST[policy],
-		...Object.keys(overrides),
-	]);
+	const keys = allowedEnvKeys(policy);
+	assertAllowedOverrides(policy, keys, overrides);
 
 	for (const key of keys) {
-		const override = overrides[key];
-		if (override !== undefined) {
-			result[key] = override;
-			continue;
-		}
-		const current = process.env[key];
-		if (current !== undefined) result[key] = current;
+		const value = envValue(key, overrides);
+		if (value !== undefined) result[key] = value;
 	}
 
 	return result;

@@ -5,6 +5,7 @@
  * localhost, private subnets, cloud metadata endpoints, and unsafe URL schemes.
  */
 
+import { isIP } from "node:net";
 import { block, confirm, rule, type RuleSet } from "../types.js";
 
 const NETWORK_PATTERNS: RegExp[] = [
@@ -41,6 +42,19 @@ const ALLOWLIST: RegExp[] = [
 ];
 
 const URL_PATTERN = /https?:\/\/[^\s'"`<>]+/gi;
+const NUMERIC_PART_PATTERNS: Array<[RegExp, number]> = [
+	[/^0x([0-9a-f]+)$/i, 16],
+	[/^0([0-7]+)$/, 8],
+	[/^(\d+)$/, 10],
+];
+const PRIVATE_IPV4_PREFIXES = new Set([0, 10, 127]);
+const PRIVATE_IPV4_SECOND_OCTET_RANGES: Array<[number, number, number]> = [
+	[100, 64, 127],
+	[169, 254, 254],
+	[172, 16, 31],
+	[192, 168, 168],
+];
+const PRIVATE_IPV6_PREFIXES = ["fc", "fd", "fe80:"];
 const BLOCKED_SCHEMES = new Set(["file:", "data:", "javascript:"]);
 const BLOCKED_HOSTS = new Set([
 	"0.0.0.0",
@@ -70,28 +84,68 @@ function parseBlockedHostPatterns(): string[] {
 		.filter(Boolean);
 }
 
-function isPrivateIpv4(hostname: string): boolean {
-	const parts = hostname.split(".").map((part) => Number(part));
-	if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
-		return false;
+function parseNumericPart(part: string): number | null {
+	for (const [pattern, radix] of NUMERIC_PART_PATTERNS) {
+		const match = part.match(pattern);
+		if (match) return Number.parseInt(match[1], radix);
 	}
+	return null;
+}
+
+function numberToIpv4(value: number): number[] | null {
+	if (value < 0 || value > 0xffffffff) return null;
+	return [(value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255];
+}
+
+function parseDottedIpv4(hostname: string): number[] | null {
+	const parts = hostname.split(".");
+	if (parts.length !== 4) return null;
+	const octets = parts.map(parseNumericPart);
+	return octets.every((part) => part !== null && part <= 255) ? octets as number[] : null;
+}
+
+function parseIpv4(hostname: string): number[] | null {
+	const singleNumber = !hostname.includes(".") ? parseNumericPart(hostname) : null;
+	return singleNumber === null ? parseDottedIpv4(hostname) : numberToIpv4(singleNumber);
+}
+
+function isPrivateIpv4Parts(parts: number[]): boolean {
 	const [a, b] = parts;
-	if (a === 10) return true;
-	if (a === 127) return true;
-	if (a === 192 && b === 168) return true;
-	if (a === 172 && b >= 16 && b <= 31) return true;
-	if (a === 169 && b === 254) return true;
-	return false;
+	return PRIVATE_IPV4_PREFIXES.has(a) ||
+		PRIVATE_IPV4_SECOND_OCTET_RANGES.some(([prefix, min, max]) => a === prefix && b >= min && b <= max);
+}
+
+function isPrivateIpv4(hostname: string): boolean {
+	const parts = parseIpv4(hostname);
+	return parts ? isPrivateIpv4Parts(parts) : false;
+}
+
+function decodeHexMappedIpv4(hostname: string): string | null {
+	const match = hostname.match(/(?:::ffff:)([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+	if (!match) return null;
+	const high = Number.parseInt(match[1], 16);
+	const low = Number.parseInt(match[2], 16);
+	return `${(high >>> 8) & 255}.${high & 255}.${(low >>> 8) & 255}.${low & 255}`;
+}
+
+function mappedIpv4Host(hostname: string): string | null {
+	const dotted = hostname.match(/(?:::ffff:)(\d+\.\d+\.\d+\.\d+)$/);
+	return dotted?.[1] ?? decodeHexMappedIpv4(hostname);
+}
+
+function isPrivateIpv6(hostname: string): boolean {
+	const normalized = hostname.toLowerCase();
+	const mapped = mappedIpv4Host(normalized);
+	return mapped ? isPrivateIpv4(mapped) : normalized === "::1" ||
+		PRIVATE_IPV6_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
 function isPrivateHostname(hostname: string): boolean {
-	const normalized = hostname.toLowerCase().replace(/\.$/, "");
-	const stripped = normalized.replace(/^\[/, "").replace(/\]$/, "");
+	const stripped = hostname.toLowerCase().replace(/\.$/, "").replace(/^\[/, "").replace(/\]$/, "");
 	if (!stripped) return false;
 	if (BLOCKED_HOSTS.has(stripped)) return true;
 	if (stripped.endsWith(".internal") || stripped.endsWith(".local")) return true;
-	if (stripped.includes(":")) return stripped === "::1" || stripped.startsWith("fc") || stripped.startsWith("fd");
-	return isPrivateIpv4(stripped);
+	return isIP(stripped) === 6 ? isPrivateIpv6(stripped) : isPrivateIpv4(stripped);
 }
 
 function classifyDangerousUrl(urlValue: string): string | null {

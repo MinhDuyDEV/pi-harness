@@ -7,6 +7,20 @@
 
 import { block, confirm, rule, type RuleSet } from "../types.js";
 
+const SENSITIVE_PATH_PATTERNS = [
+	/(^|\/)\.env($|\.)/,
+	/(^|\/)\.ssh\//,
+	/(^|\/)\.aws\/credentials$/,
+	/(^|\/)\.netrc$/,
+	/(^|\/)\.pgpass$/,
+	/(^|\/)\.npmrc$/,
+	/(^|\/)id_(rsa|dsa|ecdsa|ed25519)$/,
+];
+
+function isSensitivePath(path: string): boolean {
+	return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(path));
+}
+
 export const credentialRules: RuleSet = [
 	rule({
 		id: "no-credential-echo",
@@ -32,6 +46,20 @@ export const credentialRules: RuleSet = [
 		},
 	}),
 	rule({
+		id: "block-sensitive-file-read",
+		description: "Block reading known secret stores",
+		severity: "critical",
+		threat: "credential-exposure",
+		targets: ["read"],
+		check: (ctx) => {
+			const path = ctx.path ?? "";
+			return isSensitivePath(path)
+				? block("block-sensitive-file-read", "critical", "credential-exposure",
+					`Reading sensitive file is forbidden: ${path}.`)
+				: null;
+		},
+	}),
+	rule({
 		id: "warn-sensitive-file",
 		description: "Warn on writing to sensitive files",
 		severity: "medium",
@@ -39,10 +67,25 @@ export const credentialRules: RuleSet = [
 		targets: ["write", "edit"],
 		check: (ctx) => {
 			const path = ctx.path ?? "";
-			const patterns = [/\.env($|\.)/, /\.ssh\//, /\.aws\/credentials/, /\.gitconfig/, /id_rsa/, /\.npmrc/];
-			return patterns.some((p) => p.test(path))
+			return isSensitivePath(path) || /(^|\/)\.gitconfig$/.test(path)
 				? confirm("warn-sensitive-file", "medium", "credential-exposure",
 					`Writing to sensitive file: ${path}. This file may contain credentials or security configuration.`)
+				: null;
+		},
+	}),
+	rule({
+		id: "block-secret-read-bash",
+		description: "Block shell commands that read secrets or dump environment variables",
+		severity: "critical",
+		threat: "credential-exposure",
+		targets: ["bash"],
+		check: (ctx) => {
+			const cmd = ctx.command!;
+			const readsSensitiveFile = /\b(cat|grep|rg|sed|awk|less|more|head|tail)\b[^;&|]*(\.env($|\.)|\.npmrc|\.netrc|\.pgpass|\.aws\/credentials|\.ssh\/|id_(rsa|dsa|ecdsa|ed25519))/.test(cmd);
+			const dumpsEnvironment = /(^|[;&|]\s*)(env|printenv|export\s+-p)(\s*($|[|>;]))/.test(cmd);
+			return readsSensitiveFile || dumpsEnvironment
+				? block("block-secret-read-bash", "critical", "credential-exposure",
+					"Reading secret files or dumping environment variables is forbidden.")
 				: null;
 		},
 	}),

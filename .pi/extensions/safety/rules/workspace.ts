@@ -5,9 +5,10 @@
  * directories and enforce workspace boundaries.
  */
 
-import { join } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { block, confirm, rule, type RuleSet } from "../types.js";
+import { block, rule, type RuleSet } from "../types.js";
 
 const HOME = homedir();
 
@@ -47,20 +48,35 @@ function stripQuotes(s: string): string {
 	return s;
 }
 
-function normalizePath(p: string, cwd: string): string {
-	const unquoted = stripQuotes(p);
-	if (unquoted.startsWith("~/")) return join(HOME, unquoted.slice(2));
-	if (unquoted.startsWith("$HOME/")) return join(HOME, unquoted.slice(6));
-	if (unquoted.startsWith("/")) return unquoted;
-	return join(cwd, unquoted);
+function expandPath(p: string): string {
+	return stripQuotes(p)
+		.replace(/^~(?=\/|$)/, HOME)
+		.replace(/^\$HOME(?=\/|$)/, HOME);
 }
 
-function isProtected(filePath: string, cwd: string): string | null {
-	const resolved = normalizePath(filePath, cwd);
-	for (const pp of PROTECTED_PATHS) {
-		if (resolved === pp || resolved.startsWith(pp + "/")) return pp;
+function nearestExistingPath(absolute: string): { existing: string; missingParts: string[] } | null {
+	const missingParts: string[] = [];
+	let current = absolute;
+	while (!existsSync(current)) {
+		const parent = dirname(current);
+		if (parent === current) return null;
+		missingParts.unshift(current.slice(parent.length + 1));
+		current = parent;
 	}
-	return null;
+	return { existing: current, missingParts };
+}
+
+function canonicalPath(p: string, cwd: string): string {
+	const expanded = expandPath(p);
+	const absolute = resolve(expanded.startsWith("/") ? expanded : join(cwd, expanded));
+	const nearest = nearestExistingPath(absolute);
+	return nearest ? resolve(realpathSync.native(nearest.existing), ...nearest.missingParts) : absolute;
+}
+
+function matchesProtectedPath(candidate: string, protectedPath: string, cwd: string): boolean {
+	const resolved = canonicalPath(candidate, cwd);
+	const protectedResolved = canonicalPath(protectedPath, cwd);
+	return resolved === protectedResolved || resolved.startsWith(protectedResolved + "/");
 }
 
 export function workspaceRules(config?: { additionalProtectedPaths?: string[] }): RuleSet {
@@ -76,9 +92,8 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 			targets: ["write", "edit"],
 			check: (ctx) => {
 				const path = ctx.path ?? "";
-				const resolved = normalizePath(path, ctx.cwd);
 				for (const pp of allProtected) {
-					if (resolved === pp || resolved.startsWith(pp + "/")) {
+					if (matchesProtectedPath(path, pp, ctx.cwd)) {
 						return block("block-protected-path-write", "critical", "workspace-escape",
 							`Writing to protected system path: ${pp}. This operation is not allowed.`);
 					}
@@ -96,9 +111,8 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 				const cmd = ctx.command!;
 				const targets = extractWriteTargets(cmd);
 				for (const t of targets) {
-					const resolved = normalizePath(t, ctx.cwd);
 					for (const pp of allProtected) {
-						if (resolved === pp || resolved.startsWith(pp + "/")) {
+						if (matchesProtectedPath(t, pp, ctx.cwd)) {
 							return block("block-bash-write-protected", "critical", "workspace-escape",
 								`Bash command writes to protected path: ${pp}. This operation is not allowed.`);
 						}
@@ -116,7 +130,7 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 			check: (ctx) => {
 				// Check write/edit tool path
 				if (ctx.path) {
-					const resolved = normalizePath(ctx.path, ctx.cwd);
+					const resolved = canonicalPath(ctx.path, ctx.cwd);
 					if (/\/\.git(\/|$)/.test(resolved)) {
 						return block("block-git-dir-write", "critical", "sensitive-modification",
 							"Writing to .git/ directory is forbidden. This could inject malicious hooks.");
@@ -126,7 +140,8 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 				if (ctx.command) {
 					const targets = extractWriteTargets(ctx.command);
 					for (const t of targets) {
-						if (/\.git(\/|$)/.test(t)) {
+						const resolved = canonicalPath(t, ctx.cwd);
+						if (/\/\.git(\/|$)/.test(resolved)) {
 							return block("block-git-dir-write", "critical", "sensitive-modification",
 								"Bash command writes to .git/ directory. This could inject malicious hooks.");
 						}
@@ -148,9 +163,8 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 				const allDeleteProtected = [...allProtected, ...DELETE_PROTECTED_PATHS];
 				const parts = cmd.split(/\s+/).filter((p) => !p.startsWith("-") && p !== "rm");
 				for (const part of parts) {
-					const resolved = normalizePath(part, ctx.cwd);
 					for (const pp of allDeleteProtected) {
-						if (resolved === pp || resolved.startsWith(pp + "/")) {
+						if (matchesProtectedPath(part, pp, ctx.cwd)) {
 							return block("block-protected-path-delete", "critical", "data-destruction",
 								`Deleting protected path: ${pp}. This operation is not allowed.`);
 						}

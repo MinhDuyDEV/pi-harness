@@ -2,7 +2,7 @@
  * Safety Extension — Unified Entry Point
  *
  * Replaces guardrails.ts + guardian.ts + sandbox.ts with a single
- * composable safety module. One before_tool_call hook, one audit log,
+ * composable safety module. One tool_call hook, one audit log,
  * one /safety command.
  *
  * RULES: 26 deduplicated rules across 7 categories:
@@ -25,10 +25,64 @@ import { AuditLog } from "./audit.js";
 import { describe, exclude } from "./compose.js";
 import { contextFromEvent } from "./context.js";
 import { evaluate } from "./evaluate.js";
-import type { RuleSet } from "./types.js";
+import type { RuleSet, Verdict } from "./types.js";
 import { defaultRules } from "./rules/presets.js";
 
-export default function safetyExtension(pi: any): void {
+type BlockResult = { block: true; reason: string };
+
+type TextPart = { type: string; text?: unknown };
+
+type ExtensionContext = {
+	ui?: {
+		confirm?: (title: string, message: string) => boolean | Promise<boolean>;
+		notify?: (message: string, level: "info") => void;
+	};
+};
+
+type SafetyCommandContext = {
+	ui?: {
+		notify?: (message: string, level: "info") => void;
+	};
+};
+
+type ExtensionAPI = {
+	on(event: "tool_call" | "tool_result", handler: (event: unknown, ctx?: ExtensionContext) => unknown): void;
+	registerCommand(name: string, options: {
+		description: string;
+		handler: (args: unknown, ctx: SafetyCommandContext) => Promise<string>;
+	}): void;
+};
+
+function readTextContent(value: unknown): string {
+	if (!Array.isArray(value)) return "";
+	return value
+		.filter((part: unknown): part is TextPart =>
+			Boolean(part) && typeof part === "object" && (part as TextPart).type === "text" && typeof (part as TextPart).text === "string")
+		.map((part) => String(part.text))
+		.join("\n");
+}
+
+function makeBlockResult(message: string): BlockResult {
+	return { block: true, reason: message };
+}
+
+function formatVerdict(verdict: Verdict): string {
+	const prefix = verdict.kind === "block" ? "[safety] BLOCKED" : "[safety]";
+	return `${prefix} (${verdict.severity.toUpperCase()}): ${verdict.message}\n\nRule: ${verdict.ruleId}\nThreat: ${verdict.threat}`;
+}
+
+function confirmVerdict(
+	message: string,
+	ctx?: ExtensionContext,
+): BlockResult | undefined | Promise<BlockResult | undefined> {
+	const confirm = ctx?.ui?.confirm;
+	if (typeof confirm !== "function") {
+		return makeBlockResult(`${message}\n\nNo confirmation UI available; blocked by default.`);
+	}
+	return Promise.resolve(confirm("Safety confirmation", message)).then((ok) => ok ? undefined : makeBlockResult(message));
+}
+
+export default function safetyExtension(pi: ExtensionAPI): void {
 	const cwd = process.cwd();
 	const audit = new AuditLog();
 
@@ -38,66 +92,57 @@ export default function safetyExtension(pi: any): void {
 	// 2. Apply disabled rules from env (comma-separated)
 	let rules: RuleSet = baseRules;
 	const disabledEnv = process.env.PI_SAFETY_DISABLED_RULES;
-	if (disabledEnv) {
-		const ids = disabledEnv.split(",").map((s) => s.trim()).filter(Boolean);
-		rules = exclude(rules, ...ids);
+	const disabledRuleIds = disabledEnv?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+	if (disabledRuleIds.length > 0) {
+		rules = exclude(rules, ...disabledRuleIds);
 	}
 
 	// 3. Track verification commands from tool_result events
-	pi.on("tool_result", (event: any) => {
-		const toolName = event?.name ?? event?.toolName;
+	pi.on("tool_result", (event: unknown) => {
+		const e = event && typeof event === "object" ? event as Record<string, unknown> : {};
+		const toolName = e.name ?? e.toolName;
 		if (toolName !== "bash") return;
 
-		const command = String(event?.input?.command ?? event?.params?.command ?? "").trim();
+		const input = e.input && typeof e.input === "object" ? e.input as Record<string, unknown> : {};
+		const params = e.params && typeof e.params === "object" ? e.params as Record<string, unknown> : {};
+		const command = String(input.command ?? params.command ?? "").trim();
 		if (!command) return;
 
 		const normalized = command.replace(/\s+/g, " ").trim();
 		if (!tracker.isVerificationCommand(normalized)) return;
 
-		const sessionId = event?.sessionId ?? "default";
+		const sessionId = String(e.sessionId ?? "default");
 		tracker.recordEvidence(sessionId, normalized);
 
-		// Prefer current structured tool_result content, fall back to older event shapes.
-		const contentText = Array.isArray(event?.content)
-			? event.content
-					.filter((part: any) => part?.type === "text" && typeof part.text === "string")
-					.map((part: any) => part.text)
-					.join("\n")
-			: "";
-		const legacyResult = event?.result;
+		const contentText = readTextContent(e.content);
+		const legacyResult = e.result;
+		const legacy = legacyResult && typeof legacyResult === "object" ? legacyResult as Record<string, unknown> : {};
 		const legacyText =
 			typeof legacyResult === "string"
 				? legacyResult
-				: Array.isArray(legacyResult?.content)
-					? legacyResult.content
-							.filter((part: any) => part?.type === "text" && typeof part.text === "string")
-							.map((part: any) => part.text)
-							.join("\n")
-					: typeof legacyResult?.content === "string"
-						? legacyResult.content
-						: String(event?.output ?? "");
+				: readTextContent(legacy.content) ||
+					(typeof legacy.content === "string" ? legacy.content : String(e.output ?? ""));
 		const output = contentText || legacyText;
+		const details = e.details && typeof e.details === "object" ? e.details as Record<string, unknown> : {};
 		const exitCode =
-			typeof event?.details?.exitCode === "number"
-				? event.details.exitCode
-				: typeof event?.details?.exit_code === "number"
-					? event.details.exit_code
-					: typeof event?.exitCode === "number"
-						? event.exitCode
-						: typeof event?.exit_code === "number"
-							? event.exit_code
+			typeof details.exitCode === "number"
+				? details.exitCode
+				: typeof details.exit_code === "number"
+					? details.exit_code
+					: typeof e.exitCode === "number"
+						? e.exitCode
+						: typeof e.exit_code === "number"
+							? e.exit_code
 							: undefined;
-		if (output) {
-			tracker.recordResult(sessionId, normalized, output, exitCode);
-		}
+		tracker.recordResult(sessionId, normalized, output, exitCode);
 	});
 
-	// 4. Single before_tool_call hook — replaces 3 separate hooks
-	pi.on("before_tool_call", (event: any) => {
+	// 4. Single tool_call hook — replaces 3 separate hooks
+	pi.on("tool_call", (event: unknown, hookCtx?: ExtensionContext) => {
 		const ctx = contextFromEvent(event, cwd);
 		if (!ctx) return;
 
-		const { verdict, fired } = evaluate(rules, ctx, "first-match");
+		const { verdict, fired } = evaluate(rules, ctx, "highest-severity");
 
 		// Audit all fired rules
 		for (const v of fired) {
@@ -115,25 +160,15 @@ export default function safetyExtension(pi: any): void {
 
 		if (!verdict) return;
 
-		if (verdict.kind === "block") {
-			return {
-				blocked: true,
-				message: `[safety] BLOCKED (${verdict.severity.toUpperCase()}): ${verdict.message}\n\nRule: ${verdict.ruleId}\nThreat: ${verdict.threat}`,
-			};
-		}
-
-		if (verdict.kind === "confirm") {
-			return {
-				confirm: true,
-				message: `[safety] ${verdict.severity.toUpperCase()}: ${verdict.message}\n\nRule: ${verdict.ruleId}\nThreat: ${verdict.threat}\n\nProceed?`,
-			};
-		}
+		const message = formatVerdict(verdict);
+		if (verdict.kind === "block") return makeBlockResult(message);
+		if (verdict.kind === "confirm") return confirmVerdict(`${message}\n\nProceed?`, hookCtx);
 	});
 
 	// 5. Unified /safety command
 	pi.registerCommand("safety", {
 		description: "Show active safety rules, audit log, and posture",
-		async handler(_args: any, ctx: any) {
+		async handler(_args: unknown, ctx: SafetyCommandContext) {
 			const allRules = describe(rules);
 			const stats = audit.stats();
 			const recentBlocks = audit.query({ kind: "block" }).slice(-5);
@@ -151,6 +186,14 @@ export default function safetyExtension(pi: any): void {
 				`  Blocked: ${stats.blocked}`,
 				`  Confirmed: ${stats.confirmed}`,
 			];
+
+			if (disabledRuleIds.length > 0) {
+				lines.push(
+					"",
+					"### Disabled Rules",
+					...disabledRuleIds.map((id) => `  ${id}`),
+				);
+			}
 
 			if (recentBlocks.length > 0) {
 				lines.push("", "### Recent Blocks");
@@ -174,9 +217,7 @@ export default function safetyExtension(pi: any): void {
 			}
 
 			const output = lines.join("\n").trim();
-			if (ctx?.ui) {
-				ctx.ui.notify(output, "info");
-			}
+			ctx.ui?.notify?.(output, "info");
 			return output;
 		},
 	});
