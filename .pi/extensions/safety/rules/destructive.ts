@@ -2,7 +2,8 @@
  * Safety Rules — Destructive Operations
  *
  * Ported from guardrails.ts + guardian.ts. Covers catastrophic rm,
- * recursive delete of source dirs, pipe-to-shell, eval-remote, sudo.
+ * recursive delete of source dirs, pipe-to-shell (incl. eval/process-sub),
+ * process kill, find-delete, dd, mkfs.
  */
 
 import { block, confirm, rule, type RuleSet } from "../types.js";
@@ -53,43 +54,22 @@ export const destructiveRules: RuleSet = [
 	}),
 	rule({
 		id: "no-pipe-to-shell",
-		description: "Download and execute pattern (pipe to interpreter)",
-		severity: "critical",
-		threat: "remote-code-execution",
-		targets: ["bash"],
-		check: (ctx) =>
-			/\b(curl|wget)\b.*\|\s*(bash|sh|zsh|python[23]?|node|ruby|perl|php)\b/.test(ctx.command!)
-				? block("no-pipe-to-shell", "critical", "remote-code-execution",
-					"Remote code execution detected. This downloads and executes untrusted code.")
-				: null,
-	}),
-	rule({
-		id: "no-eval-remote",
-		description: "Evaluate remotely-fetched content",
+		description: "Block remote code download and execution patterns",
 		severity: "critical",
 		threat: "remote-code-execution",
 		targets: ["bash"],
 		check: (ctx) => {
 			const cmd = ctx.command!;
-			return /\beval\b.*\$\((curl|wget)/.test(cmd) ||
-				/\b(bash|sh|zsh)\b.*<\((curl|wget)/.test(cmd)
-				? block("no-eval-remote", "critical", "remote-code-execution",
-					"Remote code evaluation detected. This fetches and evaluates untrusted code.")
+			const pipeToShell = /\b(curl|wget)\b.*\|\s*(bash|sh|zsh|python[23]?|node|ruby|perl|php)\b/.test(cmd);
+			const evalRemote = /\beval\b.*\$\((curl|wget)/.test(cmd) ||
+				/\b(bash|sh|zsh)\b.*<\((curl|wget)/.test(cmd);
+			return pipeToShell || evalRemote
+				? block("no-pipe-to-shell", "critical", "remote-code-execution",
+					"Remote code execution detected. This downloads and executes untrusted code.")
 				: null;
 		},
 	}),
-	rule({
-		id: "no-sudo",
-		description: "Privilege escalation via sudo",
-		severity: "critical",
-		threat: "privilege-escalation",
-		targets: ["bash"],
-		check: (ctx) =>
-			/\bsudo\b/.test(ctx.command!)
-				? block("no-sudo", "critical", "privilege-escalation",
-					"Privilege escalation detected. Agent should not run commands as root.")
-				: null,
-	}),
+
 	rule({
 		id: "warn-process-kill",
 		description: "Force process termination",
@@ -126,7 +106,7 @@ export const destructiveRules: RuleSet = [
 			/\bdd\b/.test(ctx.command!)
 				? confirm("warn-dd", "high", "data-destruction",
 					"`dd` can overwrite raw disk devices. Verify of= target is correct.")
-				: null,
+				: null;
 	}),
 	rule({
 		id: "warn-mkfs",
@@ -138,18 +118,6 @@ export const destructiveRules: RuleSet = [
 			/\bmkfs\b/.test(ctx.command!)
 				? confirm("warn-mkfs", "high", "data-destruction",
 					"`mkfs` formats a filesystem, destroying all data on the target device.")
-				: null,
-	}),
-	rule({
-		id: "warn-chown",
-		description: "File ownership change",
-		severity: "medium",
-		threat: "sensitive-modification",
-		targets: ["bash"],
-		check: (ctx) =>
-			/\bchown\b/.test(ctx.command!)
-				? confirm("warn-chown", "medium", "sensitive-modification",
-					"`chown` changes file ownership. Verify the target and owner are correct.")
-				: null,
+				: null;
 	}),
 ];

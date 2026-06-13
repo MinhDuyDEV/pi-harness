@@ -84,44 +84,30 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 	const allProtected = [...PROTECTED_PATHS, ...extraPaths];
 
 	return [
-		rule({
-			id: "block-protected-path-write",
-			description: "Block writing to system-protected paths",
-			severity: "critical",
-			threat: "workspace-escape",
-			targets: ["write", "edit"],
-			check: (ctx) => {
-				const path = ctx.path ?? "";
+	rule({
+		id: "block-protected-path-write",
+		description: "Block writing to system-protected paths",
+		severity: "critical",
+		threat: "workspace-escape",
+		targets: ["write", "edit", "bash"],
+		check: (ctx) => {
+			const targets: string[] = ctx.command
+				? extractWriteTargets(ctx.command)
+				: ctx.path
+					? [ctx.path]
+					: [];
+			for (const t of targets) {
 				for (const pp of allProtected) {
-					if (matchesProtectedPath(path, pp, ctx.cwd)) {
+					if (matchesProtectedPath(t, pp, ctx.cwd)) {
 						return block("block-protected-path-write", "critical", "workspace-escape",
 							`Writing to protected system path: ${pp}. This operation is not allowed.`);
 					}
 				}
-				return null;
-			},
-		}),
-		rule({
-			id: "block-bash-write-protected",
-			description: "Block bash commands that write to protected paths",
-			severity: "critical",
-			threat: "workspace-escape",
-			targets: ["bash"],
-			check: (ctx) => {
-				const cmd = ctx.command!;
-				const targets = extractWriteTargets(cmd);
-				for (const t of targets) {
-					for (const pp of allProtected) {
-						if (matchesProtectedPath(t, pp, ctx.cwd)) {
-							return block("block-bash-write-protected", "critical", "workspace-escape",
-								`Bash command writes to protected path: ${pp}. This operation is not allowed.`);
-						}
-					}
-				}
-				return null;
-			},
-		}),
-		rule({
+			}
+			return null;
+		},
+	}),
+	rule({
 			id: "block-git-dir-write",
 			description: "Block writing to .git/ directory",
 			severity: "critical",

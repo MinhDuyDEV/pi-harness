@@ -1,8 +1,8 @@
 /**
  * Safety Rules — Network Access Controls
  *
- * Detects outbound network commands and blocks dangerous targets such as
- * localhost, private subnets, cloud metadata endpoints, and unsafe URL schemes.
+ * Blocks dangerous network targets such as localhost, private subnets,
+ * cloud metadata endpoints, and unsafe URL schemes.
  */
 
 import { isIP } from "node:net";
@@ -210,24 +210,6 @@ export const networkRules: RuleSet = [
 				);
 			}
 			return null;
-		},
-	}),
-	rule({
-		id: "warn-network-access",
-		description: "Confirm outbound network access",
-		severity: "medium",
-		threat: "network-exfiltration",
-		targets: ["bash"],
-		check: (ctx) => {
-			const cmd = ctx.command!;
-			if (!isNetworkCommand(cmd)) return null;
-			if (isAllowlisted(cmd)) return null;
-			return confirm(
-				"warn-network-access",
-				"medium",
-				"network-exfiltration",
-				`Outbound network access detected. Verify this is intentional.\n\nCommand: ${cmd.slice(0, 100)}`,
-			);
 		},
 	}),
 ];

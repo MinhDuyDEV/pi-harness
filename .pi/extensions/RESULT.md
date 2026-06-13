@@ -16,24 +16,23 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 
 ---
 
-## Top-Level Extensions (15 entry points)
+## Top-Level Extensions (14 entry points)
 
 | # | File | Lines | Purpose |
 |---|------|-------|---------|
 | 1 | `deepseek-provider.ts` | 957 | DeepSeek provider — thinking mode, tool-call repair, retry, storm breaker |
-| 3 | `guard.ts` | ~50 | Blocks dangerous patterns: pipe-to-shell (`curl\|bash`), enforces Conventional Commits |
-| 4 | `memory.ts` | ~400 | 4-tier persistent memory: capture → distill → curate → recall (SQLite + FTS5) |
-| 5 | `mimo-provider.ts` | 200 | Xiaomi MiMo OpenAI-compatible provider — flat pricing, thinking level mapping |
-| 6 | `safety.ts` | 2 | Re-export of `safety/extension.ts` — unified safety module |
-| 7 | `srcwalk.ts` | 585 | Code navigation backend — `srcwalk_search/read/files/deps/callers/callees/map/review/compare` |
-| 8 | `tps.ts` | ~60 | Tokens-per-second display — shows on agent_end when TUI is available |
-| 9 | `usage-tracker.ts` | ~350 | Token usage & cost tracking — SQLite- persisted, `/usage` command |
-| 10 | `webclaw.ts` | ~250 | Web scraping via `webclaw` CLI — `webclaw_scrape`, `webclaw_batch`, `/webclaw` |
-| 11 | `setup-global-agents.ts` | ~40 | Auto-copies `AGENTS.md` template to `~/.pi/agent/` on first session |
-| 12 | `dcp/index.ts` | ~300 | Dynamic Context Protocol — compression, nudges, artifact tracking, quality metrics |
-| 13 | `harness/index.ts` | ~170 | Multi-agent build harness — planner → generator → evaluator GAN loop |
-| 14 | `task/index.ts` | ~780 | Delegate work to specialist agents via AgentSessions (foreground + background) |
-| 15 | `tui/index.ts` | ~765 | AmpTUI — full terminal UI with fixed editor, sidebar, footer, git status |
+| 3 | `memory.ts` | ~400 | 4-tier persistent memory: capture → distill → curate → recall (SQLite + FTS5) |
+| 4 | `mimo-provider.ts` | 200 | Xiaomi MiMo OpenAI-compatible provider — flat pricing, thinking level mapping |
+| 5 | `safety.ts` | 2 | Re-export of `safety/extension.ts` — unified safety module |
+| 6 | `srcwalk.ts` | 585 | Code navigation backend — `srcwalk_search/read/files/deps/callers/callees/map/review/compare` |
+| 7 | `tps.ts` | ~60 | Tokens-per-second display — shows on agent_end when TUI is available |
+| 8 | `usage-tracker.ts` | ~350 | Token usage & cost tracking — SQLite- persisted, `/usage` command |
+| 9 | `webclaw.ts` | ~250 | Web scraping via `webclaw` CLI — `webclaw_scrape`, `webclaw_batch`, `/webclaw` |
+| 10 | `setup-global-agents.ts` | ~40 | Auto-copies `AGENTS.md` template to `~/.pi/agent/` on first session |
+| 11 | `dcp/index.ts` | ~300 | Dynamic Context Protocol — compression, nudges, artifact tracking, quality metrics |
+| 12 | `harness/index.ts` | ~170 | Multi-agent build harness — planner → generator → evaluator GAN loop |
+| 13 | `task/index.ts` | ~780 | Delegate work to specialist agents via AgentSessions (foreground + background) |
+| 14 | `tui/index.ts` | ~765 | AmpTUI — full terminal UI with fixed editor, sidebar, footer, git status |
 
 ---
 
