@@ -137,7 +137,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 
 ---
 
-### `safety/` — Unified Safety Module (10 files)
+### `safety/` — Unified Safety Module (11 files)
 
 | File | Purpose |
 |------|---------|
@@ -147,6 +147,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 | `context.ts` | Event normalization — converts raw events to `ToolCallContext` |
 | `compose.ts` | Composition operators — `merge()`, `exclude()`, `forTool()`, `sortBySeverity()` |
 | `audit.ts` | Ring-buffer audit trail (max 500 entries) |
+| `env-policy.ts` | `buildSubprocessEnv()` — restricted env for child processes (base + per-tool allowlist) |
 | `rules/presets.ts` | `defaultRules()` — composes all 26 rules + `VerificationTracker` |
 | `rules/credentials.ts` | 2 rules: credential echo block, sensitive file write |
 | `rules/destructive.ts` | 6 rules: rm -rf, pipe-to-shell, sudo, eval-remote |
@@ -158,26 +159,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 | `rules/verification.ts` | Verification tracking — detects unverified completions |
 | `rules/workspace.ts` | Workspace boundary enforcement — protected system paths |
 
-**26 rules total** across 7 categories. Modes: `block` (hard deny), `confirm` (soft deny with prompt).
-
----
-
-### `scripts/` — Automation Scripts (2 files)
-
-| File | Purpose |
-|------|---------|
-| `run-harness-evals.mjs` | E2E eval runner — checks eval `.md` files for required sections + policy terms |
-| `smoke-harness.mjs` | Smoke test — validates tool references, prompt syntax, file structure |
-
----
-
-### `security/` — Subprocess Environment Policy (1 file)
-
-| File | Purpose |
-|------|---------|
-| `env-policy.ts` | `buildSubprocessEnv()` — restricted env for child processes (base + per-tool allowlist) |
-
-**Policies**: `stitch`, `srcwalk`, `webclaw` — each gets only the env vars it needs.
+**26 rules total** across 7 categories. Modes: `block` (hard deny), `confirm` (soft deny with prompt). `env-policy.ts` provides the subprocess allowlist used by `srcwalk.ts` and `webclaw.ts`.
 
 ---
 
@@ -245,7 +227,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
           │       └─────────────┘  │ (9 files)  │
           │                        └────────────┘
   ┌───────▼───────┐ ┌────────────┐ ┌────────────┐
-  │  lib/util.ts  │ │ security/  │ │ tui/       │
+  │  lib/util.ts  │ │ safety/    │ │ tui/       │
   │ (shared util) │ │ env-policy │ │ (12 files) │
   └───────▲───────┘ └─────▲──────┘ └────────────┘
           │                │

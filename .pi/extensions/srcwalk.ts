@@ -36,7 +36,7 @@ import {
   type AgentToolResult,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { buildSubprocessEnv } from "./security/env-policy.js";
+import { buildSubprocessEnv } from "./safety/env-policy.js";
 import { execFilePromise, isAbortError } from "./lib/util.js";
 
 type ToolArgs = Record<string, unknown>;

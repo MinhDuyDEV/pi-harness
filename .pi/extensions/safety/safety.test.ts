@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import safetyExtension from "../safety.js";
-import { buildSubprocessEnv } from "../security/env-policy.js";
+import { buildSubprocessEnv } from "./env-policy.js";
 import { evaluate } from "./evaluate.js";
 import { defaultRules } from "./rules/presets.js";
 import { VerificationTracker, verificationRules } from "./rules/verification.js";

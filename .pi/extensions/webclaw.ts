@@ -20,7 +20,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { truncateHead } from "@earendil-works/pi-coding-agent";
-import { buildSubprocessEnv } from "./security/env-policy.js";
+import { buildSubprocessEnv } from "./safety/env-policy.js";
 import { execFilePromise, isAbortError } from "./lib/util.js";
 
 type OutputFormat = "llm" | "markdown" | "text" | "json" | "html";
