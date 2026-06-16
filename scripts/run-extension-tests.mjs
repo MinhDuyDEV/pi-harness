@@ -7,6 +7,7 @@ const tsxTestFiles = [
 	".pi/extensions/harness/gitSafety.test.ts",
 	".pi/extensions/harness/interactivePane.test.ts",
 	".pi/extensions/harness/parsing.test.ts",
+	".pi/extensions/harness/sprint-guards.test.ts",
 	".pi/extensions/harness/policy.test.ts",
 	".pi/extensions/harness/traceQuality.test.ts",
 	".pi/extensions/harness/verification.test.ts",

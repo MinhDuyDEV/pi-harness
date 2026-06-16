@@ -44,6 +44,7 @@ import { isInsideTmux } from "./interactivePane.js";
 import { runHarnessAgent, type AgentRunnerMode } from "./runner.js";
 import { filterToolsForRole, DEFAULT_HARNESS_POLICY, type HarnessAgentRole } from "./policy.js";
 import { formatVerificationSummary, runVerificationCommands } from "./verification.js";
+import { findFailedDependencies } from "./sprint-guards.js";
 import { assessRunTrace, assessSprintTrace, formatTraceQualitySummary, type RunTraceQualitySummary } from "./traceQuality.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -383,10 +384,7 @@ async function runBuildEvaluatePhase(
 		tracker.appendState(`sprint ${i + 1} generation`, `Generator completed sprint ${i + 1}: ${sprint.title}.`, sprint.files ? [`Planned files: ${sprint.files}`] : []);
 
 		// Fail if any dependency hasn't passed.
-		const failedDependencies = sprint.dependencies.filter((dep) => {
-			const depResult = results[dep - 1];
-			return !depResult || !depResult.passed;
-		});
+		const failedDependencies = findFailedDependencies(sprint, results);
 		if (failedDependencies.length > 0) {
 			failedSprintCount++;
 			const detail = `BLOCKED: depends on sprint(s) ${failedDependencies.join(", ")} which did not pass.`;
