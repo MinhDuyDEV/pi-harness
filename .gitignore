@@ -68,3 +68,6 @@ pnpm-debug.log*
 # bv (beads viewer) local config and caches
 .bv/
 .pi/.openpi-sync.json
+
+# Cursor SDK local session state
+.pi/cursor-sdk*.json
