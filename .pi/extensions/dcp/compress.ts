@@ -24,6 +24,7 @@ import type {
 import { Type } from "@sinclair/typebox";
 
 import type { DCPConfig, ProbeConfig } from "./config.js";
+import { applyCompressStrip } from "./compress-strip.js";
 
 // ---------------------------------------------------------------------------
 // Custom message types (internal to DCP extension)
@@ -218,7 +219,7 @@ function emptyPersistentSummary(): PersistentSessionSummary {
   };
 }
 
-function getState(sessionId: string): SessionState {
+export function getState(sessionId: string): SessionState {
   let s = sessions.get(sessionId);
   if (!s) {
     s = {
@@ -809,7 +810,7 @@ export function getQualityStatus(sessionId: string): string {
 /**
  * Estimate token count for a message using chars/4 heuristic.
  */
-function estimateTokens(msg: Message): number {
+export function estimateTokens(msg: Message): number {
   let chars = 0;
   if (msg.role === "assistant") {
     const asst = msg as AssistantMessage;
@@ -850,190 +851,37 @@ function stripToolArgs(tc: ToolCall, marker: string): number {
 }
 
 // ── Step 1: Compress-strip ──────────────────────────────────────────────
+// Moved to ./compress-strip.ts. applyCompressStrip is imported at the top.
 
 interface ToolOp {
-  messageIndex: number;
-  contentIndex: number;
-  type: "call" | "result";
-  toolName: string;
-  toolCallId: string;
-  isError: boolean;
+	messageIndex: number;
+	contentIndex: number;
+	type: "call" | "result";
+	toolName: string;
+	toolCallId: string;
+	isError: boolean;
 }
 
-function extractToolOps(messages: Message[]): ToolOp[] {
-  const ops: ToolOp[] = [];
-  for (let mi = 0; mi < messages.length; mi++) {
-    const msg = messages[mi];
-    if (msg.role === "assistant") {
-      const asst = msg as AssistantMessage;
-      if (!Array.isArray(asst.content)) continue;
-      for (let ci = 0; ci < asst.content.length; ci++) {
-        const part = asst.content[ci];
-        if (part.type === "toolCall") {
-          const tc = part as ToolCall;
-          ops.push({ messageIndex: mi, contentIndex: ci, type: "call", toolName: tc.name, toolCallId: tc.id, isError: false });
-        }
-      }
-    } else if (msg.role === "toolResult") {
-      const tr = msg as ToolResultMessage;
-      ops.push({ messageIndex: mi, contentIndex: -1, type: "result", toolName: tr.toolName, toolCallId: tr.toolCallId, isError: tr.isError ?? false });
-    }
-  }
-  return ops;
-}
-
-/**
- * Strategy 1: Compress-range stripping.
- *
- * Find compress tool results, identify the message range before each call,
- * and replace those messages with a structured summary from the persistent summary.
- */
-function applyCompressStrip(
-  messages: Message[],
-  sessionId: string,
-  config: DCPConfig,
-): { messages: Message[]; prunedTokens: number; prunedCount: number } {
-  const ops = extractToolOps(messages);
-  const compressResults: Array<{
-    callIndex: number;
-    resultIndex: number;
-    summary: string;
-    topic: string;
-  }> = [];
-
-  // Find compress tool calls and their results
-  for (const op of ops) {
-    if (op.type !== "result" || op.toolName !== "compress" || op.isError) continue;
-    const callOp = ops.find((o) => o.type === "call" && o.toolCallId === op.toolCallId);
-    if (!callOp) continue;
-
-    // Extract summary from result
-    const resultMsg = messages[op.messageIndex] as ToolResultMessage;
-    let fullText = "";
-    for (const part of resultMsg.content) {
-      if (part.type === "text") fullText += (part as TextContent).text ?? "";
-    }
-    const marker = "The following is the authoritative summary of the compressed range:";
-    const idx = fullText.indexOf(marker);
-    const summary = idx >= 0 ? fullText.substring(idx + marker.length).trim() : fullText;
-
-    // Extract topic from call
-    const callMsg = messages[callOp.messageIndex] as AssistantMessage;
-    const tc = callMsg.content[callOp.contentIndex] as ToolCall;
-    const topic = ((tc.arguments as Record<string, unknown>)?.topic ?? "compressed") as string;
-
-    compressResults.push({
-      callIndex: callOp.messageIndex,
-      resultIndex: op.messageIndex,
-      summary,
-      topic,
-    });
-  }
-
-  if (compressResults.length === 0) return { messages, prunedTokens: 0, prunedCount: 0 };
-
-  compressResults.sort((a, b) => a.callIndex - b.callIndex);
-
-  const protectedSet = new Set(config.compress.protectedTools);
-  const indicesToRemove = new Set<number>();
-  const injections: Array<{ atIndex: number; summary: string; topic: string }> = [];
-  let prunedTokens = 0;
-
-  for (let i = 0; i < compressResults.length; i++) {
-    const cr = compressResults[i];
-    // Range start: beginning of session or after previous compress result
-    const rangeStart = i === 0 ? 0 : compressResults[i - 1].resultIndex + 1;
-    const rangeEnd = cr.callIndex;
-
-    let strippedTokens = 0;
-    const nestedSummaries: string[] = [];
-    const protectedContent: string[] = [];
-
-    for (let j = rangeStart; j < rangeEnd; j++) {
-      if (indicesToRemove.has(j)) continue;
-      strippedTokens += estimateTokens(messages[j]);
-      indicesToRemove.add(j);
-
-      const m = messages[j];
-      // Nest previously compressed summaries
-      if ((m as unknown as Record<string, unknown>)?.role === "custom" && (m as unknown as Record<string, unknown>)?.customType === "dcp-compressed-summary") {
-        const content = (m as unknown as Record<string, unknown>)?.content;
-        if (typeof content === "string" && content.trim()) nestedSummaries.push(content);
-      }
-      // Preserve protected tool outputs
-      if (m.role === "toolResult") {
-        const tr = m as ToolResultMessage;
-        if (protectedSet.has(tr.toolName) && !tr.isError) {
-          let text = "";
-          for (const part of tr.content) {
-            if (part.type === "text") text += (part as TextContent).text ?? "";
-          }
-          if (text.trim()) protectedContent.push(`[${tr.toolName}] ${text.trim()}`);
-        }
-      }
-      // Preserve user messages
-      if (config.compress.protectUserMessages && m.role === "user") {
-        const um = m as UserMessage;
-        let text = "";
-        if (typeof um.content === "string") text = um.content;
-        else if (Array.isArray(um.content)) text = um.content.reduce((s: string, c: TextContent | ImageContent) => s + (c.type === "text" ? c.text : ""), "");
-        if (text.trim()) protectedContent.push(`[user] ${text.trim()}`);
-      }
-    }
-
-    // Remove compress call + result
-    indicesToRemove.add(cr.callIndex);
-    strippedTokens += estimateTokens(messages[cr.callIndex]);
-    indicesToRemove.add(cr.resultIndex);
-    strippedTokens += estimateTokens(messages[cr.resultIndex]);
-
-    // Build final summary with nesting and protected content
-    let finalSummary = cr.summary;
-    if (nestedSummaries.length > 0) {
-      finalSummary = nestedSummaries.map((s) => `[Previously compressed]\n${s}`).join("\n\n")
-        + `\n\n[Current compression]\n${cr.summary}`;
-    }
-    if (protectedContent.length > 0) {
-      finalSummary += `\n\n## Preserved content\n${protectedContent.join("\n")}`;
-    }
-
-    injections.push({ atIndex: rangeStart, summary: finalSummary, topic: cr.topic });
-    prunedTokens += strippedTokens;
-  }
-
-  // Rebuild message array — inject structured persistent summary instead of raw text
-  const newMessages: Message[] = [];
-  const injectionMap = new Map<number, typeof injections>();
-  for (const inj of injections) {
-    if (!injectionMap.has(inj.atIndex)) injectionMap.set(inj.atIndex, []);
-    injectionMap.get(inj.atIndex)!.push(inj);
-  }
-
-  // Fetch the persistent summary for structured message formatting
-  const summary = getState(sessionId).persistentSummary;
-
-  for (let i = 0; i < messages.length; i++) {
-    const injects = injectionMap.get(i);
-    if (injects) {
-      for (const inj of injects) {
-        // Use the structured persistent summary if available; fall back to raw text
-        const structured = summary.merged_block_ids.length > 0
-          ? buildCompressedSummaryMessage(summary)
-          : inj.summary;
-        newMessages.push({
-          role: "custom",
-          customType: "dcp-compressed-summary",
-          content: structured,
-          display: false,
-          timestamp: Date.now(),
-        } as unknown as Message);
-      }
-    }
-    if (indicesToRemove.has(i)) continue;
-    newMessages.push(messages[i]);
-  }
-
-  return { messages: newMessages, prunedTokens, prunedCount: indicesToRemove.size };
+export function extractToolOps(messages: Message[]): ToolOp[] {
+	const ops: ToolOp[] = [];
+	for (let mi = 0; mi < messages.length; mi++) {
+		const msg = messages[mi];
+		if (msg.role === "assistant") {
+			const asst = msg as AssistantMessage;
+			if (!Array.isArray(asst.content)) continue;
+			for (let ci = 0; ci < asst.content.length; ci++) {
+				const part = asst.content[ci];
+				if (part.type === "toolCall") {
+					const tc = part as ToolCall;
+					ops.push({ messageIndex: mi, contentIndex: ci, type: "call", toolName: tc.name, toolCallId: tc.id, isError: false });
+				}
+			}
+		} else if (msg.role === "toolResult") {
+			const tr = msg as ToolResultMessage;
+			ops.push({ messageIndex: mi, contentIndex: -1, type: "result", toolName: tr.toolName, toolCallId: tr.toolCallId, isError: tr.isError ?? false });
+		}
+	}
+	return ops;
 }
 
 // ── Step 2: Deduplication ───────────────────────────────────────────────
