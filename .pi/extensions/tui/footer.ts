@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { type TUI, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import type { GitInfo } from "./git-status.ts";
-import { NF, formatCost, fmtNum } from "./helpers.ts";
+import type { GitInfo } from "./git-status.js";
+import { NF, formatCost, fmtNum } from "./helpers.js";
 
 // ── Icon helpers ───────────────────────────────────────────────────────────
 

@@ -354,7 +354,7 @@ function registerTool(
   label: string,
   description: string,
   parameters: ReturnType<typeof Type.Object>,
-  executor: (params: ToolArgs, signal: AbortSignal) => Promise<string>,
+  executor: (params: ToolArgs, signal?: AbortSignal) => Promise<string>,
   promptSnippet?: string,
 ): void {
   pi.registerTool({
@@ -369,16 +369,20 @@ function registerTool(
       signal: AbortSignal | undefined,
       _onUpdate: undefined,
       _ctx: ExtensionContext,
-    ): Promise<AgentToolResult> {
+    ): Promise<AgentToolResult<unknown>> {
       const raw = await executor(params, signal);
       const truncated = truncateHead(raw, { maxBytes: MAX_OUTPUT_BYTES });
       if (truncated.truncated) {
+        const bytesRemoved = truncated.totalBytes - truncated.outputBytes;
         const note =
-          `\n\n[Output truncated: ${truncated.bytes} bytes removed. ` +
+          `\n\n[Output truncated: ${bytesRemoved} bytes removed. ` +
           `Full output available in the raw tool result file.]`;
         truncated.content += note;
       }
-      return { content: [{ type: "text", text: truncated.content }] };
+      return {
+        content: [{ type: "text", text: truncated.content }],
+        details: { truncated: truncated.truncated },
+      };
     },
   });
 }

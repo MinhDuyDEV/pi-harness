@@ -11,9 +11,9 @@ let emergencyTerminalModeReset: any;
 let readAmpTuiSettings: any;
 
 before(async () => {
-  const clusterModule: any = await import("../fixed-editor/cluster.ts");
-  const compositorModule: any = await import("../fixed-editor/compositor.ts");
-  const settingsModule: any = await import("../settings.ts");
+  const clusterModule: any = await import("../fixed-editor/cluster.js");
+  const compositorModule: any = await import("../fixed-editor/compositor.js");
+  const settingsModule: any = await import("../settings.js");
   ({ renderFixedCluster } = clusterModule.default ?? clusterModule);
   ({ FixedEditorCompositor, emergencyTerminalModeReset } = compositorModule.default ?? compositorModule);
   ({ readAmpTuiSettings } = settingsModule.default ?? settingsModule);

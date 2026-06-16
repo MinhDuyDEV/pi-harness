@@ -10,5 +10,8 @@
   },
   "include": [
     ".pi/extensions/**/*.ts"
+  ],
+  "exclude": [
+    ".pi/extensions/task/smoke.ts"
   ]
 }

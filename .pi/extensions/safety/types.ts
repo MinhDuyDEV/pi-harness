@@ -16,6 +16,7 @@ export type Severity = "critical" | "high" | "medium" | "low";
 export type ThreatCategory =
 	| "credential-exposure"
 	| "data-destruction"
+	| "data-integrity"
 	| "privilege-escalation"
 	| "remote-code-execution"
 	| "workspace-escape"

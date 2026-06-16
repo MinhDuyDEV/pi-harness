@@ -167,7 +167,15 @@ function getGlobalUsage(): {
 			COALESCE(SUM(total_cost_usd), 0.0) as totalCost,
 			COALESCE(SUM(total_turns), 0) as totalTurns
 		FROM session_summary
-	`).get();
+	`).get() as {
+		totalSessions: number;
+		totalInput: number;
+		totalOutput: number;
+		totalCache: number;
+		totalThinking: number;
+		totalCost: number;
+		totalTurns: number;
+	};
 	return row;
 }
 
@@ -189,7 +197,7 @@ function getModelBreakdown(days?: number): ModelBreakdown[] {
 		GROUP BY model, provider
 		ORDER BY SUM(input_tokens + output_tokens) DESC
 		LIMIT 20
-	`).all(...params);
+	`).all(...params) as unknown as ModelBreakdown[];
 }
 
 function getTodayUsage(): { input: number; output: number; cost: number; turns: number } {
@@ -205,7 +213,7 @@ function getTodayUsage(): { input: number; output: number; cost: number; turns: 
 			COUNT(*) as turns
 		FROM usage_events
 		WHERE created_at >= ?
-	`).get(todayStart.getTime());
+	`).get(todayStart.getTime()) as { input: number; output: number; cost: number; turns: number };
 	return row;
 }
 
@@ -443,13 +451,11 @@ export default function usageTrackerExtension(pi: ExtensionAPI): void {
 				if (ctx?.ui) {
 					ctx.ui.notify(output);
 				}
-				return output;
 			} catch (err) {
 				const message = `Usage stats error: ${err}`;
 				if (ctx?.ui) {
 					ctx.ui.notify(message);
 				}
-				return message;
 			}
 		},
 	});

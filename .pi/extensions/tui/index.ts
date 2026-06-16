@@ -8,24 +8,24 @@ import {
   type ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
-import { createQueueTracker } from "./queue-panel.ts";
+import { createQueueTracker } from "./queue-panel.js";
 import {
   hasOpenTodos,
   scanTodos,
   renderTodosWidget,
   type TodosState,
-} from "./todos-panel.ts";
-import { createDefaultFooterState, createFooterRenderer } from "./footer.ts";
+} from "./todos-panel.js";
+import { createDefaultFooterState, createFooterRenderer } from "./footer.js";
 import {
   refreshGitInfo,
   invalidateGitStatus,
   getCachedGitInfo,
   type GitInfo,
-} from "./git-status.ts";
-import { AmpBoxEditor } from "./editor.ts";
-import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.ts";
-import { readAmpTuiSettings, type AmpTuiSettings } from "./settings.ts";
-import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.ts";
+} from "./git-status.js";
+import { AmpBoxEditor } from "./editor.js";
+import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.js";
+import { readAmpTuiSettings, type AmpTuiSettings } from "./settings.js";
+import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.js";
 import {
   addUsageTokenMetrics,
   displayedTurnUsage,
@@ -35,7 +35,7 @@ import {
   usageCostUsd,
   usageTokenMetrics,
   type UsageTokenMetrics,
-} from "./usage.ts";
+} from "./usage.js";
 
 /** Lightweight wave animation for the editor streaming prompt. ~200ms for smooth feel. */
 const STREAMING_PROMPT_FRAMES = ["≈", "≋", "⋍", "≋"];
@@ -187,7 +187,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     if (usage) {
       footer.tokenCount = usage.tokens ?? 0;
     }
-    footer.hasPendingMessages = queue.state.hasPending;
+    footer.hasPendingMessages = queue.state().hasPending;
     footer.cwd = ctx.cwd;
     // Keep last known git info as sidebar fallback during async refresh gaps.
     const freshGit = getCachedGitInfo();
@@ -195,7 +195,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     footer.git = freshGit ?? lastKnownGit;
 
     sidebar.todos = todosState;
-    sidebar.queue = queue.state;
+    sidebar.queue = queue.state();
     sidebar.git = footer.git;
     sidebar.modelLabel = footer.modelLabel;
     sidebar.tokenCount = footer.tokenCount;
@@ -208,7 +208,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     const sidebarVisible = sidebarTotalWidth(sidebar, terminalWidth) > 0;
 
     // Widgets — hide when empty. The sidebar owns queue/TODOs when visible.
-    if (queue.state.hasPending && !sidebarVisible) {
+    if (queue.state().hasPending && !sidebarVisible) {
       ctx.ui.setWidget("amp-queue", (_tui: TUI, theme: Theme) =>
         queue.renderWidget(theme),
       );

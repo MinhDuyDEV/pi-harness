@@ -1,4 +1,4 @@
-import { hasNerdFonts } from "./helpers.ts";
+import { hasNerdFonts } from "./helpers.js";
 
 const NF_ICON_PROMPT = hasNerdFonts() ? "\ueab6 " : "> ";
 

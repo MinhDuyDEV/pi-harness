@@ -16,7 +16,7 @@ import type {
   EditorTheme,
   TUI,
 } from "@earendil-works/pi-tui";
-import { editorPromptForState } from "./editor-prompt.ts";
+import { editorPromptForState } from "./editor-prompt.js";
 
 function padRight(content: string, width: number): string {
   const vw = visibleWidth(content);

@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDefaultFooterState, createFooterRenderer } from "../footer.ts";
-import { editorPromptForState } from "../editor-prompt.ts";
-import { displayedTurnUsage, restoreUsageSnapshotFromBranch } from "../usage.ts";
+import { createDefaultFooterState, createFooterRenderer } from "../footer.js";
+import { editorPromptForState } from "../editor-prompt.js";
+import { displayedTurnUsage, restoreUsageSnapshotFromBranch } from "../usage.js";
 
 const plainTheme = {
   fg: (_color: string, text: string) => text,

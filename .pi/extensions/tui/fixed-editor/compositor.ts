@@ -13,8 +13,8 @@
  */
 
 import { visibleWidth } from "@earendil-works/pi-tui";
-import { type FixedClusterInput, type FixedClusterOutput, renderFixedCluster } from "./cluster.ts";
-import { stripAnsi } from "../helpers.ts";
+import { type FixedClusterInput, type FixedClusterOutput, renderFixedCluster } from "./cluster.js";
+import { stripAnsi } from "../helpers.js";
 import {
   beginSynchronizedOutput,
   clearLine,
@@ -35,7 +35,7 @@ import {
   setScrollRegion,
   showCursor,
   sliceColumns,
-} from "./terminal-escape.ts";
+} from "./terminal-escape.js";
 import {
   type KeyboardScrollShortcuts,
   type ScrollAction,
@@ -48,7 +48,7 @@ import {
   mouseScrollDelta,
   parseScrollAction,
   parseSgrMouse,
-} from "./input.ts";
+} from "./input.js";
 
 const MAX_RETAINED_ROOT_LINES = 2000;
 // 0 = no streaming root-render cache. Every Pi render pass calls originalTuiRender
@@ -104,7 +104,7 @@ export interface CompositorHooks {
   getBelowWidgetLines?: (width: number) => string[];
   getTranscriptLines?: (width: number) => string[];
   getFooterLines?: (width: number) => string[];
-  getRenderStateKey?: () => string;
+  getRenderStateKey?: () => string | undefined;
   getSidebarWidth?: (terminalWidth: number) => number;
   getSidebarLines?: (width: number, height: number) => string[];
   getShowHardwareCursor?: () => boolean;
@@ -405,6 +405,7 @@ export class FixedEditorCompositor {
       rootRenderCacheHits: this.rootRenderCacheHits,
       rootRenderCacheMisses: this.rootRenderCacheMisses,
       streamingRootRenderThrottleMs: STREAMING_ROOT_RENDER_THROTTLE_MS,
+      streamingClusterRepaintThrottleMs: 0,
     };
   }
 

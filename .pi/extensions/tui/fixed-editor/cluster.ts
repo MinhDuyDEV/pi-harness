@@ -11,7 +11,7 @@
  */
 
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { stripAnsi } from "../helpers.ts";
+import { stripAnsi } from "../helpers.js";
 
 export const CURSOR_MARKER = "\x1b_pi:c\x07";
 

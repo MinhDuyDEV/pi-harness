@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { hasOpenTodos, renderTodosWidget, scanTodos, type TodosState } from "../todos-panel.ts";
+import { hasOpenTodos, renderTodosWidget, scanTodos, type TodosState } from "../todos-panel.js";
 
 const markedTheme = {
   fg: (color: string, text: string) => `<${color}>${text}</${color}>`,

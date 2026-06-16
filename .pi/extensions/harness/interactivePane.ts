@@ -140,7 +140,8 @@ export function readInteractivePaneUsage(sessionFile: string): InteractivePaneUs
 }
 
 function sameUsage(a: InteractivePaneUsageSnapshot | undefined, b: InteractivePaneUsageSnapshot): boolean {
-	return Boolean(a) && a.turnCount === b.turnCount && a.inputTokens === b.inputTokens && a.outputTokens === b.outputTokens && a.cacheReadTokens === b.cacheReadTokens && a.cacheWriteTokens === b.cacheWriteTokens && a.totalCost === b.totalCost;
+	if (!a) return false;
+	return a.turnCount === b.turnCount && a.inputTokens === b.inputTokens && a.outputTokens === b.outputTokens && a.cacheReadTokens === b.cacheReadTokens && a.cacheWriteTokens === b.cacheWriteTokens && a.totalCost === b.totalCost;
 }
 
 function readCompletedAssistant(sessionFile: string): string | null {

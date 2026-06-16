@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "../sidebar.ts";
+import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "../sidebar.js";
 
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 

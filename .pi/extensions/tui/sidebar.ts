@@ -1,8 +1,8 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import type { GitInfo } from "./git-status.ts";
-import type { QueueState } from "./queue-panel.ts";
-import { hasOpenTodos, type TodosState } from "./todos-panel.ts";
-import { formatCost, fmtNum } from "./helpers.ts";
+import type { GitInfo } from "./git-status.js";
+import type { QueueState } from "./queue-panel.js";
+import { hasOpenTodos, type TodosState } from "./todos-panel.js";
+import { formatCost, fmtNum } from "./helpers.js";
 
 const RESET = "\x1b[0m";
 const LABEL = "\x1b[97m";

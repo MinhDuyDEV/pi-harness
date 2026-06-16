@@ -34,7 +34,8 @@ const MAX_BATCH_URLS = 20;
 function truncateOutput(text: string): string {
   const truncated = truncateHead(text, { maxBytes: MAX_OUTPUT_BYTES });
   if (truncated.truncated) {
-    truncated.content += `\n\n[Output truncated: ${truncated.bytes} bytes removed. Scrape again with a narrower scope for full content.]`;
+    const bytesRemoved = truncated.totalBytes - truncated.outputBytes;
+    truncated.content += `\n\n[Output truncated: ${bytesRemoved} bytes removed. Scrape again with a narrower scope for full content.]`;
   }
   return truncated.content;
 }
@@ -154,7 +155,11 @@ Prefer lightpanda/browser tools instead when:
           : "\n\nTip: if the page is JS-heavy, try lightpanda/browser tools instead.";
         return {
           content: [{ type: "text" as const, text: `webclaw_scrape failed: ${message}${help}` }],
-          details: { url: params.url, error: message },
+          details: {
+            url: params.url,
+            format: params.format || "llm",
+            onlyMainContent: params.onlyMainContent !== false,
+          },
           isError: true,
         };
       }
@@ -245,12 +250,10 @@ Maximum 20 URLs per call.`,
           `Cloud API: ${process.env.WEBCLAW_API_KEY ? "configured" : "not set (local-only mode)"}`,
         ].join("\n");
         ctx?.ui?.notify(output, "info");
-        return output;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const output = `${formatInstallHint()}\n\nFailure: ${message}`;
         ctx?.ui?.notify(output, "error");
-        return output;
       }
     },
   });

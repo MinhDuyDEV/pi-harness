@@ -437,7 +437,7 @@ async function runBuildEvaluatePhase(
 			results.push(sprintResult);
 			const traceQuality = assessSprintTrace(sprint, sprintResult);
 			widget.update({ traceQuality: traceQuality.level, frictionCount: traceQuality.friction.length });
-			tracker.recordEvent({ event: "sprint_trace_quality", sprint: i + 1, ...traceQuality });
+			tracker.recordEvent({ event: "sprint_trace_quality", ...traceQuality });
 			continue;
 		}
 
@@ -638,7 +638,7 @@ async function runBuildEvaluatePhase(
 		results.push(sprintResult);
 		const traceQuality = assessSprintTrace(sprint, sprintResult);
 		widget.update({ traceQuality: traceQuality.level, frictionCount: traceQuality.friction.length });
-		tracker.recordEvent({ event: "sprint_trace_quality", sprint: i + 1, ...traceQuality });
+		tracker.recordEvent({ event: "sprint_trace_quality", ...traceQuality });
 	}
 
 	return { results, passedSprintCount, failedSprintCount };
