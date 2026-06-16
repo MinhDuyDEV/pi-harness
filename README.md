@@ -30,14 +30,12 @@ Extensions auto-loaded from `.pi/extensions/`:
  | `deepseek-provider` | DeepSeek provider with thinking mode support (reasoning_content) |
 | `mimo-provider` | Xiaomi MiMo provider via OpenAI-compatible API |
 | `usage-tracker` | Token usage tracking via `/usage` command |
-| `guard` | Blocks dangerous patterns before tool execution |
-| `safety` | Unified safety module with composable rule system |
+| `safety` | Unified safety module with composable rule system (26 rules, block/confirm) |
 | `srcwalk` | Code intelligence via `srcwalk` binary |
 | `webclaw` | Web scraping via `webclaw` CLI binary |
 | `tps` | Tokens-per-second tracking during streaming |
 | `memory` | Persistent knowledge pipeline (observations, distillations, handoffs) |
 | `dcp` | Dynamic context pruning — compress conversation to stay under token limits |
-| `openpi-bridge` | Bridge for custom tool execution |
 | `harness` | Multi-agent build harness (planner → generator ↔ evaluator) |
 | `tui` | Fixed-editor compositor with scrollable chat, sticky editor/footer, right sidebar, selection-to-clipboard, animated streaming prompt — overrides Pi's default TUI layout |
 
@@ -62,16 +60,16 @@ Slash-command workflows in `.pi/prompts/`. Each core command has flag-based sub-
 | Command | Flags | Coverage |
 |---------|-------|----------|
 | `/create` | `--design`, `--spec-only`, `--type` | Clarify ambiguity → design exploration → spec writing → workspace setup |
-| `/fix` | `--refactor`, `--scope` | Bug fix (default) or refactoring with scope levels |
+| `/fix` | `--refactor`, `--scope minimal\|moderate\|aggressive` | Bug fix (default `--scope minimal`) or refactoring with scope levels |
 | `/init` | `--context`, `--user`, `--all`, `--deep` | Core setup, planning context (roadmap/state), or user profile |
 | `/plan` | `--split`, `--architecture` | Implementation plan with institutional research, goal-backward analysis, safety gate |
 | `/research` | `--quick`, `--thorough`, `--alternatives` | Evidence-gathering or alternatives/tradeoffs generation |
 | `/ship` | `--pr` | Execute tasks wave-by-wave, verify, commit, optionally create PR |
-| `/verify` | `--quick`, `--full`, `--fix`, `--test`, `--review`, `--ui-review` | Gates, completeness tracking, test writing, code review, UI audit |
+| `/verify` | `--quick`, `--full`, `--fix`, `--test`, `--review`, `--review --bloat`, `--ui-review` | Gates, completeness tracking, test writing, code review, bloat delete-list, UI audit |
 
 **Merged into core:** clarify, explore, design, commit, pr, test, refactor, review-codebase, ui-review, improve-architecture — all now available as flags on the 7 core commands above.
 
-### Skills (76)
+### Skills (75)
 
 Reusable procedures in `.pi/skills/` — loaded on demand:
 
@@ -118,6 +116,26 @@ pikit's settings live in `.pi/settings.json`. Key defaults:
 - **Retry**: 3 retries with exponential backoff
 
 Override any setting in your project's `.pi/settings.json` — project settings merge over pikit's.
+
+## Verification
+
+From the repo root:
+
+```bash
+npm test                      # all 15 extension test files
+npm run typecheck             # tsc --noEmit (.pi/extensions)
+npm run check:behavioral-kernel
+npm run validate:skills:ci
+```
+
+**Anti-bloat workflow** (before merge):
+
+- `/verify --review --bloat` — diff-only tagged delete-list (`delete:`, `stdlib:`, `yagni:`, `shrink:`)
+- `/fix "..." --scope minimal` — smallest root-cause fix; note lazier alternatives in one line
+- Repo-wide audit — load the `fallow` skill, section "Repo-wide bloat audit"
+- Deferred shortcuts — mark with `// pikit: ceiling, upgrade path` and harvest via `code-cleanup` skill
+
+Optional for personal greenfield work: `pi install git:github.com/DietrichGebert/ponytail` (not included in pikit defaults).
 
 ## Customizing
 

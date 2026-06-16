@@ -48,6 +48,7 @@ Prefer cleanup that removes friction without changing behavior:
 - improve names where the blast radius is small and verified
 - remove AI-ish filler comments, duplicated guards, or ceremony
 - **fix broken windows**: inconsistent patterns, dead TODOs, misnamed functions, formatting rot
+- harvest and resolve **`pikit:` debt markers** (see below)
 
 Avoid:
 
@@ -94,6 +95,43 @@ Minimum acceptable output:
 - what was deleted
 - what verification was rerun
 - any remaining ugly areas intentionally left alone
+
+## `pikit:` Debt Convention
+
+When you deliberately defer simplification during a fix or refactor, mark it in code so "later" does not rot into "never":
+
+```typescript
+// pikit: global lock, per-account locks if throughput matters
+```
+
+Convention: `pikit: <ceiling>, <upgrade path>`
+
+- **ceiling** — the known limit of the shortcut (global lock, O(n²) scan, naive heuristic)
+- **upgrade path** — the trigger to revisit (profiler says so, second implementation exists, throughput > X)
+
+Trivial one-liners need no marker. Do not use `pikit:` for prose that merely mentions the convention.
+
+### Debt harvest
+
+Before cleanup on a directory or repo slice, scan for existing markers:
+
+```bash
+grep -rnE '(#|//) ?pikit:' .pi/extensions
+```
+
+Add other comment prefixes if your stack uses them (`/* pikit:`, `# pikit:`).
+
+**Output:** one row per marker, grouped by file:
+
+```text
+<file>:<line> — <what was simplified>. ceiling: <limit>. upgrade: <trigger>.
+```
+
+Flag markers with no upgrade path or trigger as `no-trigger` (rot risk).
+
+End with: `<N> markers, <M> with no trigger.` Nothing found: `No pikit: debt. Clean ledger.`
+
+Reads and reports only during harvest — resolve markers only when explicitly asked or when the upgrade trigger is met.
 
 ## Output Checklist
 

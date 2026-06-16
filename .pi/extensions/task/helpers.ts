@@ -7,7 +7,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
-import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import { parseMarkdownFrontmatter } from "../lib/util.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -205,8 +205,7 @@ export function loadAgentsFromDir(
       continue;
     }
 
-    const { frontmatter, body } =
-      parseFrontmatter<Record<string, string>>(content);
+    const { frontmatter, body } = parseMarkdownFrontmatter(content);
     if (!frontmatter.description) continue;
 
     const name = basename(entry.name, ".md");

@@ -89,6 +89,31 @@ npx fallow health --format json | grep -i "file-youre-editing"
 npx fallow audit --base main --gate new-only --format json
 ```
 
+### Repo-wide bloat audit
+
+Use when the user asks to audit the whole repo for over-engineering, bloat, or "what can we delete" — not just the current diff. Composes with `aislop` and hands off to `code-review-and-quality` Bloat Review mode for the narrative delete-list.
+
+**Do not use for:** structural architecture deepening — use `improve-codebase-architecture` instead (HTML report, module boundaries).
+
+```bash
+# 1. Complexity and dead-code hotspots
+npx fallow health --format json
+npx fallow dead-code --format json
+
+# 2. Duplication candidates
+npx fallow dupes --format json
+
+# 3. AI slop and security patterns in changed or target scope
+npx aislop scan --json
+# or for diff-only:
+npx aislop scan --changes --json
+
+# 4. Optional: gate check on branch
+npx fallow audit --base main --gate new-only --format json
+```
+
+**Rank findings biggest cut first** (map fallow/aislop signals to tags: unused → `delete:`, dupes → `shrink:`, single-impl abstractions → `yagni:`). Format and score per **Bloat Review mode** in `code-review-and-quality`. Lists findings only — no fixes. Diff-focused: `/verify --review --bloat`.
+
 ## Reading the Output
 
 ### Dead code

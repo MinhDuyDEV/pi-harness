@@ -10,6 +10,31 @@ import { execFile } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 
 // ---------------------------------------------------------------------------
+// Markdown Frontmatter
+// ---------------------------------------------------------------------------
+
+/** Parse simple YAML frontmatter from agent markdown files. */
+export function parseMarkdownFrontmatter(
+	content: string,
+): { frontmatter: Record<string, string>; body: string } {
+	const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+	if (!match) return { frontmatter: {}, body: content.trim() };
+
+	const raw = match[1];
+	const body = match[2].trim();
+	const frontmatter: Record<string, string> = {};
+
+	for (const line of raw.split("\n")) {
+		const kvMatch = line.match(/^\s*(\w[\w_-]*)\s*:\s*(.*?)\s*$/);
+		if (kvMatch) {
+			frontmatter[kvMatch[1]] = kvMatch[2].replace(/^["']|["']$/g, "");
+		}
+	}
+
+	return { frontmatter, body };
+}
+
+// ---------------------------------------------------------------------------
 // Error Detection
 // ---------------------------------------------------------------------------
 

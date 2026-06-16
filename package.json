@@ -10,10 +10,15 @@
 		"type": "git",
 		"url": "https://github.com/huynhgiabuu/pikit"
 	},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	},
 	"scripts": {
 		"start": "node scripts/serve-workbench.mjs",
-		"test": "node --test && npm run test:safety",
+		"test": "npm run test:extensions",
+		"test:extensions": "node scripts/run-extension-tests.mjs",
 		"test:safety": "npx tsx .pi/extensions/safety/safety.test.ts",
+		"typecheck": "tsc --noEmit",
 		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec",
 		"sync:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs",
 		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check",

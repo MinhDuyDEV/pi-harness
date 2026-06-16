@@ -1,6 +1,6 @@
 ---
 name: code-review-and-quality
-description: Reviews code for correctness, regressions, security, maintainability, and goal completion. Use before merge, after subagent work, or when asked for a review.
+description: Reviews code for correctness, regressions, security, maintainability, and goal completion. Use before merge, after subagent work, or when asked for a review. Bloat Review mode hunts over-engineering only (delete-list with tagged findings).
 version: 1.0.0
 tags: [review, code-quality, verification]
 dependencies: [verification-before-completion]
@@ -26,6 +26,7 @@ Use the **three complexity symptoms** as review lenses:
 ## When to Use
 
 - User asks for review.
+- User asks to review for bloat, over-engineering, or "what can we delete" — use **Bloat Review mode** (below).
 - Before merge/ship.
 - After a worker or subagent reports completion.
 - Refactors, security-sensitive changes, API changes, migrations, concurrency, or auth.
@@ -73,6 +74,64 @@ Impact: What breaks and when.
 Evidence: Concrete code behavior.
 Confidence: 0.0-1.0
 ```
+
+## Bloat Review Mode
+
+Use when the user asks to review for over-engineering, bloat, unnecessary abstractions, or "what can we delete" — including via `/verify --review --bloat`.
+
+**Scope:** complexity and unnecessary code only. The diff's best outcome is getting shorter.
+
+**Do not use for:** correctness bugs, security holes, performance regressions, or missing tests. Route those to the standard review workflow above.
+
+### Output format
+
+One line per finding:
+
+```text
+L<line>: <tag> <what>. <replacement>.
+```
+
+For multi-file diffs:
+
+```text
+<path>:L<line>: <tag> <what>. <replacement>.
+```
+
+### Tags
+
+| Tag | Meaning | Replacement |
+| --- | --- | --- |
+| `delete:` | Dead code, unused flexibility, speculative feature | Nothing |
+| `stdlib:` | Hand-rolled thing the standard library ships | Name the function |
+| `native:` | Dependency or code doing what the platform already does | Name the feature |
+| `yagni:` | Abstraction with one implementation, config nobody sets, layer with one caller | Inline or defer |
+| `shrink:` | Same logic, fewer lines | Show the shorter form |
+
+### Examples
+
+Bad: `This EmailValidator class might be more complex than necessary at this stage.`
+
+Good: `L12-38: stdlib: 27-line validator class. "@" in email, 1 line; real validation is the confirmation mail.`
+
+### Scoring
+
+End with the only metric that matters:
+
+```text
+net: -<N> lines possible.
+```
+
+If there is nothing to cut:
+
+```text
+Lean already. Ship.
+```
+
+### Boundaries
+
+- Does not apply fixes — lists them only.
+- A single smoke test or assert-based self-check is the minimum proof, not bloat — never flag it for deletion.
+- Pair with `fallow health` / `aislop scan` for repo-wide audits; Bloat Review mode is diff-focused unless explicitly asked for full-tree scan.
 
 ## Common Rationalizations
 

@@ -1,11 +1,23 @@
 /**
  * Safety Rules — Git Operations
  *
- * Ported from guardrails.ts + guardian.ts. 7 rules covering
- * force push, reset --hard, restore ., clean, branch delete, stash drop.
+ * Ported from guardrails.ts + guardian.ts. 8 rules covering
+ * force push, reset --hard, restore ., clean, branch delete, stash drop, git add .
  */
 
-import { block, confirm, rule, type RuleSet } from "../types.js";
+import { block, confirm, rule, type RuleSet, type Verdict } from "../types.js";
+
+type GitConfirmThreat = "data-destruction" | "data-integrity";
+
+function gitConfirm(
+  id: string,
+  threat: GitConfirmThreat,
+  message: string,
+  pattern: RegExp,
+  cmd: string,
+): Verdict | null {
+  return pattern.test(cmd) ? confirm(id, "medium", threat, message) : null;
+}
 
 export const gitRules: RuleSet = [
   rule({
@@ -53,14 +65,13 @@ export const gitRules: RuleSet = [
     threat: "data-destruction",
     targets: ["bash"],
     check: (ctx) =>
-      /git\s+reset\s+--hard/.test(ctx.command!)
-        ? confirm(
-            "warn-git-reset-hard",
-            "medium",
-            "data-destruction",
-            "`git reset --hard` discards all uncommitted changes. This is destructive and irreversible.",
-          )
-        : null,
+      gitConfirm(
+        "warn-git-reset-hard",
+        "data-destruction",
+        "`git reset --hard` discards all uncommitted changes. This is destructive and irreversible.",
+        /git\s+reset\s+--hard/,
+        ctx.command!,
+      ),
   }),
   rule({
     id: "warn-git-restore-dot",
@@ -69,14 +80,28 @@ export const gitRules: RuleSet = [
     threat: "data-destruction",
     targets: ["bash"],
     check: (ctx) =>
-      /git\s+restore\s+(\.(\s|$)|.*--\s+\.(\s|$))/.test(ctx.command!)
-        ? confirm(
-            "warn-git-restore-dot",
-            "medium",
-            "data-destruction",
-            "`git restore .` discards uncommitted changes in tracked files.",
-          )
-        : null,
+      gitConfirm(
+        "warn-git-restore-dot",
+        "data-destruction",
+        "`git restore .` discards uncommitted changes in tracked files.",
+        /git\s+restore\s+(\.(\s|$)|.*--\s+\.(\s|$))/,
+        ctx.command!,
+      ),
+  }),
+  rule({
+    id: "warn-git-add-dot",
+    description: "Warn on git add . (stages all changes)",
+    severity: "medium",
+    threat: "data-integrity",
+    targets: ["bash"],
+    check: (ctx) =>
+      gitConfirm(
+        "warn-git-add-dot",
+        "data-integrity",
+        "`git add .` stages all changes including unrelated files. Stage specific paths instead.",
+        /git\s+add\s+(\.\s*$|\.$|\s+\.(\s|$))/,
+        ctx.command!,
+      ),
   }),
   rule({
     id: "warn-git-clean",
@@ -85,14 +110,13 @@ export const gitRules: RuleSet = [
     threat: "data-destruction",
     targets: ["bash"],
     check: (ctx) =>
-      /git\s+clean\s+.*-[a-zA-Z]*f/.test(ctx.command!)
-        ? confirm(
-            "warn-git-clean",
-            "medium",
-            "data-destruction",
-            "`git clean -f` permanently removes untracked files. They cannot be recovered.",
-          )
-        : null,
+      gitConfirm(
+        "warn-git-clean",
+        "data-destruction",
+        "`git clean -f` permanently removes untracked files. They cannot be recovered.",
+        /git\s+clean\s+.*-[a-zA-Z]*f/,
+        ctx.command!,
+      ),
   }),
   rule({
     id: "warn-git-branch-delete",
@@ -101,14 +125,13 @@ export const gitRules: RuleSet = [
     threat: "data-destruction",
     targets: ["bash"],
     check: (ctx) =>
-      /git\s+(branch|push)\s+.*(-[dD]|--delete)\b/.test(ctx.command!)
-        ? confirm(
-            "warn-git-branch-delete",
-            "medium",
-            "data-destruction",
-            "Branch deletion detected.",
-          )
-        : null,
+      gitConfirm(
+        "warn-git-branch-delete",
+        "data-destruction",
+        "Branch deletion detected.",
+        /git\s+(branch|push)\s+.*(-[dD]|--delete)\b/,
+        ctx.command!,
+      ),
   }),
   rule({
     id: "warn-stash-drop",
@@ -117,13 +140,12 @@ export const gitRules: RuleSet = [
     threat: "data-destruction",
     targets: ["bash"],
     check: (ctx) =>
-      /git\s+stash\s+(drop|clear)\b/.test(ctx.command!)
-        ? confirm(
-            "warn-stash-drop",
-            "medium",
-            "data-destruction",
-            "Dropped stashes cannot be easily recovered.",
-          )
-        : null,
+      gitConfirm(
+        "warn-stash-drop",
+        "data-destruction",
+        "Dropped stashes cannot be easily recovered.",
+        /git\s+stash\s+(drop|clear)\b/,
+        ctx.command!,
+      ),
   }),
 ];

@@ -32,6 +32,8 @@ skill({ name: "deep-module-design" });
 
 # Track 1: Bug Fix (Default)
 
+Optional: `--scope minimal|moderate|aggressive` (default: minimal for bug fixes). See scope table in Track 2 Phase 3.
+
 ### Phase 1: Reproduce
 
 - Identify the failing behavior from the description
@@ -108,10 +110,15 @@ Apply changes in small, verifiable steps:
 2. Run tests — must pass
 3. Repeat
 
-Scope levels:
-- **minimal**: Rename, extract, inline — no structural changes
-- **moderate**: Restructure within files, split large functions
-- **aggressive**: Cross-file restructuring, interface changes
+Scope levels (also usable on the default bug-fix track via `--scope`):
+
+| Flag | Meaning | When to use |
+| --- | --- | --- |
+| `--scope minimal` | Smallest fix that works; name a lazier alternative in one line if one exists (≈ lite) | Default for tight diffs, hotfixes, YAGNI-friendly work |
+| `--scope moderate` | Balanced — reasonable structure without cross-file rewrites (≈ full) | Default when `--scope` omitted on refactor track |
+| `--scope aggressive` | Cross-file restructuring, interface changes allowed (≈ ultra) | Legacy cleanup, planned refactors with approval |
+
+On the bug-fix track, `--scope minimal` applies the behavioral kernel: root-cause fix only, no speculative abstractions, no cleanup outside the failure class.
 
 ### Phase 4: Verify
 

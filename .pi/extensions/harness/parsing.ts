@@ -213,29 +213,7 @@ export function parseSprints(text: string): Sprint[] {
 	return sprints;
 }
 
-/**
- * Parse YAML frontmatter from a markdown file.
- * Returns frontmatter and body separated.
- */
-export function parseMarkdownFrontmatter(
-	content: string,
-): { frontmatter: Record<string, string>; body: string } {
-	const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-	if (!match) return { frontmatter: {}, body: content.trim() };
-
-	const raw = match[1];
-	const body = match[2].trim();
-	const frontmatter: Record<string, string> = {};
-
-	for (const line of raw.split("\n")) {
-		const kvMatch = line.match(/^\s*(\w[\w_-]*)\s*:\s*(.*?)\s*$/);
-		if (kvMatch) {
-			frontmatter[kvMatch[1]] = kvMatch[2].replace(/^["']|["']$/g, "");
-		}
-	}
-
-	return { frontmatter, body };
-}
+export { parseMarkdownFrontmatter } from "../lib/util.js";
 
 // ─── Eval Output Parsing ──────────────────────────────────────────────────────
 

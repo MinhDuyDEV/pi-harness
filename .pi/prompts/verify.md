@@ -1,6 +1,6 @@
 ---
 description: Verify completeness, correctness, and quality — gates, tests, code review, UI review
-argument-hint: "<work-id|path> [--quick] [--full] [--fix] [--no-cache] [--test] [--review] [--ui-review]"
+argument-hint: "<work-id|path> [--quick] [--full] [--fix] [--no-cache] [--test] [--review] [--review --bloat] [--ui-review]"
 agentType: reviewer
 ---
 
@@ -33,6 +33,7 @@ skill({ name: "accessibility-audit" });
 | `--no-cache` | false | Bypass verification cache |
 | `--test` | false | Write tests for the target code (TDD) |
 | `--review` | false | Manual code review of changed code |
+| `--bloat` | false | With `--review`: Bloat Review mode — tagged delete-list only (`delete:`, `stdlib:`, `yagni:`, `shrink:`) |
 | `--ui-review` | false | UI/UX quality audit (supports `--slop` subflag) |
 
 ## Determine Input Type
@@ -205,7 +206,15 @@ Manual review of changed code.
 | Work ID | Implementation vs spec |
 | No args | Recent/local changes |
 
+#### Phase R1b: Bloat mode (`--review --bloat`)
+
+Load `code-review-and-quality`, `fallow`, and `aislop`; follow **Bloat Review mode** in the skill (tags, one-line findings, net score). Run `git diff --stat`, `npx fallow health --changed-since main --format json`, and `npx aislop scan --changes --json` first. Do not apply fixes.
+
 #### Phase R2: Automated Scan
+
+Skip when `--bloat` is set (covered in Phase R1b).
+
+Otherwise:
 
 - Debug statements, loose typing, unjustified `@ts-ignore`/`as any`.
 - `TODO`, `FIXME`, `HACK` in changed code.
@@ -213,6 +222,10 @@ Manual review of changed code.
 - New dependencies without clear need.
 
 #### Phase R3: Manual Review
+
+Skip when `--bloat` is set (covered in Phase R1b).
+
+Otherwise:
 
 | Category | Focus |
 | --- | --- |
@@ -224,6 +237,10 @@ Manual review of changed code.
 | Testing | Changed behavior has meaningful tests |
 
 #### Phase R4: Report
+
+When `--bloat`: use Bloat Review output format from `code-review-and-quality` (tagged lines + net score).
+
+Otherwise:
 
 | Severity | Action |
 | --- | --- |
