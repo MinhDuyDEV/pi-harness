@@ -338,14 +338,16 @@ import {
     assert.ok(explore, t + " explore exists");
     assert.equal(explore!.description, "Read-only codebase explorer", t + " description");
     assert.equal(explore!.model, "gpt-4o", t + " model");
-    assert.deepEqual(explore!.disallowedTools, ["edit", "write"], t + " disallowed");
+    assert.ok(explore!.disallowedTools?.includes("edit"), t + " disallowed edit");
+    assert.ok(explore!.disallowedTools?.includes("write"), t + " disallowed write");
+    assert.ok(explore!.disallowedTools?.includes("xai_web_search"), t + " disallowed xai");
     assert.equal(explore!.source, "user", t + " source");
     assert.match(explore!.body, /# Explore Agent/, t + " body");
 
     const worker = agents.find((a) => a.name === "worker");
     assert.ok(worker, t + " worker exists");
     assert.equal(worker!.thinking, "high", t + " thinking");
-    assert.equal(worker!.disallowedTools, undefined, t + " no disallowed");
+    assert.ok(worker!.disallowedTools?.includes("xai_generate_text"), t + " default xai disallow");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

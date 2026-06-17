@@ -49,7 +49,9 @@ try {
   const explore = agents.find((a) => a.name === "explore");
   assert.ok(explore, "explore agent discovered");
   assert.equal(explore.description, "Read-only explorer", "agent description");
-  assert.deepEqual(explore.disallowedTools, ["edit", "write"], "disallowed_tools");
+  assert.ok(explore.disallowedTools?.includes("edit"), "disallowed edit");
+  assert.ok(explore.disallowedTools?.includes("write"), "disallowed write");
+  assert.ok(explore.disallowedTools?.includes("xai_web_search"), "disallowed xai side tools");
   assert.equal(explore.source, "project", "source is project");
   console.log("  PASS: agent discovery");
 

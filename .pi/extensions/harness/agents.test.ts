@@ -50,7 +50,15 @@ disallowed_tools: edit, write
 
 	const defaultTools = loadAgentFile("default-tools", root);
 	assert.ok(defaultTools, "default tool agent loads");
-	assert.deepEqual(defaultTools.tools, ["read", "bash", "grep", "find", "ls"], "agents without tools frontmatter keep built-in defaults minus disallowed tools");
+	assert.deepEqual(
+		defaultTools.tools,
+		["read", "bash", "grep", "find", "ls"],
+		"agents without tools frontmatter keep built-in defaults minus disallowed tools",
+	);
+	assert.ok(
+		defaultTools.tools.every((t) => !t.startsWith("xai_")),
+		"xai_* never in harness tool allowlist",
+	);
 } finally {
 	rmSync(root, { recursive: true, force: true });
 }

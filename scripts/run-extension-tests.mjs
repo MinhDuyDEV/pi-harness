@@ -31,3 +31,4 @@ run(["--test", ...tsxTestFiles]);
 run([".pi/extensions/safety/safety.test.ts"]);
 run([".pi/extensions/task/helpers.test.ts"]);
 run([".pi/extensions/memory/observations.test.ts"]);
+run([".pi/extensions/xai/policy.test.ts"]);

@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
 import { parseMarkdownFrontmatter } from "../lib/util.js";
+import { parseMergedDisallowedTools } from "../xai/policy.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -209,13 +210,9 @@ export function loadAgentsFromDir(
     if (!frontmatter.description) continue;
 
     const name = basename(entry.name, ".md");
-    const disallowedRaw = frontmatter.disallowed_tools;
-    const disallowedTools = disallowedRaw
-      ? disallowedRaw
-          .split(",")
-          .map((t: string) => t.trim())
-          .filter(Boolean)
-      : undefined;
+    const disallowedRaw = frontmatter.disallowed_tools as string | undefined;
+    const merged = parseMergedDisallowedTools(disallowedRaw);
+    const disallowedTools = merged.length > 0 ? merged : undefined;
 
     agents.push({
       name,
