@@ -58,6 +58,9 @@
     "preset": "default",
     "fixedEditor": true
   },
+  "piTui": {
+    "workingPaddingTop": 1
+  },
   "theme": "catppuccin",
   "showHardwareCursor": false,
   "autocompleteMaxVisible": 10,

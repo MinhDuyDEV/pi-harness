@@ -16,6 +16,7 @@ const tsxTestFiles = [
 	".pi/extensions/tui/tests/footer.test.ts",
 	".pi/extensions/tui/tests/sidebar.test.ts",
 	".pi/extensions/tui/tests/todos-panel.test.ts",
+	".pi/extensions/tui/tests/working-indicator.test.ts",
 ];
 
 function run(args) {

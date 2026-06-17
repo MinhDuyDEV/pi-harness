@@ -8,7 +8,7 @@ import { join } from "node:path";
 let renderFixedCluster: any;
 let FixedEditorCompositor: any;
 let emergencyTerminalModeReset: any;
-let readAmpTuiSettings: any;
+let readPiTuiSettings: any;
 
 before(async () => {
   const clusterModule: any = await import("../fixed-editor/cluster.js");
@@ -16,7 +16,7 @@ before(async () => {
   const settingsModule: any = await import("../settings.js");
   ({ renderFixedCluster } = clusterModule.default ?? clusterModule);
   ({ FixedEditorCompositor, emergencyTerminalModeReset } = compositorModule.default ?? compositorModule);
-  ({ readAmpTuiSettings } = settingsModule.default ?? settingsModule);
+  ({ readPiTuiSettings } = settingsModule.default ?? settingsModule);
 });
 
 class FakeTerminal {
@@ -529,12 +529,12 @@ test("keyboard navigation jumps scrollable chat to top and bottom", () => {
   fixture.compositor.dispose();
 });
 
-test("amp-tui settings read persisted fixed-editor scroll shortcuts", () => {
-  const dir = mkdtempSync(join(tmpdir(), "amp-tui-settings-"));
+test("pi-tui settings read persisted fixed-editor scroll shortcuts", () => {
+  const dir = mkdtempSync(join(tmpdir(), "pi-tui-settings-"));
   try {
     mkdirSync(join(dir, ".pi"));
     writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify({
-      ampTui: {
+      piTui: {
         fixedEditor: {
           scrollChatUp: "ctrl+shift+u",
           scrollChatDown: "ctrl+shift+d",
@@ -544,7 +544,7 @@ test("amp-tui settings read persisted fixed-editor scroll shortcuts", () => {
       },
     }));
 
-    assert.deepEqual(readAmpTuiSettings(dir).keyboardScrollShortcuts, {
+    assert.deepEqual(readPiTuiSettings(dir).keyboardScrollShortcuts, {
       up: "ctrl+shift+u",
       down: "ctrl+shift+d",
       top: "ctrl+shift+home",

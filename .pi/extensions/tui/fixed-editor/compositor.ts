@@ -239,7 +239,7 @@ export class FixedEditorCompositor {
   install(): void {
     if (this.installed) return;
     if (typeof this.terminal.write !== "function") {
-      throw new Error("[amp-tui] FixedEditorCompositor: terminal.write is required");
+      throw new Error("[pi-tui] FixedEditorCompositor: terminal.write is required");
     }
 
     // ── 1. Override terminal.rows ──────────────────────────────────────

@@ -24,7 +24,11 @@ import {
 } from "./git-status.js";
 import { AmpBoxEditor } from "./editor.js";
 import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.js";
-import { readAmpTuiSettings, type AmpTuiSettings } from "./settings.js";
+import { readPiTuiSettings, type PiTuiSettings } from "./settings.js";
+import {
+  formatWorkingMessageWithPaddingTop,
+  workingStatusSpacerLines,
+} from "./working-indicator.js";
 import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.js";
 import {
   addUsageTokenMetrics,
@@ -87,14 +91,14 @@ function modelLabel(model: {
 }
 
 
-export default function ampTuiExtension(pi: ExtensionAPI) {
+export default function piTuiExtension(pi: ExtensionAPI) {
   // ── State ────────────────────────────────────────────────────────────────
   const queue = createQueueTracker();
   let todosState: TodosState = { items: [], sourceCount: 0 };
   const footer = createDefaultFooterState();
   const sidebar = createDefaultSidebarState();
   let footerInstalled = false;
-  let ampTuiSettings: AmpTuiSettings = {};
+  let piTuiSettings: PiTuiSettings = {};
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let clipboardStatusTimer: ReturnType<typeof setTimeout> | null = null;
@@ -127,11 +131,28 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
       : undefined;
   }
 
+  function applyWorkingRowPadding(ctx: ExtensionContext): void {
+    if (!ctx.hasUI) return;
+    const top = piTuiSettings.workingPaddingTop ?? 1;
+    // Fixed-editor cluster adds blank rows in getStatusLines; avoid doubling with message newlines.
+    if (fixedEditorEnabled && compositor) {
+      ctx.ui.setWorkingMessage();
+      return;
+    }
+    const message = formatWorkingMessageWithPaddingTop(top);
+    if (message !== undefined) {
+      ctx.ui.setWorkingMessage(message);
+    } else {
+      ctx.ui.setWorkingMessage();
+    }
+  }
+
   function startFooterAnim(ctx: ExtensionContext) {
     if (editorStreamingPrompt === STREAMING_PROMPT_FRAMES[0]) return;
 
     // Restore Pi's native animated working indicator (spinner).
     if (ctx.hasUI) {
+      applyWorkingRowPadding(ctx);
       ctx.ui.setWorkingIndicator();
     }
 
@@ -299,7 +320,8 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
     restoreUsageFromBranch(ctx);
 
     refreshTodos(ctx.cwd);
-    ampTuiSettings = readAmpTuiSettings(ctx.cwd);
+    piTuiSettings = readPiTuiSettings(ctx.cwd);
+    applyWorkingRowPadding(ctx);
     updateGit(ctx);
 
     // Set boxed editor with $ / $$ prompt
@@ -743,8 +765,11 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
         );
       },
       getEditorText: () => currentEditor?.getText() ?? "",
-      getStatusLines: (width: number) =>
-        renderHiddenLines(fixedStatusContainer, width, true),
+      getStatusLines: (width: number) => {
+        const lines = renderHiddenLines(fixedStatusContainer, width, true);
+        const pad = workingStatusSpacerLines(piTuiSettings.workingPaddingTop ?? 1);
+        return pad.length > 0 ? [...pad, ...lines] : lines;
+      },
       getAboveWidgetLines: (width: number) => {
         syncFixedRenderables(false);
         const queueLines = renderHiddenLines(fixedQueueContainer, width);
@@ -769,7 +794,7 @@ export default function ampTuiExtension(pi: ExtensionAPI) {
         typeof tui.getShowHardwareCursor === "function" &&
         tui.getShowHardwareCursor(),
       isStreaming: () => footer.isStreaming,
-      keyboardScrollShortcuts: ampTuiSettings.keyboardScrollShortcuts,
+      keyboardScrollShortcuts: piTuiSettings.keyboardScrollShortcuts,
       onCopySelection: (text: string) => {
         void copyToClipboard(text).then(() => {
           ctx.ui.notify("Copied", "info");
