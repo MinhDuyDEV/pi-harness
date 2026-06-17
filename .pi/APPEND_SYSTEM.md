@@ -69,4 +69,3 @@ After either path, verify current code/config/git state from disk before acting.
 4. `webclaw_scrape` / `webclaw_batch` — when normal fetch is blocked
 5. Browser tools — only when JS rendering is required
 
-Do **not** use `xai_web_search`, `xai_x_search`, `xai_deep_research`, or `xai_multi_agent` for in-repo work — they are nested Grok API calls on your OAuth quota. The `xai_*` side tools are stripped from the active tool set by default (see `.pi/extensions/xai/`). To re-enable: `PI_XAI_SIDE_TOOLS=1`. To keep only specific tools: `PI_XAI_SIDE_TOOL_ALLOWLIST=xai_analyze_image`.

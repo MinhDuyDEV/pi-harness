@@ -57,11 +57,9 @@ function safeDrop(db: DatabaseSync, sql: string): void {
 function migrateV6ToV7({ db }: MigrationContext): void {
 	runInTransaction(db, () => {
 		// vec + TQ embedding tables.
-		// vec_observations is a VIRTUAL TABLE using the vec0 module
-		// (sqlite-vec). With sqlite-vec removed from package.json, the
-		// module can't be loaded and DROP TABLE throws "no such module: vec0".
-		// safeDrop catches it; the orphan persists harmlessly.
-		safeDrop(db, "DROP TABLE IF EXISTS vec_observations");
+		// vec_observations (vec0 virtual table) is intentionally skipped:
+		// sqlite-vec was removed from package.json, so the module can't be
+		// loaded and DROP TABLE would throw. The orphan is never queried.
 		safeDrop(db, "DROP TABLE IF EXISTS observation_embeddings_tq");
 
 		// Pipeline tables (L1 temporal messages + L2 distillations + FTS5)

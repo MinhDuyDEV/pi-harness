@@ -70,6 +70,7 @@ const PROVIDER_DISPLAY: Record<string, string> = {
   together: "Together AI",
   "vercel-ai-gateway": "Vercel AI",
   xai: "xAI",
+  "xai-auth": "xAI Grok",
   zai: "zAI",
   xiaomi: "Xiaomi MiMo",
 };
