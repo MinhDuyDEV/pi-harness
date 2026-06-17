@@ -20,8 +20,8 @@ test("footer renders visible icon turn stats by default", () => {
 
   const line = renderFooter(state, 120);
 
-  assert.match(line, /󰁝 0 · 󰁅 0 · 󰆼 0\/0 ·  0\.0s/);
-  assert.doesNotMatch(line, /\bin 0\b|\bout 0\b|\bcache 0\/0\b|\bturn 0\.0s\b/);
+  assert.match(line, /󰁝 0 · 󰁅 0 · 󰆼 0\/0/);
+  assert.doesNotMatch(line, / 0\.0s|\bin 0\b|\bout 0\b|\bcache 0\/0\b|\bturn 0\.0s\b/);
 });
 
 test("footer does not render the streaming wave before the model", () => {
