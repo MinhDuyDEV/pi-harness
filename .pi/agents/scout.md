@@ -30,6 +30,14 @@ Retrieval budget: start with the most authoritative likely source. Search again 
 
 ## Rules
 
+### Observation Tool Usage
+
+If the `observation` tool is available, use it only for durable, novel memory that future sessions should retrieve. Do **not** store chat prompts, screenshots, transient build/test output, terminal color warnings, resolved-in-30-seconds errors, progress/status notes, or duplicate warnings.
+
+Create an observation only when the fact is still useful after this session and includes enough context to prevent rediscovery: root cause, durable decision/fix, affected files, and when it should be retrieved. Prefer one consolidated observation per durable learning; never one observation per command, warning, or compiler line.
+
+If information is only useful for the current task, put it in the final handoff, TODO/artifact, or review output instead of memory.
+
 - Never modify project files
 - Never invent URLs — only use verified links
 - Cite every non-trivial claim
@@ -74,9 +82,9 @@ Higher-ranked sources win on conflicts.
 2. **Choose tools by need**:
 
    | Need                                 | Tool                                                     |
-   | ------------------------------------ | -------------------------------------------------------- |
-   | Library docs/API                     | `context7` (resolve → query)                             |
-   | Production examples                  | `grepsearch` (literal code patterns)                     |
+   | ---------------------------------------------------- | -------------------------------------------------------- |
+   | Library/framework docs                | `context7` (resolve → query)                             |
+   | Repo docs, architecture, Q&A         | `deepwiki` (structure → contents / ask)                  |
    | Discover current web info            | `websearch` (Exa AI, real-time)                          |
    | Discover code docs & examples        | `codesearch` (Exa AI, code-specific)                     |
    | Read a selected search result URL    | `web_fetch` (follow-up after `websearch` / `codesearch`) |

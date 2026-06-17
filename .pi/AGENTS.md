@@ -10,16 +10,7 @@
 If sources conflict, state the conflict explicitly. Official docs > code > blog posts > AI-generated content.
 
 <!-- behavioral-kernel:start -->
-## Behavioral Kernel
-
-This is the compressed always-on execution loop. Even if the rest of the prompt is noisy, keep these four rules active:
-
-- **Clarify before committing** — if the request is ambiguous, inconsistent, or under-specified, state assumptions explicitly or ask instead of silently choosing.
-- **Choose the smallest working change** — prefer the direct fix first; avoid speculative abstractions, flexibility, or cleanup outside the asked scope.
-- **Keep diffs surgical** — every changed line should trace to the current request; if you notice unrelated issues, log `NOTICED BUT NOT TOUCHING: ...` and move on.
-- **Define proof before acting** — for non-trivial work, name the success check, test, or verification path before implementation, then verify it after.
-
-**Tradeoff:** This kernel biases toward fewer wrong moves, not maximum speed. For trivial one-liners, use judgment.
+<!-- Canonical source: SYSTEM.md Behavioral Kernel section -->
 <!-- behavioral-kernel:end -->
 
 - **Decide before delivering** — for feature, architecture, migration, or risky work, produce a reviewable artifact (ADR/spec) before touching code. Mechanical edits use the Edit Protocol directly.
@@ -27,21 +18,28 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
 ## Core Operating Principles
 
 - **Default to action.** If intent is clear and constraints permit, act. Escalate only when blocked or materially uncertain.
-- **Scope discipline.** Stay in scope. Read files before editing. Don't live with broken windows in code you're changing.
-- **Complexity first.** A change that works but increases structural complexity is net-negative. Hide complexity at the boundary, don't leak it.
+- **Scope discipline.** Stay in scope. Don't live with broken windows in code you're changing.
+- **Complexity first.** A change that works but increases structural complexity is net-negative. No abstractions for single-use code, no flexibility that wasn't requested, no error handling for impossible scenarios.
 - **Reuse before create.** Search before creating. One home per concept.
-- **Prefer root cause over local patch.** LLM-authored code defaults to local defense: guards, fallbacks, tolerant readers, defensive copies. Pull against this. Find the global invariant.
-- **Critique every line.** Don't operate on autopilot.
+- **Memory hygiene.** `observation` is for decisions, patterns, bugs, learnings — not for chat logs, screenshots, build warnings, or single-line code snippets. Use it sparingly; 95% of `warning`-type observations are noise. Compaction notes go in `<project>/.pi/artifacts/notes/{ISO-week}.md` (per-project, not `~/.config/pi/memory/notes/`). Use `findProjectRoot()` (or walk up looking for `package.json`) before writing project-scoped files.
 
-## Edit Protocol
 
-1. **LOCATE** — find exact position of what must change
-2. **READ** — get fresh file content around the target
-3. **VERIFY** — confirm expected content exists
-4. **EDIT** — precise replacements with unique surrounding context
-5. **CONFIRM** — read back the result
 
-Steps 2 and 3 are never optional. Reading from memory, grep summary, or assumed content does not satisfy READ.
+    ## Edit Protocol
+    
+    1. **LOCATE** — find exact position of what must change
+    2. **READ** — get fresh file content around the target
+    3. **VERIFY** — confirm expected content exists
+    4. **PREPARE** — copy the exact oldText from the read output (byte-perfect, including whitespace)
+    5. **EDIT** — precise replacement with unique surrounding context
+    6. **CONFIRM** — read back the result
+    7. **ORPHANS** — remove imports/variables/functions your changes made unused. Don't touch pre-existing dead code.
+    
+    Steps 2, 3, and 4 are never optional. Reading from memory, grep summary, or assumed content does not satisfy READ.
+    
+        On edit failure: re-read the target lines with offset/limit to get exact whitespace, then retry. If 2 consecutive edits fail on the same target, escalate.
+        
+        If the edit tool rejects oldText due to JSON syntax conflicts (e.g. `:` inside template literals like `${$.repeat(n)}`), use `bash sed` instead of the edit tool.
 
 ## Verification Before Completion
 
@@ -65,3 +63,14 @@ Steps 2 and 3 are never optional. Reading from memory, grep summary, or assumed 
 ## Effort Signal
 
 When proposing work, include effort: **S** (<1h), **M** (1-3h), **L** (1-2d), **XL** (>2d).
+
+## Anti-Patterns
+
+| If you see... | Apply... |
+|---|---|
+| Silent assumption | Clarify before committing |
+| Over-engineered solution | Choose the smallest working change |
+| Noisy diff (style drift, drive-by refactors) | Keep diffs surgical |
+| Vague completion claim | Define proof before acting |
+| Dead code after your edits | ORPHANS step in Edit Protocol |
+| `observation` used as a chat log / build-warning dump | Apply Memory hygiene (Core Operating Principles) — reserve `observation` for decisions, patterns, bugs, learnings. |

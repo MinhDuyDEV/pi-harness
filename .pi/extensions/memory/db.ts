@@ -1,90 +1,91 @@
 /**
- * SQLite database layer for the memory system.
- * Uses node:sqlite (built into Node.js v22.5+, no native compilation).
+ * Memory SQLite database.
  *
- * DEPENDENCY: none — node:sqlite is bundled with Node.js v22+
+ * After ADR-001 cleanup + bug fix: schema matches what the user actually has
+ * (`created_at_epoch`, not `time_created`). All dead `temporal_messages` /
+ * `distillations` / `distillations_fts` schema removed. `allowExtension: false`
+ * (no vec/TQ extensions).
  */
 
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { applyMigrations } from "./migrations.js";
-
-// ---------------------------------------------------------------------------
-// sqlite-vec availability (optional, loaded at runtime)
-// ---------------------------------------------------------------------------
-
-let sqliteVecAvailable = false;
-
-function tryLoadSqliteVec(db: DatabaseSync): boolean {
-	try {
-		// require() used intentionally — sqlite-vec is CJS-only and this must be synchronous
-		const sqliteVec = require("sqlite-vec");
-		sqliteVec.load(db);
-		sqliteVecAvailable = true;
-		return true;
-	} catch {
-		sqliteVecAvailable = false;
-		return false;
-	}
-}
-
-export function isSqliteVecAvailable(): boolean {
-	return sqliteVecAvailable;
-}
+import { applyMigrations, verifySchemaVersion } from "./migrations.js";
 
 // ---------------------------------------------------------------------------
 // Schema SQL
 // ---------------------------------------------------------------------------
 
 const SCHEMA_SQL = `
--- Schema versioning
-CREATE TABLE IF NOT EXISTS schema_versions (
-  id INTEGER PRIMARY KEY,
-  version INTEGER UNIQUE NOT NULL,
-  applied_at TEXT NOT NULL
-);
-
--- Observations
 CREATE TABLE IF NOT EXISTS observations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  type TEXT NOT NULL CHECK(type IN ('decision','bugfix','feature','pattern','discovery','learning','warning')),
-  title TEXT NOT NULL,
-  subtitle TEXT,
-  facts TEXT,
-  narrative TEXT,
-  concepts TEXT,
-  files_read TEXT,
-  files_modified TEXT,
-  confidence TEXT CHECK(confidence IN ('high','medium','low')) DEFAULT 'high',
-  bead_id TEXT,
-  supersedes INTEGER,
-  superseded_by INTEGER,
-  valid_until TEXT,
-  markdown_file TEXT,
-  source TEXT CHECK(source IN ('manual','curator','imported')) DEFAULT 'manual',
-  maturity TEXT CHECK(maturity IN ('candidate','established','proven','deprecated')) DEFAULT 'candidate',
-  helpful_count INTEGER NOT NULL DEFAULT 0,
-  harmful_count INTEGER NOT NULL DEFAULT 0,
-  feedback_events TEXT,
-  effective_score REAL NOT NULL DEFAULT 0.0,
-  retrieval_count INTEGER NOT NULL DEFAULT 0,
-  last_retrieved INTEGER,
-  created_at TEXT NOT NULL,
-  created_at_epoch INTEGER NOT NULL,
-  updated_at TEXT,
-  FOREIGN KEY(supersedes) REFERENCES observations(id) ON DELETE SET NULL,
-  FOREIGN KEY(superseded_by) REFERENCES observations(id) ON DELETE SET NULL
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type TEXT NOT NULL CHECK(type IN ('decision','bugfix','pattern','feature','discovery','learning','warning')) DEFAULT 'pattern',
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    facts TEXT,
+    narrative TEXT,
+    concepts TEXT NOT NULL DEFAULT '[]',
+    files_read TEXT NOT NULL DEFAULT '[]',
+    files_modified TEXT NOT NULL DEFAULT '[]',
+    confidence TEXT NOT NULL DEFAULT 'high' CHECK(confidence IN ('low','medium','high')),
+    source TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','curator','imported')),
+    bead_id TEXT,
+    supersedes INTEGER,
+    superseded_by INTEGER,
+    helpful_count INTEGER NOT NULL DEFAULT 0,
+    harmful_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at_epoch INTEGER NOT NULL,
+    updated_at TEXT,
+    updated_at_epoch INTEGER,
+    maturity TEXT DEFAULT 'candidate',
+    feedback_events TEXT,
+    effective_score REAL DEFAULT 0,
+    retrieval_count INTEGER DEFAULT 0,
+    last_retrieved INTEGER,
+    valid_until TEXT,
+    markdown_file TEXT
 );
 
--- FTS5 for observations (porter stemming)
 CREATE VIRTUAL TABLE IF NOT EXISTS observations_fts USING fts5(
-  title, subtitle, narrative, facts, concepts,
-  content='observations',
-  content_rowid='id',
-  tokenize='porter unicode61'
+    title,
+    subtitle,
+    narrative,
+    facts,
+    concepts,
+    content='observations',
+    content_rowid='id',
+    tokenize='porter unicode61'
 );
+
+CREATE TABLE IF NOT EXISTS feedback_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    observation_id INTEGER NOT NULL,
+    feedback_type TEXT NOT NULL CHECK(feedback_type IN ('helpful','harmful')),
+    timestamp INTEGER NOT NULL,
+    reason TEXT,
+    session_id TEXT,
+    FOREIGN KEY(observation_id) REFERENCES observations(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_obs ON feedback_events(observation_id);
+
+CREATE TABLE IF NOT EXISTS schema_versions (
+    version INTEGER PRIMARY KEY,
+    applied_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS memory_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT UNIQUE NOT NULL,
+    content TEXT NOT NULL,
+    mode TEXT CHECK(mode IN ('replace','append')) DEFAULT 'replace',
+    created_at TEXT NOT NULL,
+    created_at_epoch INTEGER NOT NULL,
+    updated_at TEXT,
+    updated_at_epoch INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_memory_files_path ON memory_files(file_path);
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type);
@@ -92,110 +93,24 @@ CREATE INDEX IF NOT EXISTS idx_observations_created ON observations(created_at_e
 CREATE INDEX IF NOT EXISTS idx_observations_bead_id ON observations(bead_id);
 CREATE INDEX IF NOT EXISTS idx_observations_superseded ON observations(superseded_by) WHERE superseded_by IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_observations_source ON observations(source);
-
--- Memory files
-CREATE TABLE IF NOT EXISTS memory_files (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  file_path TEXT UNIQUE NOT NULL,
-  content TEXT NOT NULL,
-  mode TEXT CHECK(mode IN ('replace','append')) DEFAULT 'replace',
-  created_at TEXT NOT NULL,
-  created_at_epoch INTEGER NOT NULL,
-  updated_at TEXT,
-  updated_at_epoch INTEGER
-);
-CREATE INDEX IF NOT EXISTS idx_memory_files_path ON memory_files(file_path);
-
--- Temporal messages
-CREATE TABLE IF NOT EXISTS temporal_messages (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id TEXT NOT NULL,
-  message_id TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL,
-  content TEXT NOT NULL,
-  token_estimate INTEGER NOT NULL DEFAULT 0,
-  time_created INTEGER NOT NULL,
-  distillation_id INTEGER,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  tool_name TEXT,
-  tool_call_id TEXT,
-  status TEXT,
-  is_error INTEGER NOT NULL DEFAULT 0,
-  raw_json TEXT,
-  FOREIGN KEY(distillation_id) REFERENCES distillations(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS idx_temporal_session ON temporal_messages(session_id, time_created);
-CREATE INDEX IF NOT EXISTS idx_temporal_undistilled ON temporal_messages(session_id) WHERE distillation_id IS NULL;
-CREATE INDEX IF NOT EXISTS idx_temporal_time ON temporal_messages(time_created DESC);
-CREATE INDEX IF NOT EXISTS idx_temporal_tool ON temporal_messages(tool_name, tool_call_id);
-CREATE INDEX IF NOT EXISTS idx_temporal_status ON temporal_messages(status, is_error);
-
--- Distillations
-CREATE TABLE IF NOT EXISTS distillations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id TEXT NOT NULL,
-  content TEXT NOT NULL,
-  terms TEXT NOT NULL DEFAULT '[]',
-  message_count INTEGER NOT NULL DEFAULT 0,
-  compression_ratio REAL NOT NULL DEFAULT 0.0,
-  time_start INTEGER NOT NULL,
-  time_end INTEGER NOT NULL,
-  time_created INTEGER NOT NULL,
-  meta_distillation_id INTEGER,
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  FOREIGN KEY(meta_distillation_id) REFERENCES distillations(id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS idx_distillations_session ON distillations(session_id, time_created DESC);
-CREATE INDEX IF NOT EXISTS idx_distillations_time ON distillations(time_created DESC);
-
--- FTS5 for distillations
-CREATE VIRTUAL TABLE IF NOT EXISTS distillations_fts USING fts5(
-  content, terms,
-  content='distillations',
-  content_rowid='id',
-  tokenize='porter unicode61'
-);
 `;
 
-// ---------------------------------------------------------------------------
-// FTS Sync Triggers
-// ---------------------------------------------------------------------------
-
 const FTS_TRIGGERS_SQL = `
--- Observations FTS triggers
 CREATE TRIGGER IF NOT EXISTS observations_fts_ai AFTER INSERT ON observations BEGIN
-  INSERT INTO observations_fts(rowid, title, subtitle, narrative, facts, concepts)
-  VALUES (new.id, new.title, new.subtitle, new.narrative, new.facts, new.concepts);
+    INSERT INTO observations_fts(rowid, title, subtitle, narrative, facts, concepts)
+    VALUES (new.id, new.title, new.subtitle, new.narrative, new.facts, new.concepts);
 END;
 
 CREATE TRIGGER IF NOT EXISTS observations_fts_ad AFTER DELETE ON observations BEGIN
-  INSERT INTO observations_fts(observations_fts, rowid, title, subtitle, narrative, facts, concepts)
-  VALUES('delete', old.id, old.title, old.subtitle, old.narrative, old.facts, old.concepts);
+    INSERT INTO observations_fts(observations_fts, rowid, title, subtitle, narrative, facts, concepts)
+    VALUES('delete', old.id, old.title, old.subtitle, old.narrative, old.facts, old.concepts);
 END;
 
 CREATE TRIGGER IF NOT EXISTS observations_fts_au AFTER UPDATE ON observations BEGIN
-  INSERT INTO observations_fts(observations_fts, rowid, title, subtitle, narrative, facts, concepts)
-  VALUES('delete', old.id, old.title, old.subtitle, old.narrative, old.facts, old.concepts);
-  INSERT INTO observations_fts(rowid, title, subtitle, narrative, facts, concepts)
-  VALUES (new.id, new.title, new.subtitle, new.narrative, new.facts, new.concepts);
-END;
-
--- Distillations FTS triggers
-CREATE TRIGGER IF NOT EXISTS distillations_fts_ai AFTER INSERT ON distillations BEGIN
-  INSERT INTO distillations_fts(rowid, content, terms)
-  VALUES (new.id, new.content, new.terms);
-END;
-
-CREATE TRIGGER IF NOT EXISTS distillations_fts_ad AFTER DELETE ON distillations BEGIN
-  INSERT INTO distillations_fts(distillations_fts, rowid, content, terms)
-  VALUES('delete', old.id, old.content, old.terms);
-END;
-
-CREATE TRIGGER IF NOT EXISTS distillations_fts_au AFTER UPDATE ON distillations BEGIN
-  INSERT INTO distillations_fts(distillations_fts, rowid, content, terms)
-  VALUES('delete', old.id, old.content, old.terms);
-  INSERT INTO distillations_fts(rowid, content, terms)
-  VALUES (new.id, new.content, new.terms);
+    INSERT INTO observations_fts(observations_fts, rowid, title, subtitle, narrative, facts, concepts)
+    VALUES('delete', old.id, old.title, old.subtitle, old.narrative, old.facts, old.concepts);
+    INSERT INTO observations_fts(rowid, title, subtitle, narrative, facts, concepts)
+    VALUES (new.id, new.title, new.subtitle, new.narrative, new.facts, new.concepts);
 END;
 `;
 
@@ -221,7 +136,7 @@ export function runInTransaction<T>(db: DatabaseSync, fn: () => T): T {
 
 let dbInstance: DatabaseSync | null = null;
 
-function getMemoryDataDir(): string {
+export function getMemoryDataDir(): string {
 	const dir = path.join(homedir(), ".config", "pi", "memory");
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });
@@ -233,16 +148,14 @@ export function getMemoryDB(): DatabaseSync {
 	if (dbInstance) return dbInstance;
 
 	const dbPath = process.env.PI_MEMORY_DB_PATH?.trim() || path.join(getMemoryDataDir(), "memory.db");
-	dbInstance = new DatabaseSync(dbPath, { allowExtension: true });
+	dbInstance = new DatabaseSync(dbPath, { allowExtension: false });
 
 	// Enable WAL mode + foreign keys
 	dbInstance.exec("PRAGMA journal_mode = WAL");
 	dbInstance.exec("PRAGMA foreign_keys = ON");
 
-	// Try to load sqlite-vec extension (optional), then lock down extension loading
-	tryLoadSqliteVec(dbInstance);
-	dbInstance.enableLoadExtension(false);
-
+	// Always run base schema (idempotent via IF NOT EXISTS), then run migrations.
+	// This is safe to call on every cold start.
 	initializeSchema(dbInstance);
 	return dbInstance;
 }
@@ -259,22 +172,13 @@ export function closeMemoryDB(): void {
 // ---------------------------------------------------------------------------
 
 function initializeSchema(db: DatabaseSync): void {
-	// Fresh install: apply base schema (predates schema_versions table).
-	try {
-		const row = db
-			.prepare(
-				"SELECT version FROM schema_versions ORDER BY version DESC LIMIT 1",
-			)
-			.get() as { version: number } | undefined;
-		if (row && row.version >= 6) return; // Already at v6
-	} catch {
-		// schema_versions doesn't exist yet — fresh install
-		db.exec(SCHEMA_SQL);
-		db.exec(FTS_TRIGGERS_SQL);
-	}
-
-	// All migrations are idempotent (ALTER TABLE wrapped in try/catch,
-	// CREATE TABLE uses IF NOT EXISTS). Run them all — safe to re-run.
-	applyMigrations({ db, sqliteVecAvailable });
+	// Base schema is idempotent (CREATE TABLE IF NOT EXISTS) — safe on every cold start.
+	db.exec(SCHEMA_SQL);
+	db.exec(FTS_TRIGGERS_SQL);
+	// Migrations are also idempotent (each DROP wrapped in safeDrop try/catch).
+	applyMigrations({ db });
+	// Runtime smoke test: surface any silent migration failure (e.g., a future
+	// migration that fails to record its version). Better to fail loudly on
+	// cold start than to operate on a half-migrated DB.
+	verifySchemaVersion({ db }, 10);
 }
-

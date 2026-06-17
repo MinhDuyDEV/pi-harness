@@ -55,6 +55,14 @@ Planning is not prediction — it's creating **sacred space** where builders can
 
 ## Rules
 
+### Observation Tool Usage
+
+If the `observation` tool is available, use it only for durable, novel memory that future sessions should retrieve. Do **not** store chat prompts, screenshots, transient build/test output, terminal color warnings, resolved-in-30-seconds errors, progress/status notes, or duplicate warnings.
+
+Create an observation only when the fact is still useful after this session and includes enough context to prevent rediscovery: root cause, durable decision/fix, affected files, and when it should be retrieved. Prefer one consolidated observation per durable learning; never one observation per command, warning, or compiler line.
+
+If information is only useful for the current task, put it in the final handoff, TODO/artifact, or review output instead of memory.
+
 - Read first; only write planning artifacts and memory notes
 - Discovery is non-mutating only: inspect, analyze, and plan; do not implement production changes
 - No commits, pushes, destructive shell operations, or implementation edits

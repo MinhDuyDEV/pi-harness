@@ -1,525 +1,145 @@
 /**
- * Pi Memory Extension — Entry Point
+ * Memory extension — entry point.
  *
- * 4-tier persistent memory system: capture → distill → curate → recall.
+ * After ADR-001 cleanup: removed the L1/L2/L3 pipeline, persona/scene
+ * injection, project-index FTS5 crawler, and embedding-based search.
+ * The agent now drives all compaction and curation decisions. Per the
+ * Syntax #976 thesis: "the agent itself has some autonomy over how it
+ * compresses it" and "bash is all you need."
  *
- * DEPENDENCIES:
- *   node:sqlite (built into Node.js v22.5+, no native compilation)
- *   sqlite-vec (optional: npm install sqlite-vec) — for vector similarity search
+ * Surfaces:
+ * - 3 tools (observation, memory-search, memory-admin) — see tools.ts
+ * - before_agent_start context injection: FTS5 search of relevant observations
+ * - /memory-compact slash command: agent-driven weekly compaction to
+ *   `<project>/.pi/artifacts/notes/{ISO-week}.md`
  *
- * WHAT THIS EXTENSION DOES:
- *   - Registers compact memory tools (observation, search, read, update, admin, feedback)
- *   - Auto-captures user messages on each input event (with secret sanitization)
- *   - Runs TF-IDF distillation + pattern-based curation on agent_end
- *   - Time-decay scoring on observations (CASS-inspired)
- *   - Maturity state machine: candidate → established → proven / deprecated
- *   - Auto-injects relevant observations into system prompt on agent start
- *   - Stores everything in SQLite with FTS5 full-text search
- *
- * UPGRADES (v3, CASS-inspired):
- *   - Time-decay scoring: feedback events decay with 90-day half-life
- *   - Feedback tool: mark observations as helpful/harmful
- *   - Auto context injection: relevant observations injected before agent starts
- *   - Secret sanitization: API keys, tokens, passwords stripped before storage
- *   - Maturity states: candidate → established → proven (auto-deprecate on harmful)
+ * See: .pi/artifacts/memory-extension-cleanup/ADR-001-memory-extension-cleanup.md
  */
 
-import type { TextContent } from "@earendil-works/pi-ai";
-import { MEMORY_CONFIG } from "./memory/config.js";
-import { curateFromDistillations } from "./memory/curator.js";
-import { closeMemoryDB, getMemoryDB } from "./memory/db.js";
-import { distillSession } from "./memory/distill.js";
-import { autoDistillCycle } from "./memory/distill-workflow.js";
-import { autoDreamCycle } from "./memory/dream.js";
-import { clearEmbeddings, embed, warmupEmbeddings } from "./memory/embeddings.js";
-import { checkpointWAL, getDatabaseSizes, optimizeFTS5 } from "./memory/maintenance.js";
-import {
-  backfillEmbeddings,
-  backfillTQEmbeddings,
-  getObservationStats,
-} from "./memory/observations.js";
-import { getRelevantKnowledge, storeTemporalMessage } from "./memory/pipeline.js";
-import { sanitize } from "./memory/sanitize.js";
-import { refreshAllScores } from "./memory/scoring.js";
-import { registerMemoryTools } from "./memory/tools.js";
-import { generatePersona, readPersona } from "./memory/persona.js";
-import { reconcileProjectIndex, searchProjectIndex } from "./memory/project-index.js";
-import { detectAndStoreScenes, listScenes } from "./memory/scene.js";
 import type {
-  AgentEndEvent,
-  BeforeAgentStartEvent,
-  ExtensionAPI,
-  ExtensionContext,
-  InputEvent,
-  SessionCompactEvent,
-  ToolResultEvent,
+	ExtensionAPI,
+	AgentEndEvent,
+	SessionCompactEvent,
 } from "@earendil-works/pi-coding-agent";
-import { allocateBudget } from "./integration/budget.js";
+import { getMemoryDB } from "./memory/db.js";
+import { archiveDuplicateObservations } from "./memory/maintenance.js";
+import { getObservationStats, searchObservationsFTS } from "./memory/observations.js";
+import {
+	getCurrentWeekId,
+	getObservationsForCompaction,
+	formatObservationsForCompaction,
+	writeCompactionNote,
+} from "./memory/distill.js";
+import { registerMemoryTools } from "./memory/tools.js";
 import { getCheckpointRebuildContext } from "./checkpoint/index.js";
+import { MEMORY_CONFIG } from "./memory/config.js";
 
-// Stable session identifier from Pi's extension context
-function getSessionId(ctx: ExtensionContext, _event?: unknown): string {
-  return ctx?.sessionManager?.getSessionId?.() ?? ctx?.cwd ?? "default";
+const MAX_INJECTION_TOKENS = MEMORY_CONFIG.injection.maxTokens;
+
+/** Rough token estimate: 1 token ≈ 4 characters. */
+function estimateTokens(text: string): number {
+	return Math.ceil(text.length / 4);
 }
 
-function stringifyForCapture(value: unknown, maxLength: number): string | null {
-  try {
-    const json = JSON.stringify(value);
-    if (!json) return null;
-    return json.length > maxLength ? json.slice(0, maxLength) : json;
-  } catch {
-    return null;
-  }
-}
+export default function (pi: ExtensionAPI): void {
+	// Initialize DB on extension load (also keeps WAL warm)
+	getMemoryDB();
 
-// ---------------------------------------------------------------------------
-// Extension factory (Pi entry point)
-// ---------------------------------------------------------------------------
+	// Register 3 tools: observation, memory-search, memory-admin
+	registerMemoryTools(pi);
 
-export default function memoryExtension(pi: ExtensionAPI): void {
-  // 1. Initialize database (ensures schema is up to date)
-  try {
-    getMemoryDB();
-  } catch (err) {
-    console.error("[memory] Failed to initialize database:", err);
-    return;
-  }
+	// Auto-context-inject relevant observations on each new turn
+	pi.on("before_agent_start", async (event, ctx) => {
+		if (!MEMORY_CONFIG.injection.enabled) return {};
+		const prompt = (event as any).prompt ?? "";
+		if (!prompt || typeof prompt !== "string" || prompt.trim() === "") {
+			return {};
+		}
 
-  // 2. Register all memory tools
-  registerMemoryTools(pi);
+		const sessionId = (ctx as any)?.sessionManager?.getSessionId?.() ?? undefined;
+		const cwd = (ctx as any)?.cwd ?? process.cwd();
+		const sections: string[] = [];
 
-  // 3. Backfill embeddings for pre-existing observations (async, non-blocking)
-  backfillEmbeddings().catch(() => {});
-  backfillTQEmbeddings().catch(() => {});
+		// 1. Checkpoint context (independent of memory DB)
+		try {
+			const checkpointContext = (await getCheckpointRebuildContext(cwd, sessionId)) ?? "";
+			if (checkpointContext) {
+				sections.push(checkpointContext);
+			}
+		} catch {
+			// Best-effort; never break the user turn
+		}
 
-  // 3. Register event handlers
-  let lastMaintenanceAt = 0;
-  let maintenanceCycleCount = 0;
-  const reconciledDirs = new Set<string>();
+		// 2. FTS5 search of relevant observations (replaces getRelevantKnowledge)
+		try {
+			const stats = getObservationStats();
+			const totalObs = Object.values(stats).reduce((sum, n) => sum + n, 0);
+			if (totalObs > 0) {
+				const results = searchObservationsFTS(prompt, { limit: 5 });
+				if (results.length > 0) {
+					const lines = results.map((r) => {
+						const snippet = r.snippet ? r.snippet.replace(/\s+/g, " ").trim() : "";
+						return `- [#${r.id}] (${r.type}) ${r.title}${snippet ? ` — ${snippet}` : ""}`;
+					});
+					sections.push(`## Relevant Memory\n${lines.join("\n")}`);
+				}
+			}
+		} catch {
+			// Best-effort
+		}
 
-  // --- Capture user messages ---
-  pi.on("input", (event: InputEvent, ctx: ExtensionContext) => {
-    if (!MEMORY_CONFIG.capture.enabled) return;
+		if (sections.length === 0) return {};
 
-    // Skip mid-stream steers — only process idle prompts and follow-ups
-    if (event.streamingBehavior === "steer") return;
+		const joined = sections.join("\n\n");
+		const estimated = estimateTokens(joined);
+		if (estimated > MAX_INJECTION_TOKENS) {
+			return { systemPrompt: joined.slice(0, MAX_INJECTION_TOKENS * 4) };
+		}
 
-    try {
-      const text = typeof event === "string" ? event : (event?.text ?? "");
-      if (!text || typeof text !== "string") return;
+		return { systemPrompt: joined };
+	});
 
-      let content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);
+	// agent_end and session_compact are now no-ops (no more auto-pipeline)
+	pi.on("agent_end", (_event: AgentEndEvent) => {
+		// Intentionally empty. The agent drives observation creation
+		// explicitly via the `observation` tool, not via background pipeline.
+	});
 
-      // Sanitize secrets before storage
-      if (MEMORY_CONFIG.sanitization.enabled) {
-        const { text: sanitized } = sanitize(content);
-        content = sanitized;
-      }
+	pi.on("session_compact", (_event: SessionCompactEvent) => {
+		// Intentionally empty. Memory is decoupled from session compaction.
+	});
 
-      const tokenEstimate = Math.ceil(content.length / 4);
-      const now = Date.now();
-      const sessionId = getSessionId(ctx, event);
-
-      storeTemporalMessage({
-        session_id: sessionId,
-        message_id: `user-${now}-${Math.random().toString(36).slice(2, 8)}`,
-        role: "user",
-        content,
-        token_estimate: tokenEstimate,
-        time_created: now,
-      });
-    } catch {
-      // Capture is best-effort, never throw
-    }
-  });
-
-  // --- Capture tool results ---
-  pi.on("tool_result", (event: ToolResultEvent, ctx: ExtensionContext) => {
-    if (!MEMORY_CONFIG.capture.enabled) return;
-
-    try {
-      const toolName = event.toolName ?? "tool";
-      const toolCallId = event.toolCallId ?? null;
-      const isError = Boolean(event.isError);
-      const status = isError ? "error" : "completed";
-      let rawJson = stringifyForCapture(event, MEMORY_CONFIG.capture.maxRawJsonLength);
-      if (rawJson && MEMORY_CONFIG.sanitization.enabled) {
-        rawJson = sanitize(rawJson).text;
-      }
-      const textParts = Array.isArray(event.content)
-        ? event.content
-            .filter((c): c is TextContent => c.type === "text" && typeof c.text === "string")
-                        .map((c: any) => c.text)
-        : [];
-      const legacyResult = (event as any)?.result;
-      const legacyText =
-        typeof legacyResult === "string"
-          ? legacyResult
-          : Array.isArray(legacyResult?.content)
-            ? legacyResult.content
-                .filter((c: any): c is TextContent => c?.type === "text" && typeof c.text === "string")
-                .map((c: any) => c.text)
-                .join("\n")
-            : typeof legacyResult?.content === "string"
-              ? legacyResult.content
-              : "";
-      const text = textParts.join("\n") || legacyText;
-      if (!text) return;
-
-      let content = text.slice(0, MEMORY_CONFIG.capture.maxContentLength);
-
-      // Sanitize secrets before storage
-      if (MEMORY_CONFIG.sanitization.enabled) {
-        const { text: sanitized } = sanitize(content);
-        content = sanitized;
-      }
-
-      const tokenEstimate = Math.ceil(content.length / 4);
-      const now = Date.now();
-      const sessionId = getSessionId(ctx, event);
-
-      storeTemporalMessage({
-        session_id: sessionId,
-        message_id: `tool-${toolName}-${now}-${Math.random().toString(36).slice(2, 8)}`,
-        role: "tool",
-        content: `[${toolName}] ${content}`,
-        token_estimate: tokenEstimate,
-        time_created: now,
-        tool_name: toolName,
-        tool_call_id: toolCallId,
-        status,
-        is_error: isError,
-        raw_json: rawJson,
-      });
-    } catch {
-      // Capture is best-effort
-    }
-  });
-
-  // -----------------------------------------------------------------------
-  // Pipeline auto-trigger state (per session turn counter + timer)
-  // -----------------------------------------------------------------------
-  const pipelineTurnCounts = new Map<
-    string,
-    { count: number; warmupThreshold: number; lastRunMs: number; lastActivityMs: number }
-  >();
-
-  // --- Track user input for turn counting ---
-  pi.on("input", (_event: InputEvent, ctx: ExtensionContext) => {
-    // Skip mid-stream steers — only count idle prompts and follow-ups
-    if (_event.streamingBehavior === "steer") return;
-    const sessionId = getSessionId(ctx, _event);
-    const state = pipelineTurnCounts.get(sessionId) ?? {
-      count: 0,
-      warmupThreshold: 1,
-      lastRunMs: 0,
-      lastActivityMs: Date.now(),
-    };
-    state.count++;
-    state.lastActivityMs = Date.now();
-    pipelineTurnCounts.set(sessionId, state);
-  });
-
-  /**
-   * Check whether the pipeline should run for this session.
-   * Implements:
-   *   - everyNConversations throttle
-   *   - Warmup doubling (1→2→4→...→everyNConversations)
-   *   - Idle timeout trigger
-   */
-  function shouldRunPipeline(sessionId: string): boolean {
-    const state = pipelineTurnCounts.get(sessionId);
-    if (!state) return false;
-
-    const { pipeline } = MEMORY_CONFIG;
-    const now = Date.now();
-
-    // Respect min interval between runs
-    if (now - state.lastRunMs < pipeline.l1MinIntervalSeconds * 1000) {
-      return false;
-    }
-
-    // Check idle timeout trigger
-    if (pipeline.l1IdleTimeoutSeconds > 0) {
-      const idleSec = (now - state.lastActivityMs) / 1000;
-      if (idleSec >= pipeline.l1IdleTimeoutSeconds) {
-        return true;
-      }
-    }
-
-    // Check turn-count trigger with warmup
-    const threshold = pipeline.enableWarmup
-      ? Math.min(state.warmupThreshold, pipeline.everyNConversations)
-      : pipeline.everyNConversations;
-
-    if (threshold === 0) return true; // every turn
-    if (state.count >= threshold) return true;
-    return false;
-  }
-
-  // --- Run pipeline on agent_end ---
-  pi.on("agent_end", async (event: AgentEndEvent, ctx: ExtensionContext) => {
-    try {
-      const sessionId = getSessionId(ctx, event);
-
-      // Check auto-trigger conditions
-      if (!shouldRunPipeline(sessionId)) return;
-
-      // Bump warmup threshold (doubling) after a triggered run
-      const state = pipelineTurnCounts.get(sessionId);
-      if (state) {
-        state.count = 0;
-        state.lastRunMs = Date.now();
-        if (MEMORY_CONFIG.pipeline.enableWarmup) {
-          state.warmupThreshold = Math.min(
-            state.warmupThreshold * 2,
-            MEMORY_CONFIG.pipeline.everyNConversations,
-          );
-        }
-      }
-
-      // Distill accumulated messages
-      const distillationId = distillSession(sessionId);
-      if (distillationId) {
-        // Curate observations from distillations
-        curateFromDistillations(sessionId);
-
-        // Regenerate L3 persona after pipeline pass
-        try {
-          generatePersona("default");
-        } catch {
-          // Persona generation is best-effort
-        }
-
-        // L2 Scene detection: cluster observations into work patterns
-        if (MEMORY_CONFIG.scene.enabled) {
-          try {
-            const sceneCount = detectAndStoreScenes();
-            // scene detection complete (stored in memory_files)
-          } catch {
-            // Scene detection is best-effort
-          }
-        }
-      }
-
-      // Auto-Dream: consolidate session traces into durable observations
-      // Best-effort — internal shouldAutoDream gate prevents over-frequency.
-      try {
-        autoDreamCycle();
-      } catch {
-        /* best-effort */
-      }
-
-      // Auto-Distill: detect workflow patterns, generate skills (monthly)
-      try {
-        autoDistillCycle();
-      } catch {
-        /* best-effort */
-      }
-
-      const now = Date.now();
-      if (now - lastMaintenanceAt >= MEMORY_CONFIG.maintenance.minIntervalMs) {
-        lastMaintenanceAt = now;
-        maintenanceCycleCount++;
-
-        // Refresh time-decay scores periodically
-        refreshAllScores();
-
-        // Periodic maintenance
-        optimizeFTS5();
-        checkpointWAL();
-
-        // Background: warm up embedding model for next search
-        warmupEmbeddings().catch(() => {});
-
-        // Periodic health telemetry (every N cycles)
-        const telemetryEvery = MEMORY_CONFIG.telemetry.everyNCycles;
-        if (telemetryEvery > 0 && maintenanceCycleCount % telemetryEvery === 0) {
-          try {
-            const obsStats = getObservationStats();
-            const obsTotal = Object.values(obsStats).reduce((sum, n) => sum + n, 0);
-            const sizes = getDatabaseSizes();
-            const scenes = listScenes();
-            const telemetry = {
-              event: "memory-health",
-              observations: obsTotal,
-              scenes: scenes.length,
-              dbSizeKB: Math.round(sizes.total / 1024),
-              timestamp: new Date().toISOString(),
-            };
-            if ((MEMORY_CONFIG as any).debug) console.log(JSON.stringify(telemetry));
-          } catch {
-            // Telemetry is best-effort
-          }
-        }
-      }
-    } catch {
-      // Pipeline is best-effort
-    }
-  });
-
-  // --- Reset pipeline state on session compact ---
-  pi.on("session_compact", (_event: SessionCompactEvent, ctx: ExtensionContext) => {
-    try {
-      const sessionId = getSessionId(ctx, _event);
-      pipelineTurnCounts.delete(sessionId);
-    } catch {
-      // best-effort
-    }
-  });
-
-  // --- Auto context injection on agent start (with project knowledge reconciliation) ---
-  pi.on("before_agent_start", async (event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
-    if (!MEMORY_CONFIG.injection.enabled) return;
-
-    // 1. Lightweight project file index reconciliation (fingerprint diff, <100ms)
-    //    Runs once per project root, then fast on subsequent starts.
-    try {
-      const projectRoot = ctx?.cwd;
-      if (projectRoot && typeof projectRoot === "string" && !reconciledDirs.has(projectRoot)) {
-        reconciledDirs.add(projectRoot);
-        // Index project files in background (don't block session start)
-        setTimeout(() => {
-          try { reconcileProjectIndex(projectRoot); } catch {}
-        }, 100);
-      }
-    } catch {
-      // Reconcile is best-effort
-    }
-
-    try {
-      // 2. Inject L3 persona context (if available)
-      let personaContext = "";
-      try {
-        const personaMd = readPersona("default");
-        if (personaMd) {
-          const lines = personaMd
-            .split("\n")
-            .filter((l) => l.startsWith("**") || l.startsWith("-") || l.startsWith("|"))
-            .slice(0, 15);
-          if (lines.length > 0) {
-            personaContext =
-              "\n\n## User Persona Context\n_Learned patterns from past sessions._\n" +
-              lines.join("\n");
-          }
-        }
-      } catch {}
-
-      // 3. Inject L2 scene context
-      let sceneContext = "";
-      if (MEMORY_CONFIG.scene.enabled) {
-        try {
-          const scenes = listScenes();
-          if (scenes.length > 0) {
-            sceneContext =
-              "\n\n## Active Work Patterns (Scenes)\n_Recurring work patterns from past sessions._\n";
-            for (const s of scenes.slice(0, 5)) {
-              sceneContext += `- **${s.name}** (${s.count} obs, score: ${s.score.toFixed(2)}, ${s.span})\n`;
-            }
-          }
-        } catch {}
-      }
-
-      const stats = getObservationStats();
-      const totalObs = Object.values(stats).reduce((sum: number, n: number) => sum + n, 0);
-
-      const sessionId = getSessionId(ctx, event);
-      let checkpointContext = "";
-      try {
-        checkpointContext = (await getCheckpointRebuildContext(ctx.cwd ?? process.cwd(), sessionId)) ?? "";
-      } catch {}
-
-      if (totalObs === 0 && !personaContext && !sceneContext && !checkpointContext) return;
-
-      const userMessage = (event as any)?.userMessage ?? (event as any)?.message ?? (event as any)?.input ?? "";
-      const taskTerms =
-        typeof userMessage === "string"
-          ? userMessage
-              .toLowerCase()
-              .split(/\s+/)
-              .filter((t: string) => t.length > 2)
-              .slice(0, 20)
-          : [];
-
-      let queryEmbedding: number[] | null = null;
-      if (taskTerms.length > 0) {
-        try {
-          queryEmbedding = await embed(taskTerms.join(" "));
-        } catch {}
-      }
-
-      // 4. Search relevant observations from memory
-      const knowledge =
-        taskTerms.length > 0
-          ? getRelevantKnowledge(taskTerms, {
-              tokenBudget: MEMORY_CONFIG.injection.tokenBudget,
-              minScore: MEMORY_CONFIG.injection.minScore,
-              queryEmbedding,
-            })
-          : [];
-
-      // 5. Search project index for matching files (FTS5)
-      let projectResults: Array<{ file_path: string; snippet: string; score: number }> = [];
-      if (taskTerms.length > 0) {
-        try {
-          projectResults = searchProjectIndex(taskTerms.join(" "), 5);
-        } catch {}
-      }
-
-      // Build injection sources for budget coordinator
-      const sources: Array<{ name: string; content: string; priority: number }> = [];
-
-      if (checkpointContext) {
-        sources.push({ name: "checkpoint", content: checkpointContext, priority: 50 });
-      }
-      if (personaContext) {
-        sources.push({ name: "persona", content: personaContext, priority: 15 });
-      }
-      if (sceneContext) {
-        sources.push({ name: "scenes", content: sceneContext, priority: 10 });
-      }
-
-      if (knowledge.length > 0) {
-        const memLines = [
-          "\n## Relevant Memory (Auto-Injected)",
-          "_The following observations were retrieved from memory based on the current task._\n",
-        ];
-        for (const item of knowledge) {
-          memLines.push(`- **[${item.type}]** ${item.title} _(score: ${item.score.toFixed(2)})_`);
-          if (item.content) memLines.push(`  ${item.content.slice(0, 200).replace(/\n/g, " ")}`);
-        }
-        sources.push({ name: "memory", content: memLines.join("\n"), priority: 35 });
-      }
-
-      // 6. Inject project knowledge alongside observations
-      if (projectResults.length > 0) {
-        const projLines = [
-          "\n## Project Knowledge (Auto-Indexed)",
-          "_Relevant files from the project._\n",
-        ];
-        for (const item of projectResults) {
-          projLines.push(`- **\`${item.file_path}\`** _(score: ${item.score.toFixed(2)})_`);
-          if (item.snippet) projLines.push(`  ${item.snippet.replace(/\n/g, " ")}`);
-        }
-        sources.push({ name: "project", content: projLines.join("\n"), priority: 15 });
-      }
-
-      if (sources.length === 0) return;
-      const budgetResult = allocateBudget(sources, MEMORY_CONFIG.injection.tokenBudget);
-      return { systemPrompt: (event.systemPrompt ?? "") + budgetResult.selected.join("\n") };
-    } catch {
-      // Injection is best-effort — never break agent startup
-    }
-  });
-
-  // --- Cleanup on shutdown ---
-  pi.on("session_shutdown", () => {
-    pipelineTurnCounts.clear();
-    try {
-      clearEmbeddings();
-      closeMemoryDB();
-    } catch {
-      // Cleanup is best-effort
-    }
-  });
+	// /memory-compact slash command — agent-driven lossy compression.
+	// Per the video: "the agent itself has some autonomy over how it compresses it."
+	pi.registerCommand("memory-compact", {
+		description: "Compact recent observations into a weekly markdown note at .pi/artifacts/notes/. Args: <sinceDays>",
+		async handler(args: string, ctx: any) {
+			const sinceDays = parseInt(args.trim() || "7", 10) || 7;
+			const projectRoot = ctx?.cwd ?? process.cwd();
+			// Clean active memory before generating the raw compaction payload.
+			// Otherwise compaction faithfully reprints historical duplicate rows and
+			// relies on a human/agent to remember to run memory-admin dedupe first.
+			// This archives duplicates via superseded_by; it does not delete data.
+			const dedupeStats = archiveDuplicateObservations({ dryRun: false });
+			const observations = getObservationsForCompaction(sinceDays);
+			if (observations.length === 0) {
+				ctx.ui?.notify?.(`No observations in the last ${sinceDays} days.`, "info");
+				return;
+			}
+			const payload = formatObservationsForCompaction(observations);
+			const weekId = getCurrentWeekId();
+			const notePath = writeCompactionNote(weekId, payload, projectRoot);
+			const message = [
+				`Compaction note written: ${notePath}`,
+				`Observations covered: ${observations.length}`,
+				`Duplicates archived before compaction: ${dedupeStats.archived}`,
+				`Duplicate candidates remaining: ${dedupeStats.candidates - dedupeStats.archived}`,
+				`Week: ${weekId}`,
+				``,
+				`Next: read ${notePath} and write a curated summary to it.`,
+				`Do not call the observation tool during compaction. The note file is the durable artifact; compaction status, warnings, and meta-comments must stay out of memory observations.`,
+			].join("\n");
+			ctx.ui?.notify?.(message, "info");
+		},
+	});
 }

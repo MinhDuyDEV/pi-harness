@@ -1,5 +1,7 @@
 # Workflow Routing
 
+**Before routing, check yourself:** If the request is ambiguous — surface alternatives. If the solution is over-engineered — push back. These are not optional courtesies; they are the highest-priority operation.
+
 ## Decision Priority
 
 1. **Fix / update / refactor existing code** → direct tools. No harness, no task.
@@ -16,7 +18,6 @@
 | Text search? | `grep` |
 | Multi-pattern text search? | `mgrep` |
 | Symbol / definition / caller analysis? | `srcwalk_*` |
-| Structural pattern (empty catch, `as any`, `unwrap()`)? | `ast-grep` (`sg`) |
 | Type / compile / lint errors? | `diagnostics` |
 | Dead code / complexity? | `diagnostics` (Fallow) |
 | AI slop (narrative comments, swallowed exceptions)? | `diagnostics` (aislop) or `bash aislop scan` |
@@ -51,7 +52,9 @@ Artifacts = visible planning for direct-tool work. Harness = product-level build
 
 ## Context Retrieval
 
-- `memory-search` → durable project knowledge and FTS5 project index.
+- Check `<project>/.pi/artifacts/notes/{ISO-week}.md` first — agent-written curated summaries, high-signal, per-project.
+- `memory-search` → durable project knowledge (FTS5 only, no embeddings).
+- `/memory-compact` → compress observations into the weekly note; then read + curate.
 - `vcc_recall` → current-session recovery (earlier output, commands, decisions).
 - `npx fallow health --changed-since main --format json` → complexity and blast-radius before TS/JS edits.
 
@@ -59,7 +62,7 @@ After either path, verify current code/config/git state from disk before acting.
 
 ## Web Retrieval Priority
 
-1. `context7` — official library/framework docs
+1. `context7` / `deepwiki` — official library/framework docs and repo docs
 2. `websearch` / `codesearch` — discover URLs
 3. `web_fetch` — read result URL as markdown
 4. `webclaw_scrape` / `webclaw_batch` — when normal fetch is blocked

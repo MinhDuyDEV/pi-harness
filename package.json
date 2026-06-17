@@ -1,7 +1,7 @@
 {
 	"name": "pikit",
-	"type": "module",
-"bin": "./bin/cli.js",
+		"type": "module",
+	"bin": "./bin/cli.js",
 	"version": "1.0.0",
 	"description": "Batteries-included pi coding agent kit — extensions, agents, skills, prompts, and themes",
 	"keywords": ["pi-package"],
@@ -19,7 +19,7 @@
 		"test:extensions": "node scripts/run-extension-tests.mjs",
 		"test:safety": "npx tsx .pi/extensions/safety/safety.test.ts",
 		"typecheck": "tsc --noEmit",
-		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3 && npm rebuild sqlite-vec",
+		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3",
 		"sync:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs",
 		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check",
 		"install:hooks": "node scripts/install-git-hooks.mjs",

@@ -49,6 +49,14 @@ Files: path/to/file.ts
 
 ## Rules
 
+### Observation Tool Usage
+
+If the `observation` tool is available, use it only for durable, novel memory that future sessions should retrieve. Do **not** store chat prompts, screenshots, transient build/test output, terminal color warnings, resolved-in-30-seconds errors, progress/status notes, or duplicate warnings.
+
+Create an observation only when the fact is still useful after this session and includes enough context to prevent rediscovery: root cause, durable decision/fix, affected files, and when it should be retrieved. Prefer one consolidated observation per durable learning; never one observation per command, warning, or compiler line.
+
+If information is only useful for the current task, put it in the final handoff, TODO/artifact, or review output instead of memory.
+
 - Start with `## Sprint 1:`. End when done.
 - One sprint for trivial tasks. 2-4 for multi-file features.
 - Each criterion must be verifiable by a reviewer.

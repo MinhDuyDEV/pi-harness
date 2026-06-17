@@ -3,6 +3,7 @@ import { Type } from "@sinclair/typebox";
 import { generateMemoryIndex } from "./index-generator.js";
 import { upsertMemoryFile } from "./storage.js";
 import {
+	archiveDuplicateObservations,
 	archiveOldObservations,
 	checkFTS5Available,
 	getDatabaseSizes,
@@ -13,11 +14,7 @@ import {
 	getObservationStats,
 	storeObservation,
 } from "./observations.js";
-import { readPersona, generatePersona } from "./persona.js";
-import { getCaptureStats, getDistillationStats } from "./pipeline.js";
-import { refreshAllScores } from "./scoring.js";
-import { detectAndStoreScenes, listScenes } from "./scene.js";
-import { getMemoryDB, isSqliteVecAvailable } from "./db.js";
+import { getMemoryDB } from "./db.js";
 import type { ConfidenceLevel, ObservationType } from "./config.js";
 
 export const MEMORY_ADMIN_OPERATIONS = [
@@ -27,6 +24,7 @@ export const MEMORY_ADMIN_OPERATIONS = [
 	"import",
 	"rebuild",
 	"maintenance",
+	"dedupe",
 	"write-file",
 ] as const;
 
@@ -56,7 +54,7 @@ export const MemoryAdminParameters = Type.Object({
 		description: "Preview mutating operations without applying changes. Defaults to true for import/mutations without force.",
 	})),
 	force: Type.Optional(Type.Boolean({
-		description: "Required for mutating operations: import, rebuild, maintenance.",
+		description: "Required for mutating operations: import, rebuild, maintenance, dedupe.",
 	})),
 	import_json: Type.Optional(Type.String({
 		description: "JSON produced by memory-admin export; used only by import.",
@@ -132,17 +130,11 @@ export async function executeMemoryAdmin(params: MemoryAdminParams): Promise<Too
 				const blocked = requireForce("rebuild", dryRun, force);
 				if (blocked) return blocked;
 				if (dryRun) {
-					return textResult("## Rebuild Preview\nWould refresh scores, regenerate persona, scenes, and memory index.");
+					return textResult("## Rebuild Preview\nWould regenerate memory index.");
 				}
-				const scores = refreshAllScores();
-				const persona = generatePersona("default");
-				const scenes = detectAndStoreScenes();
 				const index = generateMemoryIndex();
 				return textResult([
 					"## Memory Rebuild Complete",
-					`- Scores refreshed: ${scores.updated} updated, ${scores.deprecated} deprecated`,
-					`- Persona: ${persona ? "generated" : "not enough signal"}`,
-					`- Scenes: ${scenes}`,
 					`- Index entries: ${index.entryCount}`,
 				].join("\n"));
 			}
@@ -155,12 +147,29 @@ export async function executeMemoryAdmin(params: MemoryAdminParams): Promise<Too
 				return textResult([
 					dryRun ? "## Maintenance Preview" : "## Maintenance Complete",
 					`- Archived observations: ${stats.archived}`,
-					`- Purged temporal messages: ${stats.purgedMessages}`,
-					`- Pruned markdown files: ${stats.prunedMarkdown}`,
 					`- WAL checkpointed: ${stats.checkpointed ? "yes" : "no"}`,
 					`- Vacuumed: ${stats.vacuumed ? "yes" : "no"}`,
 					`- Freed: ${formatBytes(stats.freedBytes)}`,
 				].join("\n"));
+			}
+
+			case "dedupe": {
+				const dryRun = params.dry_run ?? !force;
+				const blocked = requireForce("dedupe", dryRun, force);
+				if (blocked) return blocked;
+				const stats = archiveDuplicateObservations({ dryRun, sampleLimit: 10 });
+				const sampleLines = stats.samples.map((sample) =>
+					`  - [${sample.reason}] keep #${sample.keep_id} (${sample.type}) "${sample.title}"; archive ${sample.duplicates}: ${sample.duplicate_ids}`,
+				);
+				return textResult([
+					dryRun ? "## Duplicate Archive Preview" : "## Duplicate Archive Complete",
+					`- Candidate duplicate rows: ${stats.candidates}`,
+					`- Duplicate groups: ${stats.groups}`,
+					`- Exact non-warning duplicates: ${stats.exactNonWarningCandidates}`,
+					`- Warning title duplicates: ${stats.warningTitleCandidates}`,
+					`- Archived rows: ${stats.archived}`,
+					...(sampleLines.length ? ["", "Samples:", ...sampleLines] : []),
+				].join("\n"), stats as unknown as Record<string, unknown>);
 			}
 
 			case "write-file": {
@@ -187,69 +196,81 @@ export async function executeMemoryAdmin(params: MemoryAdminParams): Promise<Too
 	}
 }
 
-function renderStatus(includeDetails: boolean): ToolResult {
-	const sizes = getDatabaseSizes();
-	const obsStats = getObservationStats();
-	const captureStats = getCaptureStats();
-	const distStats = getDistillationStats();
-	const obsTotal = Object.values(obsStats).reduce((sum, n) => sum + n, 0);
-	const scenes = listScenes();
+	function renderStatus(includeDetails: boolean): ToolResult {
+		const sizes = getDatabaseSizes();
+		const obsStats = getObservationStats();
+		const obsTotal = Object.values(obsStats).reduce((sum, n) => sum + n, 0);
 
-	const lines = [
-		includeDetails ? "## Memory Dashboard" : "## Memory Status",
-		"",
-		`- Observations: ${obsTotal}`,
-		`- Temporal messages: ${captureStats.total} (${captureStats.undistilled} undistilled)` ,
-		`- Distillations: ${distStats.total}`,
-		`- Scenes: ${scenes.length}`,
-		`- DB: ${formatBytes(sizes.total)} (WAL ${formatBytes(sizes.wal)})`,
-		`- FTS5: ${checkFTS5Available() ? "available" : "unavailable"}`,
-		`- Vector search: ${isSqliteVecAvailable() ? "available" : "unavailable"}`,
-		`- Storage: SQLite (canonical)`,
-	];
+		const lines = [
+			includeDetails ? "## Memory Dashboard" : "## Memory Status",
+			"",
+			`- Observations: ${obsTotal}`,
+			`- DB: ${formatBytes(sizes.total)} (WAL ${formatBytes(sizes.wal)})`,
+			`- FTS5: ${checkFTS5Available() ? "available" : "unavailable"}`,
+			`- Storage: SQLite (canonical)`,
+		];
 
-	if (includeDetails) {
-		lines.push("", "### Observation Types");
-		for (const [type, count] of Object.entries(obsStats)) lines.push(`- ${type}: ${count}`);
-		lines.push("", "### Top Scenes");
-		if (scenes.length === 0) lines.push("- none");
-		for (const scene of scenes.slice(0, 5)) {
-			lines.push(`- ${scene.name} (${scene.count} obs, score ${scene.score.toFixed(2)})`);
+		if (includeDetails) {
+			lines.push("", "### Observation Types");
+			for (const [type, count] of Object.entries(obsStats)) lines.push(`- ${type}: ${count}`);
+
+			// Observability: signal quality
+			const signal = getMemorySignalQuality();
+			lines.push(
+				"",
+				"### Signal Quality",
+				`- Total retrievals: ${signal.totalRetrievals}`,
+				`- Helpful: ${signal.helpfulCount} · Harmful: ${signal.harmfulCount}`,
+				`- Net signal: ${signal.netSignal >= 0 ? "+" : ""}${signal.netSignal}`,
+				`- Avg retrievals / observation: ${signal.avgRetrievals.toFixed(2)}`,
+			);
+
+			if (signal.topRetrieved.length > 0) {
+				lines.push("", "### Top Retrieved (signal-rich)");
+				for (const row of signal.topRetrieved) {
+					lines.push(
+						`- [#${row.id}] (${row.type}) ${row.title} — ${row.retrieval_count}× retrieved, ${row.helpful_count} helpful / ${row.harmful_count} harmful`,
+					);
+				}
+			}
+
+			if (signal.unusedObservations > 0) {
+				lines.push(
+					"",
+					`### Unused Observations: ${signal.unusedObservations}`,
+					`Never retrieved. Consider running \`/memory-compact\` to clean up.`,
+				);
+			}
 		}
+
+		return textResult(lines.join("\n"));
 	}
 
-	return textResult(lines.join("\n"));
-}
-
-function renderExport(): ToolResult {
-	const observations = getAllObservations().map((o) => ({
-		id: o.id,
-		type: o.type,
-		title: o.title,
-		subtitle: o.subtitle,
-		narrative: o.narrative,
-		facts: parseJsonArray(o.facts),
-		concepts: parseJsonArray(o.concepts),
-		files_read: parseJsonArray(o.files_read),
-		files_modified: parseJsonArray(o.files_modified),
-		confidence: o.confidence,
-		maturity: o.maturity,
-		source: o.source,
-		bead_id: o.bead_id,
-		supersedes: o.supersedes,
-		created_at: o.created_at,
-	}));
-	const scenes = listScenes();
-	const persona = readPersona("default");
-	const archive = {
-		version: 2,
-		exported_at: new Date().toISOString(),
-		summary: { observations: observations.length, scenes: scenes.length, persona: persona !== null },
-		observations,
-		derived: { persona, scenes },
-	};
-	return textResult(JSON.stringify(archive, null, 2), { summary: archive.summary });
-}
+	function renderExport(): ToolResult {
+		const observations = getAllObservations().map((o) => ({
+			id: o.id,
+			type: o.type,
+			title: o.title,
+			subtitle: o.subtitle,
+			narrative: o.narrative,
+			facts: parseJsonArray(o.facts),
+			concepts: parseJsonArray(o.concepts),
+			files_read: parseJsonArray(o.files_read),
+			files_modified: parseJsonArray(o.files_modified),
+			confidence: o.confidence,
+			source: o.source,
+			bead_id: o.bead_id,
+			supersedes: o.supersedes,
+			created_at: o.created_at,
+		}));
+		const archive = {
+			version: 3,
+			exported_at: new Date().toISOString(),
+			summary: { observations: observations.length },
+			observations,
+		};
+		return textResult(JSON.stringify(archive, null, 2), { summary: archive.summary });
+	}
 
 function runImport(importJson: string, conflict: string, dryRun: boolean): ToolResult {
 	if (!importJson.trim()) return textResult("❌ import_json is required.");
@@ -285,7 +306,7 @@ function runImport(importJson: string, conflict: string, dryRun: boolean): ToolR
 					type: normalizeType(item.type),
 					title: typeof item.title === "string" ? item.title : "Imported observation",
 					subtitle: stringOrUndefined(item.subtitle),
-					narrative: stringOrUndefined(item.narrative),
+    				narrative: stringOrUndefined(item.narrative) ?? "",
 					facts: normalizeStringArray(item.facts),
 					concepts: normalizeStringArray(item.concepts),
 					files_read: normalizeStringArray(item.files_read),
@@ -309,21 +330,88 @@ function runImport(importJson: string, conflict: string, dryRun: boolean): ToolR
 		`- Errors: ${errors.length}`,
 	];
 	if (errors.length) lines.push("", ...errors.slice(0, 10).map((e) => `- ${e}`));
-	if (!dryRun) {
-		lines.push("", "Derived memory files were not imported. Run `memory-admin({operation:\"rebuild\", force:true})` to regenerate persona/scenes/index.");
-	}
-	return textResult(lines.join("\n"), { created, skipped, errors });
+		if (!dryRun) {
+			lines.push("", "Memory index not regenerated. Run `memory-admin({operation:\"rebuild\", force:true})` to regenerate the index.");
+		}
+		return textResult(lines.join("\n"), { created, skipped, errors });
 }
 
 
 function parseJsonArray(raw: string | null): string[] {
 	if (!raw) return [];
 	try {
-		const parsed = JSON.parse(raw);
-		return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+		const arr = JSON.parse(raw);
+		return Array.isArray(arr) ? arr : [];
 	} catch {
 		return [];
 	}
+}
+
+interface MemorySignalQuality {
+	totalRetrievals: number;
+	helpfulCount: number;
+	harmfulCount: number;
+	netSignal: number;
+	avgRetrievals: number;
+	topRetrieved: Array<{
+		id: number;
+		type: string;
+		title: string;
+		retrieval_count: number;
+		helpful_count: number;
+		harmful_count: number;
+	}>;
+	unusedObservations: number;
+}
+
+/**
+ * Compute signal-quality metrics for the memory extension.
+ * Returns total retrievals, helpful/harmful counts, and the top-N retrieved
+ * observations. Used by `memory-admin status` to answer Armin's challenge:
+ * "have you evaluated if memory actually helps?"
+ */
+function getMemorySignalQuality(): MemorySignalQuality {
+	const db = getMemoryDB();
+	const totals = db
+		.prepare(
+			`SELECT
+             COALESCE(SUM(retrieval_count), 0) AS total_retrievals,
+             COALESCE(SUM(helpful_count), 0) AS helpful_count,
+             COALESCE(SUM(harmful_count), 0) AS harmful_count,
+             COUNT(*) AS total_rows,
+             SUM(CASE WHEN COALESCE(retrieval_count, 0) = 0 THEN 1 ELSE 0 END) AS unused
+           FROM observations
+           WHERE superseded_by IS NULL`,
+		)
+		.get() as {
+		total_retrievals: number;
+		helpful_count: number;
+		harmful_count: number;
+		total_rows: number;
+		unused: number;
+	};
+
+	const topRetrieved = db
+		.prepare(
+			`SELECT id, type, title, retrieval_count, helpful_count, harmful_count
+           FROM observations
+           WHERE superseded_by IS NULL
+             AND COALESCE(retrieval_count, 0) > 0
+           ORDER BY retrieval_count DESC, helpful_count DESC
+           LIMIT 5`,
+		)
+		.all() as MemorySignalQuality["topRetrieved"];
+
+	const totalRet = totals.total_retrievals;
+	return {
+		totalRetrievals: totalRet,
+		helpfulCount: totals.helpful_count,
+		harmfulCount: totals.harmful_count,
+		netSignal: totals.helpful_count - totals.harmful_count,
+		avgRetrievals: totals.total_rows > 0 ? totalRet / totals.total_rows : 0,
+		topRetrieved,
+		unusedObservations: totals.unused,
+	};
 }
 
 function normalizeStringArray(value: unknown): string[] | undefined {

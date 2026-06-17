@@ -29,8 +29,7 @@ import {
 } from "./storage.js";
 import {
 	getObservationsByIds,
-	markObservationsRetrieved,
-	searchObservationsHybrid,
+	searchObservationsFTS,
 	storeObservation,
 } from "./observations.js";
 import { recordFeedback } from "./scoring.js";
@@ -39,6 +38,75 @@ import {
 	MemoryAdminParameters,
 	type MemoryAdminParams,
 } from "./admin.js";
+
+/**
+ * Backstop for the W25 compaction noise bug: the compaction agent was
+ * creating durable `type="warning"` observations about its own compaction
+ * work (status, meta-comments, "this is a big observation", etc.). That
+ * is not durable memory; the weekly note is the artifact.
+ */
+export function isCompactionSelfWarning(params: {
+	type?: string;
+	title?: string;
+	subtitle?: string;
+	narrative?: string;
+	facts?: string;
+	concepts?: string;
+}): boolean {
+	if (params.type !== "warning") return false;
+	const text = [
+		params.title,
+		params.subtitle,
+		params.narrative,
+		params.facts,
+		params.concepts,
+	]
+		.filter(Boolean)
+		.join("\n")
+		.toLowerCase();
+	const compactionTerms = [
+		"compaction",
+		"memory compact",
+		"memory-compact",
+		"compaction note",
+		"weekly summary",
+		"curated summary",
+	];
+	const selfWorkTerms = [
+		"self",
+		"meta",
+		"status",
+		"progress",
+		"artifact",
+		"note file",
+		"about its own work",
+		"this compaction",
+		"this weekly summary",
+		"this curated summary",
+	];
+	const hasCompactionTerm = compactionTerms.some((term) => text.includes(term));
+	const hasSelfWorkTerm = selfWorkTerms.some((term) => text.includes(term));
+	return (
+		(hasCompactionTerm && hasSelfWorkTerm) ||
+		text.includes("this is a big observation")
+	);
+}
+
+/**
+ * Reject warning titles that are source/template noise (W25): agents and
+ * deleted dream.ts used code lines or `Warning: ${terms...}` as titles.
+ */
+export function isTemplateOrSourceLineWarningTitle(title: string): boolean {
+	const t = title.trim();
+	if (!t) return false;
+	if (/^Warning:\s*\$\{/i.test(t)) return true;
+	if (/notices\.push\s*\(/i.test(t)) return true;
+	if (/title:\s*`Warning:/i.test(t)) return true;
+	if (/storeObservation\s*\(/i.test(t)) return true;
+	if (/\.ts:\d+/.test(t) && /(notices|warning|push|title:)/i.test(t)) return true;
+	if (/^type:\s*["']warning["']/i.test(t)) return true;
+	return false;
+}
 
 const VALID_CONFIDENCES: ConfidenceLevel[] = ["high", "medium", "low"];
 
@@ -109,8 +177,8 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 			_toolCallId: string,
 			params: Record<string, unknown>,
 			_signal: AbortSignal | undefined,
-    _onUpdate: ((partial: any) => void) | undefined,
-			ctx: any,
+			_onUpdate: ((partial: any) => void) | undefined,
+			_ctx: any,
 		) {
 			// --- Feedback mode: observation #id marked helpful/harmful ---
 			if (params.id !== undefined && params.feedback !== undefined) {
@@ -118,15 +186,15 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 				if (!Number.isInteger(obsId)) throw new Error("id must be an integer.");
 				const fb = String(params.feedback);
 				if (fb !== "helpful" && fb !== "harmful") throw new Error('feedback must be "helpful" or "harmful".');
-				const sessionId = ctx?.sessionId ?? ctx?.session_id;
-				const result = recordFeedback(obsId, fb, params.reason as string | undefined, sessionId);
+				const result = recordFeedback(obsId, fb);
 				if (!result.success) throw new Error(result.error ?? "Failed to record feedback.");
-				return textResult([
-					`✅ Observation #${obsId} marked ${fb}.`,
-					`- Score: ${result.effectiveScore.toFixed(2)}`,
-					`- Maturity: ${result.maturity}`,
-					`- Feedback: ${result.helpfulCount} helpful / ${result.harmfulCount} harmful`,
-				].join("\n"), result);
+				return textResult(
+					[
+						`✅ Observation #${obsId} marked ${fb}.`,
+						`- Feedback: ${result.helpfulCount} helpful / ${result.harmfulCount} harmful`,
+					].join("\n"),
+					result,
+				);
 			}
 
 			// --- Create mode: store a new observation ---
@@ -145,12 +213,33 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 			const filesModified = parseCSV((params.files_modified ?? params.files) as string | undefined);
 			const supersedes = params.supersedes ? Number(params.supersedes) : undefined;
 
+			const titleStr = String(params.title);
+			if (isCompactionSelfWarning({
+				type,
+				title: titleStr,
+				subtitle: params.subtitle as string | undefined,
+				narrative,
+				facts: params.facts as string | undefined,
+				concepts: params.concepts as string | undefined,
+			})) {
+				return textResult(
+					"Skipped: compaction self-warnings are not durable observations. Keep compaction status, warnings, and meta-comments in the weekly note/artifact instead.",
+					{ skipped: true, reason: "compaction-self-warning" },
+				);
+			}
+			if (type === "warning" && isTemplateOrSourceLineWarningTitle(titleStr)) {
+				return textResult(
+					"Skipped: warning title looks like source/template noise, not durable memory. Summarize the underlying issue in plain language.",
+					{ skipped: true, reason: "template-warning-title" },
+				);
+			}
+
 			const id = storeObservation({
 				type,
 				title: String(params.title),
 				subtitle: params.subtitle as string | undefined,
 				facts: parseCSV(params.facts as string | undefined),
-				narrative,
+				narrative: narrative ?? "",
 				concepts: parseCSV(params.concepts as string | undefined),
 				files_read: filesRead,
 				files_modified: filesModified,
@@ -198,7 +287,6 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 			const ids = parseIds(params.query);
 			if (ids.length > 0) {
 				const rows = getObservationsByIds(ids).slice(0, limit);
-				markObservationsRetrieved(rows.map((r) => r.id));
 				return textResult(
 					rows.length ? rows.map(formatObservation).join("\n\n---\n\n") : "No observations found for the requested IDs.",
 					{ ids: rows.map((r) => r.id) },
@@ -207,8 +295,7 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 
 			const type = VALID_TYPES.includes(params.type as ObservationType)
 				? (params.type as ObservationType) : undefined;
-			const rows = await searchObservationsHybrid(params.query, { type, limit });
-			markObservationsRetrieved(rows.map((r) => r.id));
+			const rows = searchObservationsFTS(params.query, { type, limit });
 			return textResult(renderSearchResults(rows), { ids: rows.map((r) => r.id) });
 		},
 	});
