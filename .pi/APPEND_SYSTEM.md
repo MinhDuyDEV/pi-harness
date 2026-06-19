@@ -27,7 +27,7 @@
 ## Delegation
 
 - **Do it yourself** when surgical, few tool calls, ambiguity needs judgment, provenance matters.
-- **Use `task`** when work is complex, well-defined, benefits from fresh context, independently verifiable.
+- **Use `task`** when work is complex, well-defined, benefits from fresh context, and matches a registered agent's specialty (research, local exploration, implementation, planning).
 - **Do NOT use `task`** when the task needs back-and-forth, current session state, is trivial (1-2 tool calls), or no matching agent exists.
 - Multiple `task()` calls in one message run in parallel; each gets its own tmux pane and artifact directory.
 - After any delegated or harness run: read changed files directly, review the diff, run verification, confirm scope, report evidence.

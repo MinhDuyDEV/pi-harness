@@ -26,6 +26,7 @@ import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import {
   type AgentConfig,
   type ParsedResult,
+  type ToolCallRecord,
   ALL_TOOL_NAMES,
   TASK_BACKGROUND_DEFAULT,
   TASK_RESULT_XML_INSTRUCTIONS,
@@ -40,6 +41,7 @@ import {
   discoverAgents,
   formatAgentList,
   countToolUses,
+  readRecentToolCalls,
 } from "./helpers.js";
 
 
@@ -61,6 +63,8 @@ interface BackgroundTask {
   startedAt: number;
   toolUses: number;
   turns: number;
+  /** Most recent tool calls (capped), updated every COUNT_POLL_MS. */
+  recentCalls: ToolCallRecord[];
 }
 
 /** Serializable subset for registry persistence. */
@@ -333,6 +337,7 @@ export default function (pi: ExtensionAPI) {
       startedAt: entry.startedAt,
       toolUses: 0,
       turns: 0,
+      recentCalls: [],
     };
     backgroundTasks.set(entry.id, bgtask);
   }
@@ -352,33 +357,137 @@ export default function (pi: ExtensionAPI) {
 
   const countInterval = setInterval(() => {
     for (const task of Array.from(backgroundTasks.values())) {
-      const { toolUses, turns } = countToolUses(join(task.dir, "sessions"));
+      const sessionDir = join(task.dir, "sessions");
+      // Single walk: counts + recent tool-call history with status
+      const { toolUses, turns, recent } = readRecentToolCalls(sessionDir, 12);
       task.toolUses = toolUses;
       task.turns = turns;
+      task.recentCalls = recent;
     }
   }, COUNT_POLL_MS);
 
+  /**
+   * Render a streaming view of one active subagent. Layout per task:
+   *
+   *   ⠋ Scout researching  • 1m 0s  11 toolcalls       (themed: accent + dim)
+   *     ├─ ✓ websearch  Model Context Protocol 2026    (green/success)
+   *     ├─ ✓ codesearch MCP reference server typescript
+   *     ├─ ✗ bash  curl -sL "https://api.github.com..."  (red/error)
+   *     └─ ⠹ read  /Users/.../scout.md                 (yellow/warning, animates)
+   *
+   * The header caret and in-progress tool marks share the same spinner
+   * frame set (rotates every WIDGET_RENDER_MS based on wall-clock time,
+   * so the animation cadence is stable regardless of TUI render rate).
+   */
+  // Theme reference is captured at setWidget time so renderWidget can use it.
+  // We don't import the Theme type because it's not exported; structural typing
+  // via `any` here is safe — the c() helper only calls `theme(color, text)`.
+  let widgetTheme: any = null;
+  // 8-frame Braille spinner. 80ms cadence = 12.5 FPS, which is the human
+  // perception threshold for "smooth motion" (below ~10 FPS the brain
+  // sees discrete steps; above ~12 FPS it reads as continuous rotation).
+  // Full rotation: 8 × 80ms = 640ms. Used for both per-tool in-progress
+  // marks AND the header caret (the "agent is active" indicator).
+  const WIDGET_SPINNER_FRAMES = [
+    "\u280B", "\u2819", "\u2838", "\u2834",
+    "\u2826", "\u2827", "\u2807", "\u280F",
+  ];
+  const WIDGET_CARET_FRAMES = WIDGET_SPINNER_FRAMES;
+  const WIDGET_RENDER_MS = 80;
+  const WIDGET_MAX_TOOL_LINES = 12;
+  const WIDGET_MAX_WIDTH = 120;
+  const TREE_MIDDLE = "\u251C\u2500"; // ├─
+  const TREE_LAST = "\u2514\u2500";   // └─
+
+  function c(color: string, text: string): string {
+    // widgetTheme is a Theme object with a .fg(color, text) method,
+    // not a callable. Calling it as a function throws "widgetTheme is not
+    // a function" which the outer try/catch in renderWidget swallows.
+    return widgetTheme ? widgetTheme.fg(color, text) : text;
+  }
+
   function renderWidget(width: number): string[] {
+    // Defensive: never let a render exception kill the TUI. If anything
+    // throws (theme lookup miss, malformed session JSONL, etc.), fall
+    // back to a minimal single-line summary so the TUI stays alive.
+    try {
+      return renderWidgetInner(width);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const active = Array.from(backgroundTasks.entries());
+      if (active.length === 0) return [];
+      const [, task] = active[0];
+      return [
+        truncateToWidth(
+          `${task.agentType} researching  \u2022 ${formatMs(Date.now() - task.startedAt)}  (render error: ${msg})`,
+          Math.min(width, WIDGET_MAX_WIDTH),
+        ),
+      ];
+    }
+  }
+
+  function renderWidgetInner(width: number): string[] {
     const active = Array.from(backgroundTasks.entries());
     if (active.length === 0) return [];
     const now = Date.now();
+    const maxWidth = Math.min(width, WIDGET_MAX_WIDTH);
+    const tick = Math.floor(now / WIDGET_RENDER_MS);
+    const spinner = WIDGET_SPINNER_FRAMES[tick % WIDGET_SPINNER_FRAMES.length];
+    const caret = WIDGET_CARET_FRAMES[tick % WIDGET_CARET_FRAMES.length];
     const lines: string[] = [];
+
     for (const [, task] of active) {
       const agentName =
         task.agentType.charAt(0).toUpperCase() + task.agentType.slice(1);
       const elapsed = formatMs(now - task.startedAt);
-      const tc =
-        task.toolUses > 0
-          ? `  ${task.turns || task.toolUses} toolcalls • ${elapsed}`
-          : `  ${elapsed}`;
-      lines.push(
-        truncateToWidth(
-          `${agentName}${task.description ? ` - ${task.description}` : ""}${tc}`,
-          120,
-        ),
-      );
+      const total =
+        task.toolUses > 0 ? `  ${task.turns || task.toolUses} toolcalls` : "";
+
+      // Header: ▼ <Agent> researching  • 1m 0s  11 toolcalls
+      const header =
+        c("accent", caret) +
+        " " +
+        c("toolTitle", agentName) +
+        " " +
+        c("dim", `researching  \u2022 ${elapsed}${total}`);
+      lines.push(truncateToWidth(header, maxWidth));
+
+      const recent = task.recentCalls ?? [];
+      if (recent.length === 0) {
+        // Pre-startup phase: spinner with trailing dots
+        const line =
+          "  " + c("warning", spinner) + c("dim", " \u2026");
+        lines.push(truncateToWidth(line, maxWidth));
+      } else {
+        const slice = recent.slice(-WIDGET_MAX_TOOL_LINES);
+        slice.forEach((tc, idx) => {
+          const isLast = idx === slice.length - 1;
+          const connector = isLast ? TREE_LAST : TREE_MIDDLE;
+          const isInProgress = tc.status === "in_progress";
+          const markChar = isInProgress
+            ? spinner
+            : tc.status === "error"
+              ? "\u2717"
+              : "\u2713";
+          const markColor = isInProgress
+            ? "warning"
+            : tc.status === "error"
+              ? "error"
+              : "success";
+          const detailStr = tc.detail ? `  ${tc.detail}` : "";
+          const line =
+            "  " +
+            c("dim", connector) +
+            " " +
+            c(markColor, markChar) +
+            " " +
+            c("text", tc.name) +
+            c("dim", detailStr);
+          lines.push(truncateToWidth(line, maxWidth));
+        });
+      }
+      lines.push("");
     }
-    lines.push("");
     return lines;
   }
 
@@ -617,6 +726,7 @@ export default function (pi: ExtensionAPI) {
             startedAt: entry.startedAt,
             toolUses: 0,
             turns: 0,
+            recentCalls: [],
           };
           backgroundTasks.set(id, bgtask);
 
@@ -781,6 +891,7 @@ export default function (pi: ExtensionAPI) {
         startedAt: Date.now(),
         toolUses: 0,
         turns: 0,
+        recentCalls: [],
       };
       backgroundTasks.set(id, bgtask);
 
@@ -827,12 +938,18 @@ export default function (pi: ExtensionAPI) {
       // ── Sticky widget ──────────────────────────────────────────────────
       if (!widgetCtx) {
         widgetCtx = ctx;
-        widgetCtx.ui.setWidget("task", (tui, _theme) => {
-          widgetTimer = setInterval(() => tui.requestRender(), 1_000);
+        widgetCtx.ui.setWidget("task", (tui, theme) => {
+          widgetTheme = theme ?? null;
+          widgetTimer = setInterval(() => tui.requestRender(), WIDGET_RENDER_MS);
+          // Don't keep the process alive just for the widget refresh.
+          widgetTimer.unref?.();
           return {
             render: (width: number) => renderWidget(width),
             invalidate: () => {},
-            dispose: () => stopWidget(),
+            dispose: () => {
+              widgetTheme = null;
+              stopWidget();
+            },
           };
         });
       }

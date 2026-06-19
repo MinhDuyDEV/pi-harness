@@ -53,6 +53,7 @@ pnpm-debug.log*
 .pi/extensions/*.bak
 .pi/.openpi-goal.json
 .pi/.openpi-plan.json
+.pi/.openpi-workspace-trust.json
 .pi/trust.json
 
 # Pi skill source manifests are committed; runtime lock/caches are local.

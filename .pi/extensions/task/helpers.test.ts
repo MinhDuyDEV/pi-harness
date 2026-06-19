@@ -20,6 +20,8 @@ import {
   TASK_RESULT_XML_INSTRUCTIONS,
   TASK_TOOL_DESCRIPTION,
   countToolUses,
+  readRecentToolCalls,
+  summarizeArgs,
   findPiDir,
   loadAgentsFromDir,
   discoverAgents,
@@ -248,6 +250,321 @@ import {
     const r = countToolUses(dir);
     assert.equal(r.toolUses, 3, t + " toolUses");
     assert.equal(r.turns, 2, t + " turns");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+// ─── summarizeArgs ──────────────────────────────────────────────────────────
+
+{
+  const t = "summarizeArgs returns path for read/write/edit";
+  assert.equal(summarizeArgs("read", { path: "/tmp/foo.ts" }), "/tmp/foo.ts", t);
+  assert.equal(summarizeArgs("write", { file_path: "/x.ts" }), "/x.ts", t + " file_path");
+  assert.equal(summarizeArgs("edit", { path: "/a/b/c" }), "/a/b/c", t);
+}
+
+{
+  const t = "summarizeArgs returns command for bash";
+  assert.equal(
+    summarizeArgs("bash", { command: "npm test" }),
+    "npm test",
+    t,
+  );
+  assert.equal(summarizeArgs("bash", { cmd: "ls -la" }), "ls -la", t + " cmd");
+}
+
+{
+  const t = "summarizeArgs returns query for search tools";
+  assert.equal(
+    summarizeArgs("websearch", { query: "MCP spec 2026" }),
+    "MCP spec 2026",
+    t,
+  );
+  assert.equal(
+    summarizeArgs("codesearch", { query: "MCP" }),
+    "MCP",
+    t + " codesearch",
+  );
+  assert.equal(
+    summarizeArgs("srcwalk_search", { query: "foo" }),
+    "foo",
+    t + " srcwalk",
+  );
+}
+
+{
+  const t = "summarizeArgs returns url for fetch tools";
+  assert.equal(
+    summarizeArgs("web_fetch", { url: "https://example.com" }),
+    "https://example.com",
+    t,
+  );
+  assert.equal(
+    summarizeArgs("webclaw_scrape", { url: "https://x.com" }),
+    "https://x.com",
+    t + " webclaw",
+  );
+}
+
+{
+  const t = "summarizeArgs returns count for batch tools";
+  assert.equal(
+    summarizeArgs("webclaw_batch", { urls: ["a", "b", "c"] }),
+    "3 urls",
+    t,
+  );
+}
+
+{
+  const t = "summarizeArgs falls back to first string for unknown tool";
+  assert.equal(
+    summarizeArgs("custom_tool", { foo: "bar", n: 42 }),
+    "bar",
+    t,
+  );
+}
+
+{
+  const t = "summarizeArgs returns empty for non-object args";
+  assert.equal(summarizeArgs("read", null), "", t);
+  assert.equal(summarizeArgs("read", undefined), "", t + " undefined");
+  assert.equal(summarizeArgs("read", "string"), "", t + " string");
+}
+
+{
+  const t = "summarizeArgs returns empty when no string args present";
+  assert.equal(summarizeArgs("read", { n: 1, b: true }), "", t);
+}
+
+// ─── readRecentToolCalls ─────────────────────────────────────────────────────
+
+{
+  const t = "readRecentToolCalls returns zeros and empty for nonexistent dir";
+  const r = readRecentToolCalls("/nonexistent/path");
+  assert.equal(r.toolUses, 0, t + " toolUses");
+  assert.equal(r.turns, 0, t + " turns");
+  assert.deepEqual(r.recent, [], t + " recent");
+}
+
+{
+  const t = "readRecentToolCalls marks calls without toolResult as in_progress";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-"));
+  try {
+    const jsonl = [
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c1", name: "websearch", arguments: { query: "MCP" } },
+          ],
+        },
+      }),
+    ].join("\n");
+    writeFileSync(join(dir, "session.jsonl"), jsonl);
+
+    const r = readRecentToolCalls(dir);
+    assert.equal(r.toolUses, 1, t + " toolUses");
+    assert.equal(r.turns, 1, t + " turns");
+    assert.equal(r.recent.length, 1, t + " recent length");
+    assert.equal(r.recent[0].name, "websearch", t + " name");
+    assert.equal(r.recent[0].detail, "MCP", t + " detail");
+    assert.equal(r.recent[0].status, "in_progress", t + " status");
+    assert.equal(r.recent[0].id, "c1", t + " id");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const t = "readRecentToolCalls matches toolResult and marks done";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-done-"));
+  try {
+    const jsonl = [
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/foo.ts" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: { role: "toolResult", toolCallId: "c1", isError: false },
+      }),
+    ].join("\n");
+    writeFileSync(join(dir, "session.jsonl"), jsonl);
+
+    const r = readRecentToolCalls(dir);
+    assert.equal(r.recent.length, 1, t + " recent length");
+    assert.equal(r.recent[0].status, "done", t + " status");
+    assert.equal(r.recent[0].detail, "/foo.ts", t + " detail");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const t = "readRecentToolCalls marks isError results as error";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-err-"));
+  try {
+    const jsonl = [
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c1", name: "bash", arguments: { command: "false" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: { role: "toolResult", toolCallId: "c1", isError: true },
+      }),
+    ].join("\n");
+    writeFileSync(join(dir, "session.jsonl"), jsonl);
+
+    const r = readRecentToolCalls(dir);
+    assert.equal(r.recent[0].status, "error", t + " status");
+    assert.equal(r.recent[0].detail, "false", t + " detail");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const t = "readRecentToolCalls respects limit and returns most recent calls";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-limit-"));
+  try {
+    const blocks: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      blocks.push(
+        JSON.stringify({
+          type: "message",
+          message: {
+            role: "assistant",
+            content: [
+              { type: "toolCall", id: `c${i}`, name: "bash", arguments: { command: `echo ${i}` } },
+            ],
+          },
+        }),
+      );
+      blocks.push(
+        JSON.stringify({
+          type: "message",
+          message: { role: "toolResult", toolCallId: `c${i}`, isError: false },
+        }),
+      );
+    }
+    writeFileSync(join(dir, "session.jsonl"), blocks.join("\n"));
+
+    const r = readRecentToolCalls(dir, 5);
+    assert.equal(r.toolUses, 20, t + " total toolUses");
+    assert.equal(r.recent.length, 5, t + " recent length");
+    // Last 5 should be c15..c19
+    assert.equal(r.recent[0].detail, "echo 15", t + " first recent");
+    assert.equal(r.recent[4].detail, "echo 19", t + " last recent");
+    assert.equal(r.recent[0].status, "done", t + " status");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const t = "readRecentToolCalls walks multiple JSONL files";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-multi-"));
+  try {
+    writeFileSync(
+      join(dir, "a.jsonl"),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/a" } },
+          ],
+        },
+      }),
+    );
+    writeFileSync(
+      join(dir, "b.jsonl"),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c2", name: "read", arguments: { path: "/b" } },
+          ],
+        },
+      }) + "\n" + JSON.stringify({
+        type: "message",
+        message: { role: "toolResult", toolCallId: "c2", isError: false },
+      }),
+    );
+
+    const r = readRecentToolCalls(dir);
+    assert.equal(r.toolUses, 2, t + " total toolUses");
+    assert.equal(r.recent.length, 2, t + " recent length");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const t = "readRecentToolCalls skips toolCalls without id";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-noid-"));
+  try {
+    const jsonl = [
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall" }, // no id
+            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/x" } },
+          ],
+        },
+      }),
+    ].join("\n");
+    writeFileSync(join(dir, "session.jsonl"), jsonl);
+
+    const r = readRecentToolCalls(dir);
+    // toolUses counts both (per existing countToolUses contract), but recent only includes id'd ones
+    assert.equal(r.toolUses, 2, t + " toolUses counts both");
+    assert.equal(r.recent.length, 1, t + " recent only id'd");
+    assert.equal(r.recent[0].id, "c1", t + " id");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const t = "readRecentToolCalls tolerates malformed lines";
+  const dir = mkdtempSync(join(tmpdir(), "task-test-recent-bad-"));
+  try {
+    const jsonl = [
+      "not json",
+      "",
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/x" } },
+          ],
+        },
+      }),
+      "{this is also broken",
+    ].join("\n");
+    writeFileSync(join(dir, "session.jsonl"), jsonl);
+
+    const r = readRecentToolCalls(dir);
+    assert.equal(r.toolUses, 1, t + " toolUses");
+    assert.equal(r.recent.length, 1, t + " recent");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

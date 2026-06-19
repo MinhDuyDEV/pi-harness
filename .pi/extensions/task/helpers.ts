@@ -32,6 +32,18 @@ export interface ParsedResult {
   raw: string;
 }
 
+/** A single tool call extracted from a subagent session JSONL. */
+export interface ToolCallRecord {
+  /** Tool name (e.g. "websearch", "read", "bash") */
+  name: string;
+  /** Short, human-readable summary of the call's primary argument */
+  detail: string;
+  /** "done" if a matching toolResult was seen, "error" if isError, "in_progress" otherwise */
+  status: "done" | "error" | "in_progress";
+  /** Entry id of the toolCall block (used for stable sorting/debug) */
+  id: string;
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const TASK_BACKGROUND_DEFAULT = true;
@@ -333,4 +345,168 @@ export function countToolUses(sessionDir: string): {
   }
 
   return { toolUses, turns };
+}
+
+// ─── JSONL Session Helpers — streaming ───────────────────────────────────────
+
+/**
+ * Extract a short, human-readable summary of a tool call's primary argument.
+ * Falls back to the first string-valued property for unknown tools.
+ */
+export function summarizeArgs(
+  toolName: string,
+  args: unknown,
+): string {
+  if (!args || typeof args !== "object") return "";
+  const a = args as Record<string, unknown>;
+  const pick = (...keys: string[]): string => {
+    for (const k of keys) {
+      const v = a[k];
+      if (typeof v === "string" && v.length > 0) return v;
+    }
+    return "";
+  };
+  switch (toolName) {
+    case "read":
+    case "write":
+    case "edit":
+    case "ls":
+      return pick("path", "file_path");
+    case "bash":
+      return pick("command", "cmd");
+    case "grep":
+    case "codesearch":
+    case "websearch":
+    case "srcwalk_search":
+    case "srcwalk_files":
+    case "srcwalk_callers":
+    case "srcwalk_callees":
+      return pick("query", "pattern", "search_term", "glob");
+    case "web_fetch":
+    case "webclaw_scrape":
+    case "lightpanda_markdown":
+    case "lightpanda_links":
+    case "lightpanda_structuredData":
+      return pick("url");
+    case "webclaw_batch":
+      return Array.isArray(a.urls) ? `${a.urls.length} urls` : pick("urls");
+    case "context7":
+      return pick("libraryId", "topic", "libraryName");
+    case "deepwiki":
+      return pick("question", "repo");
+    case "find":
+      return pick("pattern", "glob");
+    default: {
+      // Fallback: first non-empty string property
+      for (const v of Object.values(a)) {
+        if (typeof v === "string" && v.length > 0) return v;
+      }
+      return "";
+    }
+  }
+}
+
+/**
+ * Read the most recent tool calls from a pi JSONL session directory,
+ * with each call's status (done / error / in_progress) determined by
+ * whether a matching toolResult has been written.
+ *
+ * Returns total counts plus the last `limit` records in chronological order.
+ * Safe against malformed lines and missing fields.
+ */
+export function readRecentToolCalls(
+  sessionDir: string,
+  limit = 12,
+): {
+  toolUses: number;
+  turns: number;
+  recent: ToolCallRecord[];
+} {
+  let toolUses = 0;
+  let turns = 0;
+  const calls: Array<{
+    name: string;
+    detail: string;
+    id: string;
+    ts: number;
+  }> = [];
+  const resultsById = new Map<string, { isError: boolean; ts: number }>();
+
+  try {
+    if (!existsSync(sessionDir)) return { toolUses, turns, recent: [] };
+
+    const files = readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl"));
+    for (const file of files) {
+      const content = readFileSync(join(sessionDir, file), "utf-8");
+      for (const rawLine of content.split("\n")) {
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        let entry: any;
+        try {
+          entry = JSON.parse(line);
+        } catch {
+          continue;
+        }
+
+        const msg = entry?.message;
+        if (!msg || typeof msg !== "object") continue;
+
+        // Collect tool results first so we can match them to tool calls
+        if (msg.role === "toolResult") {
+          const ts =
+            typeof msg.timestamp === "number"
+              ? msg.timestamp
+              : Date.parse(entry?.timestamp ?? "") || 0;
+          if (typeof msg.toolCallId === "string") {
+            resultsById.set(msg.toolCallId, {
+              isError: Boolean(msg.isError),
+              ts,
+            });
+          }
+          continue;
+        }
+
+        if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+
+        turns++;
+        for (const block of msg.content) {
+          if (!block || block.type !== "toolCall") continue;
+          toolUses++;
+          const id = typeof block.id === "string" ? block.id : "";
+          if (!id) continue; // can't match results without an id
+          calls.push({
+            name: typeof block.name === "string" ? block.name : "tool",
+            detail: summarizeArgs(
+              typeof block.name === "string" ? block.name : "",
+              block.arguments,
+            ),
+            id,
+            ts:
+              typeof msg.timestamp === "number"
+                ? msg.timestamp
+                : Date.parse(entry?.timestamp ?? "") || 0,
+          });
+        }
+      }
+    }
+  } catch {
+    return { toolUses, turns, recent: [] };
+  }
+
+  // Determine status for each call, then take the last `limit` in order
+  const ordered = calls.slice().sort((a, b) => a.ts - b.ts);
+  const all: ToolCallRecord[] = ordered.map((c) => {
+    const r = resultsById.get(c.id);
+    if (!r) return { name: c.name, detail: c.detail, id: c.id, status: "in_progress" };
+    return {
+      name: c.name,
+      detail: c.detail,
+      id: c.id,
+      status: r.isError ? "error" : "done",
+    };
+  });
+
+  const recent = all.slice(Math.max(0, all.length - limit));
+  return { toolUses, turns, recent };
 }
