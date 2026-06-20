@@ -1,6 +1,6 @@
 {
-  "defaultProvider": "xai-auth",
-  "defaultModel": "grok-composer-2.5-fast",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.5",
   "defaultThinkingLevel": "high",
   "editorPaddingX": 0,
   "images": {
@@ -11,6 +11,7 @@
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
+    "npm:@heyhuynhgiabuu/pi-task",
     "npm:@sting8k/pi-vcc",
     "npm:pi-xai-oauth"
   ],
@@ -33,18 +34,12 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [
-    ".pi/skills/"
-  ],
-  "prompts": [
-    ".pi/prompts/"
-  ],
-  "extensions": [
-    ".pi/extensions/"
-  ],
-  "lastChangelogVersion": "0.79.6",
+  "skills": [".pi/skills/"],
+  "prompts": [".pi/prompts/"],
+  "extensions": [".pi/extensions/"],
+  "lastChangelogVersion": "0.79.8",
   "treeFilterMode": "default",
-  "transport": "sse",
+  "transport": "auto",
   "hideThinkingBlock": false,
   "terminal": {
     "showTerminalProgress": false,

@@ -36,7 +36,7 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
 - `bash` — Execute bash commands (exploration, build, test)
 - `edit` — Precise find/replace edits on existing files
 - `write` — Create or overwrite files (auto-creates parent dirs)
-- `grep` / `mgrep` / `find` / `ls` — Simple text and file search; for shell search use `rg` (ripgrep), not recursive `grep`
+- `grep` / `mgrep` / `find` / `ls` — Simple text and file search
 - `diagnostics` — Type/lint/quality checks (TS/JS, Rust, Go, Python)
 - `harness` — Multi-agent build pipeline (planner → worker → reviewer)
 - `task` — Delegate to specialist sub-agents
@@ -47,7 +47,7 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
     - `/memory-compact [sinceDays]` — Per-project compaction of observations. Agent reads the raw payload, decides what to keep, replaces it with a curated summary.
 - `vcc_recall` / `compress` — Session history
 
-Use the dedicated `grep`/`mgrep`/`find`/`ls` tools for simple text search and file ops. If shell search is needed, prefer `rg` (ripgrep) over recursive `grep`.
+Use dedicated `grep`/`mgrep`/`find`/`ls` tools for simple text search and file ops. When shell search is needed, prefer ripgrep: `rg -n` for regex, `rg -nF` for literal strings, scoped by path/glob when possible. Avoid recursive `grep`; use `rg -u`/`rg -uu` only when intentionally searching ignored/hidden files.
 
 ## Output Style
 
