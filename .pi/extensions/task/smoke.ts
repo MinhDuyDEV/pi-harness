@@ -51,7 +51,10 @@ try {
   assert.equal(explore.description, "Read-only explorer", "agent description");
   assert.ok(explore.disallowedTools?.includes("edit"), "disallowed edit");
   assert.ok(explore.disallowedTools?.includes("write"), "disallowed write");
-  assert.ok(explore.disallowedTools?.includes("xai_web_search"), "disallowed xai side tools");
+  assert.ok(
+    explore.disallowedTools?.includes("xai_web_search"),
+    "disallowed xai side tools",
+  );
   assert.equal(explore.source, "project", "source is project");
   console.log("  PASS: agent discovery");
 
@@ -62,23 +65,43 @@ try {
   const args = buildPiArgs(explore, "task-test123", sessionDir, "Do the thing");
   assert.ok(args.includes("--name"), "buildPiArgs includes --name");
   assert.ok(args.includes("task-test123"), "buildPiArgs includes session name");
-  assert.ok(args.includes("--session-dir"), "buildPiArgs includes --session-dir");
+  assert.ok(
+    args.includes("--session-dir"),
+    "buildPiArgs includes --session-dir",
+  );
   assert.ok(args.includes(sessionDir), "buildPiArgs includes session dir");
   assert.ok(!args.includes("--session"), "no --session for fresh task");
-  assert.ok(args.includes("--append-system-prompt"), "buildPiArgs includes --append-system-prompt");
+  assert.ok(
+    args.includes("--append-system-prompt"),
+    "buildPiArgs includes --append-system-prompt",
+  );
   console.log("  PASS: buildPiArgs fresh");
 
   // Test buildPiArgs (resume task — includes --session)
-  const resumeArgs = buildPiArgs(explore, "task-test123", sessionDir, "Do more", true);
+  const resumeArgs = buildPiArgs(
+    explore,
+    "task-test123",
+    sessionDir,
+    "Do more",
+    true,
+  );
   assert.ok(resumeArgs.includes("--session"), "--session included for resume");
-  assert.ok(resumeArgs.includes("task-test123"), "--session value is session name");
+  assert.ok(
+    resumeArgs.includes("task-test123"),
+    "--session value is session name",
+  );
   console.log("  PASS: buildPiArgs resume");
 
   // Test disallowed_tools filtering
   const allowedIdx = args.indexOf("--tools");
   assert.ok(allowedIdx >= 0, "--tools flag present when disallowed_tools set");
   const allowedTools = args[allowedIdx + 1];
-  assert.equal(allowedTools, "read,bash,grep,find,ls", "allowed tools excludes edit and write");
+  const toolSet = new Set(allowedTools.split(","));
+  assert.ok(toolSet.has("read"), "allowed tools includes read");
+  assert.ok(toolSet.has("bash"), "allowed tools includes bash");
+  assert.ok(!toolSet.has("edit"), "allowed tools excludes edit");
+  assert.ok(!toolSet.has("write"), "allowed tools excludes write");
+  assert.ok(!toolSet.has("task"), "allowed tools excludes recursive task");
   console.log("  PASS: --tools flag correctly filters disallowed_tools");
 
   // Test registry read/write — test the JSON file format directly using fs
@@ -181,7 +204,10 @@ try {
 
   // Run pi inline to verify spawnPiInline-like execution works
   // (simulates the foreground path without tmux)
-  const env = { ...process.env, PI_TASK_TOOL_DISABLED: "1" } as Record<string, string>;
+  const env = { ...process.env, PI_TASK_TOOL_DISABLED: "1" } as Record<
+    string,
+    string
+  >;
   const piVersionOut = execFileSync("pi", ["--version"], {
     env,
     encoding: "utf-8",
@@ -206,11 +232,29 @@ const { formatAgentList, parseResultXml } = await import("./helpers.js");
 
 // Agent list
 const formatted = formatAgentList([
-  { name: "alpha", description: "First agent", body: "", source: "project", path: "/a" },
-  { name: "beta", description: "Second agent", body: "", source: "user", path: "/b" },
+  {
+    name: "alpha",
+    description: "First agent",
+    body: "",
+    source: "project",
+    path: "/a",
+  },
+  {
+    name: "beta",
+    description: "Second agent",
+    body: "",
+    source: "user",
+    path: "/b",
+  },
 ]);
-assert.ok(formatted.includes("alpha (project): First agent"), "formatAgentList alpha");
-assert.ok(formatted.includes("beta (user): Second agent"), "formatAgentList beta");
+assert.ok(
+  formatted.includes("alpha (project): First agent"),
+  "formatAgentList alpha",
+);
+assert.ok(
+  formatted.includes("beta (user): Second agent"),
+  "formatAgentList beta",
+);
 console.log("  PASS: agent list formatting");
 
 // Result parsing

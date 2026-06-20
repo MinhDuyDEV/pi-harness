@@ -15,19 +15,19 @@
  *     detection, 30-minute timeout.
  */
 
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { Type } from "@sinclair/typebox";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import {
-  type AgentConfig,
-  type ParsedResult,
   type ToolCallRecord,
-  ALL_TOOL_NAMES,
   TASK_BACKGROUND_DEFAULT,
   TASK_RESULT_XML_INSTRUCTIONS,
   TASK_TOOL_DESCRIPTION,
@@ -36,19 +36,23 @@ import {
   buildPiArgs,
   parseResultXml,
   formatMs,
-  parseIdTimestamp,
   shellQuote,
   discoverAgents,
   formatAgentList,
   countToolUses,
   readRecentToolCalls,
 } from "./helpers.js";
-
+import { runSdkSubagent } from "../subagent/runSdk.js";
+import {
+  checkTaskCompletion,
+  waitForTaskCompletion as waitForSessionTaskCompletion,
+} from "../subagent/waitCompletion.js";
+import { buildAgentToolSelection } from "../lib/agent-tools.js";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const BACKGROUND_CHECK_MS = 10_000; // poll every 10 sec
-const COUNT_POLL_MS = 3_000;       // update toolcall counts every 3 sec
+const COUNT_POLL_MS = 3_000; // update toolcall counts every 3 sec
 const TASK_TIMEOUT_MS = 30 * 60 * 1_000; // 30 minutes
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,7 +61,7 @@ interface BackgroundTask {
   dir: string;
   agentType: string;
   sessionName: string;
-  paneId: string;
+  paneId?: string;
   originalPane: string | null;
   description: string;
   startedAt: number;
@@ -74,7 +78,7 @@ interface RegistryEntry {
   description: string;
   sessionName: string;
   startedAt: number;
-  paneId: string;
+  paneId?: string;
   piDir: string;
   dir: string;
 }
@@ -171,73 +175,23 @@ function splitWindowPane(
   return { paneId, originalPane };
 }
 
-function killAgentPane(paneId: string, originalPane: string | null): void {
-  try {
-    if (paneExists(paneId)) tmuxCmd(["kill-pane", "-t", paneId]);
-  } catch {
-    /* ignore */
-  }
-  try {
-    if (originalPane && paneExists(originalPane))
-      tmuxCmd(["select-pane", "-t", originalPane]);
-  } catch {
-    /* ignore */
-  }
-}
-
-// ─── Foreground polling (waits inline for RESULT.md) ───────────────────────
-
-const FOREGROUND_POLL_MS = 2_000;   // poll every 2 sec
-const FOREGROUND_TIMEOUT_MS = 10 * 60 * 1_000; // 10 min max for foreground
-
-async function waitForResult(
-  resultPath: string,
-  paneId: string,
+function killAgentPane(
+  paneId: string | undefined,
   originalPane: string | null,
-  signal: AbortSignal | undefined,
-  startedAt: number,
-): Promise<{ content: string; phase: "done" | "timeout" | "failed" }> {
-  while (true) {
-    // Check abort
-    if (signal?.aborted) {
-      killAgentPane(paneId, originalPane);
-      return { content: "Task aborted by caller.", phase: "failed" as const };
-    }
-
-    // Check timeout
-    if (Date.now() - startedAt > FOREGROUND_TIMEOUT_MS) {
-      killAgentPane(paneId, originalPane);
-      return { content: "Task timed out after 10 minutes.", phase: "timeout" as const };
-    }
-
-    // Check pane liveness
-    if (!paneExists(paneId)) {
-      killAgentPane(paneId, originalPane);
-      // Pane died — check if RESULT.md was written before death
-      try {
-        const c = await readFile(resultPath, "utf-8");
-        if (c.trim()) return { content: c, phase: "done" as const };
-      } catch {
-        /* file missing */
-      }
-      return {
-        content: "Agent pane terminated without producing a result.",
-        phase: "failed" as const,
-      };
-    }
-
-    // Check RESULT.md
+): void {
+  if (paneId) {
     try {
-      const c = await readFile(resultPath, "utf-8");
-      if (c.trim()) {
-        killAgentPane(paneId, originalPane);
-        return { content: c, phase: "done" as const };
-      }
+      if (paneExists(paneId)) tmuxCmd(["kill-pane", "-t", paneId]);
     } catch {
-      /* not ready yet */
+      /* ignore */
     }
-
-    await new Promise((r) => setTimeout(r, FOREGROUND_POLL_MS));
+  }
+  if (originalPane) {
+    try {
+      tmuxCmd(["select-pane", "-t", originalPane]);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -256,43 +210,33 @@ function completeTask(
 
   const parsed = parseResultXml(content);
   const durationMs = Date.now() - task.startedAt;
-  const { toolUses, turns } = task;
-
-  const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
-  const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
-  const statsStr = [useStr, durStr].filter(Boolean).join(" • ");
 
   // Send completion notification
-  pi.sendMessage({
-    customType: "task-complete",
-    content: [
-      `${task.agentType} - ${task.description}`,
-      statsStr ? `${statsStr}` : "",
-      "",
-      phase === "done"
-        ? parsed.summary || content.slice(0, 300)
-        : `[${phase}] ${content.slice(0, 300)}`,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    display: true,
-    details: {
-      task_id: id,
-      agent_type: task.agentType,
-      description: task.description,
-      tmux_session: task.sessionName,
-      phase,
-      status: phase === "done" ? parsed.status : phase,
-      summary: parsed.summary || "",
-      findings: parsed.findings || "",
-      evidence: parsed.evidence || "",
-      confidence: parsed.confidence || "",
-      result: content,
-      duration_ms: durationMs,
-      tool_uses: toolUses,
-      turn_count: turns,
+  pi.sendMessage(
+    {
+      customType: "task-complete",
+      content: `Background task ${id} (${task.agentType}) ${phase}.\n\nResult:\n${content}`,
+      display: true,
+      details: {
+        task_id: id,
+        agent_type: task.agentType,
+        description: task.description,
+        phase,
+        status: phase,
+        result: content,
+        summary: parsed.summary,
+        findings: parsed.findings,
+        confidence: parsed.confidence,
+        duration_ms: durationMs,
+        tool_uses: task.toolUses,
+        turn_count: task.turns,
+      },
     },
-  });
+    {
+      triggerTurn: true,
+      deliverAs: "followUp",
+    },
+  );
 
   // Remove from registry
   const entries = readRegistry(piDir).filter((e) => e.id !== id);
@@ -307,6 +251,7 @@ export default function (pi: ExtensionAPI) {
 
   // ── Background task tracker ────────────────────────────────────────────
   const backgroundTasks = new Map<string, BackgroundTask>();
+  const foregroundTasks = new Map<string, BackgroundTask>();
   let widgetCtx: ExtensionContext | null = null;
 
   // ── Restore active tasks from registry on load ──────────────────────────
@@ -342,7 +287,10 @@ export default function (pi: ExtensionAPI) {
     backgroundTasks.set(entry.id, bgtask);
   }
   if (staleIds.length) {
-    writeRegistry(piDir, registry.filter((e) => !staleIds.includes(e.id)));
+    writeRegistry(
+      piDir,
+      registry.filter((e) => !staleIds.includes(e.id)),
+    );
   }
 
   // ── Widget / timer setup ───────────────────────────────────────────────
@@ -356,7 +304,10 @@ export default function (pi: ExtensionAPI) {
   }
 
   const countInterval = setInterval(() => {
-    for (const task of Array.from(backgroundTasks.values())) {
+    for (const task of [
+      ...foregroundTasks.values(),
+      ...backgroundTasks.values(),
+    ]) {
       const sessionDir = join(task.dir, "sessions");
       // Single walk: counts + recent tool-call history with status
       const { toolUses, turns, recent } = readRecentToolCalls(sessionDir, 12);
@@ -389,15 +340,21 @@ export default function (pi: ExtensionAPI) {
   // Full rotation: 8 × 80ms = 640ms. Used for both per-tool in-progress
   // marks AND the header caret (the "agent is active" indicator).
   const WIDGET_SPINNER_FRAMES = [
-    "\u280B", "\u2819", "\u2838", "\u2834",
-    "\u2826", "\u2827", "\u2807", "\u280F",
+    "\u280B",
+    "\u2819",
+    "\u2838",
+    "\u2834",
+    "\u2826",
+    "\u2827",
+    "\u2807",
+    "\u280F",
   ];
   const WIDGET_CARET_FRAMES = WIDGET_SPINNER_FRAMES;
   const WIDGET_RENDER_MS = 80;
   const WIDGET_MAX_TOOL_LINES = 12;
   const WIDGET_MAX_WIDTH = 120;
   const TREE_MIDDLE = "\u251C\u2500"; // ├─
-  const TREE_LAST = "\u2514\u2500";   // └─
+  const TREE_LAST = "\u2514\u2500"; // └─
 
   function c(color: string, text: string): string {
     // widgetTheme is a Theme object with a .fg(color, text) method,
@@ -414,7 +371,10 @@ export default function (pi: ExtensionAPI) {
       return renderWidgetInner(width);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      const active = Array.from(backgroundTasks.entries());
+      const active = [
+        ...Array.from(foregroundTasks.entries()),
+        ...Array.from(backgroundTasks.entries()),
+      ];
       if (active.length === 0) return [];
       const [, task] = active[0];
       return [
@@ -426,8 +386,39 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  function ensureTaskWidget(targetCtx: ExtensionContext): void {
+    if (widgetCtx || targetCtx.mode !== "tui") return;
+    widgetCtx = targetCtx;
+    targetCtx.ui.setWidget("task", (tui, theme) => {
+      widgetTheme = theme ?? null;
+      widgetTimer = setInterval(() => tui.requestRender(), WIDGET_RENDER_MS);
+      // Don't keep the process alive just for the widget refresh.
+      widgetTimer.unref?.();
+      return {
+        render: (width: number) => renderWidget(width),
+        invalidate: () => {},
+        dispose: () => {
+          widgetTheme = null;
+          stopWidget();
+        },
+      };
+    });
+  }
+
+  function clearTaskWidgetIfIdle(): void {
+    if (foregroundTasks.size > 0 || backgroundTasks.size > 0) return;
+    stopWidget();
+    if (widgetCtx) {
+      widgetCtx.ui.setWidget("task", undefined);
+      widgetCtx = null;
+    }
+  }
+
   function renderWidgetInner(width: number): string[] {
-    const active = Array.from(backgroundTasks.entries());
+    const active = [
+      ...Array.from(foregroundTasks.entries()),
+      ...Array.from(backgroundTasks.entries()),
+    ];
     if (active.length === 0) return [];
     const now = Date.now();
     const maxWidth = Math.min(width, WIDGET_MAX_WIDTH);
@@ -455,8 +446,7 @@ export default function (pi: ExtensionAPI) {
       const recent = task.recentCalls ?? [];
       if (recent.length === 0) {
         // Pre-startup phase: spinner with trailing dots
-        const line =
-          "  " + c("warning", spinner) + c("dim", " \u2026");
+        const line = "  " + c("warning", spinner) + c("dim", " \u2026");
         lines.push(truncateToWidth(line, maxWidth));
       } else {
         const slice = recent.slice(-WIDGET_MAX_TOOL_LINES);
@@ -495,11 +485,7 @@ export default function (pi: ExtensionAPI) {
 
   const checkInterval = setInterval(async () => {
     if (backgroundTasks.size === 0) {
-      if (widgetCtx) {
-        stopWidget();
-        widgetCtx.ui.setWidget("task", undefined);
-        widgetCtx = null;
-      }
+      clearTaskWidgetIfIdle();
       return;
     }
 
@@ -514,44 +500,31 @@ export default function (pi: ExtensionAPI) {
       // ── Check timeout ────────────────────────────────────────────
       if (now - task.startedAt > TASK_TIMEOUT_MS) {
         killAgentPane(task.paneId, task.originalPane);
-        completeTask(pi, id, task, "Task timed out after 30 minutes", "timeout", piDir);
+        completeTask(
+          pi,
+          id,
+          task,
+          "Task timed out after 30 minutes",
+          "timeout",
+          piDir,
+        );
         continue;
       }
 
-      // ── Check pane liveness ──────────────────────────────────────
-      if (!paneExists(task.paneId)) {
-        // Pane dead — check if RESULT.md was produced before death
-        const resultPath = join(task.dir, "RESULT.md");
-        let content = "";
-        try {
-          content = await readFile(resultPath, "utf-8");
-        } catch {
-          /* file missing — task lost */
-        }
-        if (content.trim()) {
-          completeTask(pi, id, task, content, "done", piDir);
-        } else {
-          completeTask(pi, id, task, "Agent pane terminated without producing a result.", "failed", piDir);
-        }
-        continue;
-      }
+      const snapshot = await checkTaskCompletion({
+        resultPath: join(task.dir, "RESULT.md"),
+        sessionDir: task.dir,
+        sessionName: task.sessionName,
+        paneId: task.paneId,
+      });
 
-      // ── Check RESULT.md ─────────────────────────────────────────
-      const resultPath = join(task.dir, "RESULT.md");
-      let content: string;
-      try {
-        content = await readFile(resultPath, "utf-8");
-      } catch {
-        backgroundTasks.set(id, task); // Not ready yet
-        continue;
-      }
-      if (content.trim().length === 0) {
+      if (snapshot.status === "running") {
         backgroundTasks.set(id, task);
         continue;
       }
 
-      // Result ready — complete
-      completeTask(pi, id, task, content, "done", piDir);
+      const phase = snapshot.status === "completed" ? "done" : "failed";
+      completeTask(pi, id, task, snapshot.content, phase, piDir);
     }
   }, BACKGROUND_CHECK_MS);
 
@@ -569,48 +542,51 @@ export default function (pi: ExtensionAPI) {
 
   // ── Custom notification renderer ───────────────────────────────────────
 
-  pi.registerMessageRenderer?.("task-complete", (message, { expanded }, theme) => {
-    const d = message.details as Record<string, unknown> | undefined;
-    if (!d) return undefined;
+  pi.registerMessageRenderer?.(
+    "task-complete",
+    (message, { expanded }, theme) => {
+      const d = message.details as Record<string, unknown> | undefined;
+      if (!d) return undefined;
 
-    const agentType = (d.agent_type as string) || "";
-    const desc = (d.description as string) || "";
-    const summary = (d.summary as string) || "";
-    const findings = (d.findings as string) || "";
-    const confidence = (d.confidence as string) || "";
-    const durationMs = (d.duration_ms as number) || 0;
-    const toolUses = (d.tool_uses as number) || 0;
-    const turns = (d.turn_count as number) || 0;
+      const agentType = (d.agent_type as string) || "";
+      const desc = (d.description as string) || "";
+      const summary = (d.summary as string) || "";
+      const findings = (d.findings as string) || "";
+      const confidence = (d.confidence as string) || "";
+      const durationMs = (d.duration_ms as number) || 0;
+      const toolUses = (d.tool_uses as number) || 0;
+      const turns = (d.turn_count as number) || 0;
 
-    let line = theme.fg("accent", agentType);
-    if (desc) line += theme.fg("dim", ` - ${desc}`);
+      let line = theme.fg("accent", agentType);
+      if (desc) line += theme.fg("dim", ` - ${desc}`);
 
-    const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
-    const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
-    const statsParts = [useStr, durStr].filter(Boolean);
-    if (statsParts.length) {
-      line += "\n" + theme.fg("dim", statsParts.join(" • "));
-    }
+      const useStr = toolUses > 0 ? `${turns || toolUses} toolcalls` : "";
+      const durStr = durationMs >= 1000 ? formatMs(durationMs) : "";
+      const statsParts = [useStr, durStr].filter(Boolean);
+      if (statsParts.length) {
+        line += "\n" + theme.fg("dim", statsParts.join(" • "));
+      }
 
-    const confStr = confidence ? confidence.toUpperCase() : "";
-    if (confStr && (statsParts.length || expanded)) {
-      const confColor =
-        confidence === "high"
-          ? "success"
-          : confidence === "low"
-            ? "error"
-            : "accent";
-      line += "\n" + theme.fg(confColor as any, `[${confStr}]`);
-    }
+      const confStr = confidence ? confidence.toUpperCase() : "";
+      if (confStr && (statsParts.length || expanded)) {
+        const confColor =
+          confidence === "high"
+            ? "success"
+            : confidence === "low"
+              ? "error"
+              : "accent";
+        line += "\n" + theme.fg(confColor as any, `[${confStr}]`);
+      }
 
-    if (expanded) {
-      if (summary) line += "\n" + theme.fg("muted", summary);
-      if (findings) line += "\n" + theme.fg("dim", findings);
-    }
+      if (expanded) {
+        if (summary) line += "\n" + theme.fg("muted", summary);
+        if (findings) line += "\n" + theme.fg("dim", findings);
+      }
 
-    if (!line.trim()) return undefined;
-    return new Text(line, 0, 0);
-  });
+      if (!line.trim()) return undefined;
+      return new Text(line, 0, 0);
+    },
+  );
 
   // ── Tool Registration ──────────────────────────────────────────────────
 
@@ -634,7 +610,8 @@ export default function (pi: ExtensionAPI) {
         description: "The type of specialist agent to use for this task",
       }),
       prompt: Type.String({
-        description: "The complete task for the agent to perform. Be detailed and self-contained.",
+        description:
+          "The complete task for the agent to perform. Be detailed and self-contained.",
       }),
       description: Type.String({
         description: "A short (3-5 word) summary of the task",
@@ -667,7 +644,10 @@ export default function (pi: ExtensionAPI) {
               text: `Unknown agent: "${params.agent_type}".\nAvailable agents:\n${list}`,
             },
           ],
-          details: { phase: "failed" as const, error: `Unknown agent: ${params.agent_type}` },
+          details: {
+            phase: "failed" as const,
+            error: `Unknown agent: ${params.agent_type}`,
+          },
           isError: true,
         };
       }
@@ -691,7 +671,10 @@ export default function (pi: ExtensionAPI) {
                 text: `Unknown task_id: "${params.task_id}". No task with that ID found in the registry.`,
               },
             ],
-            details: { phase: "failed" as const, error: `Unknown task_id: ${params.task_id}` },
+            details: {
+              phase: "failed" as const,
+              error: `Unknown task_id: ${params.task_id}`,
+            },
             isError: true,
           };
         }
@@ -703,7 +686,10 @@ export default function (pi: ExtensionAPI) {
                 text: `Task "${params.task_id}" artifact directory no longer exists: ${entry.dir}`,
               },
             ],
-            details: { phase: "failed" as const, error: "Task artifact dir missing" },
+            details: {
+              phase: "failed" as const,
+              error: "Task artifact dir missing",
+            },
             isError: true,
           };
         }
@@ -715,7 +701,11 @@ export default function (pi: ExtensionAPI) {
         resume = true;
 
         // If background and pane still alive, reattach to tracker
-        if (params.background !== false && entry.paneId && paneExists(entry.paneId)) {
+        if (
+          params.background !== false &&
+          entry.paneId &&
+          paneExists(entry.paneId)
+        ) {
           const bgtask: BackgroundTask = {
             dir: artifactDir,
             agentType: agent.name,
@@ -755,8 +745,8 @@ export default function (pi: ExtensionAPI) {
       }
 
       const descText = params.description || "";
-            const isBackground = params.background ?? TASK_BACKGROUND_DEFAULT;
- // default true
+      const isBackground = params.background ?? TASK_BACKGROUND_DEFAULT;
+      // default true
 
       // ── Write durable task context ──────────────────────────────────────
       const contextPath = join(artifactDir, "CONTEXT.md");
@@ -795,21 +785,150 @@ export default function (pi: ExtensionAPI) {
       await mkdir(sessionDir, { recursive: true });
 
       // ─── Build and run the sub-agent pi process ──────────────────────────
-      const piArgs = buildPiArgs(agent, sessionName, sessionDir, promptContent, resume);
+      const piArgs = buildPiArgs(
+        agent,
+        sessionName,
+        sessionDir,
+        promptContent,
+        resume,
+      );
       const envPrefix = `PI_TASK_TOOL_DISABLED=1`;
+      const toolSelection = buildAgentToolSelection({
+        tools: agent.tools,
+        disallowedTools: agent.disallowedTools,
+      });
+      const runSdkFallback = async () =>
+        runSdkSubagent({
+          prompt: promptContent,
+          agent,
+          cwd: ctx.cwd,
+          ctx,
+          model: agent.model,
+          thinkingLevel: agent.thinking,
+          tools: toolSelection.tools,
+          excludeTools: toolSelection.excludeTools,
+          systemPrompt: agent.body,
+        });
+      const foregroundTask: BackgroundTask | undefined = isBackground
+        ? undefined
+        : {
+            dir: artifactDir,
+            agentType: agent.name,
+            sessionName,
+            originalPane: null,
+            description: descText,
+            startedAt: Date.now(),
+            toolUses: 0,
+            turns: 0,
+            recentCalls: [],
+          };
+      if (foregroundTask) {
+        foregroundTasks.set(id, foregroundTask);
+        ensureTaskWidget(ctx);
+      }
 
-      // Both foreground and background use tmux — pi needs a real terminal (TTY)
+      // Prefer tmux for observability, but fall back to the SDK in headless/CI/RPC.
       if (!hasTmux()) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: "tmux is required for task tool. Install tmux to use foreground or background tasks.",
+        if (isBackground) {
+          const bgtask: BackgroundTask = {
+            dir: artifactDir,
+            agentType: agent.name,
+            sessionName,
+            originalPane: null,
+            description: descText,
+            startedAt: Date.now(),
+            toolUses: 0,
+            turns: 0,
+            recentCalls: [],
+          };
+          backgroundTasks.set(id, bgtask);
+          const entry: RegistryEntry = {
+            id,
+            agentType: agent.name,
+            description: descText,
+            sessionName,
+            startedAt: bgtask.startedAt,
+            piDir,
+            dir: artifactDir,
+          };
+          const entries = readRegistry(piDir);
+          entries.push(entry);
+          writeRegistry(piDir, entries);
+          pi.appendEntry("task-registry", entry);
+          ensureTaskWidget(ctx);
+
+          void runSdkFallback()
+            .then(async ({ output }) => {
+              const finalOutput =
+                output || "SDK subagent completed without assistant text.";
+              await writeFile(resultPath, finalOutput, "utf-8");
+              backgroundTasks.delete(id);
+              clearTaskWidgetIfIdle();
+              completeTask(pi, id, bgtask, finalOutput, "done", piDir);
+            })
+            .catch((error) => {
+              const message =
+                error instanceof Error ? error.message : String(error);
+              backgroundTasks.delete(id);
+              clearTaskWidgetIfIdle();
+              completeTask(
+                pi,
+                id,
+                bgtask,
+                `Task ${id} failed: ${message}`,
+                "failed",
+                piDir,
+              );
+            });
+
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Task ${id} started with SDK backend (tmux unavailable).`,
+              },
+            ],
+            details: {
+              task_id: id,
+              background: true,
+              backend: "sdk" as const,
+              result_path: resultPath,
             },
-          ],
-          details: { phase: "failed" as const, error: "tmux not found" },
-          isError: true,
-        };
+          };
+        }
+
+        try {
+          const { output, sessionPath } = await runSdkFallback();
+          const finalOutput =
+            output || "SDK subagent completed without assistant text.";
+          await writeFile(resultPath, finalOutput, "utf-8");
+          return {
+            content: [{ type: "text" as const, text: finalOutput }],
+            details: {
+              phase: "done" as const,
+              backend: "sdk" as const,
+              session_path: sessionPath,
+              result_path: resultPath,
+            },
+          };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              { type: "text" as const, text: `SDK task failed: ${message}` },
+            ],
+            details: {
+              phase: "failed" as const,
+              backend: "sdk" as const,
+              error: message,
+            },
+            isError: true,
+          };
+        } finally {
+          foregroundTasks.delete(id);
+          clearTaskWidgetIfIdle();
+        }
       }
 
       const shellCommand = `${envPrefix} pi ${piArgs.map((a) => shellQuote(a)).join(" ")}`;
@@ -817,10 +936,19 @@ export default function (pi: ExtensionAPI) {
       let paneId: string;
       let originalPane: string | null;
       try {
-        const splitResult = splitWindowPane(ctx.cwd, `cd ${shellQuote(ctx.cwd)} && ${shellCommand}`);
+        const splitResult = splitWindowPane(
+          ctx.cwd,
+          `cd ${shellQuote(ctx.cwd)} && ${shellCommand}`,
+        );
         paneId = splitResult.paneId;
         originalPane = splitResult.originalPane;
+        if (foregroundTask) {
+          foregroundTask.paneId = paneId;
+          foregroundTask.originalPane = originalPane;
+        }
       } catch {
+        foregroundTasks.delete(id);
+        clearTaskWidgetIfIdle();
         return {
           content: [
             {
@@ -836,13 +964,24 @@ export default function (pi: ExtensionAPI) {
       // ── FOREGROUND MODE: block until result, return directly ────────────
       if (!isBackground) {
         const startedAt = Date.now();
-        const { content, phase } = await waitForResult(
+        const completion = await waitForSessionTaskCompletion({
           resultPath,
+          sessionDir,
+          sessionName,
           paneId,
-          originalPane,
           signal,
-          startedAt,
-        );
+          timeoutMs: 30 * 60 * 1000,
+        });
+        const content = completion.content;
+        const phase =
+          completion.status === "completed"
+            ? "done"
+            : completion.status === "cancelled"
+              ? "cancelled"
+              : "failed";
+        killAgentPane(paneId, originalPane);
+        foregroundTasks.delete(id);
+        clearTaskWidgetIfIdle();
 
         const parsed = parseResultXml(content);
         const durationMs = Date.now() - startedAt;
@@ -879,7 +1018,7 @@ export default function (pi: ExtensionAPI) {
         };
       }
 
-// ── BACKGROUND MODE (default): add to tracker, return immediately ─────
+      // ── BACKGROUND MODE (default): add to tracker, return immediately ─────
 
       const bgtask: BackgroundTask = {
         dir: artifactDir,
@@ -920,6 +1059,7 @@ export default function (pi: ExtensionAPI) {
           () => {
             killAgentPane(paneId, originalPane);
             backgroundTasks.delete(id);
+            clearTaskWidgetIfIdle();
             // Clean registry
             const remaining = readRegistry(piDir).filter((e) => e.id !== id);
             writeRegistry(piDir, remaining);
@@ -936,23 +1076,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       // ── Sticky widget ──────────────────────────────────────────────────
-      if (!widgetCtx) {
-        widgetCtx = ctx;
-        widgetCtx.ui.setWidget("task", (tui, theme) => {
-          widgetTheme = theme ?? null;
-          widgetTimer = setInterval(() => tui.requestRender(), WIDGET_RENDER_MS);
-          // Don't keep the process alive just for the widget refresh.
-          widgetTimer.unref?.();
-          return {
-            render: (width: number) => renderWidget(width),
-            invalidate: () => {},
-            dispose: () => {
-              widgetTheme = null;
-              stopWidget();
-            },
-          };
-        });
-      }
+      ensureTaskWidget(ctx);
 
       return {
         content: [
@@ -979,7 +1103,8 @@ export default function (pi: ExtensionAPI) {
     renderCall(args, theme, _context) {
       const agentName =
         ((args as Record<string, unknown>).agent_type as string) || "...";
-      const desc = ((args as Record<string, unknown>).description as string) || "";
+      const desc =
+        ((args as Record<string, unknown>).description as string) || "";
 
       let text = theme.fg("toolTitle", "");
       text += theme.fg("accent", agentName);
@@ -991,20 +1116,17 @@ export default function (pi: ExtensionAPI) {
       const d = result.details as TaskDetails | undefined;
       if (!d) return new Text("", 0, 0);
 
-      const agentType = d.agent_type || "";
-      const desc = d.description || "";
-
       if (d.background) {
         return new Text("", 0, 0);
       }
 
-      if (d.phase === "timeout" || d.phase === "aborted" || d.phase === "failed") {
+      if (
+        d.phase === "timeout" ||
+        d.phase === "aborted" ||
+        d.phase === "failed"
+      ) {
         const line =
-          theme.fg("error", "x") +
-          " " +
-          theme.fg("accent", agentType) +
-          " " +
-          theme.fg("dim", `[${d.phase}]`);
+          theme.fg("error", "x") + " " + theme.fg("dim", `[${d.phase}]`);
         return new Text(line, 0, 0);
       }
 
@@ -1026,8 +1148,13 @@ export default function (pi: ExtensionAPI) {
         ? " " + theme.fg("dim", statsParts.join(" • "))
         : "";
 
-      const icon = isError ? theme.fg("error", "x") : theme.fg("success", "v");
-      let line = icon + " " + theme.fg("accent", agentType) + statsStr;
+      const icon = isError ? theme.fg("error", "x") : theme.fg("success", "✓");
+      const statusLabel = d.status && d.status !== "done" ? d.status : "done";
+      let line =
+        icon +
+        " " +
+        theme.fg(isError ? "error" : "success", statusLabel) +
+        statsStr;
 
       if (expanded) {
         const s = d.summary || "";
@@ -1036,8 +1163,7 @@ export default function (pi: ExtensionAPI) {
         if (s) line += "\n" + theme.fg("muted", s);
         if (f) line += "\n" + theme.fg("dim", f);
         if (e)
-          line +=
-            "\n" + theme.fg("muted", "Evidence: ") + theme.fg("dim", e);
+          line += "\n" + theme.fg("muted", "Evidence: ") + theme.fg("dim", e);
       } else {
         const preview = (d.summary || "").slice(0, 80);
         if (preview) line += "\n" + theme.fg("dim", `  ⎿  ${preview}`);

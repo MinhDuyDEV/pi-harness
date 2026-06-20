@@ -26,11 +26,13 @@
 
 ## Delegation
 
-- **Do it yourself** when surgical, few tool calls, ambiguity needs judgment, provenance matters.
-- **Use `task`** when work is complex, well-defined, benefits from fresh context, and matches a registered agent's specialty (research, local exploration, implementation, planning).
-- **Do NOT use `task`** when the task needs back-and-forth, current session state, is trivial (1-2 tool calls), or no matching agent exists.
-- Multiple `task()` calls in one message run in parallel; each gets its own tmux pane and artifact directory.
-- After any delegated or harness run: read changed files directly, review the diff, run verification, confirm scope, report evidence.
+- **Do it yourself** for small/surgical work (≤3 local tool calls), high-judgment choices, current-conversation nuance, secrets/auth, or edits you must personally reason about.
+- **Use `task`** for bounded, independent, verifiable work that benefits from fresh context and matches a registered agent specialty. Do not delegate vague, trivial, back-and-forth, or no-clear-owner work.
+- **Foreground (`background:false`)**: parent waits; result returns directly; no second follow-up.
+- **Background (`background:true`)**: parent continues; completion arrives as a follow-up; audit it before trusting it.
+- Parallel `task()` calls are OK when independent. Each gets an artifact directory and, when available, a tmux pane.
+- Task prompts must include: goal/scope, non-goals, write policy, expected evidence/output, and stop condition.
+- After delegation: read artifacts/files yourself, review diffs, run verification, and check for scope creep.
 
 ## Skills
 
@@ -68,4 +70,3 @@ After either path, verify current code/config/git state from disk before acting.
 3. `web_fetch` — read result URL as markdown
 4. `webclaw_scrape` / `webclaw_batch` — when normal fetch is blocked
 5. Browser tools — only when JS rendering is required
-

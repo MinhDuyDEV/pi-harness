@@ -27,7 +27,6 @@ import {
   discoverAgents,
   formatAgentList,
   type AgentConfig,
-  type ParsedResult,
 } from "./helpers.js";
 
 // ─── extractTag ──────────────────────────────────────────────────────────────
@@ -142,7 +141,8 @@ import {
 }
 
 {
-  const t = "parseIdTimestamp falls back to Date.now() when split yields empty string";
+  const t =
+    "parseIdTimestamp falls back to Date.now() when split yields empty string";
   const before = Date.now();
   const result = parseIdTimestamp("-");
   const after = Date.now();
@@ -243,7 +243,10 @@ import {
       join(dir, "b.jsonl"),
       JSON.stringify({
         type: "message",
-        message: { role: "assistant", content: [{ type: "toolCall" }, { type: "toolCall" }] },
+        message: {
+          role: "assistant",
+          content: [{ type: "toolCall" }, { type: "toolCall" }],
+        },
       }),
     );
 
@@ -259,18 +262,22 @@ import {
 
 {
   const t = "summarizeArgs returns path for read/write/edit";
-  assert.equal(summarizeArgs("read", { path: "/tmp/foo.ts" }), "/tmp/foo.ts", t);
-  assert.equal(summarizeArgs("write", { file_path: "/x.ts" }), "/x.ts", t + " file_path");
+  assert.equal(
+    summarizeArgs("read", { path: "/tmp/foo.ts" }),
+    "/tmp/foo.ts",
+    t,
+  );
+  assert.equal(
+    summarizeArgs("write", { file_path: "/x.ts" }),
+    "/x.ts",
+    t + " file_path",
+  );
   assert.equal(summarizeArgs("edit", { path: "/a/b/c" }), "/a/b/c", t);
 }
 
 {
   const t = "summarizeArgs returns command for bash";
-  assert.equal(
-    summarizeArgs("bash", { command: "npm test" }),
-    "npm test",
-    t,
-  );
+  assert.equal(summarizeArgs("bash", { command: "npm test" }), "npm test", t);
   assert.equal(summarizeArgs("bash", { cmd: "ls -la" }), "ls -la", t + " cmd");
 }
 
@@ -318,11 +325,7 @@ import {
 
 {
   const t = "summarizeArgs falls back to first string for unknown tool";
-  assert.equal(
-    summarizeArgs("custom_tool", { foo: "bar", n: 42 }),
-    "bar",
-    t,
-  );
+  assert.equal(summarizeArgs("custom_tool", { foo: "bar", n: 42 }), "bar", t);
 }
 
 {
@@ -357,7 +360,12 @@ import {
         message: {
           role: "assistant",
           content: [
-            { type: "toolCall", id: "c1", name: "websearch", arguments: { query: "MCP" } },
+            {
+              type: "toolCall",
+              id: "c1",
+              name: "websearch",
+              arguments: { query: "MCP" },
+            },
           ],
         },
       }),
@@ -387,7 +395,12 @@ import {
         message: {
           role: "assistant",
           content: [
-            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/foo.ts" } },
+            {
+              type: "toolCall",
+              id: "c1",
+              name: "read",
+              arguments: { path: "/foo.ts" },
+            },
           ],
         },
       }),
@@ -417,7 +430,12 @@ import {
         message: {
           role: "assistant",
           content: [
-            { type: "toolCall", id: "c1", name: "bash", arguments: { command: "false" } },
+            {
+              type: "toolCall",
+              id: "c1",
+              name: "bash",
+              arguments: { command: "false" },
+            },
           ],
         },
       }),
@@ -448,7 +466,12 @@ import {
           message: {
             role: "assistant",
             content: [
-              { type: "toolCall", id: `c${i}`, name: "bash", arguments: { command: `echo ${i}` } },
+              {
+                type: "toolCall",
+                id: `c${i}`,
+                name: "bash",
+                arguments: { command: `echo ${i}` },
+              },
             ],
           },
         }),
@@ -485,7 +508,12 @@ import {
         message: {
           role: "assistant",
           content: [
-            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/a" } },
+            {
+              type: "toolCall",
+              id: "c1",
+              name: "read",
+              arguments: { path: "/a" },
+            },
           ],
         },
       }),
@@ -497,13 +525,20 @@ import {
         message: {
           role: "assistant",
           content: [
-            { type: "toolCall", id: "c2", name: "read", arguments: { path: "/b" } },
+            {
+              type: "toolCall",
+              id: "c2",
+              name: "read",
+              arguments: { path: "/b" },
+            },
           ],
         },
-      }) + "\n" + JSON.stringify({
-        type: "message",
-        message: { role: "toolResult", toolCallId: "c2", isError: false },
-      }),
+      }) +
+        "\n" +
+        JSON.stringify({
+          type: "message",
+          message: { role: "toolResult", toolCallId: "c2", isError: false },
+        }),
     );
 
     const r = readRecentToolCalls(dir);
@@ -525,7 +560,12 @@ import {
           role: "assistant",
           content: [
             { type: "toolCall" }, // no id
-            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/x" } },
+            {
+              type: "toolCall",
+              id: "c1",
+              name: "read",
+              arguments: { path: "/x" },
+            },
           ],
         },
       }),
@@ -554,7 +594,12 @@ import {
         message: {
           role: "assistant",
           content: [
-            { type: "toolCall", id: "c1", name: "read", arguments: { path: "/x" } },
+            {
+              type: "toolCall",
+              id: "c1",
+              name: "read",
+              arguments: { path: "/x" },
+            },
           ],
         },
       }),
@@ -628,6 +673,7 @@ import {
         "---",
         "description: Read-only codebase explorer",
         "model: gpt-4o",
+        "tools: read, grep",
         "disallowed_tools: edit, write",
         "---",
         "",
@@ -653,18 +699,35 @@ import {
 
     const explore = agents.find((a) => a.name === "explore");
     assert.ok(explore, t + " explore exists");
-    assert.equal(explore!.description, "Read-only codebase explorer", t + " description");
+    assert.equal(
+      explore!.description,
+      "Read-only codebase explorer",
+      t + " description",
+    );
     assert.equal(explore!.model, "gpt-4o", t + " model");
-    assert.ok(explore!.disallowedTools?.includes("edit"), t + " disallowed edit");
-    assert.ok(explore!.disallowedTools?.includes("write"), t + " disallowed write");
-    assert.ok(explore!.disallowedTools?.includes("xai_web_search"), t + " disallowed xai");
+    assert.ok(
+      explore!.disallowedTools?.includes("edit"),
+      t + " disallowed edit",
+    );
+    assert.deepEqual(explore!.tools, ["read", "grep"], t + " tools");
+    assert.ok(
+      explore!.disallowedTools?.includes("write"),
+      t + " disallowed write",
+    );
+    assert.ok(
+      explore!.disallowedTools?.includes("xai_web_search"),
+      t + " disallowed xai",
+    );
     assert.equal(explore!.source, "user", t + " source");
     assert.match(explore!.body, /# Explore Agent/, t + " body");
 
     const worker = agents.find((a) => a.name === "worker");
     assert.ok(worker, t + " worker exists");
     assert.equal(worker!.thinking, "high", t + " thinking");
-    assert.ok(worker!.disallowedTools?.includes("xai_generate_text"), t + " default xai disallow");
+    assert.ok(
+      worker!.disallowedTools?.includes("xai_generate_text"),
+      t + " default xai disallow",
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -676,21 +739,11 @@ import {
   try {
     writeFileSync(
       join(dir, "no-desc.md"),
-      [
-        "---",
-        "model: gpt-4o",
-        "---",
-        "Body without description.",
-      ].join("\n"),
+      ["---", "model: gpt-4o", "---", "Body without description."].join("\n"),
     );
     writeFileSync(
       join(dir, "has-desc.md"),
-      [
-        "---",
-        "description: Has one",
-        "---",
-        "Body.",
-      ].join("\n"),
+      ["---", "description: Has one", "---", "Body."].join("\n"),
     );
 
     const agents = loadAgentsFromDir(dir, "project");
@@ -729,8 +782,20 @@ import {
 {
   const t = "formatAgentList formats agent entries";
   const agents: AgentConfig[] = [
-    { name: "explore", description: "Read-only explorer", body: "", source: "project", path: "/a" },
-    { name: "worker", description: "Fast implementer", body: "", source: "user", path: "/b" },
+    {
+      name: "explore",
+      description: "Read-only explorer",
+      body: "",
+      source: "project",
+      path: "/a",
+    },
+    {
+      name: "worker",
+      description: "Fast implementer",
+      body: "",
+      source: "user",
+      path: "/b",
+    },
   ];
   const r = formatAgentList(agents);
   assert.match(r, /explore \(project\): Read-only explorer/, t + " explore");
@@ -784,7 +849,11 @@ import {
       const { agents } = discoverAgents(projDir); // cwd inside .pi
       const explore = agents.find((a) => a.name === "explore");
       assert.ok(explore, t + " explore exists");
-      assert.equal(explore!.description, "Project explore", t + " project overrides user");
+      assert.equal(
+        explore!.description,
+        "Project explore",
+        t + " project overrides user",
+      );
       assert.equal(explore!.source, "project", t + " source is project");
 
       const scout = agents.find((a) => a.name === "scout");
@@ -822,23 +891,45 @@ import {
   assert.ok(receipt.includes("Started task task-123"), t + " includes task id");
   assert.ok(receipt.includes("explore"), t + " includes agent type");
   assert.ok(receipt.includes("pi-task-task-123"), t + " includes session");
-  assert.ok(receipt.includes("/tmp/.pi/tasks/task-123"), t + " includes artifact dir");
-  assert.ok(receipt.includes("completion notification"), t + " explains notification");
+  assert.ok(
+    receipt.includes("/tmp/.pi/tasks/task-123"),
+    t + " includes artifact dir",
+  );
+  assert.ok(
+    receipt.includes("completion notification"),
+    t + " explains notification",
+  );
 }
 
 {
-  const t = "task tool description matches background default and verification policy";
+  const t =
+    "task tool description matches background default and verification policy";
   assert.equal(TASK_BACKGROUND_DEFAULT, true, t + " default is true");
-  assert.ok(TASK_TOOL_DESCRIPTION.includes("Background is the default"), t + " documents background default");
-  assert.ok(!TASK_TOOL_DESCRIPTION.includes("Foreground is the default"), t + " does not claim foreground default");
-  assert.ok(TASK_TOOL_DESCRIPTION.includes("Do not trust delegated output blindly"), t + " requires verification");
+  assert.ok(
+    TASK_TOOL_DESCRIPTION.includes("Background is the default"),
+    t + " documents background default",
+  );
+  assert.ok(
+    !TASK_TOOL_DESCRIPTION.includes("Foreground is the default"),
+    t + " does not claim foreground default",
+  );
+  assert.ok(
+    TASK_TOOL_DESCRIPTION.includes("Do not trust delegated output blindly"),
+    t + " requires verification",
+  );
 }
 
 {
   const t = "XML instructions preserve the required task result tags";
   for (const tag of ["status", "summary", "findings", "evidence", "files"]) {
-    assert.ok(TASK_RESULT_XML_INSTRUCTIONS.includes(`<${tag}>`), `${t}: has opening ${tag}`);
-    assert.ok(TASK_RESULT_XML_INSTRUCTIONS.includes(`</${tag}>`), `${t}: has closing ${tag}`);
+    assert.ok(
+      TASK_RESULT_XML_INSTRUCTIONS.includes(`<${tag}>`),
+      `${t}: has opening ${tag}`,
+    );
+    assert.ok(
+      TASK_RESULT_XML_INSTRUCTIONS.includes(`</${tag}>`),
+      `${t}: has closing ${tag}`,
+    );
   }
 }
 

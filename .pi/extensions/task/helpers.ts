@@ -7,8 +7,10 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, dirname, basename, resolve } from "node:path";
+import { parseToolList } from "../lib/agent-tools.js";
 import { parseMarkdownFrontmatter } from "../lib/util.js";
 import { parseMergedDisallowedTools } from "../xai/policy.js";
+import { buildPiArgv } from "../subagent/buildArgv.js";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,6 +19,8 @@ export interface AgentConfig {
   description: string;
   model?: string;
   thinking?: string;
+  /** Explicit allowlist from frontmatter `tools:` */
+  tools?: string | string[];
   disallowedTools?: string[];
   body: string;
   source: "project" | "user";
@@ -53,7 +57,9 @@ export const TASK_RESULT_XML_INSTRUCTIONS = `<status>success|failure|blocked|par
 <findings>Key findings with file:line references</findings>
 <evidence>Verification evidence, commands run, output snippets</evidence>
 <confidence>high|medium|low (optional — how certain the findings are)</confidence>
-<files>Comma-separated absolute paths of files read/created (optional)</files>`;
+<files>Comma-separated absolute paths of files read/created (optional)</files>
+
+Prefer writing this block to RESULT.md when done. If you cannot write the file, your final assistant message MUST include the same XML block.`;
 
 export const OUTPUT_FORMAT_GUIDE = TASK_RESULT_XML_INSTRUCTIONS;
 
@@ -85,8 +91,8 @@ Background mode (background: true):
 - Avoid working with the same files or topics the background task is using
 - Work on non-overlapping tasks, or briefly tell the user what you launched and end your response`;
 
-// All built-in tool names
-export const ALL_TOOL_NAMES = ["read", "write", "edit", "bash", "grep", "find", "ls"];
+/** @deprecated Import from ../lib/agent-tools.js */
+export { ALL_TOOL_NAMES, BUILTIN_TOOL_NAMES } from "../lib/agent-tools.js";
 
 // Cached regex patterns for XML result parsing
 const STATUS_RE = /<status>([\s\S]*?)<\/status>/i;
@@ -156,7 +162,10 @@ export function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
-export function buildTmuxSendKeysArgs(paneId: string, command: string): string[] {
+export function buildTmuxSendKeysArgs(
+  paneId: string,
+  command: string,
+): string[] {
   return ["send-keys", "-t", paneId, command, "Enter"];
 }
 
@@ -222,15 +231,24 @@ export function loadAgentsFromDir(
     if (!frontmatter.description) continue;
 
     const name = basename(entry.name, ".md");
-    const disallowedRaw = frontmatter.disallowed_tools as string | undefined;
-    const merged = parseMergedDisallowedTools(disallowedRaw);
+    const disallowedRaw = frontmatter.disallowed_tools as
+      | string
+      | string[]
+      | undefined;
+    const merged = parseMergedDisallowedTools(
+      parseToolList(disallowedRaw).join(","),
+    );
     const disallowedTools = merged.length > 0 ? merged : undefined;
+    const tools = parseToolList(
+      frontmatter.tools as string | string[] | undefined,
+    );
 
     agents.push({
       name,
       description: frontmatter.description,
       model: frontmatter.model,
       thinking: frontmatter.thinking,
+      tools: tools.length > 0 ? tools : undefined,
       disallowedTools,
       body,
       source,
@@ -281,26 +299,16 @@ export function buildPiArgs(
   sessionDir: string,
   promptContent: string,
   resume?: boolean,
+  parentToolNames?: string[],
 ): string[] {
-  const args: string[] = [];
-
-  if (agent.model) args.push("--model", agent.model);
-
-  const disallowed = agent.disallowedTools;
-  const allowedTools = disallowed?.length
-    ? ALL_TOOL_NAMES.filter((t) => !disallowed.includes(t))
-    : undefined;
-  if (allowedTools?.length) args.push("--tools", allowedTools.join(","));
-
-  args.push("--name", sessionName);
-  args.push("--session-dir", sessionDir);
-  if (resume) {
-    args.push("--session", sessionName);
-  }
-  args.push("--append-system-prompt", agent.body);
-  args.push(promptContent);
-
-  return args;
+  return buildPiArgv({
+    agent,
+    sessionName,
+    sessionDir,
+    promptContent,
+    resume,
+    parentToolNames,
+  });
 }
 
 // ─── JSONL Session Helpers ───────────────────────────────────────────────────
@@ -353,10 +361,7 @@ export function countToolUses(sessionDir: string): {
  * Extract a short, human-readable summary of a tool call's primary argument.
  * Falls back to the first string-valued property for unknown tools.
  */
-export function summarizeArgs(
-  toolName: string,
-  args: unknown,
-): string {
+export function summarizeArgs(toolName: string, args: unknown): string {
   if (!args || typeof args !== "object") return "";
   const a = args as Record<string, unknown>;
   const pick = (...keys: string[]): string => {
@@ -498,7 +503,13 @@ export function readRecentToolCalls(
   const ordered = calls.slice().sort((a, b) => a.ts - b.ts);
   const all: ToolCallRecord[] = ordered.map((c) => {
     const r = resultsById.get(c.id);
-    if (!r) return { name: c.name, detail: c.detail, id: c.id, status: "in_progress" };
+    if (!r)
+      return {
+        name: c.name,
+        detail: c.detail,
+        id: c.id,
+        status: "in_progress",
+      };
     return {
       name: c.name,
       detail: c.detail,
