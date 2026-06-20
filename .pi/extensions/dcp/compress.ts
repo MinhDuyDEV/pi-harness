@@ -939,6 +939,43 @@ export function processContextMessages(
 // Moved to ./compress-prune.ts.
 
 // ---------------------------------------------------------------------------
+// Post-compaction token estimate (Pi 0.79.8 RPC parity)
+// ---------------------------------------------------------------------------
+
+/** Heuristic post-compact context size (Pi 0.79.8 `estimatedTokensAfter` parity). */
+export function estimateTokensAfterCompress(
+  contextTokensBefore: number | null | undefined,
+  removedEstimate: number,
+  summaryTokens: number,
+): number | undefined {
+  if (contextTokensBefore == null || contextTokensBefore <= 0) return undefined;
+  return Math.max(0, Math.round(contextTokensBefore - removedEstimate + summaryTokens));
+}
+
+/** Recompute `estimatedTokensAfter` after DCP enrichment extends the compaction summary. */
+export function enrichCompactionResult<
+  T extends { summary: string; tokensBefore: number; estimatedTokensAfter?: number },
+>(
+  result: T,
+  preparation: { tokensBefore: number; messagesToSummarize: readonly Message[] },
+): T {
+  const removedEstimate = preparation.messagesToSummarize.reduce(
+    (sum, m) => sum + estimateTokens(m),
+    0,
+  );
+  const summaryTokens = Math.ceil(result.summary.length / 4);
+  const estimated = estimateTokensAfterCompress(
+    preparation.tokensBefore,
+    removedEstimate,
+    summaryTokens,
+  );
+  if (estimated != null) {
+    result.estimatedTokensAfter = estimated;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Compress tool registration
 // ---------------------------------------------------------------------------
 
@@ -1071,6 +1108,9 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       // Build response with persistent summary preview
       const allBlocks = getBlocks(sessionId);
       const stats = getStats(sessionId);
+      const contextUsage =
+        typeof ctx.getContextUsage === "function" ? ctx.getContextUsage() : undefined;
+      const contextTokensBefore = contextUsage?.tokens ?? undefined;
 
       const lines: string[] = [
         `[Compressed conversation section b${block.blockId}]`,
@@ -1130,6 +1170,13 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
         }
       }
 
+      if (contextTokensBefore != null) {
+        lines.push("", `Context window usage before this compress: ~${contextTokensBefore} tokens`);
+        lines.push(
+          "(Message-range stripping applies on the next LLM request; native `estimatedTokensAfter` is set when Pi runs session compaction.)",
+        );
+      }
+
       return {
         content: [{ type: "text", text: lines.join("\n") }],
         details: {
@@ -1137,6 +1184,8 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
           topic: block.topic,
           mode,
           summaryTokens: block.summaryTokens,
+          summaryBufferTokens: stats.summaryTokens,
+          ...(contextTokensBefore != null ? { contextTokensBefore } : {}),
           files: fields,
           quality: getQualityMetrics(sessionId),
         },

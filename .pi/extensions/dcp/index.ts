@@ -33,6 +33,7 @@ import {
   trackToolCall,
   incrementTurn,
   buildCompressedSummaryMessage,
+  enrichCompactionResult,
   getArtifactTracker,
 } from "./compress.js";
 import { NudgeManager } from "./nudge.js";
@@ -158,7 +159,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
       result.summary += `\n\n## DCP Persistent Summary\n\n${enrichment}`;
 
-      return { compaction: result };
+      return { compaction: enrichCompactionResult(result, preparation) };
     } catch {
       // Fall through to pi's native compaction
     }
