@@ -281,7 +281,6 @@ Additional via settings:
 | `mimo-provider`     | Xiaomi MiMo V2.5 models                          |
 | `guard`             | Permission gates for dangerous commands          |
 | `memory`            | Durable knowledge persistence                    |
-| `srcwalk`           | Code navigation and analysis                     |
 
 ### Hot Reload
 

@@ -293,11 +293,6 @@ import {
     "MCP",
     t + " codesearch",
   );
-  assert.equal(
-    summarizeArgs("srcwalk_search", { query: "foo" }),
-    "foo",
-    t + " srcwalk",
-  );
 }
 
 {

@@ -128,6 +128,15 @@ function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 }
 
 {
+	const t = "env-policy rejects override keys outside the selected policy";
+	assert.throws(
+		() => buildSubprocessEnv("webclaw", { AWS_SECRET_ACCESS_KEY: "leak" }),
+		/override is not allowed/i,
+		t,
+	);
+}
+
+{
 	const t = "dangerous network targets block encoded localhost and link-local addresses";
 	const { rules } = defaultRules();
 	for (const url of ["http://2130706433", "http://0x7f000001", "http://[::ffff:127.0.0.1]", "http://[fe80::1]"]) {
@@ -141,14 +150,6 @@ function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 	}
 }
 
-{
-	const t = "env-policy rejects override keys outside the selected policy";
-	assert.throws(
-		() => buildSubprocessEnv("srcwalk", { AWS_SECRET_ACCESS_KEY: "leak" }),
-		/override is not allowed/i,
-		t,
-	);
-}
 
 async function testConfirmationAllowsConfirmRules(): Promise<void> {
 	const t = "confirmed confirm-level rules are allowed";

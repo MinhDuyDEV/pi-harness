@@ -83,8 +83,8 @@ Run this before planning when the spec involves cross-cutting structural changes
 Use direct tools to find architectural weaknesses in affected modules:
 
 ```bash
-srcwalk_deps src/ 2>/dev/null || true
-srcwalk_map src/ --depth 2 --symbols 2>/dev/null || true
+find src -maxdepth 3 -type f 2>/dev/null | sed -n '1,120p'
+rg -n "TODO|FIXME" src 2>/dev/null || true
 ```
 
 Check:
@@ -112,7 +112,7 @@ For each selected module, propose the interface improvement:
 
 - Current interface vs proposed interface.
 - Prefer the design that deletes code from callers.
-- Document blast radius from `srcwalk_deps`.
+- Document blast radius from caller search/read evidence.
 
 ### Step 4: Record
 

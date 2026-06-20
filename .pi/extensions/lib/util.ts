@@ -2,8 +2,8 @@
  * Shared Utilities — Cross-Extension Helpers
  *
  * Consolidates patterns duplicated across extensions:
- *   - isAbortError (was in srcwalk.ts, webclaw.ts, deepseek/retry.ts)
- *   - runChildProcess / abortOnSignal (was in srcwalk.ts, webclaw.ts)
+ *   - isAbortError (shared by webclaw.ts and deepseek/retry.ts)
+ *   - runChildProcess / abortOnSignal (shared child-process helpers)
  */
 
 import { execFile } from "node:child_process";

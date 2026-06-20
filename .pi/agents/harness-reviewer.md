@@ -3,7 +3,7 @@ description: Harness reviewer. Read-only evaluator that returns strict harness J
 # Change this provider-qualified model to pin reviewer execution.
 model: opencode-go/mimo-v2.5-pro
 thinking: high
-tools: read, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_deps, srcwalk_map
+tools: read, grep, find, ls
 disallowed_tools: bash, edit, write
 prompt_mode: append
 ---

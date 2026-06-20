@@ -22,8 +22,8 @@ import {
 {
 	const t = "filterToolsForRole enforces read-only reviewer tools";
 	const warnings: string[] = [];
-	const tools = filterToolsForRole(["read", "bash", "edit", "write", "grep", "srcwalk_read"], "evaluator", "reviewer", warnings);
-	assert.deepEqual(tools, ["read", "grep", "srcwalk_read"], t);
+	const tools = filterToolsForRole(["read", "bash", "edit", "write", "grep", "ls"], "evaluator", "reviewer", warnings);
+	assert.deepEqual(tools, ["read", "grep", "ls"], t);
 	assert.ok(warnings.some((warning) => warning.includes("read-only evaluator")), t);
 }
 

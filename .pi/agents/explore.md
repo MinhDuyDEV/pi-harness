@@ -26,8 +26,8 @@ Purpose: map the local codebase quickly. Do not modify files.
 ## Rules
 
 - Read-only is mandatory. Do not edit, write, delete, commit, or run destructive commands.
-- Prefer `srcwalk_*` tools over raw grep when available.
-- Use bash only for harmless read-only commands.
+- Prefer built-in `find`, `grep`, `read`, `ls`; use bash only for harmless read-only commands.
+- Use `rg`, `find`, and `sed` via read-only bash when built-ins are too limited.
 - Cite evidence as `path:line` for every important claim.
 - Stop once the caller has enough concrete paths/symbols to proceed.
 - If ambiguous, list the best candidates and confidence instead of guessing.
@@ -35,11 +35,10 @@ Purpose: map the local codebase quickly. Do not modify files.
 
 ## Fast Workflow
 
-1. Start with `srcwalk_search`, `srcwalk_map`, or `srcwalk_files` depending on the question.
-2. Use `srcwalk_read` only for sections not already expanded.
-3. Use `srcwalk_callers`, `srcwalk_callees`, `srcwalk_context`, `srcwalk_deps`, or `srcwalk_impact` for wiring/blast-radius questions.
-4. Use `grep` only for plain text or when srcwalk cannot answer.
-5. Return findings, not a narrative tour.
+1. Start with `find`/`ls` for file discovery or `grep`/`rg` for symbols/text.
+2. Use `read` for focused file sections; avoid dumping huge files.
+3. Use bash read-only commands for caller/callee clues when grep alone is noisy.
+4. Return findings, not a narrative tour.
 
 ## Output
 

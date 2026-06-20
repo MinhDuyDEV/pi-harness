@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [architecture, code-quality, ousterhout]
 dependencies: []
 agent_types: [planner, worker, reviewer]
-tools: [srcwalk_search, srcwalk_deps]
+tools: [grep, find, read, bash]
 ---
 
 # Deep Module Design

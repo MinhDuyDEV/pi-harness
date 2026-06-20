@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [workflow, implementation, safety]
 dependencies: [verification-before-completion]
 agent_types: [worker]
-tools: [srcwalk_search, bash, edit, write]
+tools: [grep, find, read, bash, edit, write]
 ---
 
 # Incremental Implementation

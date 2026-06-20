@@ -18,7 +18,7 @@ try {
 		join(root, ".pi", "agents", "custom.md"),
 		`---
 description: Custom harness agent
-tools: read, bash, srcwalk_search, webclaw_scrape, edit
+tools: read, bash, websearch, webclaw_scrape, edit
 disallowed_tools: edit, webclaw_scrape
 model: opencode-go/deepseek-v4-flash
 thinking: high
@@ -31,7 +31,7 @@ thinking: high
 
 	const custom = loadAgentFile("custom", root);
 	assert.ok(custom, "custom agent loads");
-	assert.deepEqual(custom.tools, ["read", "bash", "srcwalk_search"], "tools frontmatter allows custom tools and disallowed_tools removes matches");
+	assert.deepEqual(custom.tools, ["read", "bash", "websearch"], "tools frontmatter allows custom tools and disallowed_tools removes matches");
 	assert.equal(custom.model, "opencode-go/deepseek-v4-flash");
 	assert.equal(custom.thinking, "high");
 	assert.equal(custom.systemPrompt, "# Custom Agent");

@@ -84,7 +84,7 @@ Improve code quality — clarity, performance, or maintainability — without ch
 
 - Read the target code thoroughly
 - Identify specific issues (duplication, complexity, naming, coupling)
-- Check blast radius with `srcwalk_deps` before changing exports/signatures
+- Check blast radius with `grep`/`rg`, caller reads, and tests before changing exports/signatures
 - Run existing tests to establish baseline
 
 ### Phase 2: Plan

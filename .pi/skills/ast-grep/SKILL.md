@@ -24,7 +24,6 @@ ast-grep (`sg`) is a CLI tool that searches code by **AST structure**, not by te
 | Tool | Best for | When to use |
 |---|---|---|
 | `grep` / `rg` | Text/string matching | Quick literal searches, regex patterns |
-| `srcwalk_search` | Symbol definitions, usages, call graphs | Code navigation, finding where things are defined/used |
 | **`sg` (ast-grep)** | **Structural patterns, anti-patterns, conventions** | Finding `console.log`, `any` type, `TODO`, empty catch, hardcoded values |
 | Fallow | Dead code, complexity, quality | Code health audits |
 
@@ -38,8 +37,8 @@ ast-grep (`sg`) is a CLI tool that searches code by **AST structure**, not by te
 ### When NOT to use ast-grep
 
 - Simple literal text search (use `grep` / `rg`)
-- Symbol definition lookups (use `srcwalk_search`)
-- Pattern requires multiple files' context (use `srcwalk_callers`)
+- Symbol definition lookups (use `grep`, `rg`, or language tooling)
+- Pattern requires multiple files' context (combine `grep`/`read` evidence)
 
 ## Quick reference
 
@@ -328,8 +327,8 @@ sg scan
 
 | Task | Right tool |
 |---|---|
-| "Find where function X is defined" | `srcwalk_search` |
-| "Find all files calling X" | `srcwalk_callers` |
+| "Find where function X is defined" | `grep` / `rg` |
+| "Find all files calling X" | `grep` / `rg` plus `read` |
 | "Find all `any` type casts" | `sg -p 'as any'` |
 | "Find unused files" | `npx fallow dead-code` |
 | "Find all error handling patterns" | `sg -p 'if err != nil'` |

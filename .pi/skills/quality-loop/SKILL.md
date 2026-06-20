@@ -5,7 +5,7 @@ description: "After implementation, run an iterative fix-verify loop until all q
 tags: [workflow, code-quality, verification]
 dependencies: [verification-before-completion]
 agent_types: [worker, reviewer]
-tools: [bash, srcwalk_search]
+tools: [bash, grep, find, read]
 ---
 
 # Quality Loop — Iterative Fix-Verify

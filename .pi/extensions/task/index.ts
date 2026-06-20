@@ -633,6 +633,10 @@ export default function (pi: ExtensionAPI) {
 
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const { agents, piDir } = discoverAgents(ctx.cwd);
+      const parentToolNames = pi
+        .getAllTools()
+        .map((tool) => tool.name)
+        .filter(Boolean);
       const agent = agents.find((a) => a.name === params.agent_type);
 
       if (!agent) {
@@ -791,11 +795,13 @@ export default function (pi: ExtensionAPI) {
         sessionDir,
         promptContent,
         resume,
+        parentToolNames,
       );
       const envPrefix = `PI_TASK_TOOL_DISABLED=1`;
       const toolSelection = buildAgentToolSelection({
         tools: agent.tools,
         disallowedTools: agent.disallowedTools,
+        parentToolNames,
       });
       const runSdkFallback = async () =>
         runSdkSubagent({

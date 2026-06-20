@@ -164,7 +164,7 @@ function parseToolList(value: string | undefined): string[] {
  *
  * The harness owns the system prompt, but it should still expose project/global
  * extension tools, skills, and prompt resources to child agents. Using
- * DefaultResourceLoader keeps extension-provided tools such as srcwalk/webclaw
+ * DefaultResourceLoader keeps extension-provided tools such as webclaw
  * available when the agent allowlist names them.
  */
 export async function createHarnessResourceLoader(systemPrompt: string, cwd: string): Promise<ResourceLoader> {

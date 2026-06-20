@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [review, code-quality, verification]
 dependencies: [verification-before-completion]
 agent_types: [reviewer]
-tools: [srcwalk_search, srcwalk_deps, bash]
+tools: [grep, find, read, bash]
 ---
 
 # Code Review & Quality

@@ -121,9 +121,6 @@ export function isCompactableTool(toolName: string): boolean {
 /** Tools whose path arguments should be tracked as "read" operations */
 export const READ_TOOLS = new Set([
   "read", "grep", "find", "ls", "multi_grep", "grepsearch",
-  "srcwalk_read", "srcwalk_search", "srcwalk_files", "srcwalk_deps",
-  "srcwalk_map", "srcwalk_callers", "srcwalk_callees", "srcwalk_flow",
-  "srcwalk_context", "srcwalk_impact", "srcwalk_review", "srcwalk_compare",
   "web_fetch", "webclaw_scrape", "webclaw_batch",
   "memory-search", "observation", "context7",
 ]);

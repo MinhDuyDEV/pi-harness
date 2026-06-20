@@ -18,7 +18,7 @@
 | Web / docs / research? | `websearch`, `web_fetch`, `webclaw_*`, `context7` — not `xai_*` |
 | Text search? | `grep` |
 | Multi-pattern text search? | `mgrep` |
-| Symbol / definition / caller analysis? | `srcwalk_*` |
+| Symbol / definition / caller analysis? | `grep`, `find`, `read`, read-only `bash` with `rg` when needed |
 | Type / compile / lint errors? | `diagnostics` |
 | Dead code / complexity? | `diagnostics` (Fallow) |
 | AI slop (narrative comments, swallowed exceptions)? | `diagnostics` (aislop) or `bash aislop scan` |

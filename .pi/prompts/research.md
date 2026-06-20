@@ -95,7 +95,7 @@ Follow this priority strictly. Lower tiers only if higher tiers don't answer.
 
 | Tier | Source | Tools | Stop When |
 | --- | --- | --- | --- |
-| 1 | Codebase patterns | `srcwalk_search`, `srcwalk_files`, `srcwalk_deps`, `grep` | Answer found in project code |
+| 1 | Codebase patterns | `find`, `grep`, `rg`, `read` | Answer found in project code |
 | 2 | Official docs | `context7` for API references | API behavior clear |
 | 3 | Package source | `opensrc` or node_modules inspection | Docs insufficient |
 | 4 | Real-world examples | `codesearch`, `grepsearch` | Pattern confirmed |
@@ -128,7 +128,7 @@ If context is still unclear, ask at most two targeted questions.
 ### Step 2: Ground in Prior Art
 
 ```bash
-srcwalk_search --query "existing implementation patterns" 2>/dev/null || true
+rg -n "existing implementation patterns" 2>/dev/null || true
 ```
 
 Search the codebase for similar patterns already in use.

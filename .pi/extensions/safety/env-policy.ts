@@ -24,8 +24,6 @@ const BASE_ENV_ALLOWLIST = [
 ] as const;
 
 const POLICY_ENV_ALLOWLIST = {
-	// srcwalk is a compiled binary; PI_SRCWALK_BIN is allowed so diagnostics and child processes keep the configured binary path.
-	srcwalk: ["PI_SRCWALK_BIN"] as const,
 	webclaw: ["WEBCLAW_BIN", "WEBCLAW_API_KEY", "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"] as const,
 } as const;
 

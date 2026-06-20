@@ -133,7 +133,7 @@ git log --oneline -20
 find . -maxdepth 3 -type f | sed 's#^./##' | sort | head -200
 ```
 
-Use `srcwalk_*` tools when available for code discovery.
+Use `find`, `grep`, `rg`, and focused reads for code discovery.
 
 ### Research Depth (Optional)
 

@@ -1,9 +1,9 @@
 ---
 description: Harness planner. Emits only a strict sprint manifest for the build harness.
-model: opencode-go/deepseek-v4-flash
-thinking: medium
+model: opencode-go/mimo-v2.5-pro
+thinking: high
 max_turns: 20
-tools: read, grep, find, ls, srcwalk_files, srcwalk_search, srcwalk_read, srcwalk_map
+tools: read, grep, find, ls
 disallowed_tools: bash, edit, write
 prompt_mode: append
 ---

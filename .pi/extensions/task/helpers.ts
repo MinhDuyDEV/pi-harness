@@ -382,10 +382,6 @@ export function summarizeArgs(toolName: string, args: unknown): string {
     case "grep":
     case "codesearch":
     case "websearch":
-    case "srcwalk_search":
-    case "srcwalk_files":
-    case "srcwalk_callers":
-    case "srcwalk_callees":
       return pick("query", "pattern", "search_term", "glob");
     case "web_fetch":
     case "webclaw_scrape":
