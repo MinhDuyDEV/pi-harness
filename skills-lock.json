@@ -128,6 +128,27 @@
       "source": "~/.pi/agent/skills/opencode-ts-service/",
       "sourceType": "local",
       "trust": "pinned"
+    },
+    "browser-tools": {
+      "source": "badlogic/pi-skills",
+      "sourceType": "github",
+      "skillPath": "browser-tools/SKILL.md",
+      "trust": "pinned",
+      "computedHash": "896a507c9b9ea54243c729b7679ffa08b109622cdb03470614fdd7b4aa072a12"
+    },
+    "brave-search": {
+      "source": "badlogic/pi-skills",
+      "sourceType": "github",
+      "skillPath": "brave-search/SKILL.md",
+      "trust": "pinned",
+      "computedHash": "c5cf919e2366c395d9bd86309d42b6311cfb3e8c5879c73b46c255c95128899b"
+    },
+    "typescript-coding-standards": {
+      "source": "dmmulroy/gist:9c80f1f499b031aa0b6525b5d9ae25f0",
+      "sourceType": "gist",
+      "skillPath": "coding-standards-draft.md",
+      "trust": "pinned",
+      "computedHash": "99292e4f1189218c304874328d85392783cb013239e331bf72220832c40dfb6e"
     }
   }
 }

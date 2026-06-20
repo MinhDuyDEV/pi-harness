@@ -1,8 +1,8 @@
 {
   "generated_by": "registry sync from .pi/skills/*/SKILL.md",
-  "active_skill_count": 74,
+  "active_skill_count": 77,
   "core_skill_count": 39,
-  "optional_skill_count": 35,
+  "optional_skill_count": 38,
   "routing_schema_version": 1,
   "routing_notes": "role_usage is a conservative hint for harness skill selection; it is not an auto-load instruction.",
   "skills": [
@@ -70,7 +70,7 @@
     {
       "name": "aislop",
       "path": "skills/aislop/SKILL.md",
-      "description": "Use when checking for AI-generated code slop — narrative comments, swallowed exceptions, console.log leftovers, as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind",
+      "description": "Use when checking for AI-generated code slop \u2014 narrative comments, swallowed exceptions, console.log leftovers, as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind",
       "version": "1.0.0",
       "tags": [
         "code-quality",
@@ -103,7 +103,7 @@
     {
       "name": "api-and-interface-design",
       "path": "skills/api-and-interface-design/SKILL.md",
-      "description": "Use when designing REST/GraphQL APIs, SDK interfaces, or public module boundaries — covers contract-first design, versioning, error shapes, and backward compatibility",
+      "description": "Use when designing REST/GraphQL APIs, SDK interfaces, or public module boundaries \u2014 covers contract-first design, versioning, error shapes, and backward compatibility",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -122,7 +122,7 @@
     {
       "name": "ast-grep",
       "path": "skills/ast-grep/SKILL.md",
-      "description": "Use when searching for code patterns structurally, finding anti-patterns, enforcing conventions, or checking for specific AST patterns across the codebase — ast-grep is an AST-aware structural code search tool (like grep for syntax trees). Supports TS/JS, Rust, Go, Python, Java, and more.",
+      "description": "Use when searching for code patterns structurally, finding anti-patterns, enforcing conventions, or checking for specific AST patterns across the codebase \u2014 ast-grep is an AST-aware structural code search tool (like grep for syntax trees). Supports TS/JS, Rust, Go, Python, Java, and more.",
       "version": "1.0.0",
       "tags": [
         "code-quality",
@@ -190,6 +190,36 @@
       "pack": "core"
     },
     {
+      "name": "brave-search",
+      "path": "skills/brave-search/SKILL.md",
+      "description": "Web search and content extraction via Brave Search API. Use for searching documentation, facts, current information, or web content without a browser.",
+      "version": "1.0.0",
+      "tags": [
+        "web-search",
+        "research"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "optional",
+      "pack": "web-research",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "conditional",
+      "triggers": [
+        "web search via Brave",
+        "current information",
+        "extracting web content without browser"
+      ]
+    },
+    {
       "name": "browser-testing-with-devtools",
       "path": "skills/browser-testing-with-devtools/SKILL.md",
       "description": "Use when verifying or debugging browser behavior with live runtime evidence: DOM state, console errors, network requests, screenshots, performance traces, or end-to-end user flows. Routes between Chrome DevTools and Playwright.",
@@ -225,9 +255,40 @@
       ]
     },
     {
+      "name": "browser-tools",
+      "path": "skills/browser-tools/SKILL.md",
+      "description": "Interactive browser automation via Chrome DevTools Protocol. Use when needing to interact with web pages, test frontends, or use a visible browser.",
+      "version": "1.0.0",
+      "tags": [
+        "browser",
+        "automation",
+        "testing"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "optional",
+      "pack": "browser-automation",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "conditional",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "conditional",
+      "triggers": [
+        "interactive browser automation",
+        "visible browser required",
+        "Chrome DevTools Protocol"
+      ]
+    },
+    {
       "name": "chrome-devtools",
       "path": "skills/chrome-devtools/SKILL.md",
-      "description": "Use when debugging web apps in Chrome — performance profiling, network inspection, DOM debugging, or console automation. MUST load before any Chrome DevTools-based debugging session.",
+      "description": "Use when debugging web apps in Chrome \u2014 performance profiling, network inspection, DOM debugging, or console automation. MUST load before any Chrome DevTools-based debugging session.",
       "version": "1.0.0",
       "tags": [
         "automation",
@@ -246,7 +307,7 @@
     {
       "name": "ci-cd-and-automation",
       "path": "skills/ci-cd-and-automation/SKILL.md",
-      "description": "Use when setting up CI/CD pipelines, GitHub Actions workflows, automated testing in CI, or deployment automation — covers pipeline design, caching, secrets management, and release workflows",
+      "description": "Use when setting up CI/CD pipelines, GitHub Actions workflows, automated testing in CI, or deployment automation \u2014 covers pipeline design, caching, secrets management, and release workflows",
       "version": "1.0.0",
       "tags": [
         "devops",
@@ -265,7 +326,7 @@
     {
       "name": "cloudflare",
       "path": "skills/cloudflare/SKILL.md",
-      "description": "Use when deploying to or configuring ANY Cloudflare service — Workers, Pages, KV, D1, R2, AI, Tunnel, WAF. MUST load before writing Cloudflare Workers code, wrangler configs, or infrastructure-as-code for Cloudflare.",
+      "description": "Use when deploying to or configuring ANY Cloudflare service \u2014 Workers, Pages, KV, D1, R2, AI, Tunnel, WAF. MUST load before writing Cloudflare Workers code, wrangler configs, or infrastructure-as-code for Cloudflare.",
       "version": "1.0.0",
       "tags": [
         "integration",
@@ -357,7 +418,7 @@
     {
       "name": "core-data-expert",
       "path": "skills/core-data-expert/SKILL.md",
-      "description": "Use when writing, debugging, or optimizing Core Data code on iOS/macOS — fetch requests, migrations, merge conflicts, threading, CloudKit sync. MUST load before any Core Data schema changes or performance work.",
+      "description": "Use when writing, debugging, or optimizing Core Data code on iOS/macOS \u2014 fetch requests, migrations, merge conflicts, threading, CloudKit sync. MUST load before any Core Data schema changes or performance work.",
       "version": "1.0.0",
       "tags": [
         "apple",
@@ -376,7 +437,7 @@
     {
       "name": "customize-pi",
       "path": "skills/customize-pi/SKILL.md",
-      "description": "Use when optimizing Pi configuration — settings.json tuning, provider setup, context window limits, compaction, keybindings, extensions, skills, packages, model cycling, or troubleshooting Pi behavior. Covers the full customization surface from quick tweaks to architecture decisions.",
+      "description": "Use when optimizing Pi configuration \u2014 settings.json tuning, provider setup, context window limits, compaction, keybindings, extensions, skills, packages, model cycling, or troubleshooting Pi behavior. Covers the full customization surface from quick tweaks to architecture decisions.",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -422,7 +483,7 @@
     {
       "name": "deep-module-design",
       "path": "skills/deep-module-design/SKILL.md",
-      "description": "Applies Ousterhout's deep module principles to code design — small interfaces, information hiding, pull complexity downward. Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.",
+      "description": "Applies Ousterhout's deep module principles to code design \u2014 small interfaces, information hiding, pull complexity downward. Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -478,7 +539,7 @@
     {
       "name": "deprecation-and-migration",
       "path": "skills/deprecation-and-migration/SKILL.md",
-      "description": "Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes — covers deprecation notices, migration guides, codemods, and staged rollout",
+      "description": "Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes \u2014 covers deprecation notices, migration guides, codemods, and staged rollout",
       "version": "1.0.0",
       "tags": [
         "architecture",
@@ -497,7 +558,7 @@
     {
       "name": "design-system-audit",
       "path": "skills/design-system-audit/SKILL.md",
-      "description": "Use when auditing an existing design system for consistency — token audits, pattern analysis, visual comparison against design specs. Load AFTER implementation to review, not during initial build.",
+      "description": "Use when auditing an existing design system for consistency \u2014 token audits, pattern analysis, visual comparison against design specs. Load AFTER implementation to review, not during initial build.",
       "version": "2.0.0",
       "tags": [
         "design",
@@ -535,7 +596,7 @@
     {
       "name": "development-lifecycle",
       "path": "skills/development-lifecycle/SKILL.md",
-      "description": "Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm → grill → ADR → specify → plan → implement → verify) and loads appropriate sub-skills at each stage.",
+      "description": "Orchestrates the full feature development lifecycle from ideation through verification. Guides through phases (brainstorm \u2192 grill \u2192 ADR \u2192 specify \u2192 plan \u2192 implement \u2192 verify) and loads appropriate sub-skills at each stage.",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -554,7 +615,7 @@
     {
       "name": "diagnose",
       "path": "skills/diagnose/SKILL.md",
-      "description": "Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce → minimise → hypothesise → instrument → fix → regression-test. Use when user says \"diagnose this\" / \"debug this\", reports a bug, says something is broken/throwing/failing, or describes a performance regression.",
+      "description": "Disciplined diagnosis loop for hard bugs and performance regressions. Reproduce \u2192 minimise \u2192 hypothesise \u2192 instrument \u2192 fix \u2192 regression-test. Use when user says \"diagnose this\" / \"debug this\", reports a bug, says something is broken/throwing/failing, or describes a performance regression.",
       "version": "1.0.0",
       "tags": [
         "debugging",
@@ -606,7 +667,7 @@
     {
       "name": "documentation-and-adrs",
       "path": "skills/documentation-and-adrs/SKILL.md",
-      "description": "Use when writing technical documentation, Architecture Decision Records (ADRs), API docs, or project READMEs — covers documentation structure, ADR format, and keeping docs in sync with code",
+      "description": "Use when writing technical documentation, Architecture Decision Records (ADRs), API docs, or project READMEs \u2014 covers documentation structure, ADR format, and keeping docs in sync with code",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -621,6 +682,105 @@
       "tools": [],
       "status": "core",
       "pack": "core"
+    },
+    {
+      "name": "effect-http-api",
+      "path": "skills/effect-http-api/SKILL.md",
+      "description": "Use when building HTTP APIs with Effect HttpApi \u2014 defining typed endpoints and groups, implementing handlers with Effect services, mapping service errors to HTTP errors with proper status codes, adding SSE streaming endpoints, implementing auth middleware with typed provides, generating OpenAPI documentation, and serving production HTTP servers. MUST load before writing any HttpApi endpoint or handler.",
+      "version": "1.0.0",
+      "tags": [
+        "backend",
+        "http",
+        "api"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Effect HttpApi",
+        "HttpApi endpoint",
+        "HttpApiGroup",
+        "typed HTTP API",
+        "SSE streaming",
+        "OpenAPI generation",
+        "HttpApi middleware",
+        "effect HTTP server",
+        "schema-first API"
+      ]
+    },
+    {
+      "name": "effect-schema",
+      "path": "skills/effect-schema/SKILL.md",
+      "description": "Use when defining data validation schemas, domain types, branded primitives, or typed errors with Effect Schema in a TypeScript project. Covers Schema.Struct vs Schema.Class, Schema.TaggedErrorClass for domain errors, branded types for type-safe primitives, decodeUnknownEffect pipeline, filters, transformations, JSON Schema/OpenAPI generation, and Zod replacement patterns. MUST load before writing any Schema definitions in an Effect-based codebase.",
+      "version": "1.0.0",
+      "tags": [
+        "typescript",
+        "validation",
+        "backend"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "Effect Schema",
+        "Schema.Class",
+        "Schema.Struct",
+        "Schema.TaggedErrorClass",
+        "branded types",
+        "data validation",
+        "decodeUnknownEffect",
+        "JSON Schema generation",
+        "Effect error handling",
+        "Zod replacement"
+      ]
+    },
+    {
+      "name": "fallow",
+      "path": "skills/fallow/SKILL.md",
+      "description": "Use when analyzing code quality, finding dead code, detecting duplication, assessing complexity, checking blast radius, or cleaning up a TS/JS codebase \u2014 Fallow provides deterministic static analysis (dead code, dupes, health) and optional runtime intelligence.",
+      "version": "1.0.0",
+      "tags": [
+        "code-quality",
+        "static-analysis",
+        "cleanup",
+        "typescript",
+        "javascript"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [
+        "bash"
+      ],
+      "status": "optional",
+      "pack": "code-quality"
     },
     {
       "name": "figma",
@@ -655,33 +815,9 @@
       ]
     },
     {
-      "name": "fallow",
-      "path": "skills/fallow/SKILL.md",
-      "description": "Use when analyzing code quality, finding dead code, detecting duplication, assessing complexity, checking blast radius, or cleaning up a TS/JS codebase — Fallow provides deterministic static analysis (dead code, dupes, health) and optional runtime intelligence.",
-      "version": "1.0.0",
-      "tags": [
-        "code-quality",
-        "static-analysis",
-        "cleanup",
-        "typescript",
-        "javascript"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [
-        "bash"
-      ],
-      "status": "optional",
-      "pack": "code-quality"
-    },
-    {
       "name": "frontend-design",
       "path": "skills/frontend-design/SKILL.md",
-      "description": "MUST load when building any web UI with React-based frameworks — components, pages, or full applications. Covers Tailwind CSS v4, shadcn/ui, Motion animations. Base UI implementation skill; combine with aesthetic overlays (minimalist-ui, high-end-visual-design) for specific styles.",
+      "description": "MUST load when building any web UI with React-based frameworks \u2014 components, pages, or full applications. Covers Tailwind CSS v4, shadcn/ui, Motion animations. Base UI implementation skill; combine with aesthetic overlays (minimalist-ui, high-end-visual-design) for specific styles.",
       "version": "1.1.0",
       "tags": [
         "ui",
@@ -733,7 +869,7 @@
     {
       "name": "grill-me",
       "path": "skills/grill-me/SKILL.md",
-      "description": "Adversarial interrogation of ideas before implementation — pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use when you have a rough idea, ADR, PRD, or spec that needs to survive scrutiny before code is written.",
+      "description": "Adversarial interrogation of ideas before implementation \u2014 pushes on ambiguity, hidden assumptions, missing constraints, and hand-waving. Use when you have a rough idea, ADR, PRD, or spec that needs to survive scrutiny before code is written.",
       "version": "1.0.0",
       "tags": [
         "planning",
@@ -890,9 +1026,48 @@
       "pack": "frontend"
     },
     {
+      "name": "inference-service",
+      "path": "skills/inference-service/SKILL.md",
+      "description": "Use when building, reviewing, or debugging inference service backends in TypeScript/JavaScript \u2014 covers request ingestion architecture, batching strategies, semantic caching, SSE streaming, circuit breakers, fallback chains, rate limiting, GPU observability, and graceful degradation. MUST load before designing inference service architecture or writing any inference-serving code.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "infrastructure",
+        "backend"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "inference service architecture",
+        "inference-serving code",
+        "model serving backend",
+        "LLM serving",
+        "vLLM",
+        "TGI",
+        "ONNX Runtime Node",
+        "Redis Streams inference",
+        "semantic cache",
+        "inference circuit breaker",
+        "SSE streaming"
+      ]
+    },
+    {
       "name": "jira",
       "path": "skills/jira/SKILL.md",
-      "description": "Use when interacting with Jira issues or Confluence docs — searching tickets, creating issues, updating status, or reading wiki pages. MUST load before any Atlassian integration. Requires network access to Atlassian MCP.",
+      "description": "Use when interacting with Jira issues or Confluence docs \u2014 searching tickets, creating issues, updating status, or reading wiki pages. MUST load before any Atlassian integration. Requires network access to Atlassian MCP.",
       "version": "1.0.0",
       "tags": [
         "integration",
@@ -966,6 +1141,85 @@
       "pack": "integrations"
     },
     {
+      "name": "opencode-ts-package",
+      "path": "skills/opencode-ts-package/SKILL.md",
+      "description": "Use when creating a new npm package in a TypeScript monorepo, setting up package.json exports and build configuration, structuring internal vs published packages, handling platform-specific code with conditional imports, or configuring workspace/catalog dependency management. MUST load before creating a new package or modifying package.json in an Effect-based monorepo.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "typescript",
+        "devops"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "new npm package",
+        "package.json configuration",
+        "TypeScript monorepo",
+        "exports map",
+        "conditional imports",
+        "workspace protocol",
+        "catalog protocol",
+        "published library",
+        "internal package",
+        "Bun package setup",
+        "platform-specific code"
+      ]
+    },
+    {
+      "name": "opencode-ts-service",
+      "path": "skills/opencode-ts-service/SKILL.md",
+      "description": "Use when starting a new TypeScript project from scratch, organizing a codebase following OpenCode-style patterns, setting up Effect TS service architecture, or structuring TypeScript services with proper module conventions, type-safe error handling, and dependency injection. MUST load before writing any new service or module for a project following Effect-based architecture.",
+      "version": "1.0.0",
+      "tags": [
+        "architecture",
+        "typescript",
+        "backend"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "core",
+      "pack": "core",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "conditional"
+      },
+      "trigger_strength": "mandatory",
+      "triggers": [
+        "new TypeScript project",
+        "project structure",
+        "Effect TS service",
+        "Context.Tag",
+        "Effect Layer",
+        "Schema.TaggedErrorClass",
+        "module organization",
+        "namespace projection",
+        "OpenCode patterns",
+        "Effect service architecture",
+        "TypeScript monorepo setup",
+        "Effect platform"
+      ]
+    },
+    {
       "name": "openpencil",
       "path": "skills/openpencil/SKILL.md",
       "description": "Open-source AI-native vector design tool with concurrent agent teams, multi-model intelligence, and multi-platform code export. Create and edit .op design files via MCP or CLI. Supports React, Vue, Svelte, Flutter, SwiftUI, Compose, React Native export. Requires OpenPencil app running.",
@@ -1011,7 +1265,7 @@
     {
       "name": "pdf-extract",
       "path": "skills/pdf-extract/SKILL.md",
-      "description": "Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction library based on PDF complexity — simple text vs structured data vs complex layouts.",
+      "description": "Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction library based on PDF complexity \u2014 simple text vs structured data vs complex layouts.",
       "version": "1.0.0",
       "tags": [
         "research",
@@ -1030,7 +1284,7 @@
     {
       "name": "performance-optimization",
       "path": "skills/performance-optimization/SKILL.md",
-      "description": "Use when profiling, optimizing, or adding performance budgets to applications — covers measure-first workflow, Core Web Vitals, common anti-patterns, and performance regression prevention",
+      "description": "Use when profiling, optimizing, or adding performance budgets to applications \u2014 covers measure-first workflow, Core Web Vitals, common anti-patterns, and performance regression prevention",
       "version": "1.0.0",
       "tags": [
         "performance",
@@ -1140,7 +1394,7 @@
     {
       "name": "prototype",
       "path": "skills/prototype/SKILL.md",
-      "description": "Build a throwaway prototype to flesh out a design before committing to it. Routes between two branches — a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route. Use when the user wants to prototype, sanity-check a data model or state machine, mock up a UI, explore design options, or says \"prototype this\", \"let me play with it\", \"try a few designs\".",
+      "description": "Build a throwaway prototype to flesh out a design before committing to it. Routes between two branches \u2014 a runnable terminal app for state/business-logic questions, or several radically different UI variations toggleable from one route. Use when the user wants to prototype, sanity-check a data model or state machine, mock up a UI, explore design options, or says \"prototype this\", \"let me play with it\", \"try a few designs\".",
       "version": "1.0.0",
       "tags": [
         "planning",
@@ -1170,7 +1424,7 @@
     {
       "name": "quality-loop",
       "path": "skills/quality-loop/SKILL.md",
-      "description": "After implementation, run an iterative fix-verify loop until all quality gates pass or max iterations reached. Wraps verification into a loop that auto-fixes issues and re-verifies — prevents the single-shot verification failure mode where a fix introduces new issues.",
+      "description": "After implementation, run an iterative fix-verify loop until all quality gates pass or max iterations reached. Wraps verification into a loop that auto-fixes issues and re-verifies \u2014 prevents the single-shot verification failure mode where a fix introduces new issues.",
       "version": "1.0.0",
       "tags": [
         "workflow",
@@ -1196,7 +1450,7 @@
     {
       "name": "react-best-practices",
       "path": "skills/react-best-practices/SKILL.md",
-      "description": "MUST load when writing, reviewing, or refactoring React/Next.js code for performance. Covers Vercel Engineering patterns — components, data fetching, bundle optimization, server components. Critical for any Next.js performance work.",
+      "description": "MUST load when writing, reviewing, or refactoring React/Next.js code for performance. Covers Vercel Engineering patterns \u2014 components, data fetching, bundle optimization, server components. Critical for any Next.js performance work.",
       "version": "1.0.0",
       "tags": [
         "ui",
@@ -1294,7 +1548,7 @@
     {
       "name": "security-and-hardening",
       "path": "skills/security-and-hardening/SKILL.md",
-      "description": "Use when auditing for security vulnerabilities, implementing auth/authz, handling secrets, or hardening against OWASP Top 10 — covers input validation, authentication, dependency auditing, and secure defaults",
+      "description": "Use when auditing for security vulnerabilities, implementing auth/authz, handling secrets, or hardening against OWASP Top 10 \u2014 covers input validation, authentication, dependency auditing, and secure defaults",
       "version": "1.0.0",
       "tags": [
         "security",
@@ -1434,7 +1688,7 @@
     {
       "name": "supabase",
       "path": "skills/supabase/SKILL.md",
-      "description": "Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.",
+      "description": "Use when working with any Supabase service \u2014 database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.",
       "version": "1.0.0",
       "tags": [
         "integration",
@@ -1583,6 +1837,39 @@
       ]
     },
     {
+      "name": "typescript-coding-standards",
+      "path": "skills/typescript-coding-standards/SKILL.md",
+      "description": "Use when writing, refactoring, or reviewing TypeScript code that needs strong domain modeling, typed errors, schema parsing, safe adapters, test seams, or maintainable module boundaries.",
+      "version": "1.0.0",
+      "tags": [
+        "typescript",
+        "code-quality",
+        "architecture",
+        "testing"
+      ],
+      "dependencies": [],
+      "agent_types": [
+        "planner",
+        "worker",
+        "reviewer"
+      ],
+      "tools": [],
+      "status": "optional",
+      "pack": "typescript",
+      "role_usage": {
+        "planner": "recommend",
+        "worker": "load",
+        "reviewer": "load"
+      },
+      "trigger_strength": "recommended",
+      "triggers": [
+        "writing TypeScript code",
+        "reviewing TypeScript architecture",
+        "typed errors and domain modeling",
+        "schema parsing or adapters"
+      ]
+    },
+    {
       "name": "using-git-worktrees",
       "path": "skills/using-git-worktrees/SKILL.md",
       "description": "Use when starting feature work that needs isolation from current workspace or before executing implementation plans - creates isolated git worktrees with smart directory selection and safety verification",
@@ -1653,7 +1940,7 @@
     {
       "name": "webclaw",
       "path": "skills/webclaw/SKILL.md",
-      "description": "MUST load when webfetch returns 403 or bot protection errors, when crawling documentation sites, batch-extracting pages, or extracting brand identity. Primary web scraping tool — prefer over webfetch for all non-trivial scraping.",
+      "description": "MUST load when webfetch returns 403 or bot protection errors, when crawling documentation sites, batch-extracting pages, or extracting brand identity. Primary web scraping tool \u2014 prefer over webfetch for all non-trivial scraping.",
       "version": "1.0.0",
       "tags": [
         "workflow"
@@ -1728,199 +2015,6 @@
         "tunnel vision",
         "need broader context",
         "explain system context"
-      ]
-    },
-    {
-      "name": "inference-service",
-      "path": "skills/inference-service/SKILL.md",
-      "description": "Use when building, reviewing, or debugging inference service backends in TypeScript/JavaScript — covers request ingestion architecture, batching strategies, semantic caching, SSE streaming, circuit breakers, fallback chains, rate limiting, GPU observability, and graceful degradation. MUST load before designing inference service architecture or writing any inference-serving code.",
-      "version": "1.0.0",
-      "tags": [
-        "architecture",
-        "infrastructure",
-        "backend"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core",
-      "role_usage": {
-        "planner": "recommend",
-        "worker": "load",
-        "reviewer": "conditional"
-      },
-      "trigger_strength": "mandatory",
-      "triggers": [
-        "inference service architecture",
-        "inference-serving code",
-        "model serving backend",
-        "LLM serving",
-        "vLLM",
-        "TGI",
-        "ONNX Runtime Node",
-        "Redis Streams inference",
-        "semantic cache",
-        "inference circuit breaker",
-        "SSE streaming"
-      ]
-    },
-    {
-      "name": "opencode-ts-service",
-      "path": "skills/opencode-ts-service/SKILL.md",
-      "description": "Use when starting a new TypeScript project from scratch, organizing a codebase following OpenCode-style patterns, setting up Effect TS service architecture, or structuring TypeScript services with proper module conventions, type-safe error handling, and dependency injection. MUST load before writing any new service or module for a project following Effect-based architecture.",
-      "version": "1.0.0",
-      "tags": [
-        "architecture",
-        "typescript",
-        "backend"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core",
-      "role_usage": {
-        "planner": "recommend",
-        "worker": "load",
-        "reviewer": "conditional"
-      },
-      "trigger_strength": "mandatory",
-      "triggers": [
-        "new TypeScript project",
-        "project structure",
-        "Effect TS service",
-        "Context.Tag",
-        "Effect Layer",
-        "Schema.TaggedErrorClass",
-        "module organization",
-        "namespace projection",
-        "OpenCode patterns",
-        "Effect service architecture",
-        "TypeScript monorepo setup",
-        "Effect platform"
-      ]
-    },
-    {
-      "name": "opencode-ts-package",
-      "path": "skills/opencode-ts-package/SKILL.md",
-      "description": "Use when creating a new npm package in a TypeScript monorepo, setting up package.json exports and build configuration, structuring internal vs published packages, handling platform-specific code with conditional imports, or configuring workspace/catalog dependency management. MUST load before creating a new package or modifying package.json in an Effect-based monorepo.",
-      "version": "1.0.0",
-      "tags": [
-        "architecture",
-        "typescript",
-        "devops"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core",
-      "role_usage": {
-        "planner": "recommend",
-        "worker": "load",
-        "reviewer": "conditional"
-      },
-      "trigger_strength": "mandatory",
-      "triggers": [
-        "new npm package",
-        "package.json configuration",
-        "TypeScript monorepo",
-        "exports map",
-        "conditional imports",
-        "workspace protocol",
-        "catalog protocol",
-        "published library",
-        "internal package",
-        "Bun package setup",
-        "platform-specific code"
-      ]
-    },
-    {
-      "name": "effect-schema",
-      "path": "skills/effect-schema/SKILL.md",
-      "description": "Use when defining data validation schemas, domain types, branded primitives, or typed errors with Effect Schema in a TypeScript project. Covers Schema.Struct vs Schema.Class, Schema.TaggedErrorClass for domain errors, branded types for type-safe primitives, decodeUnknownEffect pipeline, filters, transformations, JSON Schema/OpenAPI generation, and Zod replacement patterns. MUST load before writing any Schema definitions in an Effect-based codebase.",
-      "version": "1.0.0",
-      "tags": [
-        "typescript",
-        "validation",
-        "backend"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core",
-      "role_usage": {
-        "planner": "recommend",
-        "worker": "load",
-        "reviewer": "conditional"
-      },
-      "trigger_strength": "mandatory",
-      "triggers": [
-        "Effect Schema",
-        "Schema.Class",
-        "Schema.Struct",
-        "Schema.TaggedErrorClass",
-        "branded types",
-        "data validation",
-        "decodeUnknownEffect",
-        "JSON Schema generation",
-        "Effect error handling",
-        "Zod replacement"
-      ]
-    },
-    {
-      "name": "effect-http-api",
-      "path": "skills/effect-http-api/SKILL.md",
-      "description": "Use when building HTTP APIs with Effect HttpApi — defining typed endpoints and groups, implementing handlers with Effect services, mapping service errors to HTTP errors with proper status codes, adding SSE streaming endpoints, implementing auth middleware with typed provides, generating OpenAPI documentation, and serving production HTTP servers. MUST load before writing any HttpApi endpoint or handler.",
-      "version": "1.0.0",
-      "tags": [
-        "backend",
-        "http",
-        "api"
-      ],
-      "dependencies": [],
-      "agent_types": [
-        "planner",
-        "worker",
-        "reviewer"
-      ],
-      "tools": [],
-      "status": "core",
-      "pack": "core",
-      "role_usage": {
-        "planner": "recommend",
-        "worker": "load",
-        "reviewer": "conditional"
-      },
-      "trigger_strength": "mandatory",
-      "triggers": [
-        "Effect HttpApi",
-        "HttpApi endpoint",
-        "HttpApiGroup",
-        "typed HTTP API",
-        "SSE streaming",
-        "OpenAPI generation",
-        "HttpApi middleware",
-        "effect HTTP server",
-        "schema-first API"
       ]
     }
   ]
