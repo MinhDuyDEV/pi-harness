@@ -43,6 +43,91 @@ function runTmux(args: string[]): string {
 	return execFileSync("tmux", args, { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
+export type InteractivePaneSplitDirection = "-h" | "-v";
+
+export function chooseInteractivePaneSplitDirection(paneWidth: number, paneHeight: number): InteractivePaneSplitDirection {
+	const minSideBySideWidth = 160;
+	const minStackedHeight = 24;
+
+	if (Number.isFinite(paneWidth) && paneWidth >= minSideBySideWidth) return "-h";
+	if (Number.isFinite(paneHeight) && paneHeight >= minStackedHeight) return "-v";
+	return "-h";
+}
+
+function readPaneSize(paneId: string): { width: number; height: number } | null {
+	try {
+		const raw = runTmux(["display-message", "-p", "-t", paneId, "#{pane_width} #{pane_height}"]);
+		const [widthRaw, heightRaw] = raw.trim().split(/\s+/, 2);
+		const width = Number(widthRaw);
+		const height = Number(heightRaw);
+		if (!Number.isFinite(width) || !Number.isFinite(height)) return null;
+		return { width, height };
+	} catch {
+		return null;
+	}
+}
+
+export function buildInteractivePaneSplitArgs(opts: {
+	cwd: string;
+	command: string;
+	targetPane: string;
+	direction: InteractivePaneSplitDirection;
+}): string[] {
+	return ["split-window", opts.direction, "-P", "-F", "#{pane_id}", "-t", opts.targetPane, "-p", "50", "-c", opts.cwd, opts.command];
+}
+
+export type InteractivePaneInfo = {
+	id: string;
+	width: number;
+	height: number;
+	title: string;
+};
+
+function parseWindowPanes(raw: string): InteractivePaneInfo[] {
+	return raw
+		.split("\n")
+		.map((line) => line.trim())
+		.filter(Boolean)
+		.flatMap((line) => {
+			const [id, widthRaw, heightRaw, title = ""] = line.split("\t");
+			const width = Number(widthRaw);
+			const height = Number(heightRaw);
+			if (!id || !Number.isFinite(width) || !Number.isFinite(height)) return [];
+			return [{ id, width, height, title }];
+		});
+}
+
+function readWindowPanes(): InteractivePaneInfo[] {
+	try {
+		return parseWindowPanes(runTmux(["list-panes", "-F", "#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_title}"]));
+	} catch {
+		return [];
+	}
+}
+
+function readTrackedPaneIds(runDir: string): Set<string> {
+	const paneIds = new Set<string>();
+	try {
+		for (const entry of readdirSync(runDir, { withFileTypes: true })) {
+			if (!entry.isDirectory()) continue;
+			const paneId = readFileSync(join(runDir, entry.name, "PANE.txt"), "utf-8").trim();
+			if (paneId) paneIds.add(paneId);
+		}
+	} catch {
+		// Best effort: new runs may not have any panes yet, or old runs may lack PANE.txt.
+	}
+	return paneIds;
+}
+
+export function chooseInteractivePaneSplitTarget(originalPane: string, panes: InteractivePaneInfo[], trackedPaneIds = new Set<string>()): string {
+	const trackedTaskPanes = panes.filter((pane) => pane.id !== originalPane && trackedPaneIds.has(pane.id));
+	const titledTaskPanes = panes.filter((pane) => pane.id !== originalPane && /(?:^|\b)task-[a-z0-9-]+(?:\b|$)/i.test(pane.title));
+	const taskPanes = trackedTaskPanes.length > 0 ? trackedTaskPanes : titledTaskPanes;
+	const candidates = taskPanes.length > 0 ? taskPanes : panes.filter((pane) => pane.id === originalPane);
+	const [best] = [...candidates].sort((a, b) => b.width * b.height - a.width * a.height);
+	return best?.id ?? originalPane;
+}
+
 function tmuxPaneExists(paneId: string): boolean {
 	try {
 		return runTmux(["list-panes", "-a", "-F", "#{pane_id}"]).split("\n").includes(paneId);
@@ -214,10 +299,18 @@ export async function runInteractivePaneAgent(opts: InteractivePaneRunOptions): 
 	].join("; ");
 
 	const originalPane = runTmux(["display-message", "-p", "#{pane_id}"]);
-	const paneId = runTmux(["split-window", "-h", "-P", "-F", "#{pane_id}", "-c", opts.runCwd, `bash -lc ${shellQuote(script)}`]);
+	const targetPane = chooseInteractivePaneSplitTarget(originalPane, readWindowPanes(), readTrackedPaneIds(opts.runDir));
+	const paneSize = readPaneSize(targetPane);
+	const direction = chooseInteractivePaneSplitDirection(paneSize?.width ?? 0, paneSize?.height ?? 0);
+	const paneId = runTmux(buildInteractivePaneSplitArgs({
+		cwd: opts.runCwd,
+		command: `bash -lc ${shellQuote(script)}`,
+		targetPane,
+		direction,
+	}));
 	writeFileSync(join(agentDir, "PANE.txt"), paneId, "utf-8");
 	try {
-		runTmux(["select-layout", "tiled"]);
+		runTmux(["select-pane", "-t", paneId, "-T", `π - ${opts.subDir} - .pi`]);
 		runTmux(["select-pane", "-t", originalPane]);
 	} catch {
 		// best-effort: keep the user's main pi pane focused
