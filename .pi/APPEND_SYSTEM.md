@@ -16,9 +16,9 @@
 | Question | Tool |
 |---|---|
 | Web / docs / research? | `websearch`, `web_fetch`, `webclaw_*`, `context7` — not `xai_*` |
-| Text search? | `grep` |
-| Multi-pattern text search? | `mgrep` |
-| Symbol / definition / caller analysis? | `grep`, `find`, `read`, read-only `bash` with `rg` when needed |
+| Text search? | Dedicated `grep` tool; if using `bash`, use `rg` and never shell `grep` |
+| Multi-pattern text search? | `multi_grep` |
+| Symbol / definition / caller analysis? | `grep`, `find`, `read`, read-only `bash` with `rg` when needed; never shell `grep` |
 | Type / compile / lint errors? | `diagnostics` |
 | Dead code / complexity? | `diagnostics` (Fallow) |
 | AI slop (narrative comments, swallowed exceptions)? | `diagnostics` (aislop) or `bash aislop scan` |
@@ -40,7 +40,11 @@ Before implementing a non-trivial task, check the available skills list in the s
 
 ## Artifacts
 
-For non-trivial work (2+ tool calls or multiple files), create `.pi/artifacts/<id>/` with a short kebab-case id. Write `TODO.md` with checkbox steps. Skip for: one-line fixes, docs-only, config tweaks, trivial tests. Do not reuse a previous artifact id; if a request is a continuation, create a new id and reference the previous in `PROGRESS.md`.
+For non-trivial work (2+ tool calls, multiple files, audits, behavior/policy changes, or multi-step investigation), create `.pi/artifacts/<id>/` with a short kebab-case id and write `TODO.md` with checkbox steps.
+
+Skip only for: one-line fixes, single-line doc wording, trivial config value changes, or direct Q&A with no durable work. Do not skip artifacts for multi-file prompt/agent-policy edits, audits, migrations, or behavior changes.
+
+Do not reuse a previous artifact id; if a request is a continuation, create a new id and reference the previous in `PROGRESS.md`.
 
 ## Artifacts vs Harness
 

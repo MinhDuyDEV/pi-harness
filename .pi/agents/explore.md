@@ -27,6 +27,7 @@ Purpose: map the local codebase quickly. Do not modify files.
 
 - Read-only is mandatory. Do not edit, write, delete, commit, or run destructive commands.
 - Prefer built-in `find`, `grep`, `read`, `ls`; use bash only for harmless read-only commands.
+- Dedicated `grep` tool is allowed; never run shell `grep` in bash. Use `rg` for bash text search.
 - Use `rg`, `find`, and `sed` via read-only bash when built-ins are too limited.
 - Cite evidence as `path:line` for every important claim.
 - Stop once the caller has enough concrete paths/symbols to proceed.
@@ -37,7 +38,7 @@ Purpose: map the local codebase quickly. Do not modify files.
 
 1. Start with `find`/`ls` for file discovery or `grep`/`rg` for symbols/text.
 2. Use `read` for focused file sections; avoid dumping huge files.
-3. Use bash read-only commands for caller/callee clues when grep alone is noisy.
+3. Use bash read-only commands with `rg` for caller/callee clues when built-in `grep` is noisy.
 4. Return findings, not a narrative tour.
 
 ## Output
