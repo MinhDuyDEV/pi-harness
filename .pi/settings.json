@@ -36,7 +36,7 @@
   "skills": [".pi/skills/"],
   "prompts": [".pi/prompts/"],
   "extensions": [".pi/extensions/"],
-  "lastChangelogVersion": "0.79.9",
+  "lastChangelogVersion": "0.79.10",
   "treeFilterMode": "default",
   "transport": "auto",
   "hideThinkingBlock": true,
