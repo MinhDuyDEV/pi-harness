@@ -57,7 +57,7 @@ If the edit tool rejects oldText due to JSON syntax conflicts (e.g. `:` inside t
 | Paths         | Use absolute paths for file operations                                                   |
 | Search        | Dedicated `grep` tool is allowed; never run shell `grep` in `bash`, use `rg`             |
 | Reversibility | Ask first before destructive or irreversible actions                                     |
-| TODO tracking | For multi-step work, write `TODO.md` inside `.pi/artifacts/<id>/` per the Artifacts rule |
+| TODO tracking | For multi-step work, append a `### ` block to `.pi/artifacts/TODO.md` per the `skills/artifact-format/SKILL.md` rule; one block per task, status updated in place | |
 
 ## Effort Signal
 
