@@ -57,7 +57,7 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
 - `webclaw_scrape` / `webclaw_batch` — Web scraping (bot-protected pages)
 - `memory-search` / `memory-admin` / `observation` — Durable project knowledge
   - `/memory-compact [sinceDays]` — Per-project compaction of observations. Agent reads the raw payload, decides what to keep, replaces it with a curated summary.
-- `vcc_recall` / `compress` — Session history
+- `dcp_recall` / `compress` — Current-session history and curated compression
 
 If using `bash` for text search, never call shell `grep`; use ripgrep instead: `rg -n` for regex, `rg -nF` for literal strings, scoped by path/glob when possible. Use `rg -u`/`rg -uu` only when intentionally searching ignored/hidden files.
 

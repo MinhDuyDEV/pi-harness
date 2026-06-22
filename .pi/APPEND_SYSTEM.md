@@ -62,7 +62,7 @@ Artifacts = visible planning for direct-tool work. Harness = product-level build
 - Check `<project>/.pi/artifacts/notes/{ISO-week}.md` first — agent-written curated summaries, high-signal, per-project.
 - `memory-search` → durable project knowledge (FTS5 only, no embeddings).
 - `/memory-compact` → compress observations into the weekly note; then read + curate.
-- `vcc_recall` → current-session recovery (earlier output, commands, decisions).
+- `dcp_recall` → current-session recovery (earlier output, commands, decisions).
 - `npx fallow health --changed-since main --format json` → complexity and blast-radius before TS/JS edits.
 
 After either path, verify current code/config/git state from disk before acting.

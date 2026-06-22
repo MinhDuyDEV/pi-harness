@@ -273,7 +273,7 @@ For major tracked work:
 ## Context Management
 
 - Keep context high-signal
-- Use DCP/VCC tools to compress completed phases and recover targeted history
+- Use DCP tools (`dcp_recall` and `compress`) to compress completed phases and recover targeted history
 - After any context compaction, re-read: (1) this `AGENTS.md`, (2) the current task details, and (3) active state before continuing
 
 ---

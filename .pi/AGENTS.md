@@ -21,7 +21,7 @@ If sources conflict, state the conflict explicitly. Official docs > code > blog 
 - **Scope discipline.** Stay in scope. Don't live with broken windows in code you're changing.
 - **Complexity first.** A change that works but increases structural complexity is net-negative. No abstractions for single-use code, no flexibility that wasn't requested, no error handling for impossible scenarios.
 - **Reuse before create.** Search before creating. One home per concept.
-- **Memory hygiene.** `observation` is for decisions, patterns, bugs, learnings — not for chat logs, screenshots, build warnings, or single-line code snippets. Use it sparingly; 95% of `warning`-type observations are noise. Compaction notes go in `<project>/.pi/artifacts/notes/{ISO-week}.md` (per-project, not `~/.config/pi/memory/notes/`). Use `findProjectRoot()` (or walk up looking for `package.json`) before writing project-scoped files.
+- **Memory hygiene.** Use `dcp_recall` for current-session recovery before creating durable memory. `observation` is for decisions, patterns, bugs, learnings — not for chat logs, screenshots, build warnings, or single-line code snippets. Use it sparingly; 95% of `warning`-type observations are noise. Compaction notes go in `<project>/.pi/artifacts/notes/{ISO-week}.md` (per-project, not `~/.config/pi/memory/notes/`). Use `findProjectRoot()` (or walk up looking for `package.json`) before writing project-scoped files.
 
 ## Edit Protocol
 
