@@ -99,6 +99,29 @@ export interface ToolResultPruningConfig {
   compactableTools: string[];
 }
 
+export interface DeterministicCompactionConfig {
+  enabled: boolean;
+  /** Own Pi compaction instead of delegating to Pi's default LLM summarizer */
+  overrideNative: boolean;
+  /** Number of transcript lines kept in the compacted summary */
+  maxTranscriptLines: number;
+  /** Maximum item count per semantic section */
+  maxSectionItems: number;
+}
+
+export interface SemanticEnrichmentConfig {
+  /** Optional LLM digest. Disabled by default so DCP is deterministic/cost-free like pi-vcc. */
+  enabled: boolean;
+  /** Provider/model name; empty means use Pi's default provider when a provider hook is available. */
+  provider: string;
+}
+
+export interface RecallConfig {
+  enabled: boolean;
+  /** Search raw ~/.pi/agent/sessions JSONL in addition to durable DCP blocks */
+  rawSessionSearch: boolean;
+}
+
 export interface DCPConfig {
   enabled: boolean;
   compress: CompressConfig;
@@ -110,6 +133,9 @@ export interface DCPConfig {
   probeEvaluation: ProbeConfig;
   toolResultPruning: ToolResultPruningConfig;
   qualityMetrics: QualityMetricsConfig;
+  deterministicCompaction: DeterministicCompactionConfig;
+  semanticEnrichment: SemanticEnrichmentConfig;
+  recall: RecallConfig;
   debug: boolean;
 }
 
@@ -118,8 +144,13 @@ export interface DCPConfig {
 // ---------------------------------------------------------------------------
 
 const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
-  "write", "edit", "compress", "observation",
-  "memory-search", "TaskCreate", "TaskUpdate",
+  "write",
+  "edit",
+  "compress",
+  "observation",
+  "memory-search",
+  "TaskCreate",
+  "TaskUpdate",
 ];
 
 export const DEFAULT_CONFIG: DCPConfig = {
@@ -172,13 +203,36 @@ export const DEFAULT_CONFIG: DCPConfig = {
     thresholdTokens: 40_000,
     protectedRecentTurns: 2,
     compactableTools: [
-      "read", "bash", "grep", "find", "ls", "glob", "webfetch",
-      "websearch", "codesearch", "grepsearch", "multi_grep",
+      "read",
+      "bash",
+      "grep",
+      "find",
+      "ls",
+      "glob",
+      "webfetch",
+      "websearch",
+      "codesearch",
+      "grepsearch",
+      "multi_grep",
     ],
   },
   qualityMetrics: {
     enabled: true,
     regressionWindow: 5,
     trackReReads: true,
+  },
+  deterministicCompaction: {
+    enabled: true,
+    overrideNative: true,
+    maxTranscriptLines: 140,
+    maxSectionItems: 24,
+  },
+  semanticEnrichment: {
+    enabled: false,
+    provider: "",
+  },
+  recall: {
+    enabled: true,
+    rawSessionSearch: true,
   },
 };

@@ -1,10 +1,9 @@
 /**
  * DCP Extension — Compression Engine
  *
- * In-memory compression block management, compress tool registration,
- * and context-event message stripping (compress-strip, dedup, purge-errors).
- *
- * No SQLite. No external state. All state lives in a vanilla Map keyed by session ID.
+ * Compression block management, compress tool registration,
+ * deterministic compaction, durable state, and context-event message stripping
+ * (compress-strip, dedup, purge-errors).
  */
 
 import type {
@@ -27,6 +26,21 @@ import type { DCPConfig, ProbeConfig } from "./config.js";
 import { applyCompressStrip } from "./compress-strip.js";
 import { applyDedup, applyPurgeErrors } from "./compress-dedup.js";
 import { pruneToolResults } from "./compress-prune.js";
+import {
+  getSessionKey,
+  loadDurableSessionState,
+  saveDurableSessionState,
+  type DurableSessionState,
+} from "./storage.js";
+
+export const DCP_STATE_ENTRY_TYPE = "dcp_state";
+
+export interface DcpStateEntryPayload {
+  version: 1;
+  reason: "session_start" | "compress_tool" | "compaction" | "tree" | "manual";
+  snapshot: DurableSessionState;
+  createdAt: number;
+}
 
 // ---------------------------------------------------------------------------
 // Custom message types (internal to DCP extension)
@@ -106,8 +120,17 @@ export interface ArtifactTrackerEntry {
 
 /** Tools whose outputs are regeneratable and safe to compact */
 const COMPACTABLE_TOOLS = new Set([
-  "read", "bash", "grep", "find", "ls", "glob", "webfetch",
-  "websearch", "codesearch", "grepsearch", "multi_grep",
+  "read",
+  "bash",
+  "grep",
+  "find",
+  "ls",
+  "glob",
+  "webfetch",
+  "websearch",
+  "codesearch",
+  "grepsearch",
+  "multi_grep",
 ]);
 
 /**
@@ -120,15 +143,22 @@ export function isCompactableTool(toolName: string): boolean {
 
 /** Tools whose path arguments should be tracked as "read" operations */
 export const READ_TOOLS = new Set([
-  "read", "grep", "find", "ls", "multi_grep", "grepsearch",
-  "web_fetch", "webclaw_scrape", "webclaw_batch",
-  "memory-search", "observation", "context7",
+  "read",
+  "grep",
+  "find",
+  "ls",
+  "multi_grep",
+  "grepsearch",
+  "web_fetch",
+  "webclaw_scrape",
+  "webclaw_batch",
+  "memory-search",
+  "observation",
+  "context7",
 ]);
 
 /** Tools whose path arguments should be tracked as "modify" operations */
-const MODIFY_TOOLS = new Set([
-  "write", "edit",
-]);
+const MODIFY_TOOLS = new Set(["write", "edit"]);
 
 // ---------------------------------------------------------------------------
 // Quality metrics types (P1: regression detection)
@@ -182,6 +212,7 @@ export interface CompressionBlock {
   endLabel: string;
   summaryTokens: number;
   createdAt: number; // timestamp
+  metadata?: Record<string, unknown>;
 }
 
 export interface SessionState {
@@ -218,30 +249,201 @@ function emptyPersistentSummary(): PersistentSessionSummary {
   };
 }
 
+export function getDcpSessionId(
+  ctx: Pick<ExtensionContext, "cwd" | "sessionManager">,
+): string {
+  return ctx.sessionManager.getSessionFile() ?? ctx.cwd;
+}
+
 export function getState(sessionId: string): SessionState {
   let s = sessions.get(sessionId);
   if (!s) {
-    s = {
-      blocks: [],
-      nextBlockId: 1,
-      totalStrippedTokens: 0,
-      totalPrunedCount: 0,
-      persistentSummary: emptyPersistentSummary(),
-      artifactTracker: new Map(),
-      qualityMetrics: {
-        reReadsAfterCompress: 0,
-        totalCompressions: 0,
-        cleanCompressions: 0,
-        regressionLog: [],
-        avgProbeScore: 0,
-        failedProbes: 0,
-      },
-      recentCompressFiles: null,
-      currentTurn: 0,
-    };
+    const durable = loadDurableSessionState(sessionId);
+    s = durable ? sessionStateFromDurable(durable) : newSessionState();
     sessions.set(sessionId, s);
   }
   return s;
+}
+
+function newSessionState(): SessionState {
+  return {
+    blocks: [],
+    nextBlockId: 1,
+    totalStrippedTokens: 0,
+    totalPrunedCount: 0,
+    persistentSummary: emptyPersistentSummary(),
+    artifactTracker: new Map(),
+    qualityMetrics: {
+      reReadsAfterCompress: 0,
+      totalCompressions: 0,
+      cleanCompressions: 0,
+      regressionLog: [],
+      avgProbeScore: 0,
+      failedProbes: 0,
+    },
+    recentCompressFiles: null,
+    currentTurn: 0,
+  };
+}
+
+function sessionStateFromDurable(durable: DurableSessionState): SessionState {
+  const state = newSessionState();
+  state.blocks = durable.blocks.map((block, index) => ({
+    blockId: Number(block.id.replace(/^b/, "")) || index + 1,
+    topic: block.topic,
+    summary: block.summary,
+    startLabel: block.startMessageId ?? "durable",
+    endLabel: block.endMessageId ?? "durable",
+    summaryTokens: Math.ceil(block.summary.length / 4),
+    createdAt: block.createdAt,
+    metadata: {
+      files_read: block.filesRead,
+      files_modified: block.filesModified,
+      decisions: block.decisions,
+      next_steps: block.nextSteps,
+      start_message_id: block.startMessageId,
+      end_message_id: block.endMessageId,
+      bead_id: block.beadId,
+      source: block.source,
+    },
+  }));
+  state.nextBlockId = Math.max(
+    1,
+    ...state.blocks.map((block) => block.blockId + 1),
+  );
+  state.artifactTracker = new Map(
+    durable.artifacts.map((artifact) => [artifact.path, artifact]),
+  );
+  if (
+    durable.persistentSummary &&
+    typeof durable.persistentSummary === "object"
+  ) {
+    state.persistentSummary =
+      durable.persistentSummary as PersistentSessionSummary;
+  }
+  state.qualityMetrics.totalCompressions = durable.compressEventCount;
+  state.currentTurn = durable.lastCompressTurn;
+  return state;
+}
+
+function durableFromSessionState(
+  sessionId: string,
+  state: SessionState,
+): DurableSessionState {
+  return {
+    version: 1,
+    sessionId,
+    sessionKey: getSessionKey(sessionId),
+    blocks: state.blocks.map((block) => ({
+      id: `b${block.blockId}`,
+      topic: block.topic,
+      summary: block.summary,
+      filesRead: parseMetadataArray(block.metadata?.files_read),
+      filesModified: parseMetadataArray(block.metadata?.files_modified),
+      decisions: parseMetadataArray(block.metadata?.decisions),
+      nextSteps: parseMetadataArray(block.metadata?.next_steps),
+      createdAt: block.createdAt,
+      startMessageId: parseMetadataString(block.metadata?.start_message_id),
+      endMessageId: parseMetadataString(block.metadata?.end_message_id),
+      beadId: parseMetadataString(block.metadata?.bead_id),
+      source: parseMetadataString(block.metadata?.source),
+    })),
+    artifacts: Array.from(state.artifactTracker.entries()).map(
+      ([path, artifact]) => ({ path, ...artifact }),
+    ),
+    persistentSummary: state.persistentSummary,
+    processedMessageIds: [],
+    lastDigest: undefined,
+    compressEventCount: state.qualityMetrics.totalCompressions,
+    lastCompressTurn: state.currentTurn,
+    updatedAt: Date.now(),
+  };
+}
+
+export function getDurableStateSnapshot(
+  sessionId: string,
+): DurableSessionState {
+  return durableFromSessionState(sessionId, getState(sessionId));
+}
+
+export function makeDcpStateEntryPayload(
+  sessionId: string,
+  reason: DcpStateEntryPayload["reason"],
+): DcpStateEntryPayload {
+  return {
+    version: 1,
+    reason,
+    snapshot: getDurableStateSnapshot(sessionId),
+    createdAt: Date.now(),
+  };
+}
+
+export function restoreDcpStateSnapshot(
+  sessionId: string,
+  snapshot: DurableSessionState,
+): void {
+  const normalized: DurableSessionState = {
+    ...snapshot,
+    sessionId,
+    sessionKey: getSessionKey(sessionId),
+  };
+  sessions.set(sessionId, sessionStateFromDurable(normalized));
+  saveDurableSessionState(normalized);
+}
+
+export function restoreDcpStateFromSessionEntries(
+  sessionId: string,
+  entries: readonly unknown[],
+): boolean {
+  let latest: { timestamp: number; snapshot: DurableSessionState } | undefined;
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const obj = entry as Record<string, unknown>;
+    const details =
+      obj.details && typeof obj.details === "object"
+        ? (obj.details as Record<string, unknown>)
+        : undefined;
+    const dcpDetails =
+      details?.dcp && typeof details.dcp === "object"
+        ? (details.dcp as Record<string, unknown>)
+        : undefined;
+    const data =
+      obj.data && typeof obj.data === "object"
+        ? (obj.data as Record<string, unknown>)
+        : undefined;
+    const payload = obj.customType === DCP_STATE_ENTRY_TYPE ? data : undefined;
+    const snapshot = (payload?.snapshot ?? dcpDetails?.snapshot) as
+      | DurableSessionState
+      | undefined;
+    if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.blocks))
+      continue;
+    const timestamp = typeof obj.timestamp === "number" ? obj.timestamp : 0;
+    if (!latest || timestamp >= latest.timestamp)
+      latest = { timestamp, snapshot };
+  }
+  if (!latest) return false;
+  restoreDcpStateSnapshot(sessionId, latest.snapshot);
+  return true;
+}
+
+function persistState(sessionId: string): void {
+  const state = sessions.get(sessionId);
+  if (!state) return;
+  saveDurableSessionState(durableFromSessionState(sessionId, state));
+}
+
+function parseMetadataArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string")
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  return [];
+}
+
+function parseMetadataString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 /** Clean up session state on shutdown */
@@ -259,6 +461,7 @@ export function addBlock(
   summary: string,
   startLabel: string,
   endLabel: string,
+  metadata?: Record<string, unknown>,
 ): CompressionBlock {
   const state = getState(sessionId);
   const block: CompressionBlock = {
@@ -269,8 +472,10 @@ export function addBlock(
     endLabel,
     summaryTokens: Math.ceil(summary.length / 4),
     createdAt: Date.now(),
+    metadata,
   };
   state.blocks.push(block);
+  persistState(sessionId);
   return block;
 }
 
@@ -318,9 +523,12 @@ export function mergeIntoPersistentSummary(
 
   // Merge files (deduplicated, newest-first ordering)
   const newReads = fields.files_read.filter((f) => !ps.files_read.includes(f));
-  const newModifies = fields.files_modified.filter((f) => !ps.files_modified.includes(f));
+  const newModifies = fields.files_modified.filter(
+    (f) => !ps.files_modified.includes(f),
+  );
   if (newReads.length > 0) ps.files_read = [...newReads, ...ps.files_read];
-  if (newModifies.length > 0) ps.files_modified = [...newModifies, ...ps.files_modified];
+  if (newModifies.length > 0)
+    ps.files_modified = [...newModifies, ...ps.files_modified];
 
   // Merge decisions (dedup by exact text match)
   const existingDecisionTexts = new Set(ps.decisions.map((d) => d.text));
@@ -343,6 +551,7 @@ export function mergeIntoPersistentSummary(
   ps.topic = topic;
   ps.merged_block_ids.push(blockId);
   ps.last_updated = Date.now();
+  persistState(sessionId);
 
   return ps;
 }
@@ -378,13 +587,14 @@ export function evaluateCompressionProbes(
     name: "file-coverage",
     pass: fileCoverageScore >= config.minFileCoverage,
     score: fileCoverageScore,
-    detail: hasReads && hasModifies
-      ? `${fields.files_read.length} read, ${fields.files_modified.length} modified`
-      : hasReads
-        ? `${fields.files_read.length} read, no modified files`
-        : hasModifies
-          ? `no read files, ${fields.files_modified.length} modified`
-          : "no file paths provided",
+    detail:
+      hasReads && hasModifies
+        ? `${fields.files_read.length} read, ${fields.files_modified.length} modified`
+        : hasReads
+          ? `${fields.files_read.length} read, no modified files`
+          : hasModifies
+            ? `no read files, ${fields.files_modified.length} modified`
+            : "no file paths provided",
   });
 
   // 2. Decision coverage probe: how many decisions captured?
@@ -401,9 +611,10 @@ export function evaluateCompressionProbes(
     name: "decision-coverage",
     pass: decisionScore >= config.minDecisionCoverage,
     score: decisionScore,
-    detail: decisionCount >= 1
-      ? `${decisionCount} decision${decisionCount !== 1 ? "s" : ""} captured`
-      : "no decisions recorded",
+    detail:
+      decisionCount >= 1
+        ? `${decisionCount} decision${decisionCount !== 1 ? "s" : ""} captured`
+        : "no decisions recorded",
   });
 
   // 3. Narrative depth probe: is the summary substantive?
@@ -422,9 +633,7 @@ export function evaluateCompressionProbes(
     name: "narrative-depth",
     pass: narrativeScore >= config.minNarrativeDepth,
     score: narrativeScore,
-    detail: narrativeLen > 0
-      ? `${narrativeLen} characters`
-      : "empty narrative",
+    detail: narrativeLen > 0 ? `${narrativeLen} characters` : "empty narrative",
   });
 
   // 4. Structure completeness probe: % of 4 structured fields filled
@@ -473,23 +682,28 @@ export function recordProbeResults(
   const n = state.qualityMetrics.totalCompressions;
   if (n > 0) {
     const prevAvg = state.qualityMetrics.avgProbeScore;
-    state.qualityMetrics.avgProbeScore = (prevAvg * (n - 1) + result.overallScore) / n;
+    state.qualityMetrics.avgProbeScore =
+      (prevAvg * (n - 1) + result.overallScore) / n;
   } else {
     state.qualityMetrics.avgProbeScore = result.overallScore;
   }
+  persistState(sessionId);
 }
 
 /**
  * Build a structured context message from the persistent summary.
  * This is what gets injected into the LLM context after compression.
  */
-export function buildCompressedSummaryMessage(summary: PersistentSessionSummary): string {
+export function buildCompressedSummaryMessage(
+  summary: PersistentSessionSummary,
+): string {
   const parts: string[] = [];
 
   // Header
-  const mergedLabel = summary.merged_block_ids.length === 1
-    ? `b${summary.merged_block_ids[0]}`
-    : `b${summary.merged_block_ids[0]}–b${summary.merged_block_ids[summary.merged_block_ids.length - 1]}`;
+  const mergedLabel =
+    summary.merged_block_ids.length === 1
+      ? `b${summary.merged_block_ids[0]}`
+      : `b${summary.merged_block_ids[0]}–b${summary.merged_block_ids[summary.merged_block_ids.length - 1]}`;
   parts.push(`\uF07C Session Context (${mergedLabel})`);
 
   // Topic
@@ -527,7 +741,9 @@ export function buildCompressedSummaryMessage(summary: PersistentSessionSummary)
     parts.push("", "\uF140 Next Steps:");
     parts.push(`  \u2022 ${latest.text}`);
     if (summary.next_steps.length > 1) {
-      parts.push(`  (${summary.next_steps.length - 1} prior step groups archived)`);
+      parts.push(
+        `  (${summary.next_steps.length - 1} prior step groups archived)`,
+      );
     }
   }
 
@@ -568,17 +784,20 @@ function extractStructuredFields(
   // Auto-extract file paths from summary text when structured fields are empty
   if (config.structuredSummary.autoExtractPaths) {
     if (fields.files_read.length === 0 && fields.files_modified.length === 0) {
-      const filePattern = /(?:\b(?:src|lib|app|test|config|public)\/[^\s,)]+(?:\.[a-z]+)?\b)|(?:\b[a-zA-Z0-9_-]+\/[a-zA-Z0-9._\/-]+\.[a-z]+\b)/g;
+      const filePattern =
+        /(?:\b(?:src|lib|app|test|config|public)\/[^\s,)]+(?:\.[a-z]+)?\b)|(?:\b[a-zA-Z0-9_-]+\/[a-zA-Z0-9._\/-]+\.[a-z]+\b)/g;
       const matches = narrative.match(filePattern);
       if (matches) {
         const readContext = /read|open|look|check|examine|review/i;
-        const modContext = /modify|edit|write|change|update|fix|add|create|delete|refactor/i;
+        const modContext =
+          /modify|edit|write|change|update|fix|add|create|delete|refactor/i;
         for (const m of [...new Set(matches)]) {
           const idx = narrative.indexOf(m);
           const start = Math.max(0, idx - 60);
           const lineContext = narrative.substring(start, idx + m.length + 60);
           if (modContext.test(lineContext)) {
-            if (!fields.files_modified.includes(m)) fields.files_modified.push(m);
+            if (!fields.files_modified.includes(m))
+              fields.files_modified.push(m);
           } else if (readContext.test(lineContext)) {
             if (!fields.files_read.includes(m)) fields.files_read.push(m);
           } else {
@@ -599,7 +818,10 @@ function extractStructuredFields(
 /**
  * Extract file path(s) from tool call arguments.
  */
-function extractPathFromArgs(toolName: string, args: Record<string, unknown>): string[] {
+function extractPathFromArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+): string[] {
   const paths: string[] = [];
 
   if (typeof args.path === "string" && args.path.trim()) {
@@ -665,7 +887,10 @@ export function trackToolCall(
 /**
  * Get current artifact tracker state.
  */
-export function getArtifactTracker(sessionId: string): { files_read: string[]; files_modified: string[] } {
+export function getArtifactTracker(sessionId: string): {
+  files_read: string[];
+  files_modified: string[];
+} {
   const ps = getState(sessionId).persistentSummary;
   return {
     files_read: [...ps.files_read],
@@ -697,6 +922,7 @@ export function recordCompressEvent(
     const entry = state.artifactTracker.get(f);
     if (entry) entry.wasCompressed = true;
   }
+  persistState(sessionId);
 }
 
 /**
@@ -715,6 +941,7 @@ export function checkCompressionRegression(
   const turnGap = state.currentTurn - state.recentCompressFiles.turn;
   if (turnGap > regressionWindow) {
     state.recentCompressFiles = null;
+    persistState(sessionId);
     return;
   }
 
@@ -729,7 +956,10 @@ export function checkCompressionRegression(
       const tc = part as ToolCall;
       if (!READ_TOOLS.has(tc.name)) continue;
 
-      const paths = extractPathFromArgs(tc.name, tc.arguments as Record<string, unknown>);
+      const paths = extractPathFromArgs(
+        tc.name,
+        tc.arguments as Record<string, unknown>,
+      );
       for (const p of paths) {
         if (compressedFiles.has(p)) {
           state.qualityMetrics.reReadsAfterCompress++;
@@ -744,6 +974,7 @@ export function checkCompressionRegression(
       }
     }
   }
+  persistState(sessionId);
 }
 
 /**
@@ -758,12 +989,15 @@ export function getQualityMetrics(sessionId: string): QualityMetricsData {
  */
 export function incrementTurn(sessionId: string): void {
   getState(sessionId).currentTurn++;
+  persistState(sessionId);
 }
 
 /**
  * Get persistent summary (for /dcp command).
  */
-export function getPersistentSummary(sessionId: string): PersistentSessionSummary {
+export function getPersistentSummary(
+  sessionId: string,
+): PersistentSessionSummary {
   return { ...getState(sessionId).persistentSummary };
 }
 
@@ -773,10 +1007,12 @@ export function getPersistentSummary(sessionId: string): PersistentSessionSummar
 export function getQualityStatus(sessionId: string): string {
   const qm = getState(sessionId).qualityMetrics;
   if (qm.totalCompressions === 0) return "";
-  const reReadPct = qm.totalCompressions > 0
-    ? Math.round((qm.reReadsAfterCompress / qm.totalCompressions) * 100)
-    : 0;
-  const streak = qm.cleanCompressions > 0 ? ` (${qm.cleanCompressions}\uF00C streak)` : "";
+  const reReadPct =
+    qm.totalCompressions > 0
+      ? Math.round((qm.reReadsAfterCompress / qm.totalCompressions) * 100)
+      : 0;
+  const streak =
+    qm.cleanCompressions > 0 ? ` (${qm.cleanCompressions}\uF00C streak)` : "";
   let status = `Regression: ${qm.reReadsAfterCompress}/${qm.totalCompressions} (${reReadPct}%)${streak}`;
 
   // Add probe score if available
@@ -814,8 +1050,10 @@ export function estimateTokens(msg: Message): number {
   if (msg.role === "assistant") {
     const asst = msg as AssistantMessage;
     for (const part of asst.content) {
-      if (part.type === "text") chars += (part as TextContent).text?.length ?? 0;
-      else if (part.type === "thinking") chars += (part as ThinkingContent).thinking?.length ?? 0;
+      if (part.type === "text")
+        chars += (part as TextContent).text?.length ?? 0;
+      else if (part.type === "thinking")
+        chars += (part as ThinkingContent).thinking?.length ?? 0;
       else if (part.type === "toolCall") {
         const tc = part as ToolCall;
         chars += tc.name.length + JSON.stringify(tc.arguments).length;
@@ -825,15 +1063,28 @@ export function estimateTokens(msg: Message): number {
     const um = msg as UserMessage;
     if (typeof um.content === "string") chars = um.content.length;
     else if (Array.isArray(um.content))
-      chars = um.content.reduce((s: number, c: TextContent | ImageContent) => s + (c.type === "text" ? c.text.length : 0), 0);
+      chars = um.content.reduce(
+        (s: number, c: TextContent | ImageContent) =>
+          s + (c.type === "text" ? c.text.length : 0),
+        0,
+      );
   } else if (msg.role === "toolResult") {
     const tr = msg as ToolResultMessage;
-    chars = tr.content.reduce((s: number, c: TextContent | ImageContent) => s + (c.type === "text" ? c.text.length : 0), 0);
+    chars = tr.content.reduce(
+      (s: number, c: TextContent | ImageContent) =>
+        s + (c.type === "text" ? c.text.length : 0),
+      0,
+    );
   } else if ((msg as BashExecutionMessage).role === "bashExecution") {
     const b = msg as BashExecutionMessage;
     chars = (b.command?.length ?? 0) + (b.output?.length ?? 0);
-  } else if ((msg as CompactionSummaryMessage).role === "compactionSummary" || (msg as BranchSummaryMessage).role === "branchSummary") {
-    chars = (msg as CompactionSummaryMessage | BranchSummaryMessage).summary?.length ?? 0;
+  } else if (
+    (msg as CompactionSummaryMessage).role === "compactionSummary" ||
+    (msg as BranchSummaryMessage).role === "branchSummary"
+  ) {
+    chars =
+      (msg as CompactionSummaryMessage | BranchSummaryMessage).summary
+        ?.length ?? 0;
   }
   return Math.ceil(chars / 4);
 }
@@ -853,34 +1104,48 @@ export function stripToolArgs(tc: ToolCall, marker: string): number {
 // Moved to ./compress-strip.ts. applyCompressStrip is imported at the top.
 
 interface ToolOp {
-	messageIndex: number;
-	contentIndex: number;
-	type: "call" | "result";
-	toolName: string;
-	toolCallId: string;
-	isError: boolean;
+  messageIndex: number;
+  contentIndex: number;
+  type: "call" | "result";
+  toolName: string;
+  toolCallId: string;
+  isError: boolean;
 }
 
 export function extractToolOps(messages: Message[]): ToolOp[] {
-	const ops: ToolOp[] = [];
-	for (let mi = 0; mi < messages.length; mi++) {
-		const msg = messages[mi];
-		if (msg.role === "assistant") {
-			const asst = msg as AssistantMessage;
-			if (!Array.isArray(asst.content)) continue;
-			for (let ci = 0; ci < asst.content.length; ci++) {
-				const part = asst.content[ci];
-				if (part.type === "toolCall") {
-					const tc = part as ToolCall;
-					ops.push({ messageIndex: mi, contentIndex: ci, type: "call", toolName: tc.name, toolCallId: tc.id, isError: false });
-				}
-			}
-		} else if (msg.role === "toolResult") {
-			const tr = msg as ToolResultMessage;
-			ops.push({ messageIndex: mi, contentIndex: -1, type: "result", toolName: tr.toolName, toolCallId: tr.toolCallId, isError: tr.isError ?? false });
-		}
-	}
-	return ops;
+  const ops: ToolOp[] = [];
+  for (let mi = 0; mi < messages.length; mi++) {
+    const msg = messages[mi];
+    if (msg.role === "assistant") {
+      const asst = msg as AssistantMessage;
+      if (!Array.isArray(asst.content)) continue;
+      for (let ci = 0; ci < asst.content.length; ci++) {
+        const part = asst.content[ci];
+        if (part.type === "toolCall") {
+          const tc = part as ToolCall;
+          ops.push({
+            messageIndex: mi,
+            contentIndex: ci,
+            type: "call",
+            toolName: tc.name,
+            toolCallId: tc.id,
+            isError: false,
+          });
+        }
+      }
+    } else if (msg.role === "toolResult") {
+      const tr = msg as ToolResultMessage;
+      ops.push({
+        messageIndex: mi,
+        contentIndex: -1,
+        type: "result",
+        toolName: tr.toolName,
+        toolCallId: tr.toolCallId,
+        isError: tr.isError ?? false,
+      });
+    }
+  }
+  return ops;
 }
 
 // ── Step 2: Deduplication ───────────────────────────────────────────────
@@ -911,12 +1176,17 @@ export function processContextMessages(
   }
 
   // 1. Compress-strip — now receives sessionId for persistent summary injection
-  const { messages: afterStrip, prunedTokens: stripTokens, prunedCount: stripCount } =
-    applyCompressStrip(messages, sessionId, config);
+  const {
+    messages: afterStrip,
+    prunedTokens: stripTokens,
+    prunedCount: stripCount,
+  } = applyCompressStrip(messages, sessionId, config);
 
   // 2. Dedup
-  const { prunedTokens: dedupTokens, prunedCount: dedupCount } =
-    applyDedup(afterStrip, config);
+  const { prunedTokens: dedupTokens, prunedCount: dedupCount } = applyDedup(
+    afterStrip,
+    config,
+  );
 
   // 3. Purge errors
   const { prunedTokens: purgeTokens, prunedCount: purgeCount } =
@@ -926,7 +1196,8 @@ export function processContextMessages(
   const { prunedTokens: pruneTokens, prunedCount: pruneCount } =
     pruneToolResults(afterStrip, config);
 
-  state.totalStrippedTokens += stripTokens + dedupTokens + purgeTokens + pruneTokens;
+  state.totalStrippedTokens +=
+    stripTokens + dedupTokens + purgeTokens + pruneTokens;
   state.totalPrunedCount += stripCount + dedupCount + purgeCount + pruneCount;
 
   return afterStrip;
@@ -946,15 +1217,25 @@ export function estimateTokensAfterCompress(
   summaryTokens: number,
 ): number | undefined {
   if (contextTokensBefore == null || contextTokensBefore <= 0) return undefined;
-  return Math.max(0, Math.round(contextTokensBefore - removedEstimate + summaryTokens));
+  return Math.max(
+    0,
+    Math.round(contextTokensBefore - removedEstimate + summaryTokens),
+  );
 }
 
 /** Recompute `estimatedTokensAfter` after DCP enrichment extends the compaction summary. */
 export function enrichCompactionResult<
-  T extends { summary: string; tokensBefore: number; estimatedTokensAfter?: number },
+  T extends {
+    summary: string;
+    tokensBefore: number;
+    estimatedTokensAfter?: number;
+  },
 >(
   result: T,
-  preparation: { tokensBefore: number; messagesToSummarize: readonly Message[] },
+  preparation: {
+    tokensBefore: number;
+    messagesToSummarize: readonly Message[];
+  },
 ): T {
   const removedEstimate = preparation.messagesToSummarize.reduce(
     (sum, m) => sum + estimateTokens(m),
@@ -1013,14 +1294,18 @@ const COMPRESS_TOOL_DESCRIPTION = [
   "- Work in that area is still active or likely to resume immediately",
 ].join("\n");
 
-export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void {
+export function registerCompressTool(
+  pi: ExtensionAPI,
+  config: DCPConfig,
+): void {
   if (config.compress.permission === "deny") return;
 
   pi.registerTool({
     name: "compress",
     label: "Compress Context",
     description: COMPRESS_TOOL_DESCRIPTION,
-    promptSnippet: "Collapse a conversation range into a dense, exhaustive summary with structured fields.",
+    promptSnippet:
+      "Collapse a conversation range into a dense, exhaustive summary with structured fields.",
     promptGuidelines: [
       "Compress completed research or implementation phases to free context space.",
       "Before compressing, verify the range is truly closed — never compress work you may need exact details from.",
@@ -1028,21 +1313,56 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       "Write exhaustive summaries that capture file paths, function signatures, decisions, and constraints.",
     ],
     parameters: Type.Object({
-      topic: Type.String({ description: "Short label (3-5 words) — e.g., 'Auth System Exploration'" }),
-      summary: Type.String({ description: "Complete technical prose summary of the compressed range. Must be exhaustive." }),
+      topic: Type.String({
+        description:
+          "Short label (3-5 words) — e.g., 'Auth System Exploration'",
+      }),
+      summary: Type.String({
+        description:
+          "Complete technical prose summary of the compressed range. Must be exhaustive.",
+      }),
       // P0: Structured fields for Factory-style anchored summarization
-      files_read: Type.Optional(Type.String({ description: "Comma-separated files read during this phase" })),
-      files_modified: Type.Optional(Type.String({ description: "Comma-separated files modified during this phase" })),
-      decisions: Type.Optional(Type.String({ description: "Comma-separated key decisions made (e.g. 'Used X instead of Y because Z')" })),
-      next_steps: Type.Optional(Type.String({ description: "Comma-separated next steps / task state" })),
-      startId: Type.Optional(Type.String({ description: "Start boundary description. Omit in batch mode." })),
-      endId: Type.Optional(Type.String({ description: "End boundary description. Omit in batch mode." })),
+      files_read: Type.Optional(
+        Type.String({
+          description: "Comma-separated files read during this phase",
+        }),
+      ),
+      files_modified: Type.Optional(
+        Type.String({
+          description: "Comma-separated files modified during this phase",
+        }),
+      ),
+      decisions: Type.Optional(
+        Type.String({
+          description:
+            "Comma-separated key decisions made (e.g. 'Used X instead of Y because Z')",
+        }),
+      ),
+      next_steps: Type.Optional(
+        Type.String({ description: "Comma-separated next steps / task state" }),
+      ),
+      startId: Type.Optional(
+        Type.String({
+          description: "Start boundary description. Omit in batch mode.",
+        }),
+      ),
+      endId: Type.Optional(
+        Type.String({
+          description: "End boundary description. Omit in batch mode.",
+        }),
+      ),
       mode: Type.Optional(
-        Type.Union([
-          Type.Literal("range"),
-          Type.Literal("message"),
-          Type.Literal("batch"),
-        ], { description: 'Compression mode: "range" (default), "message" (experimental), or "batch" (auto-detect range).' }),
+        Type.Union(
+          [
+            Type.Literal("range"),
+            Type.Literal("message"),
+            Type.Literal("batch"),
+          ],
+          {
+            description:
+              'Compression mode: "range" (default), "message" (experimental), or "batch" (auto-detect range).',
+          },
+        ),
       ),
     }),
     async execute(
@@ -1066,7 +1386,7 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       if (!params.summary?.trim()) throw new Error("summary is required");
 
       const mode = params.mode ?? config.compress.mode;
-      const sessionId = ctx.cwd;
+      const sessionId = getDcpSessionId(ctx);
 
       // P0: Extract structured fields and narrative
       const { fields, narrative } = extractStructuredFields(
@@ -1075,16 +1395,32 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       );
 
       // Resolve start/end labels
-      const startLabel = params.startId?.trim()
-        ?? (() => {
+      const startLabel =
+        params.startId?.trim() ??
+        (() => {
           const blocks = getBlocks(sessionId);
           const last = blocks[blocks.length - 1];
-          return last ? `after "${last.topic}" (b${last.blockId})` : "beginning of session";
+          return last
+            ? `after "${last.topic}" (b${last.blockId})`
+            : "beginning of session";
         })();
       const endLabel = params.endId?.trim() ?? "current state";
 
       // Store the compression block
-      const block = addBlock(sessionId, params.topic.trim(), params.summary.trim(), startLabel, endLabel);
+      const block = addBlock(
+        sessionId,
+        params.topic.trim(),
+        params.summary.trim(),
+        startLabel,
+        endLabel,
+        {
+          files_read: fields.files_read,
+          files_modified: fields.files_modified,
+          decisions: fields.decisions,
+          next_steps: fields.next_steps,
+          source: "compress_tool",
+        },
+      );
 
       // P0: Merge into persistent summary (anchored iterative summarization)
       mergeIntoPersistentSummary(sessionId, fields, block.topic, block.blockId);
@@ -1095,10 +1431,19 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
 
       // P1: Record compress event for quality tracking
       recordCompressEvent(sessionId, block.blockId, fields);
+      pi.appendEntry(
+        DCP_STATE_ENTRY_TYPE,
+        makeDcpStateEntryPayload(sessionId, "compress_tool"),
+      );
 
       // P1: Run probe-based evaluation
       if (config.probeEvaluation?.enabled) {
-        const probeResult = evaluateCompressionProbes(fields, narrative, block.summaryTokens, config.probeEvaluation);
+        const probeResult = evaluateCompressionProbes(
+          fields,
+          narrative,
+          block.summaryTokens,
+          config.probeEvaluation,
+        );
         recordProbeResults(sessionId, probeResult);
       }
 
@@ -1106,7 +1451,9 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       const allBlocks = getBlocks(sessionId);
       const stats = getStats(sessionId);
       const contextUsage =
-        typeof ctx.getContextUsage === "function" ? ctx.getContextUsage() : undefined;
+        typeof ctx.getContextUsage === "function"
+          ? ctx.getContextUsage()
+          : undefined;
       const contextTokensBefore = contextUsage?.tokens ?? undefined;
 
       const lines: string[] = [
@@ -1130,7 +1477,9 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
         structuredParts.push(`Files read: ${fields.files_read.join(", ")}`);
       }
       if (fields.files_modified.length > 0) {
-        structuredParts.push(`Files modified: ${fields.files_modified.join(", ")}`);
+        structuredParts.push(
+          `Files modified: ${fields.files_modified.join(", ")}`,
+        );
       }
       if (fields.decisions.length > 0) {
         structuredParts.push(`Decisions: ${fields.decisions.join("; ")}`);
@@ -1150,7 +1499,10 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
       }
 
       // P1: Add probe results to response if configured
-      if (config.probeEvaluation?.enabled && config.probeEvaluation.showInResponse) {
+      if (
+        config.probeEvaluation?.enabled &&
+        config.probeEvaluation.showInResponse
+      ) {
         const qm = getQualityMetrics(sessionId);
         if (qm.lastProbeResults) {
           const probeLines: string[] = [
@@ -1159,16 +1511,25 @@ export function registerCompressTool(pi: ExtensionAPI, config: DCPConfig): void 
           ];
           for (const p of qm.lastProbeResults.probes) {
             const icon = p.pass ? "\uF00C" : "\uF071";
-            probeLines.push(`  ${icon} ${p.name}: ${p.score}/100 — ${p.detail}`);
+            probeLines.push(
+              `  ${icon} ${p.name}: ${p.score}/100 — ${p.detail}`,
+            );
           }
-          const overallIcon = qm.lastProbeResults.allPassed ? "\uF00C" : "\uF071";
-          probeLines.push(`  ${overallIcon} Overall: ${qm.lastProbeResults.overallScore}/100`);
+          const overallIcon = qm.lastProbeResults.allPassed
+            ? "\uF00C"
+            : "\uF071";
+          probeLines.push(
+            `  ${overallIcon} Overall: ${qm.lastProbeResults.overallScore}/100`,
+          );
           lines.push(...probeLines);
         }
       }
 
       if (contextTokensBefore != null) {
-        lines.push("", `Context window usage before this compress: ~${contextTokensBefore} tokens`);
+        lines.push(
+          "",
+          `Context window usage before this compress: ~${contextTokensBefore} tokens`,
+        );
         lines.push(
           "(Message-range stripping applies on the next LLM request; native `estimatedTokensAfter` is set when Pi runs session compaction.)",
         );

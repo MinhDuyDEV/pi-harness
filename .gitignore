@@ -41,7 +41,9 @@ pnpm-debug.log*
 .pi/tasks/
 .pi/.pi/
 .pi/cache/
+.pi/dcp-state/
 .pi/sessions/
+
 .pi/fff/
 .pi/pi-pretty/
 .pi/pi-crash.log

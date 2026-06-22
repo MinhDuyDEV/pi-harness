@@ -9,14 +9,17 @@
  * block-aware nudges, and enhanced /dcp status.
  */
 
-import type {
-  BeforeAgentStartEvent,
-  ContextEvent,
-  ExtensionAPI,
-  ExtensionContext,
-  InputEvent,
-  SessionBeforeCompactEvent,
-  ToolResultEvent,
+import {
+  convertToLlm,
+  serializeConversation,
+  type BeforeAgentStartEvent,
+  type ContextEvent,
+  type ExtensionAPI,
+  type ExtensionContext,
+  type InputEvent,
+  type SessionBeforeCompactEvent,
+  type SessionBeforeTreeEvent,
+  type ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 
 import type { Message } from "@earendil-works/pi-ai";
@@ -24,6 +27,7 @@ import { DEFAULT_CONFIG, type DCPConfig } from "./config.js";
 import {
   cleanupSession,
   getBlocks,
+  getDcpSessionId,
   getPersistentSummary,
   getQualityMetrics,
   getQualityStatus,
@@ -35,8 +39,13 @@ import {
   buildCompressedSummaryMessage,
   enrichCompactionResult,
   getArtifactTracker,
+  makeDcpStateEntryPayload,
+  restoreDcpStateFromSessionEntries,
 } from "./compress.js";
+
+import { buildDeterministicSummary } from "./deterministic.js";
 import { NudgeManager } from "./nudge.js";
+import { registerRecallTool, searchDcpRecall } from "./recall.js";
 
 export default function dcpExtension(pi: ExtensionAPI): void {
   // Merge with user config from settings if available (config is module-level)
@@ -49,19 +58,58 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   // Guard: track whether ensureInitialized has run
   let initialized = false;
 
+  function appendDcpStateEntry(
+    ctx: ExtensionContext,
+    reason:
+      | "session_start"
+      | "compress_tool"
+      | "compaction"
+      | "tree"
+      | "manual",
+  ): void {
+    pi.appendEntry(
+      "dcp_state",
+      makeDcpStateEntryPayload(getDcpSessionId(ctx), reason),
+    );
+  }
+
+  function serializeSessionEntries(entries: readonly unknown[]): string {
+    return entries
+      .map((entry, index) => {
+        if (!entry || typeof entry !== "object")
+          return `[Entry ${index}] ${String(entry)}`;
+        const obj = entry as Record<string, unknown>;
+        const type = String(obj.type ?? "entry");
+        const payload = obj.summary ?? obj.content ?? obj.data ?? obj;
+        return `[${type} ${String(obj.id ?? index)}]: ${typeof payload === "string" ? payload : JSON.stringify(payload)}`;
+      })
+      .join("\n\n");
+  }
+
   function ensureInitialized(ctx: ExtensionContext): void {
+    if (!initialized) {
+      const entries = ctx.sessionManager.getBranch() as readonly unknown[];
+      restoreDcpStateFromSessionEntries(getDcpSessionId(ctx), entries);
+    }
     if (initialized) return;
+
     registerCompressTool(pi, config);
+    if (config.recall.enabled) registerRecallTool(pi);
     initialized = true;
   }
 
+  pi.on("session_start", (_event, ctx: ExtensionContext) => {
+    ensureInitialized(ctx);
+  });
+
   // ── Event: input — track turns ──────────────────────────────────────
+
   pi.on("input", (event: InputEvent, ctx: ExtensionContext) => {
     // Skip mid-stream steers — only count idle prompts and follow-ups
     if (event.streamingBehavior === "steer") return;
     nudge.incTurn();
     // P2: Increment turn for regression detection
-    incrementTurn(ctx.cwd);
+    incrementTurn(getDcpSessionId(ctx));
   });
 
   // ── Event: tool_result — detect compress + track artifacts ──────────
@@ -72,7 +120,12 @@ export default function dcpExtension(pi: ExtensionAPI): void {
       }
       // P1: Track all relevant tool calls for artifact tracking
       if (config.artifactTracking.enabled && event.toolName && event.input) {
-        trackToolCall(ctx.cwd, event.toolName, event.input, config.artifactTracking.maxFiles);
+        trackToolCall(
+          getDcpSessionId(ctx),
+          event.toolName,
+          event.input,
+          config.artifactTracking.maxFiles,
+        );
       }
     } catch {
       // best-effort
@@ -90,93 +143,231 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   });
 
   // ── Event: before_agent_start — inject pending nudge ────────────────
-  pi.on("before_agent_start", (_event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
-    try {
-      ensureInitialized(ctx);
-      // P3: Update nudge block context before checking
-      const sessionId = ctx.cwd;
-      const blocks = getBlocks(sessionId);
-      const qualityStatus = getQualityStatus(sessionId);
-      nudge.updateBlockContext(blocks.length, qualityStatus);
+  pi.on(
+    "before_agent_start",
+    (_event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
+      try {
+        ensureInitialized(ctx);
+        // P3: Update nudge block context before checking
+        const sessionId = getDcpSessionId(ctx);
+        const blocks = getBlocks(sessionId);
 
-      const nudgeMsg = nudge.consumeNudge();
-      if (nudgeMsg) {
-        return {
-          message: {
-            customType: "dcp-nudge",
-            content: nudgeMsg,
-            display: true,
-          },
-        };
+        const qualityStatus = getQualityStatus(sessionId);
+        nudge.updateBlockContext(blocks.length, qualityStatus);
+
+        const nudgeMsg = nudge.consumeNudge();
+        if (nudgeMsg) {
+          return {
+            message: {
+              customType: "dcp-nudge",
+              content: nudgeMsg,
+              display: true,
+            },
+          };
+        }
+      } catch {
+        // best-effort
       }
-    } catch {
-      // best-effort
-    }
-  });
+    },
+  );
 
   // ── Event: context — apply DCP strategies ───────────────────────────
   pi.on("context", (event: ContextEvent, ctx: ExtensionContext) => {
     try {
       ensureInitialized(ctx);
-      const sessionId = ctx.cwd;
-      const pruned = processContextMessages(event.messages as Message[], sessionId, config);
+      const sessionId = getDcpSessionId(ctx);
+      const pruned = processContextMessages(
+        event.messages as Message[],
+        sessionId,
+        config,
+      );
       return { messages: pruned };
     } catch {
       // best-effort — return unmodified on error
     }
   });
 
-  // ── Event: session_before_compact — enrich with DCP blocks ──────────
-  pi.on("session_before_compact", async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
-    try {
+  // ── Event: session_before_compact — deterministic DCP compaction ─────
+  const onPiEvent = pi.on as (
+    eventName: string,
+    handler: (
+      event: SessionBeforeCompactEvent,
+      ctx: ExtensionContext,
+    ) => unknown,
+  ) => void;
+  onPiEvent(
+    "session_before_compact",
+    async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
+      try {
+        ensureInitialized(ctx);
+        const sessionId = getDcpSessionId(ctx);
+        const blocks = getBlocks(sessionId);
+        const preparation = event.preparation;
+        if (!preparation) return;
+
+        const prepLike = preparation as unknown as {
+          messagesToSummarize?: readonly Message[];
+          turnPrefixMessages?: readonly Message[];
+          messages?: readonly Message[];
+          previousSummary?: string;
+          fileOps?: { readFiles?: string[]; modifiedFiles?: string[] };
+        };
+        const messagesToSummarize = Array.isArray(prepLike.messagesToSummarize)
+          ? prepLike.messagesToSummarize
+          : Array.isArray(prepLike.messages)
+            ? prepLike.messages
+            : [];
+        const turnPrefixMessages = Array.isArray(prepLike.turnPrefixMessages)
+          ? prepLike.turnPrefixMessages
+          : [];
+        const messages = [...messagesToSummarize, ...turnPrefixMessages];
+        const ps = getPersistentSummary(sessionId);
+        const serializedConversation = serializeConversation(
+          convertToLlm(messages),
+        );
+
+        if (
+          config.deterministicCompaction.enabled &&
+          config.deterministicCompaction.overrideNative
+        ) {
+          const deterministic = buildDeterministicSummary({
+            messages,
+            serializedConversation,
+            blocks,
+            previousSummary: prepLike.previousSummary,
+            persistentSummary: ps,
+            maxTranscriptLines:
+              config.deterministicCompaction.maxTranscriptLines,
+            maxSectionItems: config.deterministicCompaction.maxSectionItems,
+          });
+          const result = enrichCompactionResult(
+            {
+              summary: `${deterministic.summary}\n\n## DCP Persistent Summary\n\n${buildCompressedSummaryMessage(ps)}`,
+              firstKeptEntryId: preparation.firstKeptEntryId,
+              tokensBefore: preparation.tokensBefore,
+              estimatedTokensAfter: deterministic.estimatedTokensAfter,
+              details: {
+                dcp: {
+                  deterministic: true,
+                  blockCount: blocks.length,
+                  lineCount: deterministic.lineCount,
+                  snapshot: makeDcpStateEntryPayload(sessionId, "compaction")
+                    .snapshot,
+                },
+                readFiles: prepLike.fileOps?.readFiles ?? [],
+                modifiedFiles: prepLike.fileOps?.modifiedFiles ?? [],
+              },
+            },
+            preparation as unknown as Parameters<
+              typeof enrichCompactionResult
+            >[1],
+          );
+          return { compaction: result };
+        }
+
+        if (!config.semanticEnrichment.enabled || blocks.length === 0) return;
+
+        const model = ctx.model;
+        if (!model) return;
+
+        const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+        if (!auth.ok || !auth.apiKey) return;
+
+        const { compact } = await import("@earendil-works/pi-coding-agent");
+        const result = await compact(
+          preparation,
+          model,
+          auth.apiKey,
+          auth.headers,
+          undefined,
+          event.signal,
+        );
+
+        if (!result) return;
+        result.summary += `\n\n## DCP Persistent Summary\n\n${buildCompressedSummaryMessage(ps)}`;
+        return {
+          compaction: enrichCompactionResult(
+            result,
+            preparation as unknown as Parameters<
+              typeof enrichCompactionResult
+            >[1],
+          ),
+        };
+      } catch {
+        // Fall through to pi's native compaction
+      }
+    },
+  );
+
+  pi.on("session_compact", (_event, ctx: ExtensionContext) => {
+    ensureInitialized(ctx);
+    appendDcpStateEntry(ctx, "compaction");
+  });
+
+  const onTreeEvent = pi.on as (
+    eventName: string,
+    handler: (event: SessionBeforeTreeEvent, ctx: ExtensionContext) => unknown,
+  ) => void;
+  onTreeEvent(
+    "session_before_tree",
+    async (event: SessionBeforeTreeEvent, ctx: ExtensionContext) => {
       ensureInitialized(ctx);
-      const sessionId = ctx.cwd;
-      const blocks = getBlocks(sessionId);
-      const preparation = event.preparation;
-      if (!preparation || blocks.length === 0) return;
+      const prep = event.preparation as unknown as {
+        userWantsSummary?: boolean;
+        entriesToSummarize?: readonly unknown[];
+        targetId?: string;
+        oldLeafId?: string;
+        commonAncestorId?: string;
+      };
+      if (!prep.userWantsSummary) return;
+      const sessionId = getDcpSessionId(ctx);
+      const entriesToSummarize = Array.isArray(prep.entriesToSummarize)
+        ? prep.entriesToSummarize
+        : [];
+      const deterministic = buildDeterministicSummary({
+        messages: [],
+        serializedConversation: serializeSessionEntries(entriesToSummarize),
+        previousSummary: `Branch navigation: ${prep.oldLeafId ?? "unknown"} -> ${prep.targetId ?? "unknown"}; common ancestor ${prep.commonAncestorId ?? "unknown"}.`,
+        blocks: getBlocks(sessionId),
+        persistentSummary: getPersistentSummary(sessionId),
+        maxTranscriptLines: config.deterministicCompaction.maxTranscriptLines,
+        maxSectionItems: config.deterministicCompaction.maxSectionItems,
+      });
+      return {
+        summary: {
+          summary: deterministic.summary,
+          details: {
+            dcp: {
+              deterministic: true,
+              branchSummary: true,
+              entryCount: entriesToSummarize.length,
+              snapshot: makeDcpStateEntryPayload(sessionId, "tree").snapshot,
+            },
+          },
+        },
+      };
+    },
+  );
 
-      const model = ctx.model;
-      if (!model) return;
-
-      const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-      if (!auth.ok || !auth.apiKey) return;
-
-      const { compact } = await import("@earendil-works/pi-coding-agent");
-      const result = await compact(
-        preparation,
-        model,
-        auth.apiKey,
-        auth.headers,
-        undefined,
-        ctx.signal,
-      );
-
-      if (!result) return;
-
-      // P0: Use persistent summary for enrichment instead of raw blocks
-      const ps = getPersistentSummary(sessionId);
-      const enrichment = buildCompressedSummaryMessage(ps);
-
-      result.summary += `\n\n## DCP Persistent Summary\n\n${enrichment}`;
-
-      return { compaction: enrichCompactionResult(result, preparation) };
-    } catch {
-      // Fall through to pi's native compaction
-    }
+  pi.on("session_tree", (_event, ctx: ExtensionContext) => {
+    ensureInitialized(ctx);
+    appendDcpStateEntry(ctx, "tree");
   });
 
   // ── Event: session_shutdown — clean up state ────────────────────────
-  pi.on("session_shutdown", () => {
-    cleanupSession(process.cwd());
+  pi.on("session_shutdown", (_event, ctx: ExtensionContext) => {
+    cleanupSession(getDcpSessionId(ctx));
   });
 
   // ── Command: /dcp — enhanced status display ─────────────────────────
   pi.registerCommand("dcp", {
-    description: "DCP status — compression blocks, artifact tracking, quality metrics, and nudges",
+    description:
+      "DCP status — compression blocks, artifact tracking, quality metrics, and nudges",
     async handler(_args: string, ctx: ExtensionContext) {
       ensureInitialized(ctx);
-      const sessionId = ctx.cwd;
+      const sessionId = getDcpSessionId(ctx);
       const blocks = getBlocks(sessionId);
+
       const stats = getStats(sessionId);
       const nudgeState = nudge.getState();
 
@@ -184,12 +375,19 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         "## DCP Status",
         "",
         `Context: ${nudgeState.lastContextTokens !== null ? `${Math.round(nudgeState.lastContextTokens / 1000)}k tokens` : "no data"}` +
-          (nudgeState.lastContextPercent !== null ? ` (${Math.round(nudgeState.lastContextPercent)}%)` : ""),
+          (nudgeState.lastContextPercent !== null
+            ? ` (${Math.round(nudgeState.lastContextPercent)}%)`
+            : ""),
         "",
         "### Compression Blocks",
         blocks.length === 0
           ? "  None yet. Use `compress` when a phase is complete."
-          : blocks.map((b) => `  b${b.blockId}: ${b.topic} (~${b.summaryTokens} tokens)`).join("\n"),
+          : blocks
+              .map(
+                (b) =>
+                  `  b${b.blockId}: ${b.topic} (~${b.summaryTokens} tokens)`,
+              )
+              .join("\n"),
         "",
         `Total summary buffer: ~${stats.summaryTokens} tokens`,
         `Total stripped: ~${stats.totalStrippedTokens} tokens across ${stats.totalPrunedCount} items`,
@@ -200,16 +398,22 @@ export default function dcpExtension(pi: ExtensionAPI): void {
       if (config.qualityMetrics.enabled) {
         const qm = stats.qualityMetrics;
         if (qm.totalCompressions > 0) {
-          const reReadPct = Math.round((qm.reReadsAfterCompress / qm.totalCompressions) * 100);
+          const reReadPct = Math.round(
+            (qm.reReadsAfterCompress / qm.totalCompressions) * 100,
+          );
           lines.push("### Quality Metrics");
           lines.push(`  Compressions: ${qm.totalCompressions}`);
-          lines.push(`  Re-reads after compress: ${qm.reReadsAfterCompress} (${reReadPct}%)`);
+          lines.push(
+            `  Re-reads after compress: ${qm.reReadsAfterCompress} (${reReadPct}%)`,
+          );
           lines.push(`  Clean streak: ${qm.cleanCompressions}`);
           if (qm.regressionLog.length > 0) {
             lines.push("  Recent regressions:");
             const recent = qm.regressionLog.slice(-3);
             for (const r of recent) {
-              lines.push(`    b${r.blockId} → ${r.file} (gap: ${r.turnGap} turns)`);
+              lines.push(
+                `    b${r.blockId} → ${r.file} (gap: ${r.turnGap} turns)`,
+              );
             }
           }
           lines.push("");
@@ -217,7 +421,10 @@ export default function dcpExtension(pi: ExtensionAPI): void {
       }
 
       // P1: Probe evaluation results
-      if (config.probeEvaluation?.enabled && stats.qualityMetrics.lastProbeResults) {
+      if (
+        config.probeEvaluation?.enabled &&
+        stats.qualityMetrics.lastProbeResults
+      ) {
         const pr = stats.qualityMetrics.lastProbeResults;
         lines.push("### Probe Evaluation (last compression)");
         for (const p of pr.probes) {
@@ -227,19 +434,30 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         const overallIcon = pr.allPassed ? "\uF00C" : "\uF071";
         lines.push(`  ${overallIcon} Overall: ${pr.overallScore}/100`);
         if (stats.qualityMetrics.avgProbeScore > 0) {
-          lines.push(`  Running average: ${Math.round(stats.qualityMetrics.avgProbeScore)}/100`);
+          lines.push(
+            `  Running average: ${Math.round(stats.qualityMetrics.avgProbeScore)}/100`,
+          );
         }
         if (stats.qualityMetrics.failedProbes > 0) {
-          lines.push(`  Failed compressions: ${stats.qualityMetrics.failedProbes}`);
+          lines.push(
+            `  Failed compressions: ${stats.qualityMetrics.failedProbes}`,
+          );
         }
         lines.push("");
-      } else if (config.probeEvaluation?.enabled && stats.qualityMetrics.totalCompressions > 0) {
+      } else if (
+        config.probeEvaluation?.enabled &&
+        stats.qualityMetrics.totalCompressions > 0
+      ) {
         // Show aggregate if no latest result
         if (stats.qualityMetrics.avgProbeScore > 0) {
           lines.push("### Probe Evaluation");
-          lines.push(`  Running average: ${Math.round(stats.qualityMetrics.avgProbeScore)}/100`);
+          lines.push(
+            `  Running average: ${Math.round(stats.qualityMetrics.avgProbeScore)}/100`,
+          );
           if (stats.qualityMetrics.failedProbes > 0) {
-            lines.push(`  Failed compressions: ${stats.qualityMetrics.failedProbes}`);
+            lines.push(
+              `  Failed compressions: ${stats.qualityMetrics.failedProbes}`,
+            );
           }
           lines.push("");
         }
@@ -248,7 +466,8 @@ export default function dcpExtension(pi: ExtensionAPI): void {
       // P1: Artifact tracking
       if (config.artifactTracking.enabled) {
         const artifacts = getArtifactTracker(sessionId);
-        const totalTracked = artifacts.files_read.length + artifacts.files_modified.length;
+        const totalTracked =
+          artifacts.files_read.length + artifacts.files_modified.length;
         if (totalTracked > 0) {
           lines.push("### Artifact Tracking");
           if (artifacts.files_read.length > 0) {
@@ -261,12 +480,16 @@ export default function dcpExtension(pi: ExtensionAPI): void {
             }
           }
           if (artifacts.files_modified.length > 0) {
-            lines.push(`  Files modified (${artifacts.files_modified.length}):`);
+            lines.push(
+              `  Files modified (${artifacts.files_modified.length}):`,
+            );
             for (const f of artifacts.files_modified.slice(0, 5)) {
               lines.push(`    • ${f}`);
             }
             if (artifacts.files_modified.length > 5) {
-              lines.push(`    … and ${artifacts.files_modified.length - 5} more`);
+              lines.push(
+                `    … and ${artifacts.files_modified.length - 5} more`,
+              );
             }
           }
           lines.push("");
@@ -279,21 +502,59 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         if (ps.merged_block_ids.length > 0) {
           lines.push("### Persistent Summary");
           lines.push(`  Merged blocks: ${ps.merged_block_ids.join(", ")}`);
-          lines.push(`  Files tracked: ${ps.files_read.length} read, ${ps.files_modified.length} modified`);
+          lines.push(
+            `  Files tracked: ${ps.files_read.length} read, ${ps.files_modified.length} modified`,
+          );
           lines.push(`  Decisions: ${ps.decisions.length}`);
           lines.push(`  Narrative segments: ${ps.narrative_parts.length}`);
-          lines.push(`  Last updated: ${new Date(ps.last_updated).toLocaleTimeString()}`);
+          lines.push(
+            `  Last updated: ${new Date(ps.last_updated).toLocaleTimeString()}`,
+          );
           lines.push("");
         }
       }
 
       // Nudge state
-      lines.push(nudgeState.pendingNudge
-        ? `\uF071 Pending nudge: "${nudgeState.pendingNudge}"`
-        : "No pending nudge");
+      lines.push(
+        nudgeState.pendingNudge
+          ? `\uF071 Pending nudge: "${nudgeState.pendingNudge}"`
+          : "No pending nudge",
+      );
 
       const output = lines.filter(Boolean).join("\n");
       if (ctx.hasUI) ctx.ui.notify(output);
+    },
+  });
+
+  pi.registerCommand("dcp-recall", {
+    description:
+      "Search durable DCP blocks and raw Pi session JSONL. Usage: /dcp-recall <query> [scope:all] [page:N] [expand:N,N]",
+    async handler(args: string, ctx: ExtensionContext) {
+      ensureInitialized(ctx);
+      const scope = /\bscope:all\b/i.test(args) ? "all" : "active";
+      const pageMatch = args.match(/\bpage:(\d+)\b/i);
+      const expandMatch = args.match(/\bexpand:([\d,\s]+)\b/i);
+      const page = pageMatch ? Number(pageMatch[1]) : 1;
+      const expand = expandMatch
+        ? expandMatch[1]
+            .split(/[,\s]+/)
+            .map((item) => Number(item))
+            .filter((item) => Number.isFinite(item))
+        : undefined;
+      const query = args
+        .replace(/\bscope:all\b/gi, "")
+        .replace(/\bpage:\d+\b/gi, "")
+        .replace(/\bexpand:[\d,\s]+\b/gi, "")
+        .trim();
+      const result = searchDcpRecall({
+        sessionId: getDcpSessionId(ctx),
+        sessionFile: ctx.sessionManager.getSessionFile() ?? undefined,
+        query,
+        expand,
+        page,
+        scope,
+      });
+      if (ctx.hasUI) ctx.ui.notify(result.rendered);
     },
   });
 }
