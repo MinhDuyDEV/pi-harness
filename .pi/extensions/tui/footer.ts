@@ -6,8 +6,8 @@ import { NF, formatCost, fmtNum } from "./helpers.js";
 // ── Icon helpers ───────────────────────────────────────────────────────────
 
 /** Returns icon + trailing space with Nerd Fonts, empty string without. */
-function iFolder(): string   { return NF ? "\uf07c " : ""; }
-function iGit(): string      { return NF ? "\ue0a0 " : ""; }
+function iFolder(): string   { return ""; }
+function iGit(): string      { return ""; }
 function iQueue(): string    { return NF ? "\uf0c9 " : ""; }
 function iInput(): string    { return NF ? "󰁝" : "↑"; }
 function iOutput(): string   { return NF ? "󰁅" : "↓"; }
