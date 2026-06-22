@@ -1,33 +1,30 @@
-# `.pi/cli/`
+# .pi/cli
 
-Project-local CLI helpers live here when a workflow needs repeatable local automation but should not become a Pi extension.
+Local Node.js helper scripts. Run with `node .pi/cli/<script>.mjs ...` from the project root.
 
-Use this directory for small scripts that:
+## Conventions
 
-- run through `bash` or another local command from Pi;
-- do not require background services unless the user explicitly starts them;
-- take explicit file/path arguments instead of reading hidden runtime state;
-- write durable outputs under `.pi/artifacts/<id>/` when used for handoffs;
-- are safe to inspect, rerun, and verify independently.
+These scripts are **evidence producers**, not artifact authors. The output they produce is captured by the slash command that invokes them and embedded as a `####` subsection in the work session block (typically in `PROGRESS.md`). The scripts themselves default to writing only to `.pi/browser-artifacts/` (screenshots, HTML snapshots, etc.) and printing a markdown report to stdout.
 
-Do **not** put Pi extension tools here. Extension tools belong in `.pi/extensions/` so Pi can register them through the extension runtime.
+If you need a one-off report file, use `--artifact <path>` (or `--report <path>`) to write it to a specific location.
 
-Before adding a helper, prefer direct shell commands. Add a script only when the command becomes repeated, error-prone, or needs structured output.
+## Scripts
 
-## Browser wrappers
+| Script | Use for | Output |
+| --- | --- | --- |
+| `browser-devtools.mjs` | Connect to a Chromium DevTools endpoint, run JS evaluations, capture console + network | `.pi/browser-artifacts/screenshots/`, optional report to `--artifact <path>` |
+| `playwright-flow.mjs` | Drive a browser through a sequence of steps (open URL, snapshot, screenshot, eval) | Same as above |
+| `browser-screenshot.mjs` | Take a screenshot at a URL with optional viewport / wait | `.pi/browser-artifacts/screenshots/`, optional report to `--report <path>` |
 
-Browser and UI verification are the main use case for `.pi/cli/` because they benefit from repeatable commands and saved artifacts.
+## How a slash command uses these
 
-- `browser-devtools.mjs` — connects to an existing Chrome DevTools endpoint, inspects page/console/network state, and writes `.pi/artifacts/<id>/BROWSER-DEVTOOLS.md`.
-- `playwright-flow.mjs` — runs a scripted browser flow with Playwright, saves screenshots/traces/logs, and writes `.pi/artifacts/<id>/PLAYWRIGHT-FLOW.md`.
-- `browser-screenshot.mjs` — captures deterministic responsive screenshots and writes `.pi/artifacts/<id>/SCREENSHOTS.md` plus `.pi/artifacts/<id>/screenshots/*.png`.
+A typical `/ship` or `/verify` flow:
 
-Examples:
+1. The slash command reads the plan and finds the step that needs browser evidence
+2. It invokes one of these scripts (e.g. `node .pi/cli/browser-screenshot.mjs --url ...`)
+3. The script writes evidence to `.pi/browser-artifacts/` and prints a markdown report to stdout
+4. The slash command captures the markdown report and embeds it under `#### Run Report` or `#### Verification` in the work session block in `PROGRESS.md`
 
-```bash
-.pi/cli/browser-devtools.mjs --work-id my-check --url http://localhost:3000 --eval 'document.title'
-.pi/cli/playwright-flow.mjs --work-id my-check --url http://localhost:3000 --step snapshot --step screenshot=home.png
-.pi/cli/browser-screenshot.mjs --work-id my-check --url http://localhost:3000 --full-page
-```
+## Why no `--work-id` flag
 
-Keep wrappers thin: argument parsing, command execution, artifact writing. Put reusable Pi-facing tools in `.pi/extensions/` instead.
+Earlier versions of these scripts took a `--work-id` flag and wrote to `.pi/artifacts/<id>/...`. That pattern is gone: the artifact directory is now flat (`.pi/artifacts/{TODO,PLAN,PROGRESS,DECISIONS}.md`), and work session content lives as `### ` blocks within those files. Pass an explicit `--artifact` or `--report` path if you need a standalone file.

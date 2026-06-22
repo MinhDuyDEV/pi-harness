@@ -7,13 +7,12 @@ import { setTimeout as sleep } from "node:timers/promises";
 const DEFAULT_ENDPOINT = "http://127.0.0.1:9222";
 
 function parseArgs(argv) {
-	const args = { endpoint: DEFAULT_ENDPOINT, waitMs: 1500, evals: [], artifact: undefined, workId: undefined, page: 0 };
+	const args = { endpoint: DEFAULT_ENDPOINT, waitMs: 1500, evals: [], artifact: undefined, page: 0 };
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
 		const next = () => argv[++i];
 		if (arg === "--help" || arg === "-h") args.help = true;
 		else if (arg === "--endpoint") args.endpoint = next();
-		else if (arg === "--work-id") args.workId = next();
 		else if (arg === "--artifact") args.artifact = next();
 		else if (arg === "--url") args.url = next();
 		else if (arg === "--page") args.page = Number(next());
@@ -31,13 +30,12 @@ Prerequisite: start Chrome with remote debugging, e.g.
   /Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome --remote-debugging-port=9222
 
 Usage:
-  .pi/cli/browser-devtools.mjs --work-id <id> [--url <url>] [--eval <js>]...
-  .pi/cli/browser-devtools.mjs --artifact <path> --endpoint http://127.0.0.1:9222
+      .pi/cli/browser-devtools.mjs [--url <url>] [--eval <js>]...
+      .pi/cli/browser-devtools.mjs --artifact <path> --endpoint http://127.0.0.1:9222
 
-Options:
-  --endpoint <url>   DevTools HTTP endpoint. Default: ${DEFAULT_ENDPOINT}
-  --work-id <id>     Write .pi/artifacts/<id>/BROWSER-DEVTOOLS.md
-  --artifact <path>  Write markdown report to an explicit path
+    Options:
+      --endpoint <url>   DevTools HTTP endpoint. Default: ${DEFAULT_ENDPOINT}
+      --artifact <path>  Write markdown report to an explicit path
   --url <url>        Navigate selected tab before inspection
   --page <index>     Page index from /json/list. Default: 0
   --wait-ms <ms>     Wait after navigation before collecting state. Default: 1500
@@ -47,9 +45,8 @@ Options:
 }
 
 function artifactPath(args) {
-	if (args.artifact) return args.artifact;
-	if (args.workId) return join(".pi", "artifacts", args.workId, "BROWSER-DEVTOOLS.md");
-	return undefined;
+    	if (args.artifact) return args.artifact;
+    	return undefined;
 }
 
 async function fetchJson(url) {

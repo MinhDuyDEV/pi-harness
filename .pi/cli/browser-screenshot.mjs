@@ -16,7 +16,6 @@ function parseArgs(argv) {
 		const next = () => argv[++i];
 		if (arg === "--help" || arg === "-h") args.help = true;
 		else if (arg === "--url") args.url = next();
-		else if (arg === "--work-id") args.workId = next();
 		else if (arg === "--out-dir") args.outDir = next();
 		else if (arg === "--report") args.report = next();
 		else if (arg === "--browser") args.browser = next();
@@ -39,12 +38,12 @@ function usage() {
 	return `browser-screenshot.mjs — capture deterministic screenshots with Playwright
 
 Usage:
-  .pi/cli/browser-screenshot.mjs --work-id <id> --url http://localhost:3000
+  .pi/cli/browser-screenshot.mjs --url http://localhost:3000
   .pi/cli/browser-screenshot.mjs --url https://example.com --out-dir /tmp/shots --viewport desktop:1440x900
 
 Options:
   --url <url>             Page URL to capture. Required
-  --work-id <id>          Save under .pi/artifacts/<id>/screenshots/ and write SCREENSHOTS.md
+  --out-dir <dir>         Save screenshots under <dir> (default: .pi/browser-artifacts/screenshots)
   --out-dir <dir>         Explicit screenshot output directory
   --report <path>         Explicit markdown report path
   --browser <name>        chromium | firefox | webkit. Default: chromium
@@ -64,8 +63,8 @@ async function loadPlaywright() {
 }
 
 function paths(args) {
-	const outDir = args.outDir ?? (args.workId ? join(".pi", "artifacts", args.workId, "screenshots") : join(process.cwd(), ".pi", "browser-artifacts", "screenshots"));
-	const report = args.report ?? (args.workId ? join(".pi", "artifacts", args.workId, "SCREENSHOTS.md") : join(outDir, "SCREENSHOTS.md"));
+	const outDir = args.outDir ?? join(process.cwd(), ".pi", "browser-artifacts", "screenshots");
+	const report = args.report ?? join(outDir, "SCREENSHOTS.md");
 	return { outDir, report };
 }
 

@@ -9,7 +9,6 @@ function parseArgs(argv) {
 		const arg = argv[i];
 		const next = () => argv[++i];
 		if (arg === "--help" || arg === "-h") args.help = true;
-		else if (arg === "--work-id") args.workId = next();
 		else if (arg === "--artifact") args.artifact = next();
 		else if (arg === "--url") args.url = next();
 		else if (arg === "--browser") args.browser = next();
@@ -29,13 +28,12 @@ function usage() {
 	return `playwright-flow.mjs — run a repeatable browser flow and save evidence
 
 Usage:
-  .pi/cli/playwright-flow.mjs --work-id <id> --url <url> --step snapshot --step screenshot=home.png
+      .pi/cli/playwright-flow.mjs --url <url> --step snapshot --step screenshot=home.png
   .pi/cli/playwright-flow.mjs --artifact /tmp/FLOW.md --url http://localhost:3000 --step 'click=button[type=submit]'
 
-Options:
-  --work-id <id>         Write .pi/artifacts/<id>/PLAYWRIGHT-FLOW.md
-  --artifact <path>      Write markdown report to an explicit path
-  --url <url>            Initial URL to open
+    Options:
+      --artifact <path>      Write markdown report to an explicit path
+      --url <url>            Initial URL to open
   --browser <name>       chromium | firefox | webkit. Default: chromium
   --headed               Show browser window
   --headless             Force headless mode. Default
@@ -59,7 +57,6 @@ Step syntax:
 
 function artifactPath(args) {
 	if (args.artifact) return args.artifact;
-	if (args.workId) return join(".pi", "artifacts", args.workId, "PLAYWRIGHT-FLOW.md");
 	return undefined;
 }
 
