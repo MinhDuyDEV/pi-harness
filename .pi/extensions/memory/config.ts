@@ -7,7 +7,7 @@
  * needs no config. Pipeline, persona, scenes, and embedding subsystems were
  * deleted entirely; their config sections are removed.
  *
- * See: .pi/artifacts/memory-extension-cleanup/ADR-001-memory-extension-cleanup.md
+ * See: .pi/artifacts/DECISIONS.md#adr-001-memory-extension-cleanup
  */
 
 // ---------------------------------------------------------------------------

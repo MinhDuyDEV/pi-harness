@@ -13,7 +13,7 @@
  * - /memory-compact slash command: agent-driven weekly compaction to
  *   `<project>/.pi/artifacts/notes/{ISO-week}.md`
  *
- * See: .pi/artifacts/memory-extension-cleanup/ADR-001-memory-extension-cleanup.md
+ * See: .pi/artifacts/DECISIONS.md#adr-001-memory-extension-cleanup
  */
 
 import type {

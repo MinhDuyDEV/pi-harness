@@ -10,7 +10,7 @@
  * - "the agent itself has some autonomy over how it compresses it" (Mario)
  * - "It just grabs a JSONL file. Bash is all you need." (Armin)
  *
- * See: .pi/artifacts/memory-extension-cleanup/ADR-001-memory-extension-cleanup.md
+ * See: .pi/artifacts/DECISIONS.md#adr-001-memory-extension-cleanup
  */
 
 import type { ObservationRow } from "./config.js";

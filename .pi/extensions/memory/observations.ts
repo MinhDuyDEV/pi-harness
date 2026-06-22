@@ -17,7 +17,7 @@
  * returns the existing row's id instead of creating a duplicate.
  * Non-warning types are unaffected (the index is partial).
  *
- * See: .pi/artifacts/memory-extension-cleanup/ADR-001-memory-extension-cleanup.md
+ * See: .pi/artifacts/DECISIONS.md#adr-001-memory-extension-cleanup
  */
 
 import type { SQLInputValue } from "node:sqlite";
