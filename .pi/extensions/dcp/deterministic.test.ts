@@ -27,6 +27,22 @@ test("deterministic compaction is stable across repeated runs", () => {
   expect(first).toContain("because password reset invalidates sessions");
 });
 
+test("deterministic summary records compaction reason metadata", () => {
+  const summary = buildDeterministicSummary({
+    messages: [{ role: "user", content: "Continue deploying DCP" }],
+    compactionReason: "overflow",
+    willRetry: true,
+    customInstructions: "focus on current deployment blocker",
+  }).summary;
+
+  expect(summary).toContain("Compaction metadata:");
+  expect(summary).toContain("Reason: overflow");
+  expect(summary).toContain("Pi will retry the interrupted turn");
+  expect(summary).toContain(
+    "Manual compact instructions: focus on current deployment blocker",
+  );
+});
+
 test("deterministic summary is shorter than repeated noisy transcript", () => {
   const messages = Array.from({ length: 80 }, (_, index) => ({
     role: index % 2 === 0 ? "assistant" : "tool",

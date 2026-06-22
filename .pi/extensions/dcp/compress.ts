@@ -37,7 +37,7 @@ export const DCP_STATE_ENTRY_TYPE = "dcp_state";
 
 export interface DcpStateEntryPayload {
   version: 1;
-  reason: "session_start" | "compress_tool" | "compaction" | "tree" | "manual";
+  reason: string;
   snapshot: DurableSessionState;
   createdAt: number;
 }

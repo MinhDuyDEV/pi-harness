@@ -43,9 +43,36 @@ import {
   restoreDcpStateFromSessionEntries,
 } from "./compress.js";
 
-import { buildDeterministicSummary } from "./deterministic.js";
+import {
+  buildDeterministicSummary,
+  type CompactionReason,
+} from "./deterministic.js";
 import { NudgeManager } from "./nudge.js";
 import { registerRecallTool, searchDcpRecall } from "./recall.js";
+
+interface DcpCompactionMetadata {
+  reason: CompactionReason;
+  willRetry?: boolean;
+  customInstructions?: string;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function asMutableRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function parseCompactionReason(value: unknown): CompactionReason {
+  return value === "manual" || value === "threshold" || value === "overflow"
+    ? value
+    : "unknown";
+}
 
 export default function dcpExtension(pi: ExtensionAPI): void {
   // Merge with user config from settings if available (config is module-level)
@@ -58,15 +85,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   // Guard: track whether ensureInitialized has run
   let initialized = false;
 
-  function appendDcpStateEntry(
-    ctx: ExtensionContext,
-    reason:
-      | "session_start"
-      | "compress_tool"
-      | "compaction"
-      | "tree"
-      | "manual",
-  ): void {
+  function appendDcpStateEntry(ctx: ExtensionContext, reason: string): void {
     pi.appendEntry(
       "dcp_state",
       makeDcpStateEntryPayload(getDcpSessionId(ctx), reason),
@@ -84,6 +103,70 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         return `[${type} ${String(obj.id ?? index)}]: ${typeof payload === "string" ? payload : JSON.stringify(payload)}`;
       })
       .join("\n\n");
+  }
+
+  function getCompactionMetadata(event: unknown): DcpCompactionMetadata {
+    const record = asRecord(event);
+    return {
+      reason: parseCompactionReason(record?.reason),
+      willRetry:
+        typeof record?.willRetry === "boolean" ? record.willRetry : undefined,
+      customInstructions:
+        typeof record?.customInstructions === "string"
+          ? record.customInstructions
+          : undefined,
+    };
+  }
+
+  function getDeterministicTranscriptLimit(
+    baseLimit: number,
+    reason: CompactionReason,
+  ): number {
+    if (reason !== "overflow") return baseLimit;
+    return Math.max(baseLimit, Math.ceil(baseLimit * 1.5));
+  }
+
+  function prependCompactionContext(
+    summary: string,
+    metadata: DcpCompactionMetadata,
+  ): string {
+    const lines = [`Compaction reason: ${metadata.reason}.`];
+    if (typeof metadata.willRetry === "boolean") {
+      lines.push(
+        metadata.willRetry
+          ? "Pi will retry the interrupted turn after compaction."
+          : "Pi will not retry an interrupted turn after compaction.",
+      );
+    }
+    if (metadata.reason === "overflow") {
+      lines.push(
+        "Overflow recovery: preserve the latest user intent and split-turn context needed for retry.",
+      );
+    }
+    if (metadata.customInstructions) {
+      lines.push(`Manual compact instructions: ${metadata.customInstructions}`);
+    }
+    return `${lines.join("\n")}\n\n${summary}`;
+  }
+
+  function addDcpCompactionDetails(
+    result: { details?: unknown },
+    sessionId: string,
+    metadata: DcpCompactionMetadata,
+  ): void {
+    const details = asMutableRecord(result.details) ?? {};
+    const dcp = asMutableRecord(details.dcp) ?? {};
+    dcp.deterministic = false;
+    dcp.reason = metadata.reason;
+    if (typeof metadata.willRetry === "boolean") {
+      dcp.willRetry = metadata.willRetry;
+    }
+    if (metadata.customInstructions) {
+      dcp.customInstructions = metadata.customInstructions;
+    }
+    dcp.snapshot = makeDcpStateEntryPayload(sessionId, "compaction").snapshot;
+    details.dcp = dcp;
+    result.details = details;
   }
 
   function ensureInitialized(ctx: ExtensionContext): void {
@@ -225,6 +308,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         const serializedConversation = serializeConversation(
           convertToLlm(messages),
         );
+        const compactionMetadata = getCompactionMetadata(event);
 
         if (
           config.deterministicCompaction.enabled &&
@@ -236,10 +320,16 @@ export default function dcpExtension(pi: ExtensionAPI): void {
             blocks,
             previousSummary: prepLike.previousSummary,
             persistentSummary: ps,
-            maxTranscriptLines:
+            maxTranscriptLines: getDeterministicTranscriptLimit(
               config.deterministicCompaction.maxTranscriptLines,
+              compactionMetadata.reason,
+            ),
             maxSectionItems: config.deterministicCompaction.maxSectionItems,
+            compactionReason: compactionMetadata.reason,
+            willRetry: compactionMetadata.willRetry,
+            customInstructions: compactionMetadata.customInstructions,
           });
+
           const result = enrichCompactionResult(
             {
               summary: `${deterministic.summary}\n\n## DCP Persistent Summary\n\n${buildCompressedSummaryMessage(ps)}`,
@@ -249,6 +339,10 @@ export default function dcpExtension(pi: ExtensionAPI): void {
               details: {
                 dcp: {
                   deterministic: true,
+                  reason: compactionMetadata.reason,
+                  willRetry: compactionMetadata.willRetry,
+                  customInstructions:
+                    compactionMetadata.customInstructions || undefined,
                   blockCount: blocks.length,
                   lineCount: deterministic.lineCount,
                   snapshot: makeDcpStateEntryPayload(sessionId, "compaction")
@@ -284,7 +378,8 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         );
 
         if (!result) return;
-        result.summary += `\n\n## DCP Persistent Summary\n\n${buildCompressedSummaryMessage(ps)}`;
+        result.summary = `${prependCompactionContext(result.summary, compactionMetadata)}\n\n## DCP Persistent Summary\n\n${buildCompressedSummaryMessage(ps)}`;
+        addDcpCompactionDetails(result, sessionId, compactionMetadata);
         return {
           compaction: enrichCompactionResult(
             result,
@@ -299,9 +394,10 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     },
   );
 
-  pi.on("session_compact", (_event, ctx: ExtensionContext) => {
+  pi.on("session_compact", (event, ctx: ExtensionContext) => {
     ensureInitialized(ctx);
-    appendDcpStateEntry(ctx, "compaction");
+    const metadata = getCompactionMetadata(event);
+    appendDcpStateEntry(ctx, `compaction:${metadata.reason}`);
   });
 
   const onTreeEvent = pi.on as (

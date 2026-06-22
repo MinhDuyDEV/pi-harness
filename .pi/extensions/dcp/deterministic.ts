@@ -1,5 +1,7 @@
 import type { CompressionBlock, PersistentSessionSummary } from "./compress";
 
+export type CompactionReason = "manual" | "threshold" | "overflow" | "unknown";
+
 export interface DeterministicSummaryOptions {
   messages: readonly unknown[];
   serializedConversation?: string;
@@ -8,6 +10,9 @@ export interface DeterministicSummaryOptions {
   blocks?: readonly CompressionBlock[];
   maxTranscriptLines?: number;
   maxSectionItems?: number;
+  compactionReason?: CompactionReason;
+  willRetry?: boolean;
+  customInstructions?: string;
 }
 
 export interface DeterministicSummaryResult {
@@ -66,6 +71,7 @@ export function buildDeterministicSummary(
   ]).slice(-maxSectionItems);
 
   const transcript = buildBriefTranscript(messages, maxTranscriptLines);
+  const compactionContext = buildCompactionContext(options);
   const sections: string[] = [];
   sections.push(
     "## Goal",
@@ -98,6 +104,11 @@ export function buildDeterministicSummary(
     "- ",
   );
   sections.push("", "## Critical Context");
+  if (compactionContext.length > 0) {
+    sections.push("Compaction metadata:");
+    pushBullets(sections, compactionContext, "- ");
+    sections.push("");
+  }
   if (options.previousSummary)
     sections.push(
       "Previous compaction summary:",
@@ -161,6 +172,33 @@ function parseStringArray(value: unknown): string[] {
 
 function pushBullets(out: string[], items: string[], prefix: string): void {
   for (const item of items.filter(Boolean)) out.push(`${prefix}${item}`);
+}
+
+function buildCompactionContext(
+  options: DeterministicSummaryOptions,
+): string[] {
+  const context: string[] = [];
+  if (options.compactionReason) {
+    context.push(`Reason: ${options.compactionReason}`);
+  }
+  if (typeof options.willRetry === "boolean") {
+    context.push(
+      options.willRetry
+        ? "Pi will retry the interrupted turn after compaction. Preserve the latest user intent and recovery context."
+        : "Pi will not retry an interrupted turn after this compaction.",
+    );
+  }
+  if (options.compactionReason === "overflow") {
+    context.push(
+      "Overflow recovery: be conservative and keep split-turn/tool context needed for retry.",
+    );
+  }
+  if (options.customInstructions?.trim()) {
+    context.push(
+      `Manual compact instructions: ${oneLine(options.customInstructions, 240)}`,
+    );
+  }
+  return context;
 }
 
 function extractBlocked(nextSteps: string[]): string[] {
