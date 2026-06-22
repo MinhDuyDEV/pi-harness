@@ -8,7 +8,7 @@ import {
   type ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
-import { createQueueTracker } from "./queue-panel.js";
+import { createQueueTracker } from "./sidebar.js";
 import {
   hasOpenTodos,
   scanTodos,
@@ -202,44 +202,37 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       footer.contextWindow = ctx.model.contextWindow ?? 0;
     }
     const usage = ctx.getContextUsage();
-    if (usage) {
-      footer.tokenCount = usage.tokens ?? 0;
-    }
-    footer.hasPendingMessages = queue.state().hasPending;
-    footer.cwd = ctx.cwd;
-    // Keep last known git info as sidebar fallback during async refresh gaps.
-    const freshGit = getCachedGitInfo();
-    if (freshGit) lastKnownGit = freshGit;
-    footer.git = freshGit ?? lastKnownGit;
+        if (usage) {
+          footer.tokenCount = usage.tokens ?? 0;
+        }
+        footer.cwd = ctx.cwd;
+        // Keep last known git info as sidebar fallback during async refresh gaps.
+        const freshGit = getCachedGitInfo();
+        if (freshGit) lastKnownGit = freshGit;
+        footer.git = freshGit ?? lastKnownGit;
 
-    sidebar.todos = todosState;
-    sidebar.queue = queue.state();
-    sidebar.git = footer.git;
-    sidebar.modelLabel = footer.modelLabel;
-    sidebar.tokenCount = footer.tokenCount;
-    sidebar.contextWindow = footer.contextWindow;
-    sidebar.totalCostUsd = footer.totalCostUsd;
-    sidebar.thinkingLevel = footer.thinkingLevel;
-    sidebar.cwd = ctx.cwd;
-    sidebar.piVersion = VERSION;
-    const terminalWidth = typeof tuiRef?.terminal?.columns === "number" ? tuiRef.terminal.columns : 0;
-    const sidebarVisible = sidebarTotalWidth(sidebar, terminalWidth) > 0;
+        sidebar.todos = todosState;
+        sidebar.queue = queue.state();
+        sidebar.git = footer.git;
+        sidebar.modelLabel = footer.modelLabel;
+        sidebar.tokenCount = footer.tokenCount;
+        sidebar.contextWindow = footer.contextWindow;
+        sidebar.totalCostUsd = footer.totalCostUsd;
+        sidebar.thinkingLevel = footer.thinkingLevel;
+        sidebar.cwd = ctx.cwd;
+        sidebar.piVersion = VERSION;
+        const terminalWidth = typeof tuiRef?.terminal?.columns === "number" ? tuiRef.terminal.columns : 0;
+        const sidebarVisible = sidebarTotalWidth(sidebar, terminalWidth) > 0;
 
-    // Widgets — hide when empty. The sidebar owns queue/TODOs when visible.
-    if (queue.state().hasPending && !sidebarVisible) {
-      ctx.ui.setWidget("amp-queue", (_tui: TUI, theme: Theme) =>
-        queue.renderWidget(theme),
-      );
-    } else {
-      ctx.ui.setWidget("amp-queue", undefined);
-    }
-    if (hasOpenTodos(todosState) && !sidebarVisible) {
-      ctx.ui.setWidget("amp-todos", (_tui: TUI, theme: Theme) =>
-        renderTodosWidget(todosState, _tui, theme),
-      );
-    } else {
-      ctx.ui.setWidget("amp-todos", undefined);
-    }
+        // Widgets — hide when empty. The sidebar owns queue/TODOs when visible.
+        if (hasOpenTodos(todosState) && !sidebarVisible) {
+          ctx.ui.setWidget("amp-todos", (_tui: TUI, theme: Theme) =>
+            renderTodosWidget(todosState, _tui, theme),
+          );
+        } else {
+          ctx.ui.setWidget("amp-todos", undefined);
+        }
+
 
     compositor?.invalidateCluster();
     syncFixedRenderables();
@@ -286,10 +279,9 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   // ── Session lifecycle ────────────────────────────────────────────────────
   pi.on("session_start", async (_event, ctx) => {
     footer.isStreaming = false;
-    footer.tokenCount = 0;
-    footer.contextWindow = 0;
-    footer.hasPendingMessages = false;
-    setEditorStreamingPrompt(null);
+        footer.tokenCount = 0;
+        footer.contextWindow = 0;
+        setEditorStreamingPrompt(null);
     footer.cwd = ctx.cwd;
     footer.git = null;
     footer.thinkingLevel = "";
@@ -718,10 +710,9 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       model: footer.modelLabel,
       thinking: footer.thinkingLevel,
       streaming: footer.isStreaming,
-      editorPrompt: editorStreamingPrompt,
-      context: footer.contextWindow,
-      pending: footer.hasPendingMessages,
-      cwd: footer.cwd,
+          editorPrompt: editorStreamingPrompt,
+          context: footer.contextWindow,
+          cwd: footer.cwd,
       git: footer.git,
       turnCacheReadTokens: footer.turnCacheReadTokens,
       turnCacheWriteTokens: footer.turnCacheWriteTokens,

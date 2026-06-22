@@ -8,7 +8,6 @@ import { NF, formatCost, fmtNum } from "./helpers.js";
 /** Returns icon + trailing space with Nerd Fonts, empty string without. */
 function iFolder(): string   { return ""; }
 function iGit(): string      { return ""; }
-function iQueue(): string    { return NF ? "\uf0c9 " : ""; }
 function iInput(): string    { return NF ? "󰁝" : "↑"; }
 function iOutput(): string   { return NF ? "󰁅" : "↓"; }
 function iCache(): string    { return NF ? "󰆼" : "cache"; }
@@ -22,11 +21,10 @@ function sep(): string       { return "·"; }
 export interface FooterState {
   modelLabel: string;
   thinkingLevel: string;
-  isStreaming: boolean;
-  tokenCount: number;
-  contextWindow: number;
-  hasPendingMessages: boolean;
-  tui: TUI | null;
+      isStreaming: boolean;
+      tokenCount: number;
+      contextWindow: number;
+      tui: TUI | null;
   git: GitInfo | null;
   cwd: string;
   /** Elapsed ms since current turn started. */
@@ -50,10 +48,9 @@ export function createDefaultFooterState(): FooterState {
     modelLabel: "",
     thinkingLevel: "",
     isStreaming: false,
-    tokenCount: 0,
-    contextWindow: 0,
-    hasPendingMessages: false,
-    tui: null,
+        tokenCount: 0,
+        contextWindow: 0,
+        tui: null,
     git: null,
     cwd: "",
     turnElapsed: 0,
@@ -213,14 +210,10 @@ export function createFooterRenderer(state: FooterState) {
       }
 
       if (state.cwd) {
-        L.push(seg(theme.fg("dim", iFolder() + " " + shortPath(state.cwd) + " ")));
-      }
+            L.push(seg(theme.fg("dim", iFolder() + " " + shortPath(state.cwd) + " ")));
+          }
 
-      if (state.hasPendingMessages) {
-        L.push(seg(theme.fg("warning", iQueue() + "\u25c6")));
-      }
-
-      // ── Right: [git] [latency*] [token bar] ──────────────────────────
+          // ── Right: [git] [latency*] [token bar] ──────────────────────────
       const R: Seg[] = [];
 
       const g = gitSeg(state.git, theme);

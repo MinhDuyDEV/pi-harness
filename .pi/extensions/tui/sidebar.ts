@@ -1,8 +1,44 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { GitInfo } from "./git-status.js";
-import type { QueueState } from "./queue-panel.js";
 import { hasOpenTodos, type TodosState } from "./todos-panel.js";
 import { formatCost, fmtNum } from "./helpers.js";
+
+export interface QueueState {
+  steerCount: number;
+  followUpCount: number;
+  hasPending: boolean;
+}
+
+export interface QueueTracker {
+  state(): QueueState;
+  onInput(streamingBehavior: string | undefined): void;
+  onTurnEnd(): void;
+  onAgentEnd(): void;
+}
+
+export function createQueueTracker(): QueueTracker {
+  let steerCount = 0;
+  let followUpCount = 0;
+
+  return {
+    state() {
+      return { steerCount, followUpCount, hasPending: steerCount + followUpCount > 0 };
+    },
+    onInput(streamingBehavior) {
+      if (streamingBehavior === "steer") {
+        steerCount++;
+      } else if (streamingBehavior === "followUp") {
+        followUpCount++;
+      }
+    },
+    onTurnEnd() {
+      steerCount = 0;
+    },
+    onAgentEnd() {
+      followUpCount = 0;
+    },
+  };
+}
 
 const RESET = "\x1b[0m";
 const LABEL = "\x1b[97m";
