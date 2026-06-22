@@ -52,7 +52,7 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
 - `diagnostics` — Type/lint/quality checks (TS/JS, Rust, Go, Python)
 - `harness` — Multi-agent build pipeline (planner → worker → reviewer)
 - `task` — Delegate to specialist sub-agents
-- `ask_user_question` — Clarifying questions (structured choices)
+- `ask_user` — Clarifying questions (structured choices)
 - `websearch` / `web_fetch` / `codesearch` / `context7` / `deepwiki` — Web research
 - `webclaw_scrape` / `webclaw_batch` — Web scraping (bot-protected pages)
 - `memory-search` / `memory-admin` / `observation` — Durable project knowledge

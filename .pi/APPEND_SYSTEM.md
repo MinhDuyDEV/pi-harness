@@ -62,10 +62,18 @@ Artifacts = visible planning for direct-tool work. Harness = product-level build
 - Check `<project>/.pi/artifacts/notes/{ISO-week}.md` first — agent-written curated summaries, high-signal, per-project.
 - `memory-search` → durable project knowledge (FTS5 only, no embeddings).
 - `/memory-compact` → compress observations into the weekly note; then read + curate.
-- `dcp_recall` → current-session recovery (earlier output, commands, decisions).
+- `dcp_recall` / `compress` — current-session recovery and curated compression
+- `task` — delegate work to a Pi subagent; pass `conversation_id` for a durable specialist thread
 - `npx fallow health --changed-since main --format json` → complexity and blast-radius before TS/JS edits.
 
 After either path, verify current code/config/git state from disk before acting.
+
+## `task` Tool Usage
+
+- Use `task` for exploration, parallelisable work, or work that should not pollute the parent context. Do not use it for trivial or single-step work.
+- Pass `conversation_id` for a named specialist that must remember past work; use `background: true` when the parent can keep moving; use foreground without `conversation_id` for one-shot helpers.
+- `conversation_id` resume requires tmux. The SDK fallback only supports one-shot tasks.
+- Refer to specialists by `conversation_id` or agent name, never by raw `task_id`.
 
 ## Web Retrieval Priority
 

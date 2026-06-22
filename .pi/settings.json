@@ -1,18 +1,18 @@
 {
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.5",
+  "defaultProvider": "opencode-go",
+  "defaultModel": "minimax-m3",
   "defaultThinkingLevel": "high",
   "editorPaddingX": 0,
   "images": {
     "blockImages": false
   },
   "packages": [
-    "git:github.com/ghoseb/pi-askuserquestion",
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:@heyhuynhgiabuu/pi-task",
-    "npm:pi-xai-oauth"
+    "npm:pi-xai-oauth",
+    "npm:@eko24ive/pi-ask"
   ],
   "compaction": {
     "enabled": true,
@@ -33,9 +33,15 @@
   "steeringMode": "one-at-a-time",
   "followUpMode": "one-at-a-time",
   "enableSkillCommands": true,
-  "skills": [".pi/skills/"],
-  "prompts": [".pi/prompts/"],
-  "extensions": [".pi/extensions/"],
+  "skills": [
+    ".pi/skills/"
+  ],
+  "prompts": [
+    ".pi/prompts/"
+  ],
+  "extensions": [
+    ".pi/extensions/"
+  ],
   "lastChangelogVersion": "0.79.10",
   "treeFilterMode": "default",
   "transport": "auto",
