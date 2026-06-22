@@ -277,16 +277,17 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   let fixedEditorEnabled = true;
 
   // ── Session lifecycle ────────────────────────────────────────────────────
-  pi.on("session_start", async (_event, ctx) => {
-    footer.isStreaming = false;
-        footer.tokenCount = 0;
-        footer.contextWindow = 0;
-        setEditorStreamingPrompt(null);
-    footer.cwd = ctx.cwd;
-    footer.git = null;
-    footer.thinkingLevel = "";
-    footer.turnElapsed = 0;
-    footer.turnTokens = 0;
+      pi.on("session_start", async (_event, ctx) => {
+        ctx.ui.setWorkingVisible(false);
+        footer.isStreaming = false;
+            footer.tokenCount = 0;
+            footer.contextWindow = 0;
+            setEditorStreamingPrompt(null);
+        footer.cwd = ctx.cwd;
+        footer.git = null;
+        footer.thinkingLevel = "";
+        footer.turnElapsed = 0;
+        footer.turnTokens = 0;
     footer.turnInputTokens = 0;
     footer.turnOutputTokens = 0;
     footer.turnCacheReadTokens = 0;
