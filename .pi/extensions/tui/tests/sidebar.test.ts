@@ -42,10 +42,11 @@ test("sidebar omits the TODO section when all tracked tasks are complete", () =>
   const state = createDefaultSidebarState();
   state.enabled = true;
   state.modelLabel = "OpenAI / GPT-5.5";
-  state.todos = {
-    sourceCount: 1,
-    items: [{ text: "Finished", done: true, sourceFile: "TODO.md" }],
-  };
+      state.todos = {
+        sourceFile: "TODO.md",
+        sourceCount: 1,
+            items: [{ text: "Finished", done: true, sourceFile: "TODO.md", blockTitle: null, status: null }],
+      };
   state.git = { branch: "main", staged: 0, unstaged: 0, untracked: 0 };
   state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pikit/.pi`;
   state.piVersion = "1.2.3";
@@ -64,13 +65,14 @@ test("sidebar renders compact session todos queue and bottom identity rows", () 
   state.tokenCount = 117_700;
   state.contextWindow = 272_000;
   state.totalCostUsd = 0.03;
-  state.todos = {
-    sourceCount: 1,
-    items: [
-      { text: "Verify TODO panel appears in the TUI", done: false, sourceFile: "TODO.md" },
-      { text: "Try checking this item manually", done: false, sourceFile: "TODO.md" },
-      { text: "Completed task", done: true, sourceFile: "TODO.md" },
-    ],
+      state.todos = {
+        sourceFile: "TODO.md",
+        sourceCount: 1,
+            items: [
+          { text: "Verify TODO panel appears in the TUI", done: false, sourceFile: "TODO.md", blockTitle: null, status: null },
+          { text: "Try checking this item manually", done: false, sourceFile: "TODO.md", blockTitle: null, status: null },
+          { text: "Completed task", done: true, sourceFile: "TODO.md", blockTitle: null, status: null },
+        ],
   };
   state.queue = { steerCount: 1, followUpCount: 2, hasPending: true };
   state.git = { branch: "main", staged: 1, unstaged: 2, untracked: 3 };

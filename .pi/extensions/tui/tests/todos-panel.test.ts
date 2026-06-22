@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { hasOpenTodos, renderTodosWidget, scanTodos, type TodosState } from "../todos-panel.js";
 
 const markedTheme = {
@@ -17,99 +17,167 @@ function renderTodos(state: TodosState, width = 120): string[] {
     .map((line) => line.trimEnd());
 }
 
-test("scanTodos finds artifacts when Pi is launched from the .pi directory", () => {
-  const dir = mkdtempSync(join(tmpdir(), "tui-todos-scan-"));
+test("scanTodos finds the canonical TODO.md from the project root", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-root-"));
   try {
-    const piDir = join(dir, ".pi");
-    const planDir = join(piDir, "artifacts", "example");
-    mkdirSync(planDir, { recursive: true });
-    writeFileSync(join(planDir, "TODO.md"), "- [ ] Visible from dot-pi cwd\n- [x] Done item\n");
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      `### 2026-06-23 - fix rate limit
+status: active | updated: 2026-06-23
 
-    const state = scanTodos(piDir);
+- [ ] Visible from project root
+- [x] Done item
+`,
+    );
 
+    const state = scanTodos(dir);
+
+        assert.equal(state.sourceFile, join(dir, ".pi", "artifacts", "TODO.md"));
     assert.equal(state.sourceCount, 1);
-    assert.deepEqual(state.items.map((item) => ({ text: item.text, done: item.done })), [
-      { text: "Visible from dot-pi cwd", done: false },
-      { text: "Done item", done: true },
-    ]);
+    assert.deepEqual(
+      state.items.map((item) => ({ text: item.text, done: item.done, block: item.blockTitle, status: item.status })),
+      [
+        { text: "Visible from project root", done: false, block: "2026-06-23 - fix rate limit", status: "active" },
+        { text: "Done item", done: true, block: "2026-06-23 - fix rate limit", status: "active" },
+      ],
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("scanTodos tracks only the current artifact TODO when launched inside an artifact", () => {
-  const dir = mkdtempSync(join(tmpdir(), "tui-todos-active-artifact-"));
+test("scanTodos parses multiple blocks with different statuses", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-multi-block-"));
   try {
-    const piDir = join(dir, ".pi");
-    const activeDir = join(piDir, "artifacts", "active", "notes");
-    const oldDir = join(piDir, "artifacts", "old");
-    mkdirSync(activeDir, { recursive: true });
-    mkdirSync(oldDir, { recursive: true });
-    writeFileSync(join(piDir, "artifacts", "active", "TODO.md"), "- [ ] Active task\n");
-    writeFileSync(join(oldDir, "TODO.md"), "- [ ] Old task\n");
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      `### 2026-06-23 - active work
+status: active | updated: 2026-06-23
 
-    const state = scanTodos(activeDir);
+- [ ] Open task
 
-    assert.equal(state.sourceCount, 1);
-    assert.deepEqual(state.items.map((item) => item.text), ["Active task"]);
+### 2026-06-22 - done work
+status: done | updated: 2026-06-22
+
+- [x] Done task
+`,
+    );
+
+    const state = scanTodos(dir);
+
+    assert.equal(state.items.length, 2);
+    assert.deepEqual(
+      state.items.map((item) => ({ text: item.text, done: item.done, block: item.blockTitle, status: item.status })),
+      [
+        { text: "Open task", done: false, block: "2026-06-23 - active work", status: "active" },
+        { text: "Done task", done: true, block: "2026-06-22 - done work", status: "done" },
+      ],
+    );
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("scanTodos falls back to the most recently changed artifact TODO from .pi cwd", () => {
-  const dir = mkdtempSync(join(tmpdir(), "tui-todos-latest-artifact-"));
+test("scanTodos walks up to find TODO.md when launched in a subdirectory", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-walkup-"));
   try {
-    const piDir = join(dir, ".pi");
-    const oldDir = join(piDir, "artifacts", "old");
-    const latestDir = join(piDir, "artifacts", "latest");
-    mkdirSync(oldDir, { recursive: true });
-    mkdirSync(latestDir, { recursive: true });
-    const oldTodo = join(oldDir, "TODO.md");
-    const latestTodo = join(latestDir, "TODO.md");
-    writeFileSync(oldTodo, "- [ ] Old task\n");
-    writeFileSync(latestTodo, "- [ ] Latest task\n");
-    utimesSync(oldTodo, new Date("2024-01-01T00:00:00Z"), new Date("2024-01-01T00:00:00Z"));
-    utimesSync(latestTodo, new Date("2024-02-01T00:00:00Z"), new Date("2024-02-01T00:00:00Z"));
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(join(artifactsDir, "nested", "deeper"), { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      `### 2026-06-23 - work
+status: active | updated: 2026-06-23
 
-    const state = scanTodos(piDir);
+- [ ] Found by walking up
+`,
+    );
 
+    const deep = join(artifactsDir, "nested", "deeper");
+    const state = scanTodos(deep);
+
+    assert.equal(state.sourceFile, join(dir, ".pi", "artifacts", "TODO.md"));
     assert.equal(state.sourceCount, 1);
-    assert.deepEqual(state.items.map((item) => item.text), ["Latest task"]);
+    assert.equal(state.items.length, 1);
+    assert.equal(state.items[0].text, "Found by walking up");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("hasOpenTodos is false when every parsed task is complete", () => {
-  assert.equal(hasOpenTodos({ sourceCount: 1, items: [{ text: "Finished", done: true, sourceFile: "TODO.md" }] }), false);
-  assert.equal(hasOpenTodos({ sourceCount: 1, items: [{ text: "Open", done: false, sourceFile: "TODO.md" }] }), true);
+test("scanTodos returns empty state when no TODO.md is found", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-empty-"));
+  try {
+    const state = scanTodos(dir);
+    assert.equal(state.sourceFile, null);
+    assert.equal(state.sourceCount, 0);
+    assert.deepEqual(state.items, []);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("hasOpenTodos reflects only unchecked items", () => {
+  assert.equal(
+    hasOpenTodos({ sourceFile: "TODO.md", sourceCount: 1, items: [{ text: "Finished", done: true, blockTitle: null, status: null, sourceFile: "TODO.md" }] }),
+    false,
+  );
+  assert.equal(
+    hasOpenTodos({ sourceFile: "TODO.md", sourceCount: 1, items: [{ text: "Open", done: false, blockTitle: null, status: null, sourceFile: "TODO.md" }] }),
+    true,
+  );
 });
 
 test("todos widget renders missing TODO.md empty state", () => {
-  assert.deepEqual(renderTodos({ items: [], sourceCount: 0 }), [
-    " <muted>TODOs — No TODO.md files found in .pi/artifacts/</muted>",
+  assert.deepEqual(renderTodos({ sourceFile: null, sourceCount: 0, items: [] }), [
+    " <muted>TODOs — No .pi/artifacts/TODO.md found</muted>",
   ]);
 });
 
-test("todos widget renders all-done state when source files have no open items", () => {
-  assert.deepEqual(renderTodos({ items: [], sourceCount: 2 }), [
-    " <muted>TODOs — 2 file(s), all done</muted>",
+test("todos widget renders all-done state when no open items remain", () => {
+  assert.deepEqual(renderTodos({ sourceFile: "TODO.md", sourceCount: 1, items: [] }), [
+    " <muted>TODOs — all done</muted>",
   ]);
 });
 
-test("todos widget renders only open checklist items", () => {
+test("todos widget groups open items by work session block", () => {
   const lines = renderTodos({
+    sourceFile: "TODO.md",
     sourceCount: 1,
     items: [
-      { text: "Ship footer metrics", done: false, sourceFile: "/tmp/TODO.md" },
-      { text: "Document restore behavior", done: true, sourceFile: "/tmp/TODO.md" },
+      {
+        text: "Ship footer metrics",
+        done: false,
+        blockTitle: "2026-06-23 - ship footer",
+        status: "active",
+        sourceFile: "TODO.md",
+      },
+      {
+        text: "Document restore behavior",
+        done: true,
+        blockTitle: "2026-06-23 - ship footer",
+        status: "active",
+        sourceFile: "TODO.md",
+      },
+      {
+        text: "Pick a fix strategy",
+        done: false,
+        blockTitle: "2026-06-22 - rate limit",
+        status: "active",
+        sourceFile: "TODO.md",
+      },
     ],
   });
 
   assert.deepEqual(lines, [
-    " TODOs — 1 file(s):",
-    "   <warning>☐</warning> Ship footer metrics",
+    " TODOs — 2 open across 2 block(s):",
+    "   <accent>2026-06-23 - ship footer</accent>",
+    "     <warning>☐</warning> Ship footer metrics",
+    "   <accent>2026-06-22 - rate limit</accent>",
+    "     <warning>☐</warning> Pick a fix strategy",
     "",
   ]);
 });

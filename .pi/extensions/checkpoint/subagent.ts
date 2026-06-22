@@ -5,17 +5,77 @@
  * structured checkpoint content. No subagent is spawned — all data already
  * exists on disk or in memory. This just connects the dots.
  *
- * DATA SOURCES:
- *   1. DCP Artifact Tracker    → files_read / files_modified
- *   2. DCP Persistent Summary  → discoveries, accomplishments
- *   3. Active Artifacts        → TODO.md / PROGRESS.md from .pi/artifacts/<id>/
- *   4. Memory Observations     → recent session observations (FTS5)
- */
+     * DATA SOURCES:
+     *   1. DCP Artifact Tracker    → files_read / files_modified
+     *   2. DCP Persistent Summary  → discoveries, accomplishments
+     *   3. Active Artifacts        → blocks from .pi/artifacts/{TODO,PROGRESS}.md
+     *   4. Memory Observations     → recent session observations (FTS5)
+     */
 
-import { readdirSync, readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+    import { readdirSync, readFileSync, existsSync } from "node:fs";
+    import { join } from "node:path";
 
-interface CheckpointContent {
+    interface ParsedBlock {
+      title: string;
+      status: "active" | "done" | "abandoned" | null;
+      checkboxes: { text: string; done: boolean }[];
+      firstContentLines: string[];
+    }
+
+    /**
+     * Parse a canonical artifact file (TODO.md / PROGRESS.md) into blocks keyed
+     * by `### <title>` headings. Returns blocks in file order. Each block carries
+     * its status (from the `status:` line, if present), its checkboxes, and the
+     * first few content lines under the heading for context.
+     */
+    function parseActiveBlocks(content: string): ParsedBlock[] {
+      const blocks: ParsedBlock[] = [];
+      let current: ParsedBlock | null = null;
+      let inCheckboxSection = false;
+
+      for (const line of content.split("\n")) {
+        const heading = line.match(/^###\s+(.+?)\s*$/);
+        if (heading) {
+          if (current) blocks.push(current);
+          current = {
+            title: heading[1],
+            status: null,
+            checkboxes: [],
+            firstContentLines: [],
+          };
+          inCheckboxSection = false;
+          continue;
+        }
+
+        if (!current) continue;
+
+        const statusMatch = line.match(/^status:\s*(\w+)/);
+        if (statusMatch) {
+          const v = statusMatch[1].toLowerCase();
+          if (v === "active" || v === "done" || v === "abandoned") {
+            current.status = v;
+          }
+          continue;
+        }
+
+        const checkbox = line.match(/^[-*]\s*\[([ xX])\]\s*(.+)$/);
+        if (checkbox) {
+          current.checkboxes.push({ text: checkbox[2].trim(), done: checkbox[1].toLowerCase() === "x" });
+          inCheckboxSection = true;
+          continue;
+        }
+
+        // Capture the first few non-checkbox content lines (#### Run Report etc.)
+        if (!inCheckboxSection && current.firstContentLines.length < 5 && line.trim().length > 0) {
+          current.firstContentLines.push(line);
+        }
+      }
+
+      if (current) blocks.push(current);
+      return blocks;
+    }
+
+    interface CheckpointContent {
   discoveries: string;
   filesRead: string[];
   filesModified: string[];
@@ -58,46 +118,42 @@ export async function generateCheckpointContent(
     // DCP not available — skip
   }
 
-  // 2. Active artifacts from .pi/artifacts/<id>/ directories (most recent first)
-  try {
-    const artifactsDir = join(piDir, "artifacts");
-    if (existsSync(artifactsDir)) {
-      const entries = readdirSync(artifactsDir, { withFileTypes: true });
-      const dirs = entries
-        .filter((e) => e.isDirectory())
-        .map((e) => e.name)
-        .sort()
-        .reverse()
-        .slice(0, 3); // 3 most recent
+      // 2. Active work session blocks from canonical .pi/artifacts/{TODO,PROGRESS}.md
+      try {
+        const artifactsDir = join(piDir, "artifacts");
+        const todoPath = join(artifactsDir, "TODO.md");
+        const progressPath = join(artifactsDir, "PROGRESS.md");
 
-      const taskLines: string[] = [];
-      for (const dir of dirs) {
-        const artifactDir = join(artifactsDir, dir);
-        const todoPath = join(artifactDir, "TODO.md");
-        const progressPath = join(artifactDir, "PROGRESS.md");
+        const taskLines: string[] = [];
 
         if (existsSync(todoPath)) {
-          const todo = readFileSync(todoPath, "utf-8").trim();
-          // Extract task summary: first paragraph + checkbox items
-          const lines = todo.split("\n").filter(
-            (l) => l.includes("- [ ]") || l.includes("- [x]"),
-          );
-          if (lines.length > 0) {
-            taskLines.push(`## ${dir}`);
-            taskLines.push(...lines.slice(0, 10)); // cap at 10 checkboxes
+          const blocks = parseActiveBlocks(readFileSync(todoPath, "utf-8"));
+          for (const block of blocks.slice(0, 3)) {
+            const open = block.checkboxes.filter((c) => !c.done);
+            if (open.length === 0 && block.status === "done") continue;
+            taskLines.push(`## ${block.title}`);
+            for (const c of block.checkboxes.slice(0, 10)) {
+              taskLines.push(c.done ? `- [x] ${c.text}` : `- [ ] ${c.text}`);
+            }
           }
         }
+
         if (existsSync(progressPath)) {
-          const progress = readFileSync(progressPath, "utf-8").trim();
-          const firstLines = progress.split("\n").slice(0, 5);
-          taskLines.push(`Progress (${dir}):`, ...firstLines);
+          const blocks = parseActiveBlocks(readFileSync(progressPath, "utf-8"));
+          for (const block of blocks.slice(0, 3)) {
+            if (block.status === "active") {
+              const first = block.firstContentLines.slice(0, 5);
+              if (first.length > 0) {
+                taskLines.push(`Progress (${block.title}):`, ...first);
+              }
+            }
+          }
         }
+
+        result.activeTasks = taskLines.join("\n") || "(no active tasks)";
+      } catch {
+        result.activeTasks = "(unable to read artifacts)";
       }
-      result.activeTasks = taskLines.join("\n") || "(no active tasks)";
-    }
-  } catch {
-    result.activeTasks = "(unable to read artifacts)";
-  }
 
   // 3. Memory observations from this session (FTS5)
   try {

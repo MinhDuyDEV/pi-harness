@@ -95,7 +95,7 @@ function modelLabel(model: {
 export default function piTuiExtension(pi: ExtensionAPI) {
   // ── State ────────────────────────────────────────────────────────────────
   const queue = createQueueTracker();
-  let todosState: TodosState = { items: [], sourceCount: 0 };
+      let todosState: TodosState = { items: [], sourceFile: null, sourceCount: 0 };
   const footer = createDefaultFooterState();
   const sidebar = createDefaultSidebarState();
   let footerInstalled = false;

@@ -40,7 +40,7 @@ export function createDefaultSidebarState(): SidebarState {
     enabled: false,
     width: 30,
     minTerminalWidth: 150,
-    todos: { items: [], sourceCount: 0 },
+        todos: { items: [], sourceFile: null, sourceCount: 0 },
     queue: { steerCount: 0, followUpCount: 0, hasPending: false },
     git: null,
     modelLabel: "",
