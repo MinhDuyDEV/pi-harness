@@ -1,10 +1,12 @@
 {
 	"name": "pikit",
-		"type": "module",
+	"type": "module",
 	"bin": "./bin/cli.js",
 	"version": "1.0.0",
 	"description": "Batteries-included pi coding agent kit — extensions, agents, skills, prompts, and themes",
-	"keywords": ["pi-package"],
+	"keywords": [
+		"pi-package"
+	],
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -30,9 +32,17 @@
 		"setup": "npm run install:hooks && echo 'Ready.'"
 	},
 	"pi": {
-		"extensions": [".pi/extensions"],
-		"skills": [".pi/skills"],
-		"prompts": [".pi/prompts"],
-		"themes": [".pi/themes"]
+		"extensions": [
+			".pi/extensions"
+		],
+		"skills": [
+			".pi/skills"
+		],
+		"prompts": [
+			".pi/prompts"
+		],
+		"themes": [
+			".pi/themes"
+		]
 	}
 }
