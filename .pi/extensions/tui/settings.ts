@@ -1,11 +1,18 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { readWorkingPaddingTop } from "./working-indicator.js";
 
 export interface PiTuiSettings {
   /** Blank lines above the streaming "⠙ Working..." row (fixed-editor status slice + loader message). Default 1. */
   workingPaddingTop?: number;
+  /**
+   * Mirrors the top-level `terminal.showTerminalProgress` setting from
+   * `.pi/settings.json`. When false (the default), the extension must not
+   * emit OSC 9;4 progress sequences directly to stdout — the user has
+   * explicitly opted out. Only `true` means "user wants the tab-bar progress".
+   */
+  showTerminalProgress?: boolean;
   keyboardScrollShortcuts?: {
     up: string;
     down: string;
@@ -29,9 +36,36 @@ function readPiTuiBlock(parsed: Record<string, unknown>): Record<string, unknown
   return undefined;
 }
 
+function findSettingsPath(cwd: string): string | null {
+  let current = resolve(cwd);
+  for (let depth = 0; depth < 8; depth++) {
+    const nested = join(current, ".pi", "settings.json");
+    if (existsSync(nested)) return nested;
+
+    const direct = join(current, "settings.json");
+    if (basename(current) === ".pi" && existsSync(direct)) return direct;
+
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return null;
+}
+
+/**
+ * Read `terminal.showTerminalProgress` from the top-level `terminal` block.
+ * Defaults to `false` (matches pi core's `getShowTerminalProgress()`), so an
+ * absent key or a non-boolean value means "do not show".
+ */
+function readShowTerminalProgress(parsed: Record<string, unknown>): boolean {
+  const term = parsed?.terminal;
+  if (!term || typeof term !== "object") return false;
+  return (term as Record<string, unknown>).showTerminalProgress === true;
+}
+
 export function readPiTuiSettings(cwd: string): PiTuiSettings {
-  const settingsPath = join(cwd, ".pi", "settings.json");
-  if (!existsSync(settingsPath)) return {};
+  const settingsPath = findSettingsPath(cwd);
+  if (!settingsPath) return { showTerminalProgress: false };
 
   try {
     const parsed = JSON.parse(readFileSync(settingsPath, "utf-8")) as Record<string, unknown>;
@@ -55,12 +89,14 @@ export function readPiTuiSettings(cwd: string): PiTuiSettings {
             },
           }
         : {};
+    const showTerminalProgress = readShowTerminalProgress(parsed);
     return {
       workingPaddingTop,
+      showTerminalProgress,
       ...shortcuts,
     };
   } catch {
-    return { workingPaddingTop: 1 };
+    return { workingPaddingTop: 1, showTerminalProgress: false };
   }
 }
 

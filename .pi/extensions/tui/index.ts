@@ -421,15 +421,21 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
   pi.on("agent_start", async (_event, ctx) => {
     footer.isStreaming = true;
-    // Send OSC 9;4 progress bar directly to Ghostty (via tmux passthrough if in tmux)
-    emitOscProgress("\x1b]9;4;3\x1b\\");
-    // Ghostty times out after ~15s; keepalive every 1s so the bar stays alive
-    // during long streaming sessions (matching pi core's keepalive rate)
-    if (!progressKeepalive) {
-      progressKeepalive = setInterval(() => {
-        emitOscProgress("\x1b]9;4;3\x1b\\");
-      }, 1000);
-      progressKeepalive.unref();
+    // Honor the user's `terminal.showTerminalProgress` setting.
+    // pi core gates its own OSC 9;4 emission on this, but the extension
+    // writes the escape sequence directly to stdout for Ghostty/tmux
+    // passthrough — so we must mirror the gate here.
+    if (piTuiSettings.showTerminalProgress === true) {
+      // Send OSC 9;4 progress bar directly to Ghostty (via tmux passthrough if in tmux)
+      emitOscProgress("\x1b]9;4;3\x1b\\");
+      // Ghostty times out after ~15s; keepalive every 1s so the bar stays alive
+      // during long streaming sessions (matching pi core's keepalive rate)
+      if (!progressKeepalive) {
+        progressKeepalive = setInterval(() => {
+          emitOscProgress("\x1b]9;4;3\x1b\\");
+        }, 1000);
+        progressKeepalive.unref();
+      }
     }
     startFooterAnim(ctx);
     scheduleRefresh(ctx);
@@ -493,12 +499,14 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   pi.on("agent_end", async (_event, ctx) => {
     queue.onAgentEnd();
     footer.isStreaming = false;
-    // Clear terminal progress bar
+    // Clear terminal progress bar (only matters if we were showing one)
     if (progressKeepalive) {
       clearInterval(progressKeepalive);
       progressKeepalive = null;
     }
-    emitOscProgress("\x1b]9;4;0\x1b\\");
+    if (piTuiSettings.showTerminalProgress === true) {
+      emitOscProgress("\x1b]9;4;0\x1b\\");
+    }
     if (turnStartTime > 0) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
