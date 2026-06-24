@@ -59,7 +59,34 @@ This is the compressed always-on execution loop. Even if the rest of the prompt 
   - `/memory-compact [sinceDays]` — Per-project compaction of observations. Agent reads the raw payload, decides what to keep, replaces it with a curated summary.
 - `dcp_recall` / `compress` — Current-session history and curated compression
 
-If using `bash` for text search, never call shell `grep`; use ripgrep instead: `rg -n` for regex, `rg -nF` for literal strings, scoped by path/glob when possible. Use `rg -u`/`rg -uu` only when intentionally searching ignored/hidden files.
+## Text search
+
+Use ripgrep for all `bash` text search. Hard rule — no "when convenient" exceptions.
+
+**Defaults:** `rg -n <pat> <path>` regex, `rg -nF <literal> <path>` fixed. Always `-n` (no `-n` → can't cite as `path:line`). Always scope by path/`-g`/`--type`; bare `rg` walks the whole repo.
+
+**Tool selection (mandatory):**
+
+- `grep` tool — one-shot, returns `path:line:content`
+- `multi_grep` — OR-logic across patterns
+- `rg` in `bash` — pipelines or tool flags
+- `skills/ast-grep/SKILL.md` — structural/AST matching
+
+**Forbidden — replace with `rg` or the dedicated tool:**
+
+- `grep -rn foo .` → `rg -n foo .`
+- `egrep foo file`, `fgrep foo file` → `rg -nF foo file`
+- `git grep foo` → `rg -n foo .`
+- `find . -exec grep -l foo {} \;`, `find . | xargs grep foo` → `rg -n -l foo -g '<glob>'`
+- `cat file | grep foo` → `rg -n foo file`
+- `awk '/foo/' file`, `sed -n /foo/p file` → `rg -n foo file`
+- `rg foo .` (no `-n`) → `rg -n foo .`
+
+**Volume controls (when results >~50):** `--files`, `--files-with-matches`/`-l`, `--type <lang>`, `--max-count <N>`. Pipe to `head`/`wc -l`.
+
+**`.gitignore`:** `rg` skips `.gitignore` by default. Missing match ≠ missing file — confirm with `rg --no-ignore` before concluding it doesn't exist.
+
+**`-u` / `-uu`:** only for security audits, dotfile inspection, build-artifact recovery. Pair with explicit path + one-line comment explaining the bypass. Never default to `-uu`. Never use to dodge a `.gitignore` rule — fix the rule.
 
 ## Output Style
 

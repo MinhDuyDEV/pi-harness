@@ -1,6 +1,6 @@
 ---
 name: artifact-format
-description: Use when starting non-trivial work (2+ tool calls, multi-file edits, audits, behavior/policy changes, multi-step investigations) — defines the format and lifecycle for the four canonical artifact files at `.pi/artifacts/` (`TODO.md`, `PLAN.md`, `PROGRESS.md`, `DECISIONS.md`).
+description: "ALWAYS load this skill at the start of any non-trivial task (>= 2 tool calls, >= 2 files modified, audits, plans, reviews, behavior or policy changes, multi-step investigations, or any work the user may want to review later). Defines the format and lifecycle for `.pi/artifacts/TODO.md`, `PLAN.md`, `PROGRESS.md`, `DECISIONS.md`. The first action of a non-trivial task is to append a `### YYYY-MM-DD - <title>` block with `status: active | updated: <date>` to `.pi/artifacts/TODO.md` (or PLAN/PROGRESS/DECISIONS.md if escalated). Skip only for single-line edits, trivial config values, or direct Q&A with no durable output."
 version: 1.0.0
 tags: [workflow, artifacts, planning]
 agent_types: [planner, worker, reviewer]

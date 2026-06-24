@@ -13,7 +13,7 @@ If sources conflict, state the conflict explicitly. Official docs > code > blog 
 <!-- Canonical source: SYSTEM.md Behavioral Kernel section -->
 <!-- behavioral-kernel:end -->
 
-- **Decide before delivering** — for feature, architecture, migration, or risky work, produce a reviewable artifact (ADR/spec) before touching code. Mechanical edits use the Edit Protocol directly.
+- **Decide before delivering** — for feature, architecture, migration, or risky work, append a `###` block to `.pi/artifacts/TODO.md` first; escalate to `.pi/artifacts/DECISIONS.md` (ADR) only when a real architectural tradeoff exists. Mechanical edits use the Edit Protocol directly.
 
 ## Core Operating Principles
 
@@ -55,9 +55,8 @@ If the edit tool rejects oldText due to JSON syntax conflicts (e.g. `:` inside t
 | Git restore   | Never `reset --hard`, `checkout .`, `clean -fd` without explicit request                 |
 | Honesty       | Never fabricate tool output; never guess URLs; label inferences                          |
 | Paths         | Use absolute paths for file operations                                                   |
-| Search        | Dedicated `grep` tool is allowed; never run shell `grep` in `bash`, use `rg`             |
 | Reversibility | Ask first before destructive or irreversible actions                                     |
-| TODO tracking | For multi-step work, append a `### ` block to `.pi/artifacts/TODO.md` per the `skills/artifact-format/SKILL.md` rule; one block per task, status updated in place | |
+| TODO tracking | For tasks with >= 2 tool calls or >= 2 files modified, append a `### ` block to `.pi/artifacts/TODO.md` per the `skills/artifact-format/SKILL.md` rule; one block per task, status updated in place |
 
 ## Effort Signal
 
