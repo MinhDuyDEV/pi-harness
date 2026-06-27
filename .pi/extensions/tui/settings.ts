@@ -10,6 +10,12 @@ export interface PiTuiSettings {
   /** Blank lines above the streaming "⠙ Working..." row (fixed-editor status slice + loader message). Default 1. */
   workingPaddingTop?: number;
   /**
+   * Mirrors the top-level `editorPaddingX` UI setting (0-3, default 0).
+   * Controls horizontal padding for the input editor. We clamp invalid values
+   * to the documented 0-3 range and default to 0 when missing.
+   */
+  editorPaddingX?: number;
+  /**
    * Mirrors the top-level `terminal.showTerminalProgress` setting from
    * `.pi/settings.json`. When false (the default), the extension must not
    * emit OSC 9;4 progress sequences directly to stdout — the user has
@@ -66,6 +72,16 @@ function readShowTerminalProgress(parsed: Record<string, unknown>): boolean {
   return (term as Record<string, unknown>).showTerminalProgress === true;
 }
 
+/**
+ * Read `editorPaddingX` from the top level of the merged settings file.
+ * Per pi docs: number 0-3, default 0. Anything else is clamped to the range.
+ */
+function readEditorPaddingX(parsed: Record<string, unknown>): number {
+  const raw = parsed?.editorPaddingX;
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.min(3, Math.trunc(raw)));
+}
+
 /** Read and merge settings from global (~/.pi/agent/settings.json) then project (.pi/settings.json). */
 export function readPiTuiSettings(cwd: string): PiTuiSettings {
   // 1. Start with the global settings file as the base.
@@ -99,11 +115,12 @@ export function readPiTuiSettings(cwd: string): PiTuiSettings {
     }
   }
 
-  // 3. showTerminalProgress from the merged result (global + project overlay).
+  // 3. Top-level settings come from the merged result (global + project overlay).
   const showTerminalProgress = readShowTerminalProgress(merged);
+  const editorPaddingX = readEditorPaddingX(merged);
 
   // 4. PiTui-specific settings come from the *project* file only.
-  if (!projectParsed) return { showTerminalProgress };
+  if (!projectParsed) return { showTerminalProgress, editorPaddingX };
 
   const block = readPiTuiBlock(projectParsed);
   const workingPaddingTop = readWorkingPaddingTop(block?.workingPaddingTop);
@@ -125,7 +142,7 @@ export function readPiTuiSettings(cwd: string): PiTuiSettings {
           },
         }
       : {};
-  return { workingPaddingTop, showTerminalProgress, ...shortcuts };
+  return { workingPaddingTop, showTerminalProgress, editorPaddingX, ...shortcuts };
 }
 
 /** @deprecated Use readPiTuiSettings */

@@ -317,7 +317,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (ctx.mode === "tui") {
       ctx.ui.setEditorComponent((tui, theme, kb) => {
         tuiRef = tui;
-        currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme);
+        currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme, piTuiSettings.editorPaddingX);
         currentEditor.setStreamingPrompt(editorStreamingPrompt);
 
         // After editor is created, initialize the compositor if fixed-editor is enabled
@@ -594,7 +594,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     ctx.ui.setEditorComponent((tui, theme, kb) => {
       tuiRef = tui;
       currentEditor?.dispose();
-      currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme);
+      currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme, piTuiSettings.editorPaddingX);
       currentEditor.setStreamingPrompt(editorStreamingPrompt);
       tryInitCompositor(tui, ctx);
       return currentEditor;
