@@ -1,11 +1,13 @@
 
 import {
   copyToClipboard,
+  isBashToolResult,
+  isEditToolResult,
+  isWriteToolResult,
   VERSION,
   type ExtensionAPI,
   type ExtensionContext,
   type Theme,
-  type ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
 import { createQueueTracker } from "./sidebar.js";
@@ -791,9 +793,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       isStreaming: () => footer.isStreaming,
       keyboardScrollShortcuts: piTuiSettings.keyboardScrollShortcuts,
       onCopySelection: (text: string) => {
-        void copyToClipboard(text).then(() => {
-          ctx.ui.notify("Copied", "info");
-        }).catch(() => {
+        void copyToClipboard(text).catch(() => {
           ctx.ui.setStatus("tui-copy", "Clipboard copy failed");
           if (clipboardStatusTimer) clearTimeout(clipboardStatusTimer);
           clipboardStatusTimer = setTimeout(() => {
@@ -810,16 +810,12 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   }
 
   // ── Tool results ─────────────────────────────────────────────────────────
-  pi.on("tool_result", async (event: ToolResultEvent, ctx) => {
-    if (
-      event.toolName === "write" ||
-      event.toolName === "edit" ||
-      event.toolName === "bash"
-    ) {
+  pi.on("tool_result", async (event, ctx) => {
+    if (isWriteToolResult(event) || isEditToolResult(event) || isBashToolResult(event)) {
       invalidateGitStatus();
       updateGit(ctx);
     }
-    if (event.toolName === "write" || event.toolName === "edit") {
+    if (isWriteToolResult(event) || isEditToolResult(event)) {
       const path = typeof event.input.path === "string" ? event.input.path : "";
       if (path.toLowerCase().includes("todo.md")) {
         refreshTodos(ctx.cwd);
