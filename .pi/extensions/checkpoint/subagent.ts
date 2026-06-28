@@ -9,7 +9,7 @@
      *   1. DCP Artifact Tracker    → files_read / files_modified
      *   2. DCP Persistent Summary  → discoveries, accomplishments
      *   3. Active Artifacts        → blocks from .pi/artifacts/{TODO,PROGRESS}.md
-     *   4. Memory Observations     → recent session observations (FTS5)
+     *   4. (removed) - was Memory Observations via FTS5; now MEMORY.md is injected via before_agent_start in extensions/memory.ts
      */
 
     import { readdirSync, readFileSync, existsSync } from "node:fs";
@@ -80,7 +80,6 @@
   filesRead: string[];
   filesModified: string[];
   activeTasks: string;
-  memoryObservations: string;
 }
 
 /**
@@ -95,8 +94,7 @@ export async function generateCheckpointContent(
     filesRead: [],
     filesModified: [],
     activeTasks: "",
-    memoryObservations: "",
-  };
+    };
 
   // 1. DCP Artifact Tracker (files_read / files_modified)
   try {
@@ -154,30 +152,6 @@ export async function generateCheckpointContent(
       } catch {
         result.activeTasks = "(unable to read artifacts)";
       }
-
-  // 3. Memory observations from this session (FTS5)
-  try {
-    const memoryModule = await import("../memory/db.js");
-    if (typeof memoryModule.getMemoryDB === "function") {
-      const db = memoryModule.getMemoryDB();
-      if (db) {
-        const rows = db
-          .prepare(
-            `SELECT narrative FROM observations
-             ORDER BY created_at_epoch DESC
-             LIMIT 5`,
-          )
-          .all() as { narrative: string }[];
-        if (rows.length > 0) {
-          result.memoryObservations = rows
-            .map((r) => `- ${r.narrative.slice(0, 200)}`)
-            .join("\n");
-        }
-      }
-    }
-  } catch {
-    // Memory DB not available — skip
-  }
 
   return result;
 }

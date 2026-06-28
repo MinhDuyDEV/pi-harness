@@ -152,8 +152,6 @@ export const READ_TOOLS = new Set([
   "web_fetch",
   "webclaw_scrape",
   "webclaw_batch",
-  "memory-search",
-  "observation",
   "context7",
 ]);
 

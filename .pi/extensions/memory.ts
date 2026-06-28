@@ -1,153 +1,50 @@
 /**
- * Memory extension — entry point.
+ * Memory extension — minimal, file-based, pi-shaped.
  *
- * After ADR-001 cleanup: removed the L1/L2/L3 pipeline, persona/scene
- * injection, project-index FTS5 crawler, and embedding-based search.
- * The agent now drives all compaction and curation decisions. Per the
- * Syntax #976 thesis: "the agent itself has some autonomy over how it
- * compresses it" and "bash is all you need."
+ * After the brutal redesign: this is the entire LLM-facing memory surface.
+ * No SQLite, no FTS5, no observation types, no feedback scores, no
+ * custom tools. Just one before_agent_start hook that injects a markdown
+ * file into the system prompt.
  *
- * After ADR-002 cleanup: removed the memory-admin tool entirely. Mario's
- * philosophy: "if I don't need it, I won't build it. And I don't need
- * a lot of things." Bulk diagnostics, export/import, rebuild, and
- * vacuum are user-initiated ad-hoc ops — the user can run sqlite3 via
- * bash when needed, or rely on /memory-compact to dedupe+compact
- * in one shot.
+ * The LLM sees:
+ *   - ~/.pi/MEMORY.md          (global personal memory)
+ *   - <project>/.pi/MEMORY.md  (project-level memory, if present)
  *
- * Surfaces:
- * - 2 tools (observation, memory-search) — see tools.ts
- * - before_agent_start context injection: FTS5 search of relevant observations
- * - /memory-compact slash command: agent-driven weekly compaction to
- *   `<project>/.pi/artifacts/notes/{ISO-week}.md` (also dedupes via
- *   archiveDuplicateObservations, so no separate dedupe admin op is needed)
+ * Both files are read on every agent turn. The LLM uses the built-in
+ * read / write / edit / bash / grep primitives to manage them.
  *
- * See: .pi/artifacts/DECISIONS.md#adr-001-memory-extension-cleanup
+ * To add a memory:    edit ~/.pi/MEMORY.md  (or tell the LLM)
+ * To search memories:  bash grep "X" ~/.pi/MEMORY.md
+ * To read a section:   read ~/.pi/MEMORY.md (offset/limit)
+ * To compact:          rewrite the file, dropping low-value entries
+ *
+ * Per Mario (pi author): "If I don't need it, it won't be built. And I
+ * don't need a lot of things." State is just files.
  */
+import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
+import { type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import type {
-	ExtensionAPI,
-	AgentEndEvent,
-	SessionCompactEvent,
-} from "@earendil-works/pi-coding-agent";
-import { getMemoryDB } from "./memory/db.js";
-import { archiveDuplicateObservations } from "./memory/maintenance.js";
-import { getObservationStats, searchObservationsFTS } from "./memory/observations.js";
-import {
-	getCurrentWeekId,
-	getObservationsForCompaction,
-	formatObservationsForCompaction,
-	writeCompactionNote,
-} from "./memory/distill.js";
-import { registerMemoryTools } from "./memory/tools.js";
-import { getCheckpointRebuildContext } from "./checkpoint/index.js";
-import { MEMORY_CONFIG } from "./memory/config.js";
+const GLOBAL_MEMORY = join(homedir(), ".pi", "MEMORY.md");
 
-const MAX_INJECTION_TOKENS = MEMORY_CONFIG.injection.maxTokens;
-
-/** Rough token estimate: 1 token ≈ 4 characters. */
-function estimateTokens(text: string): number {
-	return Math.ceil(text.length / 4);
+async function readIfExists(path: string): Promise<string | null> {
+    try {
+        const content = await readFile(path, "utf-8");
+        return content.trim() ? content : null;
+    } catch {
+        return null;
+    }
 }
 
-export default function (pi: ExtensionAPI): void {
-	// Initialize DB on extension load (also keeps WAL warm)
-	getMemoryDB();
-
-	// Register 2 tools: observation, memory-search
-	registerMemoryTools(pi);
-
-	// Auto-context-inject relevant observations on each new turn
-	pi.on("before_agent_start", async (event, ctx) => {
-		if (!MEMORY_CONFIG.injection.enabled) return {};
-		const prompt = (event as any).prompt ?? "";
-		if (!prompt || typeof prompt !== "string" || prompt.trim() === "") {
-			return {};
-		}
-
-		const sessionId = (ctx as any)?.sessionManager?.getSessionId?.() ?? undefined;
-		const cwd = (ctx as any)?.cwd ?? process.cwd();
-		const sections: string[] = [];
-
-		// 1. Checkpoint context (independent of memory DB)
-		try {
-			const checkpointContext = (await getCheckpointRebuildContext(cwd, sessionId)) ?? "";
-			if (checkpointContext) {
-				sections.push(checkpointContext);
-			}
-		} catch {
-			// Best-effort; never break the user turn
-		}
-
-		// 2. FTS5 search of relevant observations (replaces getRelevantKnowledge)
-		try {
-			const stats = getObservationStats();
-			const totalObs = Object.values(stats).reduce((sum, n) => sum + n, 0);
-			if (totalObs > 0) {
-				const results = searchObservationsFTS(prompt, { limit: 5 });
-				if (results.length > 0) {
-					const lines = results.map((r) => {
-						const snippet = r.snippet ? r.snippet.replace(/\s+/g, " ").trim() : "";
-						return `- [#${r.id}] (${r.type}) ${r.title}${snippet ? ` — ${snippet}` : ""}`;
-					});
-					sections.push(`## Relevant Memory\n${lines.join("\n")}`);
-				}
-			}
-		} catch {
-			// Best-effort
-		}
-
-		if (sections.length === 0) return {};
-
-		const joined = sections.join("\n\n");
-		const estimated = estimateTokens(joined);
-		if (estimated > MAX_INJECTION_TOKENS) {
-			return { systemPrompt: joined.slice(0, MAX_INJECTION_TOKENS * 4) };
-		}
-
-		return { systemPrompt: joined };
-	});
-
-	// agent_end and session_compact are now no-ops (no more auto-pipeline)
-	pi.on("agent_end", (_event: AgentEndEvent) => {
-		// Intentionally empty. The agent drives observation creation
-		// explicitly via the `observation` tool, not via background pipeline.
-	});
-
-	pi.on("session_compact", (_event: SessionCompactEvent) => {
-		// Intentionally empty. Memory is decoupled from session compaction.
-	});
-
-	// /memory-compact slash command — agent-driven lossy compression.
-	// Per the video: "the agent itself has some autonomy over how it compresses it."
-	pi.registerCommand("memory-compact", {
-		description: "Compact recent observations into a weekly markdown note at .pi/artifacts/notes/. Args: <sinceDays>",
-		async handler(args: string, ctx: any) {
-			const sinceDays = parseInt(args.trim() || "7", 10) || 7;
-			const projectRoot = ctx?.cwd ?? process.cwd();
-			// Clean active memory before generating the raw compaction payload.
-			// Otherwise compaction faithfully reprints historical duplicate rows and
-			// /memory-compact now dedupes (via archiveDuplicateObservations) and compacts in one pass.
-			// This archives duplicates via superseded_by; it does not delete data.
-			const dedupeStats = archiveDuplicateObservations({ dryRun: false });
-			const observations = getObservationsForCompaction(sinceDays);
-			if (observations.length === 0) {
-				ctx.ui?.notify?.(`No observations in the last ${sinceDays} days.`, "info");
-				return;
-			}
-			const payload = formatObservationsForCompaction(observations);
-			const weekId = getCurrentWeekId();
-			const notePath = writeCompactionNote(weekId, payload, projectRoot);
-			const message = [
-				`Compaction note written: ${notePath}`,
-				`Observations covered: ${observations.length}`,
-				`Duplicates archived before compaction: ${dedupeStats.archived}`,
-				`Duplicate candidates remaining: ${dedupeStats.candidates - dedupeStats.archived}`,
-				`Week: ${weekId}`,
-				``,
-				`Next: read ${notePath} and write a curated summary to it.`,
-				`Do not call the observation tool during compaction. The note file is the durable artifact; compaction status, warnings, and meta-comments must stay out of memory observations.`,
-			].join("\n");
-			ctx.ui?.notify?.(message, "info");
-		},
-	});
+export default function (pi: ExtensionAPI) {
+    pi.on("before_agent_start", async (event, ctx) => {
+        const sections: string[] = [];
+        const global = await readIfExists(GLOBAL_MEMORY);
+        if (global) sections.push(`## ~/.pi/MEMORY.md\n\n${global}`);
+        const project = await readIfExists(join(ctx.cwd, ".pi", "MEMORY.md"));
+        if (project) sections.push(`## ${ctx.cwd}/.pi/MEMORY.md\n\n${project}`);
+        if (sections.length === 0) return {};
+        return { systemPrompt: event.systemPrompt + "\n\n" + sections.join("\n\n") };
+    });
 }

@@ -114,7 +114,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 
 | File | Purpose |
 |------|---------|
-| `memory.ts` (top-level) | Extension entry — registers 2 tools (observation, memory-search) |
+| `memory.ts` (top-level) | Extension entry — single before_agent_start hook that injects `~/.pi/MEMORY.md` and `<project>/.pi/MEMORY.md` |
 | `config.ts` | Types: `ConfidenceLevel`, `ObservationType`, `MemoryConfig`, `MEMORY_CONFIG` default |
 | `db.ts` | SQLite database layer — `getMemoryDB()`, `closeMemoryDB()`, FTS5 setup |
 | `pipeline.ts` | Capture pipeline — `storeTemporalMessage()`, `getRelevantKnowledge()`, distillation ops |
@@ -247,7 +247,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 **Tools registered** (via `pi.registerTool`):
 - `compress` (dcp) — conversation compression
 - `harness` (harness) — multi-agent build loop
-- `observation`, `memory-search` (memory) — memory CRUD (memory-admin removed in ADR-002)
+- _(none)_ — the memory extension has zero custom tools; the LLM uses the built-in `read` / `write` / `edit` / `bash` / `grep` on `~/.pi/MEMORY.md` directly. The only interface is the file itself.
 - `webclaw_scrape`, `webclaw_batch` (webclaw) — web scraping
 - `srcwalk_search`, `srcwalk_read`, `srcwalk_files`, `srcwalk_deps` (srcwalk)
 - `srcwalk_map`, `srcwalk_callers`, `srcwalk_callees`, `srcwalk_context` (srcwalk)

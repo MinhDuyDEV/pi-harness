@@ -147,8 +147,6 @@ const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
   "write",
   "edit",
   "compress",
-  "observation",
-  "memory-search",
   "TaskCreate",
   "TaskUpdate",
 ];
