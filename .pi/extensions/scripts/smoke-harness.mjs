@@ -15,7 +15,6 @@ const PROMPT_PSEUDO_TOOL_PATTERNS = [
   { pattern: /^\s*memory_search\s*\(/m, replacement: 'memory-search(' },
   { pattern: /^\s*memory_update\s*\(/m, replacement: 'memory-update(' },
   { pattern: /^\s*memory_get\s*\(/m, replacement: 'memory-get(' },
-  { pattern: /^\s*memory_admin\s*\(/m, replacement: 'memory-admin(' },
   { pattern: /^\s*question\s*\(/m, replacement: 'ask_user_question(' },
   { pattern: /^\s*task\s*\(/m, replacement: 'Agent(' },
   { pattern: /^\s*subagent\s*\(/m, replacement: 'Agent(' },

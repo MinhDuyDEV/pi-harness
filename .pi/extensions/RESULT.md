@@ -114,7 +114,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 
 | File | Purpose |
 |------|---------|
-| `memory.ts` (top-level) | Extension entry — registers 3 tools (observation, memory-search, memory-admin) |
+| `memory.ts` (top-level) | Extension entry — registers 2 tools (observation, memory-search) |
 | `config.ts` | Types: `ConfidenceLevel`, `ObservationType`, `MemoryConfig`, `MEMORY_CONFIG` default |
 | `db.ts` | SQLite database layer — `getMemoryDB()`, `closeMemoryDB()`, FTS5 setup |
 | `pipeline.ts` | Capture pipeline — `storeTemporalMessage()`, `getRelevantKnowledge()`, distillation ops |
@@ -131,7 +131,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 | `tools.ts` | Compact tool registrations (3 tools) |
 | `index-generator.ts` | Auto-generated knowledge catalog (Karpathy-style LLM Wiki) |
 | `helpers.ts` | Constants, formatting, file helpers |
-| `admin.ts` | Admin commands for `/memory-admin` |
+| `admin.ts` | (removed in ADR-002) — was admin tool dispatcher |
 | `scripts/smoke-lifecycle.ts` | End-to-end lifecycle smoke test |
 
 ---
@@ -247,7 +247,7 @@ The `.pi/extensions/` directory contains 15 extension entry points and 7 subdire
 **Tools registered** (via `pi.registerTool`):
 - `compress` (dcp) — conversation compression
 - `harness` (harness) — multi-agent build loop
-- `observation`, `memory-search`, `memory-admin` (memory) — memory CRUD
+- `observation`, `memory-search` (memory) — memory CRUD (memory-admin removed in ADR-002)
 - `webclaw_scrape`, `webclaw_batch` (webclaw) — web scraping
 - `srcwalk_search`, `srcwalk_read`, `srcwalk_files`, `srcwalk_deps` (srcwalk)
 - `srcwalk_map`, `srcwalk_callers`, `srcwalk_callees`, `srcwalk_context` (srcwalk)

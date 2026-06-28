@@ -7,11 +7,19 @@
  * Syntax #976 thesis: "the agent itself has some autonomy over how it
  * compresses it" and "bash is all you need."
  *
+ * After ADR-002 cleanup: removed the memory-admin tool entirely. Mario's
+ * philosophy: "if I don't need it, I won't build it. And I don't need
+ * a lot of things." Bulk diagnostics, export/import, rebuild, and
+ * vacuum are user-initiated ad-hoc ops — the user can run sqlite3 via
+ * bash when needed, or rely on /memory-compact to dedupe+compact
+ * in one shot.
+ *
  * Surfaces:
- * - 3 tools (observation, memory-search, memory-admin) — see tools.ts
+ * - 2 tools (observation, memory-search) — see tools.ts
  * - before_agent_start context injection: FTS5 search of relevant observations
  * - /memory-compact slash command: agent-driven weekly compaction to
- *   `<project>/.pi/artifacts/notes/{ISO-week}.md`
+ *   `<project>/.pi/artifacts/notes/{ISO-week}.md` (also dedupes via
+ *   archiveDuplicateObservations, so no separate dedupe admin op is needed)
  *
  * See: .pi/artifacts/DECISIONS.md#adr-001-memory-extension-cleanup
  */
@@ -45,7 +53,7 @@ export default function (pi: ExtensionAPI): void {
 	// Initialize DB on extension load (also keeps WAL warm)
 	getMemoryDB();
 
-	// Register 3 tools: observation, memory-search, memory-admin
+	// Register 2 tools: observation, memory-search
 	registerMemoryTools(pi);
 
 	// Auto-context-inject relevant observations on each new turn
@@ -118,7 +126,7 @@ export default function (pi: ExtensionAPI): void {
 			const projectRoot = ctx?.cwd ?? process.cwd();
 			// Clean active memory before generating the raw compaction payload.
 			// Otherwise compaction faithfully reprints historical duplicate rows and
-			// relies on a human/agent to remember to run memory-admin dedupe first.
+			// /memory-compact now dedupes (via archiveDuplicateObservations) and compacts in one pass.
 			// This archives duplicates via superseded_by; it does not delete data.
 			const dedupeStats = archiveDuplicateObservations({ dryRun: false });
 			const observations = getObservationsForCompaction(sinceDays);

@@ -1,10 +1,13 @@
 /**
  * Compact Pi memory tool registrations.
  *
- * 3 tools is the optimal surface:
+ * 2 tools is the entire LLM-facing surface:
  * - observation: create observations OR give feedback on existing ones
  * - memory-search: search observations by text OR read memory files by path
- * - memory-admin: diagnostics + explicitly gated maintenance
+ *
+ * Bulk diagnostics and maintenance are intentionally not exposed to the LLM.
+ * The user can run /memory-compact for session compaction (which also dedupes
+ * via archiveDuplicateObservations). For rare ad-hoc ops, sqlite3 + bash works.
  */
 
 import { Type } from "@sinclair/typebox";
@@ -32,12 +35,6 @@ import {
 	storeObservation,
 } from "./observations.js";
 import { recordFeedback } from "./scoring.js";
-import {
-	executeMemoryAdmin,
-	MemoryAdminParameters,
-	type MemoryAdminParams,
-} from "./admin.js";
-
 /**
  * Backstop for the W25 compaction noise bug: the compaction agent was
  * creating durable `type="warning"` observations about its own compaction
@@ -298,13 +295,4 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 		},
 	});
 
-	pi.registerTool({
-		name: "memory-admin",
-		label: "Memory Admin",
-		description: "Compact memory diagnostics and explicitly gated maintenance.",
-		parameters: MemoryAdminParameters,
-		async execute(_toolCallId: string, params: MemoryAdminParams) {
-			return executeMemoryAdmin(params ?? {}) as any;
-		},
-	});
 }

@@ -4,13 +4,17 @@ Minimal FTS5-backed memory for Pi. After ADR-001 cleanup: 8,170 → 2,313 lines 
 zero ML deps, agent-driven compaction. Per the Syntax #976 thesis: "Bash is all you need" and
 "the agent itself has some autonomy over how it compresses it."
 
-## Tool Surface (3 tools, matches Pi's "while loop with N tools")
+## Tool Surface (2 tools, the entire LLM-facing surface)
 
 | Tool | Purpose |
 |------|---------|
 | `observation` | Store a manual observation (decision, bugfix, pattern, feature, discovery, learning, warning) |
 | `memory-search` | FTS5 BM25 search of observations; or read/list stored markdown files |
-| `memory-admin` | Status, export, import, maintenance, compact, rebuild |
+
+After ADR-002 cleanup: no `memory-admin` tool. Status, export, import, rebuild, and vacuum
+are user-initiated ad-hoc ops — the user can run `sqlite3` via `bash` when needed, or rely on
+`/memory-compact` to dedupe+compact in one shot. Mario's principle: "if I don't need it, I
+won't build it. And I don't need a lot of things."
 
 ## Slash Commands
 
@@ -31,12 +35,11 @@ zero ML deps, agent-driven compaction. Per the Syntax #976 thesis: "Bash is all 
 ```
 memory.ts              → Entry point: tool registration + before_agent_start injection + /memory-compact
 memory/
-  tools.ts             → registerMemoryTools: 3-tool surface
+  tools.ts             → registerMemoryTools: 2-tool surface
   observations.ts      → FTS5 search + CRUD
   scoring.ts           → recordFeedback(obsId, "helpful"|"harmful")
   distill.ts           → getObservationsForCompaction / writeCompactionNote
-  admin.ts             → memory-admin operation dispatch
-  maintenance.ts       → archiveOldObservations, runFullMaintenance
+  maintenance.ts       → archiveDuplicateObservations (called by /memory-compact)
   migrations.ts        → v1 base + v6→v7 cleanup
   config.ts            → types + MEMORY_CONFIG
   db.ts                → SQLite (FTS5 only, allowExtension: false)
