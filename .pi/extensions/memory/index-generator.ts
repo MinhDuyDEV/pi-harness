@@ -10,7 +10,7 @@
 
 import type { ObservationRow } from "./config.js";
 import { getMemoryDB } from "./db.js";
-import { TYPE_ICONS, parseConcepts } from "./helpers.js";
+import { parseConcepts } from "./helpers.js";
 import { upsertMemoryFile } from "./storage.js";
 
 // ============================================================================
@@ -93,17 +93,15 @@ export function generateMemoryIndex(): IndexResult {
 	lines.push("| Type | Count |");
 	lines.push("|------|-------|");
 	for (const [type, entries] of byType) {
-		const icon = TYPE_ICONS[type] ?? "📌";
-		lines.push(`| ${icon} ${type} | ${entries.length} |`);
+		lines.push(`| ${type} | ${entries.length} |`);
 	}
 	lines.push(`| **Total** | **${observations.length}** |`);
 	lines.push("");
 
 	// By type
 	for (const [type, entries] of byType) {
-		const icon = TYPE_ICONS[type] ?? "📌";
 		lines.push(
-			`## ${icon} ${type.charAt(0).toUpperCase() + type.slice(1)} (${entries.length})`,
+			`## ${type.charAt(0).toUpperCase() + type.slice(1)} (${entries.length})`,
 		);
 		lines.push("");
 		for (const entry of entries) {

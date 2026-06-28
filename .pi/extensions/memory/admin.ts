@@ -85,7 +85,7 @@ function formatBytes(bytes: number): string {
 function requireForce(op: string, dryRun: boolean, force: boolean): ToolResult | null {
 	if (dryRun || force) return null;
 	return textResult(
-		`⚠️ \`${op}\` mutates memory state. Re-run with \`dry_run: true\` to preview or \`force: true\` to apply.`,
+		`\`${op}\` mutates memory state. Re-run with \`dry_run: true\` to preview or \`force: true\` to apply.`,
 	);
 }
 
@@ -101,7 +101,7 @@ export async function executeMemoryAdmin(params: MemoryAdminParams): Promise<Too
 	const op = normalizeOp(rawOp);
 	if (!op) {
 		return textResult(
-			`❌ Unknown memory-admin operation \"${rawOp}\". Valid operations: ${MEMORY_ADMIN_OPERATIONS.join(", ")}`,
+			`Unknown memory-admin operation \"${rawOp}\". Valid operations: ${MEMORY_ADMIN_OPERATIONS.join(", ")}`,
 		);
 	}
 
@@ -174,25 +174,25 @@ export async function executeMemoryAdmin(params: MemoryAdminParams): Promise<Too
 
 			case "write-file": {
 				if (!params.file?.trim() || !params.content?.trim()) {
-					return textResult("❌ Provide file path and content.");
+					return textResult("Provide file path and content.");
 				}
 				const dryRun = params.dry_run ?? !force;
 				if (dryRun) {
 					return textResult(`[DRY RUN] Would write ${params.file.trim()} (${params.content.trim().length} chars, mode: ${params.mode === "append" ? "append" : "replace"})`);
 				}
 				if (!force) {
-					return textResult("⚠️  write-file mutates memory. Re-run with dry_run:true to preview or force:true to apply.");
+					return textResult("write-file mutates memory. Re-run with dry_run:true to preview or force:true to apply.");
 				}
 				const mode = params.mode === "append" ? "append" : "replace";
 				upsertMemoryFile(params.file.trim(), params.content, mode);
-				return textResult(`✅ Memory file ${mode === "append" ? "appended" : "written"}: ${params.file.trim()}`);
+				return textResult(`Memory file ${mode === "append" ? "appended" : "written"}: ${params.file.trim()}`);
 			}
 
 			default:
-				return textResult(`❌ Unknown operation "${op}". Valid: ${MEMORY_ADMIN_OPERATIONS.join(", ")}`);
+				return textResult(`Unknown operation "${op}". Valid: ${MEMORY_ADMIN_OPERATIONS.join(", ")}`);
 		}
 	} catch (error) {
-		return textResult(`❌ memory-admin ${op} failed: ${error instanceof Error ? error.message : String(error)}`);
+		return textResult(`memory-admin ${op} failed: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 
@@ -273,16 +273,16 @@ export async function executeMemoryAdmin(params: MemoryAdminParams): Promise<Too
 	}
 
 function runImport(importJson: string, conflict: string, dryRun: boolean): ToolResult {
-	if (!importJson.trim()) return textResult("❌ import_json is required.");
+	if (!importJson.trim()) return textResult("import_json is required.");
 	if (!["skip", "create"].includes(conflict)) {
-		return textResult('❌ conflict must be "skip" or "create". Overwrite was intentionally removed to avoid corrupting canonical memory.');
+		return textResult('conflict must be "skip" or "create". Overwrite was intentionally removed to avoid corrupting canonical memory.');
 	}
 
 	let data: { observations?: Array<Record<string, unknown>> };
 	try {
 		data = JSON.parse(importJson);
 	} catch {
-		return textResult("❌ import_json is not valid JSON.");
+		return textResult("import_json is not valid JSON.");
 	}
 
 	const observations = Array.isArray(data.observations) ? data.observations : [];

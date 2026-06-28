@@ -20,16 +20,6 @@ export const VALID_TYPES: ObservationType[] = [
 	"warning",
 ];
 
-export const TYPE_ICONS: Record<string, string> = {
-	decision: "⚖️",
-	bugfix: "🪛",
-	feature: "✨",
-	pattern: "🔄",
-	discovery: "🧭",
-	learning: "📚",
-	warning: "⚠️",
-};
-
 export const FILE_REF_PATTERNS = [
 	/(?:^|\s)(\S+\.(?:ts|tsx|js|jsx|json|md|yaml|yml|toml|sql|sh|py|rs|go)):(\d+)/g,
 	/`([^`]+\.(?:ts|tsx|js|jsx|json|md|yaml|yml|toml))`/g,
@@ -199,8 +189,7 @@ export function formatObservation(obs: {
 	effective_score?: number | null;
 	created_at?: string | null;
 }): string {
-	const icon = TYPE_ICONS[obs.type] ?? "📌";
-	const lines = [`${icon} **#${obs.id}** [${obs.type}] ${obs.title}`];
+	const lines = [`**#${obs.id}** [${obs.type}] ${obs.title}`];
 	if (obs.subtitle) lines.push(`  _${obs.subtitle}_`);
 	if (obs.confidence) lines.push(`  Confidence: ${obs.confidence}`);
 	if (obs.maturity && obs.maturity !== "candidate")
@@ -216,7 +205,7 @@ export function formatObservation(obs: {
 		(obs.harmful_count ?? 0) > 0
 	)
 		lines.push(
-			`  Feedback: ${obs.helpful_count ?? 0}👍 / ${obs.harmful_count ?? 0}👎`,
+			`  Feedback: helpful=${obs.helpful_count ?? 0}, harmful=${obs.harmful_count ?? 0}`,
 		);
 	if (obs.source && obs.source !== "manual")
 		lines.push(`  Source: ${obs.source}`);

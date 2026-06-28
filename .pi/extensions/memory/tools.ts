@@ -19,7 +19,6 @@ import {
 	autoDetectFiles,
 	formatObservation,
 	parseCSV,
-	TYPE_ICONS,
 	VALID_TYPES,
 } from "./helpers.js";
 import {
@@ -134,9 +133,8 @@ function renderSearchResults(rows: Array<{
 	if (rows.length === 0) return "No matching observations found.";
 	const lines = ["## Memory Search Results", ""];
 	for (const row of rows) {
-		const icon = TYPE_ICONS[row.type] ?? "📌";
 		const score = row.combined_score ?? row.relevance_score;
-		lines.push(`${icon} **#${row.id}** [${row.type}] ${row.title}`);
+		lines.push(`**#${row.id}** [${row.type}] ${row.title}`);
 		if (score !== undefined) lines.push(`  Score: ${score.toFixed(3)}`);
 		if (row.snippet) lines.push(`  ${row.snippet}`);
 		if (row.created_at) lines.push(`  _${row.created_at}_`);
@@ -190,7 +188,7 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 				if (!result.success) throw new Error(result.error ?? "Failed to record feedback.");
 				return textResult(
 					[
-						`✅ Observation #${obsId} marked ${fb}.`,
+						`Observation #${obsId} marked ${fb}.`,
 						`- Feedback: ${result.helpfulCount} helpful / ${result.harmfulCount} harmful`,
 					].join("\n"),
 					result,
@@ -248,7 +246,7 @@ export function registerMemoryTools(pi: ExtensionAPI): void {
 				supersedes: Number.isInteger(supersedes) ? supersedes : undefined,
 				source,
 			});
-			return textResult(`✅ Observation #${id} stored.`, { id });
+			return textResult(`Observation #${id} stored.`, { id });
 		},
 	});
 
