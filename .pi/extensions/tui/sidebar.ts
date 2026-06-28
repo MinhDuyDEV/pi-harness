@@ -1,4 +1,4 @@
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { GitInfo } from "./git-status.js";
 import { hasOpenTodos, type TodosState } from "./todos-panel.js";
 import { formatCost, fmtNum } from "./helpers.js";
@@ -124,9 +124,13 @@ export function renderSidebar(state: SidebarState, width: number, height: number
   if (hasOpenTodos(state.todos)) {
     push("TODOs", labelText);
     const openTodos = state.todos.items.filter((item) => !item.done);
-    const visibleTodos = openTodos.slice(0, 5);
-    for (const item of visibleTodos) push(`☐ ${item.text}`);
-    if (openTodos.length > visibleTodos.length) push(`+${openTodos.length - visibleTodos.length} more`);
+    const todoWrapWidth = Math.max(1, contentWidth - 2);
+    for (const item of openTodos) {
+      const wrapped = wrapTextWithAnsi(item.text, todoWrapWidth);
+      for (let i = 0; i < wrapped.length; i++) {
+        push(i === 0 ? `☐ ${wrapped[i]}` : `  ${wrapped[i]}`);
+      }
+    }
     push();
   }
 

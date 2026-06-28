@@ -21,6 +21,69 @@ test("sidebar stays disabled below configured width or when toggled off", () => 
   assert.equal(sidebarTotalWidth(state, 180), 0);
 });
 
+test("sidebar renders all open todos without a slice limit", () => {
+  const state = createDefaultSidebarState();
+  state.enabled = true;
+  state.modelLabel = "OpenAI / GPT-5.5";
+  state.git = { branch: "main", staged: 0, unstaged: 0, untracked: 0 };
+  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pikit/.pi`;
+  state.todos = {
+    sourceFile: "TODO.md",
+    sourceCount: 1,
+    items: Array.from({ length: 8 }, (_, i) => ({
+      text: `todo item ${i + 1}`,
+      done: false,
+      blockTitle: "block",
+      status: "active",
+      sourceFile: "TODO.md",
+    })),
+  };
+  const lines = renderSidebar(state, 80, 30).map(plain);
+  for (let i = 1; i <= 8; i++) {
+    assert.ok(
+      lines.some((l) => l.includes(`☐ todo item ${i}`)),
+      `expected line containing todo item ${i} in sidebar, got: ${JSON.stringify(lines)}`,
+    );
+  }
+  assert.ok(
+    !lines.some((l) => /\+\d+ more/.test(l)),
+    `expected no "+N more" truncation line, got: ${JSON.stringify(lines)}`,
+  );
+});
+
+test("sidebar wraps long todo text instead of truncating", () => {
+  const state = createDefaultSidebarState();
+  state.enabled = true;
+  state.modelLabel = "M";
+  state.git = { branch: "main", staged: 0, unstaged: 0, untracked: 0 };
+  state.cwd = "/p/.pi";
+  state.todos = {
+    sourceFile: "TODO.md",
+    sourceCount: 1,
+    items: [
+      {
+        text: "This is a deliberately long todo item that should wrap onto multiple lines in the sidebar when the column is narrow",
+        done: false,
+        blockTitle: "b",
+        status: "active",
+        sourceFile: "TODO.md",
+      },
+    ],
+  };
+  const lines = renderSidebar(state, 24, 20).map(plain);
+  const todoLines = lines.filter((l) => l.includes("☐") || l.startsWith("   "));
+  assert.ok(
+    todoLines.length >= 2,
+    `expected wrapped todo to span multiple lines, got: ${JSON.stringify(todoLines)}`,
+  );
+  for (const line of todoLines) {
+    assert.ok(
+      line.length <= 24,
+      `expected wrapped line to fit width 24, got ${line.length}: ${line}`,
+    );
+  }
+});
+
 test("sidebar omits the queue section when there is no pending queue", () => {
   const state = createDefaultSidebarState();
   state.enabled = true;

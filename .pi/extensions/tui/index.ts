@@ -29,6 +29,7 @@ import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-edito
 import { readPiTuiSettings, type PiTuiSettings } from "./settings.js";
 import {
   formatWorkingMessageWithPaddingTop,
+  pickRandomWorkingQuote,
   workingStatusSpacerLines,
 } from "./working-indicator.js";
 import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.js";
@@ -135,14 +136,14 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     const top = piTuiSettings.workingPaddingTop ?? 1;
     // Fixed-editor cluster adds blank rows in getStatusLines; avoid doubling with message newlines.
     if (fixedEditorEnabled && compositor) {
-      ctx.ui.setWorkingMessage();
+      ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
       return;
     }
     const message = formatWorkingMessageWithPaddingTop(top);
     if (message !== undefined) {
       ctx.ui.setWorkingMessage(message);
     } else {
-      ctx.ui.setWorkingMessage();
+      ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
     }
   }
 
@@ -228,11 +229,16 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
         // Widgets — hide when empty. The sidebar owns queue/TODOs when visible.
         if (hasOpenTodos(todosState) && !sidebarVisible) {
-          ctx.ui.setWidget("amp-todos", (_tui: TUI, theme: Theme) =>
-            renderTodosWidget(todosState, _tui, theme),
+          ctx.ui.setWidget(
+            "amp-todos",
+            (_tui: TUI, theme: Theme) =>
+              renderTodosWidget(todosState, _tui, theme),
+            { placement: "belowEditor" },
           );
         } else {
-          ctx.ui.setWidget("amp-todos", undefined);
+          ctx.ui.setWidget("amp-todos", undefined, {
+            placement: "belowEditor",
+          });
         }
 
 
@@ -280,7 +286,15 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
   // ── Session lifecycle ────────────────────────────────────────────────────
       pi.on("session_start", async (_event, ctx) => {
-        ctx.ui.setWorkingVisible(false);
+        // Do NOT call setWorkingVisible(false) here. The SDK auto-creates the
+        // working loader (spinner + working message) inside the status
+        // container in its message_start path, but only when `workingVisible`
+        // is still true. Flipping it to false here would prevent the spinner
+        // from ever being created, leaving the status row of the fixed
+        // cluster empty even while the agent is streaming.
+        if (ctx.hasUI) {
+          ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
+        }
         footer.isStreaming = false;
             footer.tokenCount = 0;
             footer.contextWindow = 0;
@@ -763,6 +777,11 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       },
       getEditorText: () => currentEditor?.getText() ?? "",
       getStatusLines: (width: number) => {
+        // Sync first so fixedStatusContainer is resolved before we render.
+        // The above/below hooks do this too — we must not be the odd one out,
+        // otherwise the first status render returns [] because the reference
+        // is still null.
+        syncFixedRenderables(false);
         const lines = renderHiddenLines(fixedStatusContainer, width, true);
         const pad = workingStatusSpacerLines(piTuiSettings.workingPaddingTop ?? 1);
         return pad.length > 0 ? [...pad, ...lines] : lines;

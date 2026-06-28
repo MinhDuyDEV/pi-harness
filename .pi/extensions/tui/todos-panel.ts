@@ -81,7 +81,7 @@ function parseTodoFile(filePath: string): BlockState[] {
         continue;
       }
 
-      const checkboxMatch = line.match(/^[-*]\s*\[([ xX])\]\s*(.+)$/);
+      const checkboxMatch = line.match(/^[-*]\s*\[([ xX]?)\]\s*(.+)$/);
       if (checkboxMatch) {
         current.items.push({
           text: checkboxMatch[2].trim(),

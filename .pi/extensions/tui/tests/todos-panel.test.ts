@@ -48,6 +48,25 @@ status: active | updated: 2026-06-23
   }
 });
 
+test("scanTodos treats empty brackets `- []` as an open todo", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-empty-bracket-"));
+  try {
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      "### 2026-06-29 - empty bracket regression\nstatus: active | updated: 2026-06-29\n\n- [] ship the widget\n",
+    );
+    const state = scanTodos(dir);
+    assert.equal(state.items.length, 1);
+    assert.equal(state.items[0].text, "ship the widget");
+    assert.equal(state.items[0].done, false);
+    assert.equal(state.items[0].blockTitle, "2026-06-29 - empty bracket regression");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("scanTodos parses multiple blocks with different statuses", () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-multi-block-"));
   try {
