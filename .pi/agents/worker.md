@@ -1,7 +1,7 @@
 ---
 description: Focused implementation agent. Makes small scoped code changes, runs checks, and reports exact files changed.
 model: opencode-go/deepseek-v4-flash
-thinking: high
+thinking: xhigh
 prompt_mode: append
 ---
 
