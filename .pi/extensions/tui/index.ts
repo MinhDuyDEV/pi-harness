@@ -611,25 +611,29 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   });
 
   // ── Fixed-editor command ─────────────────────────────────────────────────
+  function toggleSidebar(ctx: ExtensionContext): void {
+    sidebar.enabled = !sidebar.enabled;
+    ctx.ui.notify(sidebar.enabled ? "Sidebar: ON" : "Sidebar: OFF", "info");
+    compositor?.invalidateCluster();
+    refreshUI(ctx);
+    compositor?.requestRepaint();
+  }
+
   pi.registerCommand("sidebar", {
     description: "Toggle right sidebar for TODOs, queue, git, and session context",
     handler: async (_args, ctx) => {
-      sidebar.enabled = !sidebar.enabled;
-      ctx.ui.notify(sidebar.enabled ? "Sidebar: ON" : "Sidebar: OFF", "info");
-      compositor?.invalidateCluster();
-      refreshUI(ctx);
-      compositor?.requestRepaint();
+      toggleSidebar(ctx);
     },
   });
 
-  pi.registerShortcut("ctrl+shift+b", {
+  // Note: was ctrl+shift+b — most terminals send the same byte
+  // sequence for ctrl+b and ctrl+shift+b (shift is a no-op for
+  // non-printable control chars), so the shortcut silently never
+  // fired. f2 is unambiguous (\x1bOQ in xterm).
+  pi.registerShortcut("f2", {
     description: "Toggle right sidebar",
     handler: async (ctx) => {
-      sidebar.enabled = !sidebar.enabled;
-      ctx.ui.notify(sidebar.enabled ? "Sidebar: ON" : "Sidebar: OFF", "info");
-      compositor?.invalidateCluster();
-      refreshUI(ctx);
-      compositor?.requestRepaint();
+      toggleSidebar(ctx);
     },
   });
 
