@@ -27,7 +27,7 @@ interface BlockState {
  * Find the canonical TODO.md. Walks up from cwd looking for `.pi/artifacts/TODO.md`.
  * Returns the path if found, null otherwise.
  */
-function findCanonicalTodo(cwd: string): string | null {
+export function findCanonicalTodo(cwd: string): string | null {
   let current = cwd;
   while (true) {
     const direct = join(current, ".pi", "artifacts", "TODO.md");

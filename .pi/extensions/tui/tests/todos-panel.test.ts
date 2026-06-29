@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { hasOpenTodos, renderTodosWidget, scanTodos, type TodosState } from "../todos-panel.js";
+import { findCanonicalTodo } from "../todos-panel.js";
 
 const markedTheme = {
   fg: (color: string, text: string) => `<${color}>${text}</${color}>`,
@@ -16,6 +17,32 @@ function renderTodos(state: TodosState, width = 120): string[] {
     .render(width)
     .map((line) => line.trimEnd());
 }
+
+test("findCanonicalTodo walks up to locate the canonical TODO.md", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-find-"));
+  try {
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    const todoPath = join(artifactsDir, "TODO.md");
+    writeFileSync(todoPath, "### stub\nstatus: active\n");
+
+    // From the project root
+    assert.equal(findCanonicalTodo(dir), todoPath);
+    // From a subdirectory — must walk up
+    const subdir = join(dir, ".pi", "extensions", "tui");
+    mkdirSync(subdir, { recursive: true });
+    assert.equal(findCanonicalTodo(subdir), todoPath);
+    // Outside the project — should return null
+    const outside = mkdtempSync(join(tmpdir(), "tui-todos-outside-"));
+    try {
+      assert.equal(findCanonicalTodo(outside), null);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 test("scanTodos finds the canonical TODO.md from the project root", () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-root-"));

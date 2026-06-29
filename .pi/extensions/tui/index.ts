@@ -10,9 +10,12 @@ import {
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
+import { watch as fsWatch, type FSWatcher } from "node:fs";
+import { basename as pathBasename, dirname as pathDirname } from "node:path";
 import { createQueueTracker } from "./sidebar.js";
 import {
   hasOpenTodos,
+  findCanonicalTodo,
   scanTodos,
   renderTodosWidget,
   type TodosState,
@@ -108,6 +111,64 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   let clipboardStatusTimer: ReturnType<typeof setTimeout> | null = null;
   let progressKeepalive: ReturnType<typeof setInterval> | null = null;
   let turnStartTime = 0;
+  let todosWatcher: FSWatcher | null = null;
+  let todosWatchDebounce: ReturnType<typeof setTimeout> | null = null;
+  let lastNotifiedOpenCount = -1;
+
+  // ── Todo file watcher ────────────────────────────────────────────
+  // Watches the canonical TODO.md so any change (editor, bash, other
+  // extensions, external) triggers an immediate widget refresh. The
+  // tool_result handler only catches Edit/Write/Bash results, so this
+  // is the safety net for vim, sed, and any out-of-band edit.
+  const TODO_WATCH_DEBOUNCE_MS = 100;
+
+  function teardownTodosWatcher(): void {
+    if (todosWatcher) {
+      todosWatcher.close();
+      todosWatcher = null;
+    }
+    if (todosWatchDebounce) {
+      clearTimeout(todosWatchDebounce);
+      todosWatchDebounce = null;
+    }
+  }
+
+  function refreshTodosWithNotify(cwd: string, source: string, piCtx: ExtensionContext): void {
+    refreshTodos(cwd);
+    const openCount = todosState.items.filter((it) => !it.done).length;
+    // Only notify when the open count actually changes — avoids
+    // notification spam while still surfacing meaningful updates.
+    if (openCount !== lastNotifiedOpenCount) {
+      lastNotifiedOpenCount = openCount;
+      try {
+        piCtx.ui.notify(`Todo list refreshed (${openCount} open, via ${source})`, "info");
+      } catch {
+        // best-effort; some UIs may not implement notify
+      }
+    }
+  }
+
+  function watchTodosFile(cwd: string, piCtx: ExtensionContext): void {
+    teardownTodosWatcher();
+    const todoPath = findCanonicalTodo(cwd);
+    if (!todoPath) return;
+    const dir = pathDirname(todoPath);
+    const target = pathBasename(todoPath);
+    try {
+      todosWatcher = fsWatch(dir, (eventType, changedFilename) => {
+        if (!changedFilename || changedFilename !== target) return;
+        if (todosWatchDebounce) clearTimeout(todosWatchDebounce);
+        todosWatchDebounce = setTimeout(() => {
+          todosWatchDebounce = null;
+          refreshTodosWithNotify(cwd, "file-watch", piCtx);
+          scheduleRefresh(piCtx);
+        }, TODO_WATCH_DEBOUNCE_MS);
+      });
+    } catch {
+      // fs.watch can throw on missing dirs / permission errors; skip silently
+      todosWatcher = null;
+    }
+  }
 
   // ── Streaming prompt state ─────────────────────────────────────────────
   let editorStreamingPrompt: string | null = null;
@@ -325,6 +386,9 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     restoreUsageFromBranch(ctx);
 
     refreshTodos(ctx.cwd);
+    // Set up the file watcher so out-of-band edits (vim, sed, any tool
+    // that doesn't match the path check below) still refresh the panel.
+    watchTodosFile(ctx.cwd, ctx);
     piTuiSettings = readPiTuiSettings(ctx.cwd);
     applyWorkingRowPadding(ctx);
     updateGit(ctx);
@@ -347,6 +411,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
+    teardownTodosWatcher();
     if (compositor) {
       compositor.dispose();
       compositor = null;
@@ -837,7 +902,19 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (isWriteToolResult(event) || isEditToolResult(event)) {
       const path = typeof event.input.path === "string" ? event.input.path : "";
       if (path.toLowerCase().includes("todo.md")) {
-        refreshTodos(ctx.cwd);
+        refreshTodosWithNotify(
+          ctx.cwd,
+          isEditToolResult(event) ? "edit" : "write",
+          ctx,
+        );
+        scheduleRefresh(ctx);
+      }
+    } else if (isBashToolResult(event)) {
+      // Bash can edit TODO.md via `cat >>`, `sed -i`, `tee`, `python -c`, etc.
+      // Catches anything with "todo.md" (case-insensitive) in the command.
+      const cmd = typeof event.input.command === "string" ? event.input.command : "";
+      if (cmd.toLowerCase().includes("todo.md")) {
+        refreshTodosWithNotify(ctx.cwd, "bash", ctx);
         scheduleRefresh(ctx);
       }
     }
