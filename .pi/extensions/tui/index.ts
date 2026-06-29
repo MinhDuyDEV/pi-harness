@@ -828,6 +828,15 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     const terminal = (tui as any).terminal;
     if (!terminal || typeof terminal.write !== "function") return;
 
+    // If compositor already exists but the TUI changed (e.g., session
+    // resume: setEditorComponent fires again with a fresh tui object),
+    // the old input listener is bound to the old TUI and never fires
+    // on the new one. Dispose and recreate so the listener moves.
+    if (compositor && (compositor as unknown as { tui: unknown }).tui !== tui) {
+      compositor.dispose();
+      compositor = null;
+    }
+
     // If compositor already exists, re-discover containers for the new editor/footer.
     if (compositor) {
       syncFixedRenderables();
