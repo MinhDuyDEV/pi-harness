@@ -67,26 +67,44 @@ const CONTEXT_MENU_CLIPBOARD_RESTORE_INTERVAL_MS = 100;
 const SCROLLBAR_TRACK = "\x1b[48;5;238m \x1b[0m";
 const SCROLLBAR_THUMB = "\x1b[48;5;244m \x1b[0m";
 
-// Shift+Enter sequences across terminals. The pi-tui editor's default
-// new-line check (kb.matches on tui.input.newLine) only fires when the
-// runtime keybinding system parses the data as "shift+enter", which
-// depends on the terminal sending a recognized CSI sequence. To make
-// shift+enter work reliably on any terminal — not just ones that have
-// completed the kitty keyboard protocol handshake — we intercept the
-// common raw sequences here and transform them to a plain LF. The
-// underlying editor's `(data === "\n" && data.length === 1)` condition
-// then inserts a newline.
-const SHIFT_ENTER_PATTERNS: readonly RegExp[] = [
-  /^\x1b\[13;2u$/,    // Kitty CSI u: ESC [ Ps;Pu (shift+enter)
-  /^\x1b\[13;2~$/,    // xterm modifyOtherKeys (without u protocol)
-  /^\x1b\[27;2;13~$/, // xterm modifyOtherKeys CSI 27;modifier;key~
-  /^\x1b\r$/,          // Legacy xterm / mintty: ESC + CR
-  /^\x1b\[Z$/,         // rxvt / urxvt: ESC [ Z
-  /^\x1bO2u$/,         // WezTerm SS3 with kitty modifier
+// "Insert newline" keybindings across terminals. Covers both Shift+Enter
+// and Ctrl+J. The pi-tui editor's default new-line check (kb.matches on
+// tui.input.newLine) only fires when the runtime keybinding system
+// parses the data as the bound key, which depends on the terminal
+// sending a recognized CSI sequence. To make these keys work reliably
+// on any terminal — not just ones that have completed the kitty keyboard
+// protocol handshake — we intercept the common raw sequences here and
+// transform them to a plain LF. The underlying editor's
+// `(data === "\n" && data.length === 1)` condition then inserts a
+// newline without firing the submit keybinding (which expects "\r").
+//
+// Shift+Enter:
+//   \x1b[13;2u     (Kitty CSI u — Ghostty, Kitty, modern terminals)
+//   \x1b[13;2~     (xterm modifyOtherKeys, legacy)
+//   \x1b[27;2;13~   (xterm CSI 27;modifier;key~)
+//   \x1b\r          (legacy xterm / mintty)
+//   \x1b[Z         (rxvt / urxvt)
+//   \x1bO2u        (WezTerm SS3 with kitty modifier)
+//
+// Ctrl+J (key code 106 = 'j', ctrl modifier = 5):
+//   \n             (most raw-mode terminals — Ctrl+J is LF in cooked mode)
+//   \x1b[27;5;106~ (xterm modifyOtherKeys)
+//   \x1b[106;5u    (Kitty CSI u)
+//   \x1bO5u        (WezTerm SS3 with kitty modifier)
+const NEWLINE_KEY_PATTERNS: readonly RegExp[] = [
+  /^\x1b\[13;2u$/,
+  /^\x1b\[13;2~$/,
+  /^\x1b\[27;2;13~$/,
+  /^\x1b\r$/,
+  /^\x1b\[Z$/,
+  /^\x1bO2u$/,
+  /^\x1b\[27;5;106~$/,
+  /^\x1b\[106;5u$/,
+  /^\x1bO5u$/,
 ];
 
-function isShiftEnter(data: string): boolean {
-  for (const pattern of SHIFT_ENTER_PATTERNS) {
+function isNewlineKey(data: string): boolean {
+  for (const pattern of NEWLINE_KEY_PATTERNS) {
     if (pattern.test(data)) return true;
   }
   return false;
@@ -798,17 +816,18 @@ export class FixedEditorCompositor {
   private handleInput(data: string): { consume?: boolean; data?: string } | undefined {
     if (this.disposed || this.hasVisibleOverlay()) return undefined;
 
-    // Transform Shift+Enter to a plain newline. The underlying editor's
-    // new-line check matches "\n" (one char), so passing "\n" through
-    // here inserts a newline without firing the submit keybinding
-    // (which expects "\r"). This catches terminals that haven't
-    // completed the kitty keyboard protocol handshake at startup.
+    // Transform Shift+Enter and Ctrl+J to a plain newline. The
+    // underlying editor's new-line check matches "\n" (one char), so
+    // passing "\n" through here inserts a newline without firing the
+    // submit keybinding (which expects "\r"). This catches terminals
+    // that haven't completed the kitty keyboard protocol handshake at
+    // startup.
     //
     // Do NOT set `consume: true` — the TUI's input dispatcher returns
     // early when consume is true, and the transformed "\n" would never
     // reach the editor. Just return the new data; the TUI passes it
     // through to the focused component (the editor).
-    if (isShiftEnter(data)) {
+    if (isNewlineKey(data)) {
       return { data: "\n" };
     }
 
