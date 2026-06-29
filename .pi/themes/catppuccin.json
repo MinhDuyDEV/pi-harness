@@ -31,8 +31,11 @@
     "dark": "#001d2b",
     "warp": "#252a2d",
     "toolPending": "#27283a",
+    "toolPending2": "#282832",
     "toolSuccess": "#203624",
-    "toolError": "#3b202a"
+    "toolSuccess2": "#283228",
+    "toolError": "#3b202a",
+    "toolError2": "#3c2828"
   },
   "colors": {
     "accent": "mauve",
@@ -52,10 +55,10 @@
     "customMessageBg": "surface0",
     "customMessageText": "text",
     "customMessageLabel": "mauve",
-    "toolPendingBg": "base",
-    "toolSuccessBg": "base",
-    "toolErrorBg": "toolError",
-    "toolTitle": "mauve",
+    "toolPendingBg": "toolPending",
+    "toolSuccessBg": "toolSuccess2",
+    "toolErrorBg": "toolError2",
+    "toolTitle": "text",
     "toolOutput": "text",
     "mdHeading": "peach",
     "mdLink": "peach",
