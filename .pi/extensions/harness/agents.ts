@@ -16,7 +16,6 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { parseMarkdownFrontmatter } from "./parsing.js";
-import { parseMergedDisallowedTools } from "../xai/policy.js";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -193,8 +192,10 @@ export function loadAgentFile(name: string, projectDir: string): AgentConfig | n
 	const fm = frontmatter as unknown as AgentFrontmatter;
 
 	// Resolve tools: explicit `tools:` allowlist if provided, otherwise all built-ins.
-	// In both cases, remove anything listed in `disallowed_tools:` (+ default xai_* via merge).
-	const disallowed = new Set(parseMergedDisallowedTools(fm.disallowed_tools));
+	// In both cases, remove anything listed in `disallowed_tools:`.
+	// (Previously merged in default xai_* side tools too, but the local
+	// xai fork keeps the xai_* tools available, so no merge is needed.)
+	const disallowed = new Set(parseToolList(fm.disallowed_tools));
 	const baseTools = fm.tools ? parseToolList(fm.tools) : [...BUILTIN_TOOL_NAMES];
 	const tools = baseTools.filter((tool) => !disallowed.has(tool));
 
