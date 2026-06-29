@@ -9,7 +9,7 @@
      *   1. DCP Artifact Tracker    → files_read / files_modified
      *   2. DCP Persistent Summary  → discoveries, accomplishments
      *   3. Active Artifacts        → blocks from .pi/artifacts/{TODO,PROGRESS}.md
-     *   4. (removed) - was Memory Observations via FTS5; now MEMORY.md is injected via before_agent_start in extensions/memory.ts
+     *   4. (removed) - was Memory Observations via FTS5; MEMORY.md is now managed by the user and read on-demand via the memory skill
      */
 
     import { readdirSync, readFileSync, existsSync } from "node:fs";

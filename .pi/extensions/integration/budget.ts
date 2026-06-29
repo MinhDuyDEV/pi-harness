@@ -23,7 +23,7 @@ export const DEFAULT_PRIORITIES: Record<string, number> = {
   scenes: 10, // context flags
 };
 
-// Default token budget for MEMORY.md injection in before_agent_start
+// Default token budget for context injection in before_agent_start
 export const DEFAULT_TOKEN_BUDGET = 2000;
 
 export interface InjectionSource {
