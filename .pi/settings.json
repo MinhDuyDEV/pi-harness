@@ -7,12 +7,10 @@
     "blockImages": false
   },
   "packages": [
-    "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:@heyhuynhgiabuu/pi-task",
-    "npm:pi-xai-oauth",
-    "npm:@eko24ive/pi-ask"
+    "git:https://github.com/badlogic/pi-diff-review"
   ],
   "compaction": {
     "enabled": true,
@@ -42,7 +40,7 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.79.10",
+  "lastChangelogVersion": "0.80.2",
   "treeFilterMode": "default",
   "transport": "auto",
   "hideThinkingBlock": true,
