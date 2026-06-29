@@ -62,7 +62,12 @@ export class NudgeManager {
   /** Record a compress call to suppress nudges briefly */
   recordCompress(): void {
     this.state.lastNudgeTurn = this.currentTurn;
-    this.state.autoCompactTriggered = false;
+    // NOTE: do NOT reset autoCompactTriggered here. The auto-compact
+    // trigger should stay armed while context is still over the
+    // threshold; it's re-armed (set back to false) in checkContext
+    // only when context has actually dropped below it. Resetting it
+    // here causes Zone 4 to re-fire the critical nudge as soon as the
+    // 3-turn cooldown expires, even when the agent just compressed.
     this.state.suppressUntilTurn = this.currentTurn + this.config.compress.compressNudgeCooldown;
   }
 
@@ -98,6 +103,14 @@ export class NudgeManager {
 
     // Suppression: don't nudge right after a compress
     if (this.currentTurn < this.state.suppressUntilTurn) return null;
+
+    // Re-arm autoCompactTriggered once context drops below the
+    // threshold. This is what makes Zone 4 a one-shot per high-context
+    // cycle: the trigger stays armed while the user is still over the
+    // threshold, and gets reset only when context is safely under it.
+    if (this.state.autoCompactTriggered && contextPercent < autoCfg.thresholdPercent) {
+      this.state.autoCompactTriggered = false;
+    }
 
     // Zone 1: Below minimum — no pressure
     if (contextPercent < config.minContextLimit) return null;
