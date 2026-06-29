@@ -60,7 +60,8 @@ function textForFunctionCallOutput(output: unknown): string {
 function normalizeXaiResponsesInput(input: unknown[], model: Model<Api>): unknown[] {
   const normalizedInput = input.map(normalizeResponsesImageParts) as Record<string, any>[];
   const rewritten: unknown[] = [];
-  const modelInputs = Array.isArray((model as any).input) ? ((model as any).input as unknown[]) : [];
+  const modelExtras = model as Model<Api> & { input?: unknown };
+  const modelInputs = Array.isArray(modelExtras.input) ? (modelExtras.input as unknown[]) : [];
   const supportsImages = modelInputs.includes("image");
 
   for (const item of normalizedInput) {

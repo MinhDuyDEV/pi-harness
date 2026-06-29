@@ -1,10 +1,13 @@
+import type { XaiResponsesData } from "./types";
+
 /** Extract display text from an xAI/OpenAI Responses API response. */
-export function extractResponsesText(data: any): string {
+export function extractResponsesText(data: XaiResponsesData | undefined | null): string {
   if (typeof data?.output_text === "string" && data.output_text) return data.output_text;
   const chunks: string[] = [];
-  for (const item of data?.output || []) {
-    for (const part of item?.content || []) {
-      if (typeof part?.text === "string" && (part.type === "output_text" || part.text)) chunks.push(part.text);
+  for (const item of data?.output ?? []) {
+    for (const part of item?.content ?? []) {
+      const partObj = part as { type?: unknown; text?: unknown } | undefined;
+      if (typeof partObj?.text === "string" && (partObj.type === "output_text" || partObj.text)) chunks.push(partObj.text);
     }
   }
   return chunks.join("") || JSON.stringify(data);
@@ -28,7 +31,9 @@ export function textFromResponsesContent(content: unknown): string {
 
 /** Extract an HTTP-like status from thrown xAI request errors. */
 export function statusFromError(error: unknown): number | undefined {
-  return typeof (error as any)?.status === "number" ? (error as any).status : undefined;
+  if (!error || typeof error !== "object") return undefined;
+  const status = (error as { status?: unknown }).status;
+  return typeof status === "number" ? status : undefined;
 }
 
 /** Return a safe display message for thrown values. */

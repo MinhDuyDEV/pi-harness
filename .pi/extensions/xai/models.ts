@@ -77,17 +77,17 @@ export const MODELS = [
 /** Build a pi model object for direct xAI tool requests. */
 export function xaiModelForRequest(modelId?: string): Model<Api> {
   const id = modelId || DEFAULT_XAI_MODEL;
-  const model =
+  const source =
     MODELS.find((candidate) => candidate.id === id) ||
     MODELS.find((candidate) => candidate.id === DEFAULT_XAI_MODEL) ||
     MODELS[0];
   return {
-    ...model,
+    ...source,
     id,
     provider: XAI_PROVIDER_ID,
-    api: "xai-responses",
+    api: "xai-responses" as const,
     baseUrl: xaiBaseUrlForModel(id),
-  } as any;
+  } as Model<Api>;
 }
 
 /** Normalize provider/model-prefixed xAI model ids for routing comparisons. */

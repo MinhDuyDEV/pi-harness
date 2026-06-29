@@ -1,4 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type, type Static, type TSchema } from "@earendil-works/pi-ai";
 import { resolveXaiAuthToken } from "../auth";
 import { DEFAULT_XAI_IMAGE_MODEL, DEFAULT_XAI_MODEL, XAI_IMAGES_GENERATIONS_URL } from "../constants";
 import { normalizeXaiImageInput } from "../images";
@@ -7,196 +8,277 @@ import { createXaiResponse, postXaiJson } from "../responses";
 import { extractResponsesText, messageFromError, statusFromError } from "../text";
 import { xaiTextInput, xaiToolError } from "./common";
 
-/** Register the OAuth-backed custom xAI tools whose names are in `enabled`. */
-export function registerCustomXaiTools(pi: ExtensionAPI, enabled: Set<string>) {
-    if (enabled.has("xai_generate_text")) pi.registerTool({
-      name: "xai_generate_text",
-      label: "xAI Generate Text",
-      description: "Generate text using Grok with full reasoning, structured output, and stateful conversations.",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: { type: "string", description: "The prompt or question" },
-          model: { type: "string", description: "Model to use", default: DEFAULT_XAI_MODEL },
-          reasoning_effort: { type: "string", enum: ["none", "low", "medium", "high"], default: "medium" },
-          response_format: { type: "string", description: "Set to 'json' for JSON output" },
-          previous_response_id: { type: "string", description: "Continue conversation" },
-          image_url: { type: "string", description: "Optional image URL for vision/multimodal input (supports image analysis)" },
-        },
-        required: ["prompt"],
-      },
-      execute: async (_toolCallId: string, params: any, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { reasoning: "", response_id: "" });
-        }
+/** Minimal shape of an xAI Responses API response we actually use. */
+interface XaiResponsesData {
+  id?: string;
+  output_text?: string;
+  output?: ReadonlyArray<{ content?: ReadonlyArray<{ text?: string }> }>;
+  reasoning?: { content?: ReadonlyArray<{ text?: string }> };
+}
 
-        const model = params.model || DEFAULT_XAI_MODEL;
-        const imageUrl = normalizeXaiImageInput(params.image_url);
-        const input = imageUrl
-          ? [
-              {
-                role: "user",
-                content: [
-                  { type: "input_text", text: params.prompt || "Describe this image." },
-                  { type: "input_image", image_url: imageUrl, detail: "high" },
-                ],
-              },
-            ]
-          : params.prompt;
+/** Reasoning effort values supported by Grok's Responses API. */
+type ReasoningEffort = "none" | "low" | "medium" | "high";
 
-        const body: any = {
-          model,
-          input,
-        };
+/**
+ * The runtime tool shape accepted by pi's `pi.registerTool`. We type the
+ * `execute` parameter with `unknown` to avoid a TypeScript module-resolution
+ * clash with pi-coding-agent's internal `AgentToolUpdateCallback` type
+ * (resolved through a nested `pi-agent-core` path that TypeScript treats
+ * as a different module than our import). The actual params shape is
+ * encoded in the `parameters` (TypeBox) schema and the call site uses
+ * `unknown` casts inside `execute` — runtime is unchanged from the
+ * upstream pi-xai-oauth.
+ */
+type XaiToolExecute = (input: {
+  toolCallId: string;
+  params: unknown;
+  signal: AbortSignal | undefined;
+  onUpdate: unknown;
+  ctx: unknown;
+}) => Promise<unknown>;
 
-        const effort = params.reasoning_effort || "medium";
-        if (grokSupportsReasoningEffort(model) && effort !== "none") {
-          body.reasoning = { effort };
-        }
+interface XaiToolDef {
+  name: string;
+  label: string;
+  description: string;
+  parameters: TSchema;
+  execute: XaiToolExecute;
+}
 
-        if (params.response_format === "json") {
-          body.text = { format: { type: "json_object" } };
-        }
-        if (params.previous_response_id) {
-          body.previous_response_id = params.previous_response_id;
-        }
+/** Build a typed tool definition. The runtime object is cast to `any` so
+ *  pi's `registerTool` accepts it without a module-resolution error. */
+function defineXaiTool<S extends TSchema>(def: {
+  name: string;
+  label: string;
+  description: string;
+  parameters: S;
+  execute: (input: { toolCallId: string; params: Static<S>; signal: AbortSignal | undefined; onUpdate: unknown; ctx: unknown }) => Promise<unknown>;
+}): XaiToolDef {
+  return def as unknown as XaiToolDef;
+}
 
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, body, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
-            error: true,
-            status,
-            reasoning: "",
-            response_id: "",
-          });
-        }
-        const text = extractResponsesText(data);
+// ──────────────────────────────────────────────────────────────────────
+// Tool 1: xai_generate_text
+// ──────────────────────────────────────────────────────────────────────
 
-        return {
-          content: [{ type: "text", text }],
-          details: {
-            reasoning: data.reasoning?.content?.[0]?.text || "",
-            response_id: data.id,
+const xaiGenerateTextParams = Type.Object({
+  prompt: Type.String({ description: "The prompt or question" }),
+  model: Type.Optional(Type.String({ description: `Model to use (default: ${DEFAULT_XAI_MODEL})` })),
+  reasoning_effort: Type.Optional(
+    Type.Union([Type.Literal("none"), Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")]),
+  ),
+  response_format: Type.Optional(Type.String({ description: "Set to 'json' for JSON output" })),
+  previous_response_id: Type.Optional(Type.String({ description: "Continue conversation" })),
+  image_url: Type.Optional(
+    Type.String({ description: "Optional image URL for vision/multimodal input (supports image analysis)" }),
+  ),
+});
+type XaiGenerateTextParams = Static<typeof xaiGenerateTextParams>;
+
+const xaiGenerateTextTool = defineXaiTool({
+  name: "xai_generate_text",
+  label: "xAI Generate Text",
+  description: "Generate text using Grok with full reasoning, structured output, and stateful conversations.",
+  parameters: xaiGenerateTextParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as XaiGenerateTextParams;
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        reasoning: "",
+        response_id: "",
+      });
+    }
+
+    const model = p.model ?? DEFAULT_XAI_MODEL;
+    const imageUrl = p.image_url ? normalizeXaiImageInput(p.image_url) : undefined;
+    const input: unknown = imageUrl
+      ? [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: p.prompt || "Describe this image." },
+              { type: "input_image", image_url: imageUrl, detail: "high" },
+            ],
           },
-        };
-      },
-    } as any);
+        ]
+      : p.prompt;
 
-    if (enabled.has("xai_multi_agent")) pi.registerTool({
-      name: "xai_multi_agent",
-      label: "xAI Multi-Agent Research",
-      description: "Run deep multi-agent research using Grok.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string", description: "Research topic" },
-          num_agents: { type: "number", enum: [4, 16], default: 4 },
-          reasoning_effort: { type: "string", enum: ["medium", "high"], description: "Override num_agents: medium uses 4 agents, high uses 16 agents" },
-        },
-        required: ["query"],
-      },
-      execute: async (_toolCallId: string, params: any, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { agents_used: 0, response_id: "" });
-        }
+    const body: Record<string, unknown> = { model, input };
+    const effort: ReasoningEffort = (p.reasoning_effort ?? "medium") as ReasoningEffort;
+    if (grokSupportsReasoningEffort(model) && effort !== "none") {
+      body.reasoning = { effort };
+    }
+    if (p.response_format === "json") {
+      body.text = { format: { type: "json_object" } };
+    }
+    if (p.previous_response_id) {
+      body.previous_response_id = p.previous_response_id;
+    }
 
-        const requestedAgents = params.num_agents === 16 ? 16 : 4;
-        const effort = params.reasoning_effort || (requestedAgents === 16 ? "high" : "medium");
-        const agentsUsed = effort === "high" ? 16 : 4;
-        const prompt = `You are leading a team of ${agentsUsed} researchers. Research: ${params.query}`;
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, {
-            model: "grok-4.20-multi-agent-0309",
-            input: xaiTextInput(prompt),
-            reasoning: { effort },
-            tools: [{ type: "web_search" }, { type: "x_search" }],
-          }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
-            error: true,
-            status,
-            agents_used: 0,
-            response_id: "",
-          });
-        }
-        const text = extractResponsesText(data) || "Research completed";
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, body)) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        reasoning: "",
+        response_id: "",
+      });
+    }
 
-        return {
-          content: [{ type: "text", text }],
-          details: {
-            agents_used: agentsUsed,
-            response_id: data.id,
-          },
-        };
+    const text = extractResponsesText(data);
+    return {
+      content: [{ type: "text", text }],
+      details: {
+        reasoning: data.reasoning?.content?.[0]?.text ?? "",
+        response_id: data.id,
       },
-    } as any);
+    };
+  },
+});
 
-    // Agentic tools that leverage xAI's native server-side tools.
-    if (enabled.has("xai_web_search")) pi.registerTool({
-      name: "xai_web_search",
-      label: "xAI Web Search",
-      description: "Search the web using Grok's native web knowledge and search capabilities.",
-      parameters: {
-        type: "object",
-        properties: { query: { type: "string", description: "Search query" } },
-        required: ["query"],
-      },
-      execute: async (_toolCallId: string, params: { query?: string }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { query: params?.query });
-        }
-        const prompt = `Search the web for: ${params.query}. Summarize the top results with sources, key facts, dates, and recent developments. Prioritize authoritative sources.`;
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, {
-            model: DEFAULT_XAI_MODEL,
-            input: xaiTextInput(prompt),
-            reasoning: { effort: "medium" },
-            tools: [{ type: "web_search", enable_image_understanding: true }],
-          }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status, query: params.query });
-        }
-        const text = extractResponsesText(data) || `No results for: ${params.query}`;
-        return { content: [{ type: "text", text }], details: { query: params.query } };
-      },
-    } as any);
+// ──────────────────────────────────────────────────────────────────────
+// Tool 2: xai_multi_agent
+// ──────────────────────────────────────────────────────────────────────
 
-    if (enabled.has("xai_x_search")) pi.registerTool({
-      name: "xai_x_search",
-      label: "xAI X Search",
-      description: "Search X (Twitter) using Grok's native real-time X search and knowledge. Supports advanced filters like count, since, until.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: { type: "string", description: "X search query" },
-          count: { type: "number", description: "Max number of posts to return (1-10)", default: 5 },
-          since: { type: "string", description: "Only posts after this date (YYYY-MM-DD)" },
-          until: { type: "string", description: "Only posts before this date (YYYY-MM-DD)" }
-        },
-        required: ["query"],
-      },
-      execute: async (_toolCallId: string, params: { query?: string; count?: number; since?: string; until?: string }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { query: params?.query });
-        }
-        let prompt = `You have native real-time access to X (Twitter) posts and trends via Grok's built-in X search. Use it to find the most relevant recent posts about: ${params.query}.
+const xaiMultiAgentParams = Type.Object({
+  query: Type.String({ description: "Research topic" }),
+  num_agents: Type.Optional(Type.Union([Type.Literal(4), Type.Literal(16)])),
+  reasoning_effort: Type.Optional(
+    Type.String({
+      description: "Override num_agents: medium uses 4 agents, high uses 16 agents",
+    }),
+  ),
+});
+type XaiMultiAgentParams = Static<typeof xaiMultiAgentParams>;
+
+const xaiMultiAgentTool = defineXaiTool({
+  name: "xai_multi_agent",
+  label: "xAI Multi-Agent Research",
+  description: "Run deep multi-agent research using Grok.",
+  parameters: xaiMultiAgentParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as XaiMultiAgentParams;
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        agents_used: 0,
+        response_id: "",
+      });
+    }
+
+    const requestedAgents: 4 | 16 = p.num_agents === 16 ? 16 : 4;
+    const effort: "medium" | "high" =
+      (p.reasoning_effort as "medium" | "high" | undefined) ?? (requestedAgents === 16 ? "high" : "medium");
+    const agentsUsed: 4 | 16 = effort === "high" ? 16 : 4;
+    const prompt = `You are leading a team of ${agentsUsed} researchers. Research: ${p.query}`;
+
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: "grok-4.20-multi-agent-0309",
+        input: xaiTextInput(prompt),
+        reasoning: { effort },
+        tools: [{ type: "web_search" }, { type: "x_search" }],
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        agents_used: 0,
+        response_id: "",
+      });
+    }
+
+    const text = extractResponsesText(data) || "Research completed";
+    return {
+      content: [{ type: "text", text }],
+      details: { agents_used: agentsUsed, response_id: data.id },
+    };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Tool 3: xai_web_search
+// ──────────────────────────────────────────────────────────────────────
+
+const xaiWebSearchParams = Type.Object({
+  query: Type.String({ description: "Search query" }),
+});
+
+const xaiWebSearchTool = defineXaiTool({
+  name: "xai_web_search",
+  label: "xAI Web Search",
+  description: "Search the web using Grok's native web knowledge and search capabilities.",
+  parameters: xaiWebSearchParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as { query: string };
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        query: p.query,
+      });
+    }
+    const prompt = `Search the web for: ${p.query}. Summarize the top results with sources, key facts, dates, and recent developments. Prioritize authoritative sources.`;
+
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: DEFAULT_XAI_MODEL,
+        input: xaiTextInput(prompt),
+        reasoning: { effort: "medium" },
+        tools: [{ type: "web_search", enable_image_understanding: true }],
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        query: p.query,
+      });
+    }
+
+    const text = extractResponsesText(data) || `No results for: ${p.query}`;
+    return { content: [{ type: "text", text }], details: { query: p.query } };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Tool 4: xai_x_search
+// ──────────────────────────────────────────────────────────────────────
+
+const xaiXSearchParams = Type.Object({
+  query: Type.String({ description: "X search query" }),
+  count: Type.Optional(Type.Number({ description: "Max number of posts to return (1-10)", default: 5 })),
+  since: Type.Optional(Type.String({ description: "Only posts after this date (YYYY-MM-DD)" })),
+  until: Type.Optional(Type.String({ description: "Only posts before this date (YYYY-MM-DD)" })),
+});
+
+const xaiXSearchTool = defineXaiTool({
+  name: "xai_x_search",
+  label: "xAI X Search",
+  description:
+    "Search X (Twitter) using Grok's native real-time X search and knowledge. Supports advanced filters like count, since, until.",
+  parameters: xaiXSearchParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as { query: string; count?: number; since?: string; until?: string };
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        query: p.query,
+      });
+    }
+    let prompt = `You have native real-time access to X (Twitter) posts and trends via Grok's built-in X search. Use it to find the most relevant recent posts about: ${p.query}.
 
 Filters:`;
-        if (params.count) prompt += ` Return up to ${params.count} posts.`;
-        if (params.since) prompt += ` Only posts since ${params.since}.`;
-        if (params.until) prompt += ` Only posts until ${params.until}.`;
-        prompt += `
+    if (p.count) prompt += ` Return up to ${p.count} posts.`;
+    if (p.since) prompt += ` Only posts since ${p.since}.`;
+    if (p.until) prompt += ` Only posts until ${p.until}.`;
+    prompt += `
 
 Summarize:
 - Top posts with usernames, engagement (likes/reposts/views), and timestamps
@@ -205,198 +287,328 @@ Summarize:
 - Notable users or conversations
 
 Be specific and cite examples where helpful.`;
-        const xSearchTool: Record<string, any> = { type: "x_search", enable_image_understanding: true };
-        if (params.since) xSearchTool.from_date = params.since;
-        if (params.until) xSearchTool.to_date = params.until;
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, {
-            model: DEFAULT_XAI_MODEL,
-            input: xaiTextInput(prompt),
-            reasoning: { effort: "medium" },
-            tools: [xSearchTool],
-          }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status, query: params.query });
-        }
-        const text = extractResponsesText(data) || `No X results for: ${params.query}`;
-        return { content: [{ type: "text", text }], details: { query: params.query } };
-      },
-    } as any);
 
-    if (enabled.has("xai_code_execution")) pi.registerTool({
-      name: "xai_code_execution",
-      label: "xAI Code Execution",
-      description: "Execute or analyze Python code using xAI's native code interpreter tool.",
-      parameters: {
-        type: "object",
-        properties: { code: { type: "string", description: "Python code to execute or analyze" } },
-        required: ["code"],
-      },
-      execute: async (_toolCallId: string, params: { code?: string }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { code: params?.code });
-        }
-        const prompt = `Execute this Python code and show the result or output:\n\n${params.code}`;
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, {
-            model: DEFAULT_XAI_MODEL,
-            input: xaiTextInput(prompt),
-            reasoning: { effort: "low" },
-            tools: [{ type: "code_interpreter" }],
-          }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status, code: params.code });
-        }
-        const text = extractResponsesText(data) || `Executed: ${String(params.code).substring(0, 100)}...`;
-        return { content: [{ type: "text", text }], details: { code: params.code } };
-      },
-    } as any);
+    const xSearchTool: Record<string, unknown> = { type: "x_search", enable_image_understanding: true };
+    if (p.since) xSearchTool.from_date = p.since;
+    if (p.until) xSearchTool.to_date = p.until;
 
-    // ====================== ADDITIONAL TOOLS ======================
-    if (enabled.has("xai_generate_image")) pi.registerTool({
-      name: "xai_generate_image",
-      label: "xAI Image Generation",
-      description: "Generate images using xAI's current image generation model.",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: { type: "string", description: "Detailed description of the image to generate" },
-          model: { type: "string", description: "Image model to use", default: DEFAULT_XAI_IMAGE_MODEL },
-          size: { type: "string", description: "Image size (e.g. 1024x1024, 1792x1024)", default: "1024x1024" },
-          n: { type: "number", description: "Number of images to generate (1-4)", default: 1 }
-        },
-        required: ["prompt"],
-      },
-      execute: async (_toolCallId: string, params: { prompt?: string; model?: string; size?: string; n?: number }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { prompt: params?.prompt });
-        }
-        let data: any;
-        try {
-          data = await postXaiJson(apiKey, XAI_IMAGES_GENERATIONS_URL, {
-            model: params.model || DEFAULT_XAI_IMAGE_MODEL,
-            prompt: params.prompt,
-            n: params.n || 1,
-            size: params.size || "1024x1024"
-          }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI Image API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status, prompt: params.prompt });
-        }
-        const images = data.data || [];
-        const urls = images.map((img: any) => img.url).filter(Boolean);
-        const text = urls.length > 0
-          ? `Generated ${urls.length} image(s):\n${urls.map((u: string) => `- ${u}`).join("\n")}`
-          : "Image generation completed but no URLs returned.";
-        return { content: [{ type: "text", text }], details: { prompt: params.prompt, urls, count: urls.length } };
-      },
-    } as any);
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: DEFAULT_XAI_MODEL,
+        input: xaiTextInput(prompt),
+        reasoning: { effort: "medium" },
+        tools: [xSearchTool],
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        query: p.query,
+      });
+    }
 
-    // ====================== NEW TOOLS (OAuth-only) ======================
-    if (enabled.has("xai_critique")) pi.registerTool({
-      name: "xai_critique",
-      label: "xAI Critique",
-      description: "Provide detailed, reasoned critique of code, designs, writing, ideas, or arguments with structured feedback.",
-      parameters: {
-        type: "object",
-        properties: {
-          content: { type: "string", description: "The code, text, design, or idea to critique" },
-          aspect: { type: "string", description: "Focus area: code, design, writing, logic, security, performance, etc." },
-          tone: { type: "string", description: "Tone of critique: constructive, strict, balanced", default: "constructive" }
-        },
-        required: ["content"],
-      },
-      execute: async (_toolCallId: string, params: { content?: string; aspect?: string; tone?: string }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { content: params?.content });
-        }
-        const aspect = params.aspect || "overall quality and correctness";
-        const tone = params.tone || "constructive";
-        const prompt = `Provide a ${tone} critique focused on ${aspect}.\n\nContent to critique:\n${params.content}\n\nStructure your response with:\n- Strengths\n- Weaknesses / Issues\n- Specific suggestions for improvement\n- Overall assessment (score 1-10)\nUse step-by-step reasoning.`;
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, { model: DEFAULT_XAI_MODEL, input: xaiTextInput(prompt), reasoning: { effort: "high" } }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status });
-        }
-        const text = extractResponsesText(data) || "Critique completed.";
-        return { content: [{ type: "text", text }], details: { aspect, tone } };
-      },
-    } as any);
+    const text = extractResponsesText(data) || `No X results for: ${p.query}`;
+    return { content: [{ type: "text", text }], details: { query: p.query } };
+  },
+});
 
-    if (enabled.has("xai_analyze_image")) pi.registerTool({
-      name: "xai_analyze_image",
-      label: "xAI Image Analysis",
-      description: "Analyze images, describe visual content, answer questions about images, or extract information using Grok's vision capabilities.",
-      parameters: {
-        type: "object",
-        properties: {
-          image: { type: "string", description: "Image URL, local file path, or base64 data URL" },
-          question: { type: "string", description: "Question to ask about the image (default: describe in detail)" }
-        },
-        required: ["image"],
-      },
-      execute: async (_toolCallId: string, params: { image?: string; question?: string }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { image: params?.image });
-        }
-        const question = params.question || "Describe this image in detail, including objects, text, style, and any notable details.";
-        const imageInput = normalizeXaiImageInput(params.image) || params.image;
-        const input = [{ role: "user", content: [{ type: "input_image", image_url: imageInput, detail: "high" }, { type: "input_text", text: question }] }];
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, { model: DEFAULT_XAI_MODEL, input, reasoning: { effort: "medium" } }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status, image: params.image });
-        }
-        const text = extractResponsesText(data) || "Image analysis completed.";
-        return { content: [{ type: "text", text }], details: { image: params.image, question } };
-      },
-    } as any);
+// ──────────────────────────────────────────────────────────────────────
+// Tool 5: xai_code_execution
+// ──────────────────────────────────────────────────────────────────────
 
-    if (enabled.has("xai_deep_research")) pi.registerTool({
-      name: "xai_deep_research",
-      label: "xAI Deep Research",
-      description: "Conduct thorough multi-step research on a topic, synthesize information, cite sources, and provide comprehensive analysis with high reasoning effort.",
-      parameters: {
-        type: "object",
-        properties: {
-          topic: { type: "string", description: "Research topic or question" },
-          depth: { type: "string", description: "Research depth: low, medium, high", default: "high" }
-        },
-        required: ["topic"],
+const xaiCodeExecutionParams = Type.Object({
+  code: Type.String({ description: "Python code to execute or analyze" }),
+});
+
+const xaiCodeExecutionTool = defineXaiTool({
+  name: "xai_code_execution",
+  label: "xAI Code Execution",
+  description: "Execute or analyze Python code using xAI's native code interpreter tool.",
+  parameters: xaiCodeExecutionParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as { code: string };
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        code: p.code,
+      });
+    }
+    const prompt = `Execute this Python code and show the result or output:\n\n${p.code}`;
+
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: DEFAULT_XAI_MODEL,
+        input: xaiTextInput(prompt),
+        reasoning: { effort: "low" },
+        tools: [{ type: "code_interpreter" }],
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        code: p.code,
+      });
+    }
+
+    const text = extractResponsesText(data) || `Executed: ${String(p.code).substring(0, 100)}...`;
+    return { content: [{ type: "text", text }], details: { code: p.code } };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Tool 6: xai_generate_image
+// ──────────────────────────────────────────────────────────────────────
+
+const xaiGenerateImageParams = Type.Object({
+  prompt: Type.String({ description: "Detailed description of the image to generate" }),
+  model: Type.Optional(
+    Type.String({ description: `Image model to use (default: ${DEFAULT_XAI_IMAGE_MODEL})` }),
+  ),
+  size: Type.Optional(Type.String({ description: "Image size (e.g. 1024x1024, 1792x1024)", default: "1024x1024" })),
+  n: Type.Optional(Type.Number({ description: "Number of images to generate (1-4)", default: 1 })),
+});
+
+const xaiGenerateImageTool = defineXaiTool({
+  name: "xai_generate_image",
+  label: "xAI Image Generation",
+  description: "Generate images using xAI's current image generation model.",
+  parameters: xaiGenerateImageParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as {
+      prompt: string;
+      model?: string;
+      size?: string;
+      n?: number;
+    };
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        prompt: p.prompt,
+      });
+    }
+    interface ImageApiResponse {
+      data?: ReadonlyArray<{ url?: string }>;
+    }
+    let data: ImageApiResponse;
+    try {
+      data = (await postXaiJson(apiKey, XAI_IMAGES_GENERATIONS_URL, {
+        model: p.model ?? DEFAULT_XAI_IMAGE_MODEL,
+        prompt: p.prompt,
+        n: p.n ?? 1,
+        size: p.size ?? "1024x1024",
+      })) as ImageApiResponse;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI Image API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        prompt: p.prompt,
+      });
+    }
+    const images = data.data ?? [];
+    const urls = images.map((img) => img.url).filter((u): u is string => Boolean(u));
+    const text =
+      urls.length > 0
+        ? `Generated ${urls.length} image(s):\n${urls.map((u) => `- ${u}`).join("\n")}`
+        : "Image generation completed but no URLs returned.";
+    return { content: [{ type: "text", text }], details: { prompt: p.prompt, urls, count: urls.length } };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Tool 7: xai_critique
+// ──────────────────────────────────────────────────────────────────────
+
+const xaiCritiqueParams = Type.Object({
+  content: Type.String({ description: "The code, text, design, or idea to critique" }),
+  aspect: Type.Optional(
+    Type.String({ description: "Focus area: code, design, writing, logic, security, performance, etc." }),
+  ),
+  tone: Type.Optional(
+    Type.Union([Type.Literal("constructive"), Type.Literal("strict"), Type.Literal("balanced")]),
+  ),
+});
+type XaiCritiqueParams = Static<typeof xaiCritiqueParams>;
+
+const xaiCritiqueTool = defineXaiTool({
+  name: "xai_critique",
+  label: "xAI Critique",
+  description: "Provide detailed, reasoned critique of code, designs, writing, ideas, or arguments with structured feedback.",
+  parameters: xaiCritiqueParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as XaiCritiqueParams;
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        content: p.content,
+      });
+    }
+    const aspect = p.aspect ?? "overall quality and correctness";
+    const tone = p.tone ?? "constructive";
+    const prompt = `Provide a ${tone} critique focused on ${aspect}.\n\nContent to critique:\n${p.content}\n\nStructure your response with:\n- Strengths\n- Weaknesses / Issues\n- Specific suggestions for improvement\n- Overall assessment (score 1-10)\nUse step-by-step reasoning.`;
+
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: DEFAULT_XAI_MODEL,
+        input: xaiTextInput(prompt),
+        reasoning: { effort: "high" },
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+      });
+    }
+
+    const text = extractResponsesText(data) || "Critique completed.";
+    return { content: [{ type: "text", text }], details: { aspect, tone } };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Tool 8: xai_analyze_image
+// ──────────────────────────────────────────────────────────────────────
+
+const xaiAnalyzeImageParams = Type.Object({
+  image: Type.String({ description: "Image URL, local file path, or base64 data URL" }),
+  question: Type.Optional(Type.String({ description: "Question to ask about the image (default: describe in detail)" })),
+});
+type XaiAnalyzeImageParams = Static<typeof xaiAnalyzeImageParams>;
+
+const xaiAnalyzeImageTool = defineXaiTool({
+  name: "xai_analyze_image",
+  label: "xAI Image Analysis",
+  description: "Analyze images, describe visual content, answer questions about images, or extract information using Grok's vision capabilities.",
+  parameters: xaiAnalyzeImageParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as XaiAnalyzeImageParams;
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        image: p.image,
+      });
+    }
+    const question = p.question ?? "Describe this image in detail, including objects, text, style, and any notable details.";
+    const imageInput = (() => {
+      try {
+        return normalizeXaiImageInput(p.image) ?? p.image;
+      } catch {
+        return p.image;
+      }
+    })();
+    const input = [
+      {
+        role: "user",
+        content: [
+          { type: "input_image", image_url: imageInput, detail: "high" },
+          { type: "input_text", text: question },
+        ],
       },
-      execute: async (_toolCallId: string, params: { topic?: string; depth?: string }, _signal: any, _onUpdate: any, ctx: any) => {
-        const apiKey = await resolveXaiAuthToken(ctx);
-        if (!apiKey) {
-          return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", { topic: params?.topic });
-        }
-        const depth = params.depth || "high";
-        const prompt = `Conduct deep ${depth} research on: ${params.topic}.\n\nSteps:\n1. Gather key facts, recent developments, and authoritative sources.\n2. Analyze different perspectives and potential biases.\n3. Synthesize findings into clear conclusions.\n4. Provide actionable insights and open questions.\n\nUse step-by-step reasoning and cite sources where possible.`;
-        let data: any;
-        try {
-          data = await createXaiResponse(apiKey, {
-            model: DEFAULT_XAI_MODEL,
-            input: xaiTextInput(prompt),
-            reasoning: { effort: depth === "high" ? "high" : "medium" },
-            tools: [{ type: "web_search" }, { type: "x_search" }],
-          }, _signal);
-        } catch (error) {
-          const status = statusFromError(error);
-          return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, { error: true, status });
-        }
-        const text = extractResponsesText(data) || "Research completed.";
-        return { content: [{ type: "text", text }], details: { topic: params.topic, depth } };
-      },
-    } as any);
+    ];
+
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: DEFAULT_XAI_MODEL,
+        input,
+        reasoning: { effort: "medium" },
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+        image: p.image,
+      });
+    }
+
+    const text = extractResponsesText(data) || "Image analysis completed.";
+    return { content: [{ type: "text", text }], details: { image: p.image, question } };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Tool 9: xai_deep_research
+// ──────────────────────────────────────────────────────────────────────
+
+const xaiDeepResearchParams = Type.Object({
+  topic: Type.String({ description: "Research topic or question" }),
+  depth: Type.Optional(Type.Union([Type.Literal("low"), Type.Literal("medium"), Type.Literal("high")])),
+});
+type XaiDeepResearchParams = Static<typeof xaiDeepResearchParams>;
+
+const xaiDeepResearchTool = defineXaiTool({
+  name: "xai_deep_research",
+  label: "xAI Deep Research",
+  description:
+    "Conduct thorough multi-step research on a topic, synthesize information, cite sources, and provide comprehensive analysis with high reasoning effort.",
+  parameters: xaiDeepResearchParams,
+  execute: async ({ params, ctx }) => {
+    const p = params as XaiDeepResearchParams;
+    const apiKey = await resolveXaiAuthToken(ctx);
+    if (!apiKey) {
+      return xaiToolError("Error: No xAI OAuth credentials found. Please run the OAuth login first.", {
+        topic: p.topic,
+      });
+    }
+    const depth = p.depth ?? "high";
+    const prompt = `Conduct deep ${depth} research on: ${p.topic}.\n\nSteps:\n1. Gather key facts, recent developments, and authoritative sources.\n2. Analyze different perspectives and potential biases.\n3. Synthesize findings into clear conclusions.\n4. Provide actionable insights and open questions.\n\nUse step-by-step reasoning and cite sources where possible.`;
+
+    let data: XaiResponsesData;
+    try {
+      data = (await createXaiResponse(apiKey, {
+        model: DEFAULT_XAI_MODEL,
+        input: xaiTextInput(prompt),
+        reasoning: { effort: depth === "high" ? "high" : "medium" },
+        tools: [{ type: "web_search" }, { type: "x_search" }],
+      })) as XaiResponsesData;
+    } catch (error) {
+      const status = statusFromError(error);
+      return xaiToolError(`xAI API Error${status ? ` ${status}` : ""}: ${messageFromError(error)}`, {
+        error: true,
+        status,
+      });
+    }
+
+    const text = extractResponsesText(data) || "Research completed.";
+    return { content: [{ type: "text", text }], details: { topic: p.topic, depth } };
+  },
+});
+
+// ──────────────────────────────────────────────────────────────────────
+// Registry
+// ──────────────────────────────────────────────────────────────────────
+
+/** Map tool names to their pre-built tool definitions. */
+const xaiToolRegistry = {
+  xai_generate_text: xaiGenerateTextTool,
+  xai_multi_agent: xaiMultiAgentTool,
+  xai_web_search: xaiWebSearchTool,
+  xai_x_search: xaiXSearchTool,
+  xai_code_execution: xaiCodeExecutionTool,
+  xai_generate_image: xaiGenerateImageTool,
+  xai_critique: xaiCritiqueTool,
+  xai_analyze_image: xaiAnalyzeImageTool,
+  xai_deep_research: xaiDeepResearchTool,
+} as const;
+
+const xaiToolRegistrations = new WeakSet<object>();
+
+/** Register the OAuth-backed custom xAI tools whose names are in `enabled`. */
+export function registerCustomXaiTools(pi: ExtensionAPI, enabled: Set<string>): void {
+  if (xaiToolRegistrations.has(pi as object)) return;
+  xaiToolRegistrations.add(pi as object);
+
+  for (const [name, tool] of Object.entries(xaiToolRegistry)) {
+    if (enabled.has(name)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pi.registerTool(tool as any);
+    }
+  }
 }

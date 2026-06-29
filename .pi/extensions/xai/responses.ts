@@ -2,10 +2,11 @@ import type { Api, Context, Model, SimpleStreamOptions } from "@earendil-works/p
 import { randomUUID } from "crypto";
 import { isGrokCliProxyModel, xaiBaseUrlForModel, xaiModelForRequest, xaiModelRequestHeaders, xaiResponsesUrlForModel } from "./models";
 import { rewriteXaiResponsesPayload } from "./payload";
+import type { XaiError, XaiResponsesBody } from "./types";
 
 type AssistantStreamEvent = Record<string, any>;
 
-function resultFromStreamEvent(event: AssistantStreamEvent): any {
+function resultFromStreamEvent(event: AssistantStreamEvent): unknown {
   if (event.type === "done") return event.message;
   if (event.type === "error") return event.error;
   return undefined;
@@ -15,12 +16,12 @@ function createForwardingAssistantStream() {
   const queue: AssistantStreamEvent[] = [];
   const waiting: Array<(result: IteratorResult<AssistantStreamEvent>) => void> = [];
   let done = false;
-  let resolveResult: (result: any) => void = () => {};
-  const resultPromise = new Promise<any>((resolve) => {
+  let resolveResult: (result: unknown) => void = () => {};
+  const resultPromise = new Promise<unknown>((resolve) => {
     resolveResult = resolve;
   });
 
-  function finish(result: any) {
+  function finish(result: unknown) {
     if (done) return;
     done = true;
     resolveResult(result);
@@ -39,10 +40,10 @@ function createForwardingAssistantStream() {
         queue.push(event);
       }
     },
-    end(result?: any) {
+    end(result?: unknown) {
       finish(result);
       while (waiting.length > 0) {
-        waiting.shift()?.({ value: undefined as any, done: true });
+        waiting.shift()?.({ value: undefined as unknown, done: true });
       }
     },
     result() {
@@ -92,7 +93,7 @@ export async function postXaiJson(
   body: Record<string, any>,
   signal?: AbortSignal,
   headers: Record<string, string> = {},
-): Promise<any> {
+): Promise<unknown> {
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -106,8 +107,8 @@ export async function postXaiJson(
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "Unknown error");
-    const error = new Error(errorText);
-    (error as any).status = response.status;
+    const error: Error & { status?: number } = new Error(errorText);
+    error.status = response.status;
     throw error;
   }
 
@@ -115,7 +116,7 @@ export async function postXaiJson(
 }
 
 /** Create a single xAI Responses API response with model-aware routing. */
-export async function createXaiResponse(apiKey: string, body: Record<string, any>, signal?: AbortSignal): Promise<any> {
+export async function createXaiResponse(apiKey: string, body: Record<string, any>, signal?: AbortSignal): Promise<unknown> {
   const model = xaiModelForRequest(typeof body.model === "string" ? body.model : undefined);
   const payload = rewriteXaiResponsesPayload(body, model) as Record<string, any>;
   const usesGrokCliProxy = isGrokCliProxyModel(model.id);
@@ -153,7 +154,7 @@ export function streamSimpleXaiResponses(model: Model<Api>, context: Context, op
     ...model,
     baseUrl: xaiBaseUrlForModel(model.id),
     headers: {
-      ...(model as any).headers,
+      ...((model as Model<Api> & { headers?: Record<string, string> }).headers ?? {}),
       ...xaiModelRequestHeaders(model.id, grokCliSessionId),
     },
   };
