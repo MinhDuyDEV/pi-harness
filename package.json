@@ -22,8 +22,6 @@
 		"test:safety": "npx tsx .pi/extensions/safety/safety.test.ts",
 		"typecheck": "tsc --noEmit",
 		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3",
-		"sync:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs",
-		"check:behavioral-kernel": "node scripts/sync-behavioral-kernel.mjs --check",
 		"install:hooks": "node scripts/install-git-hooks.mjs",
 		"setup": "npm run install:hooks && echo 'Ready.'"
 	},

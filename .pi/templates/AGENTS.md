@@ -60,10 +60,6 @@ If a newer user instruction conflicts with an earlier one, follow the newer inst
 
 ## Operating Principles
 
-<!-- behavioral-kernel:start -->
-<!-- Canonical source: SYSTEM.md Behavioral Kernel section -->
-<!-- behavioral-kernel:end -->
-
 ### Default to Action
 
 - If intent is clear and constraints permit, act

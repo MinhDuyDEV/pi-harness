@@ -15,7 +15,6 @@ Two tracks for improving code without adding features:
 ```typescript
 skill({ name: "debugging-and-error-recovery" });
 skill({ name: "root-cause-tracing" });
-skill({ name: "behavioral-kernel" });
 skill({ name: "verification-before-completion" });
 skill({ name: "code-cleanup" });
 skill({ name: "deep-module-design" });
