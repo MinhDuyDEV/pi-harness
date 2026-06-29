@@ -803,8 +803,13 @@ export class FixedEditorCompositor {
     // here inserts a newline without firing the submit keybinding
     // (which expects "\r"). This catches terminals that haven't
     // completed the kitty keyboard protocol handshake at startup.
+    //
+    // Do NOT set `consume: true` — the TUI's input dispatcher returns
+    // early when consume is true, and the transformed "\n" would never
+    // reach the editor. Just return the new data; the TUI passes it
+    // through to the focused component (the editor).
     if (isShiftEnter(data)) {
-      return { consume: true, data: "\n" };
+      return { data: "\n" };
     }
 
     const packets = parseSgrMouse(data);
