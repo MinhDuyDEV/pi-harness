@@ -24,48 +24,47 @@ This pulls in the delegation stack (`@tintinweb/pi-subagents`, `@tintinweb/pi-ta
 
 Extensions auto-loaded from `.pi/extensions/`:
 
-| Extension | Purpose |
-|-----------|---------|
- | `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive) |
- | `deepseek-provider` | DeepSeek provider with thinking mode support (reasoning_content) |
-| `mimo-provider` | Xiaomi MiMo provider via OpenAI-compatible API |
-| `usage-tracker` | Token usage tracking via `/usage` command |
-| `safety` | Unified safety module with composable rule system (26 rules, block/confirm) |
-| `srcwalk` | Code intelligence via `srcwalk` binary |
-| `webclaw` | Web scraping via `webclaw` CLI binary |
-| `tps` | Tokens-per-second tracking during streaming |
-| `memory` | Persistent knowledge pipeline (observations, distillations, handoffs) |
-| `dcp` | Dynamic context pruning — compress conversation to stay under token limits |
-| `harness` | Multi-agent build harness (planner → generator ↔ evaluator) |
-| `tui` | Fixed-editor compositor with scrollable chat, sticky editor/footer, right sidebar, selection-to-clipboard, animated streaming prompt — overrides Pi's default TUI layout |
+| Extension             | Purpose                                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive)                                                                                                     |
+| `deepseek-provider`   | DeepSeek provider with thinking mode support (reasoning_content)                                                                                                         |
+| `mimo-provider`       | Xiaomi MiMo provider via OpenAI-compatible API                                                                                                                           |
+| `usage-tracker`       | Token usage tracking via `/usage` command                                                                                                                                |
+| `safety`              | Unified safety module with composable rule system (26 rules, block/confirm)                                                                                              |
+| `srcwalk`             | Code intelligence via `srcwalk` binary                                                                                                                                   |
+| `webclaw`             | Web scraping via `webclaw` CLI binary                                                                                                                                    |
+| `tps`                 | Tokens-per-second tracking during streaming                                                                                                                              |
+| `dcp`                 | Dynamic context pruning — compress conversation to stay under token limits                                                                                               |
+| `harness`             | Multi-agent build harness (planner → generator ↔ evaluator)                                                                                                              |
+| `tui`                 | Fixed-editor compositor with scrollable chat, sticky editor/footer, right sidebar, selection-to-clipboard, animated streaming prompt — overrides Pi's default TUI layout |
 
 ### Agents (7)
 
 Specialist agent definitions in `.pi/agents/`:
 
-| Agent | Role |
-|-------|------|
-| `worker` | Small implementation tasks (1-3 files) |
-| `explore` | Read-only codebase search and pattern discovery |
-| `scout` | External research and documentation lookup |
-| `reviewer` | Code review, debugging, security audit |
-| `planner` | Architecture and implementation planning |
-| `vision` | UI/UX and accessibility analysis |
-| `painter` | Image generation and editing |
+| Agent      | Role                                            |
+| ---------- | ----------------------------------------------- |
+| `worker`   | Small implementation tasks (1-3 files)          |
+| `explore`  | Read-only codebase search and pattern discovery |
+| `scout`    | External research and documentation lookup      |
+| `reviewer` | Code review, debugging, security audit          |
+| `planner`  | Architecture and implementation planning        |
+| `vision`   | UI/UX and accessibility analysis                |
+| `painter`  | Image generation and editing                    |
 
 ### Prompts (7)
 
 Slash-command workflows in `.pi/prompts/`. Each core command has flag-based sub-tracks — no separate prompt file needed.
 
-| Command | Flags | Coverage |
-|---------|-------|----------|
-| `/create` | `--design`, `--spec-only`, `--type` | Clarify ambiguity → design exploration → spec writing → workspace setup |
-| `/fix` | `--refactor`, `--scope minimal\|moderate\|aggressive` | Bug fix (default `--scope minimal`) or refactoring with scope levels |
-| `/init` | `--context`, `--user`, `--all`, `--deep` | Core setup, planning context (roadmap/state), or user profile |
-| `/plan` | `--split`, `--architecture` | Implementation plan with institutional research, goal-backward analysis, safety gate |
-| `/research` | `--quick`, `--thorough`, `--alternatives` | Evidence-gathering or alternatives/tradeoffs generation |
-| `/ship` | `--pr` | Execute tasks wave-by-wave, verify, commit, optionally create PR |
-| `/verify` | `--quick`, `--full`, `--fix`, `--test`, `--review`, `--review --bloat`, `--ui-review` | Gates, completeness tracking, test writing, code review, bloat delete-list, UI audit |
+| Command     | Flags                                                                                 | Coverage                                                                             |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `/create`   | `--design`, `--spec-only`, `--type`                                                   | Clarify ambiguity → design exploration → spec writing → workspace setup              |
+| `/fix`      | `--refactor`, `--scope minimal\|moderate\|aggressive`                                 | Bug fix (default `--scope minimal`) or refactoring with scope levels                 |
+| `/init`     | `--context`, `--user`, `--all`, `--deep`                                              | Core setup, planning context (roadmap/state), or user profile                        |
+| `/plan`     | `--split`, `--architecture`                                                           | Implementation plan with institutional research, goal-backward analysis, safety gate |
+| `/research` | `--quick`, `--thorough`, `--alternatives`                                             | Evidence-gathering or alternatives/tradeoffs generation                              |
+| `/ship`     | `--pr`                                                                                | Execute tasks wave-by-wave, verify, commit, optionally create PR                     |
+| `/verify`   | `--quick`, `--full`, `--fix`, `--test`, `--review`, `--review --bloat`, `--ui-review` | Gates, completeness tracking, test writing, code review, bloat delete-list, UI audit |
 
 **Merged into core:** clarify, explore, design, commit, pr, test, refactor, review-codebase, ui-review, improve-architecture — all now available as flags on the 7 core commands above.
 
@@ -73,11 +72,11 @@ Slash-command workflows in `.pi/prompts/`. Each core command has flag-based sub-
 
 Reusable procedures in `.pi/skills/` — loaded on demand:
 
-Covers: accessibility auditing, browser automation, Cloudflare, context management, Core Data, debugging, design systems, Figma, frontend design, git worktrees, Jira, memory systems, mockup-to-code, Obsidian, PDF extraction, Playwright, React best practices, Resend, Supabase, Swift/SwiftUI, TDD, Vercel deployment, and more.
+Covers: accessibility auditing, browser automation, Cloudflare, context management, Core Data, debugging, design systems, Figma, frontend design, git worktrees, mockup-to-code, Obsidian, PDF extraction, Playwright, React best practices, Resend, Supabase, Swift/SwiftUI, TDD, Vercel deployment, and more.
 
 ### Themes
 
-Dark and light TUI themes in `.pi/themes/`.
+two canonical palettes: `catppuccin.json` and `tokyo-night.json` are built from their respective canonical sources and not from the opencode translation.
 
 ## Three-Layer Delegation
 
@@ -103,7 +102,7 @@ cp .pi/templates/AGENTS.md ~/.pi/agent/AGENTS.md
 
 To customize, edit `~/.pi/agent/AGENTS.md` directly — it's your personal config, not overwritten on updates.
 
-If you update the kernel source in `.pi/templates/behavioral-kernel.md`, run `npm run sync:behavioral-kernel` to refresh Pikit's Pi-native instruction surfaces.
+If you update the kernel source in `.pi/templates/AGENTS.md`, edit that file directly — the Operating Principles section is the single source of truth.
 
 ## Configuration
 
@@ -124,7 +123,6 @@ From the repo root:
 ```bash
 npm test                      # all 15 extension test files
 npm run typecheck             # tsc --noEmit (.pi/extensions)
-npm run check:behavioral-kernel
 npm run validate:skills:ci
 ```
 
