@@ -1,76 +1,58 @@
-# Workflow Routing
+# Workflow
 
-**Before routing, check yourself:** If the request is ambiguous — surface alternatives. If the solution is over-engineered — push back. These are not optional courtesies; they are the highest-priority operation.
+## Routing
 
-## Routing Rules
+| Shape                                          | Action                       |
+| ---------------------------------------------- | ---------------------------- |
+| Fix / refactor / doc / research / plan / audit | Direct tools. No delegation. |
+| Bounded subtask with clear scope               | `task`                       |
+| Multi-agent product build                      | `harness`                    |
+| Ambiguous / destructive / touches secrets      | Ask first                    |
 
-1. **Direct tools** for: fix/refactor existing code, harness-self-modify, doc/config/prompt edits, research/plan/audit. No `harness`, no `task`.
-2. **Delegate** (`harness` for product builds, `task` for bounded subtasks) — see **Delegation** below for the `task` schema and agent types.
-3. **Ask first** when: the request is ambiguous, destructive, touches secrets/auth, or is a large refactor without clear scope.
+**Before routing:** If the request is ambiguous, surface alternatives. If the solution is over-engineered, push back.
+
+**Parallel:** Fire all independent `task` calls in one block.
+**Verification:** Parent reads the artifact, never trusts the sub-agent's summary.
 
 ## Delegation
 
-**`task` tool shape:** `{ agent_type, description, prompt, background?, conversation_id? }`
-- `agent_type` (required) — pick from the table below
-- `description` (3-5 words, required) — UI label
-- `prompt` (required) — see template
-- `background` (default `false`) — `true` only when you can do other work first
-- `conversation_id` — reuse for continuity with a prior specialist call
+**Do yourself:** ≤3 tool calls, 1-2 files, secrets, or edits needing current-conversation nuance.
 
-**Agent types (pi-task built-in; project can add at `.pi/agents/<name>.md`):**
-- `scout` — external research, web/docs, cited guidance
-- `explore` — read-only code exploration, file:line evidence
-- `planner` — implementation plan + risk + acceptance, no edits
-- `reviewer` — post-change audit (correctness/security/regression), file:line evidence
-- `vision` — UI/UX visual review from screenshots or code
-- `worker` — small scoped implementation, runs checks, reports files changed
+**Agent types** (full detail: `~/.pi/agent/agents/README.md` — read once, cache):
 
-**Pick by task shape:**
-- find / research / cite → `scout`
-- map / locate / where is → `explore`
-- plan / design / how to implement → `planner`
-- review / audit / check this change → `reviewer`
-- UI / visual / layout → `vision`
-- implement / make this small change → `worker`
+| Agent      | Use for                                                         |
+| ---------- | --------------------------------------------------------------- |
+| `scout`    | External research, web/docs, cited guidance                     |
+| `explore`  | Read-only code exploration, file:line evidence                  |
+| `planner`  | Implementation plan + risk + acceptance, no edits               |
+| `reviewer` | Post-change audit, file:line evidence                           |
+| `vision`   | UI/UX visual review from screenshots or code                    |
+| `worker`   | Small scoped implementation, runs checks, reports files changed |
 
-**Do yourself (don't delegate):** ≤3 tool calls, 1-2 files, secrets, edits needing current-conversation nuance, anything you'd just re-verify yourself.
+**Prompt template** (mandatory): goal, non-goals, write policy, read policy, expected output, stop condition, failure handling. Parent reads the artifact — never trusts the summary.
 
-**Ask first** — see Routing Rule 3.
-
-**Prompt template (mandatory fields):**
-- Goal, non-goals
-- Write policy (edit / no-edit / allowed paths)
-- Read policy (conventions, prior outputs to consume)
-- Expected output (artifact path or report shape)
-- Stop condition
-- Failure handling (return partial / retry / stop)
-- Verification: parent reads the file, never trusts the summary
-
-**Parallel:** fire all independent `task` calls in one block.
-
-**Verification (non-negotiable):** read the artifact, review the diff, run the check. Sub-agent self-report is untrusted.
-
-## Skills
-
-Before non-trivial work, read the `description:` line of every `SKILL.md` under `.pi/skills/`, then read the full text of any whose description matches the current task. Follow the skill's instructions over the rules in this file when they conflict.
-
-## Artifacts
-
-For any task with >= 2 tool calls or >= 2 files modified, read `skills/artifact-format/SKILL.md` and follow it. The first action is to append a `### YYYY-MM-DD - <title>` block with `status: active | updated: <date>` to `.pi/artifacts/TODO.md` (or PLAN/PROGRESS/DECISIONS.md if escalated). Canonical files: `.pi/artifacts/{TODO,PLAN,PROGRESS,DECISIONS}.md`.
-
-## On Failure
-
-1. Retry once with the same tool/approach.
-2. If that fails, switch to a fallback tool or approach.
-3. After 2 failures on the same step, stop. Present what was tried, what failed, and the options with tradeoffs.
-4. Save partial output before retrying a failed portion.
+**Subagent propagation:** Subagents have their own context and do not inherit APPEND_SYSTEM.md or AGENTS.md. The subagent sees its agent-specific rules file (e.g., `~/.pi/agent/agents/worker.md`) plus your task prompt. In the task prompt: tell the subagent to read `~/.pi/agent/AGENTS.md` if any of those rules apply, name which rules apply (a scout does not need the Edit Protocol; a worker does), state a specific stop condition and give a verification recipe (bad: "when done"; good: "when `pnpm test` returns 0 — subagent is responsible for self-verification before reporting back"), state the failure handling (return with what you tried, what failed, options for the parent), and specify exactly what the subagent should return in its final and only message to you (one message, defined up front). Pass only the context the subagent needs — a pointer to AGENTS.md counts; dumping your conversation does not. Don't spawn a subagent for: reading a specific file, searching for a class definition, scanning 2-3 files, or any task answerable with a single direct tool call. Subagents are for bounded subtasks that need their own context and tool sequence. The artifact is what the subagent wrote or changed; the summary is what the subagent says it did. Read the artifact.
 
 ## Context Retrieval
 
-- Order: `notes/{ISO-week}.md` → `memory-search` → `dcp_recall` (current session) → `task` (delegate to specialist). If all four return nothing, accept the gap and proceed.
-- For TS/JS edits, run `npx fallow health --changed-since main` first to check complexity and blast radius.
-- Always verify current code/config/git state from disk after retrieval, before acting.
+Order: `dcp_recall` (current session) → `task` (delegate). If all return nothing, accept the gap. Always verify current code/config/git state from disk after retrieval, before acting. Memory recall is handled by the `memory` skill (its description is in the system prompt).
+
+For TS/JS edits: run `npx fallow health --changed-since main` first to check complexity and blast radius.
 
 ## Web Retrieval
 
-Order: official docs (`context7`, `deepwiki`) → discovery (`websearch`, `codesearch`) → fetch (`web_fetch`) → scrape (`webclaw_scrape`, `webclaw_batch`) → browser tools (only when JS rendering is required).
+Order: official docs (`context7`, `deepwiki`) → discovery (`websearch`, `codesearch`) → fetch (`web_fetch`) → scrape (`webclaw_scrape`, `webclaw_batch`) → browser tools (only when JS rendering required).
+
+## TODO Tracking
+
+For tasks with >= 2 tool calls or >= 2 files modified, follow `skills/artifact-format/SKILL.md`. First action: append a `### YYYY-MM-DD - <title>` block to `.pi/artifacts/TODO.md`. Escalate to `.pi/artifacts/DECISIONS.md` (ADR) only when a real architectural tradeoff exists.
+
+## Anti-Patterns
+
+| If you see...                  | Apply...                               |
+| ------------------------------ | -------------------------------------- |
+| Silent assumption              | Kernel #1 (clarify when ambiguous)     |
+| Over-engineered solution       | Kernel #2 (smallest working change)    |
+| Noisy diff / drive-by refactor | Kernel #3 (surgical diffs)             |
+| Vague completion claim         | Kernel #4 (define proof before acting) |
+| Dead code after your edits     | Edit Protocol ORPHANS step             |
