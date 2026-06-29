@@ -9,6 +9,7 @@ import { MODELS } from "./xai/models";
 import { createXaiOAuth } from "./xai/oauth";
 import { streamSimpleXaiResponses } from "./xai/responses";
 import { registerXaiTools } from "./xai/tools";
+import { resolveXaiToolConfig } from "./xai/tools/defaults";
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider(XAI_PROVIDER_ID, {
@@ -21,5 +22,5 @@ export default function (pi: ExtensionAPI) {
     oauth: createXaiOAuth({ getExistingCredentials: getGrokAuthCredentials }) as any,
   });
 
-  registerXaiTools(pi);
+  registerXaiTools(pi, resolveXaiToolConfig());
 }

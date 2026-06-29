@@ -7,9 +7,9 @@ import { createXaiResponse, postXaiJson } from "../responses";
 import { extractResponsesText, messageFromError, statusFromError } from "../text";
 import { xaiTextInput, xaiToolError } from "./common";
 
-/** Register OAuth-backed custom xAI tools. */
-export function registerCustomXaiTools(pi: ExtensionAPI) {
-    pi.registerTool({
+/** Register the OAuth-backed custom xAI tools whose names are in `enabled`. */
+export function registerCustomXaiTools(pi: ExtensionAPI, enabled: Set<string>) {
+    if (enabled.has("xai_generate_text")) pi.registerTool({
       name: "xai_generate_text",
       label: "xAI Generate Text",
       description: "Generate text using Grok with full reasoning, structured output, and stateful conversations.",
@@ -86,7 +86,7 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
       },
     } as any);
 
-    pi.registerTool({
+    if (enabled.has("xai_multi_agent")) pi.registerTool({
       name: "xai_multi_agent",
       label: "xAI Multi-Agent Research",
       description: "Run deep multi-agent research using Grok.",
@@ -139,7 +139,7 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
     } as any);
 
     // Agentic tools that leverage xAI's native server-side tools.
-    pi.registerTool({
+    if (enabled.has("xai_web_search")) pi.registerTool({
       name: "xai_web_search",
       label: "xAI Web Search",
       description: "Search the web using Grok's native web knowledge and search capabilities.",
@@ -171,7 +171,7 @@ export function registerCustomXaiTools(pi: ExtensionAPI) {
       },
     } as any);
 
-    pi.registerTool({
+    if (enabled.has("xai_x_search")) pi.registerTool({
       name: "xai_x_search",
       label: "xAI X Search",
       description: "Search X (Twitter) using Grok's native real-time X search and knowledge. Supports advanced filters like count, since, until.",
@@ -225,7 +225,7 @@ Be specific and cite examples where helpful.`;
       },
     } as any);
 
-    pi.registerTool({
+    if (enabled.has("xai_code_execution")) pi.registerTool({
       name: "xai_code_execution",
       label: "xAI Code Execution",
       description: "Execute or analyze Python code using xAI's native code interpreter tool.",
@@ -258,7 +258,7 @@ Be specific and cite examples where helpful.`;
     } as any);
 
     // ====================== ADDITIONAL TOOLS ======================
-    pi.registerTool({
+    if (enabled.has("xai_generate_image")) pi.registerTool({
       name: "xai_generate_image",
       label: "xAI Image Generation",
       description: "Generate images using xAI's current image generation model.",
@@ -299,7 +299,7 @@ Be specific and cite examples where helpful.`;
     } as any);
 
     // ====================== NEW TOOLS (OAuth-only) ======================
-    pi.registerTool({
+    if (enabled.has("xai_critique")) pi.registerTool({
       name: "xai_critique",
       label: "xAI Critique",
       description: "Provide detailed, reasoned critique of code, designs, writing, ideas, or arguments with structured feedback.",
@@ -332,7 +332,7 @@ Be specific and cite examples where helpful.`;
       },
     } as any);
 
-    pi.registerTool({
+    if (enabled.has("xai_analyze_image")) pi.registerTool({
       name: "xai_analyze_image",
       label: "xAI Image Analysis",
       description: "Analyze images, describe visual content, answer questions about images, or extract information using Grok's vision capabilities.",
@@ -364,7 +364,7 @@ Be specific and cite examples where helpful.`;
       },
     } as any);
 
-    pi.registerTool({
+    if (enabled.has("xai_deep_research")) pi.registerTool({
       name: "xai_deep_research",
       label: "xAI Deep Research",
       description: "Conduct thorough multi-step research on a topic, synthesize information, cite sources, and provide comprehensive analysis with high reasoning effort.",
