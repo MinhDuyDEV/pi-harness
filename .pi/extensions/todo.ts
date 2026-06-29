@@ -20,9 +20,20 @@ const state: SessionState = {
 	reminderShown: false,
 }
 
+function findCanonicalTodo(cwd: string): string | null {
+	let dir = path.resolve(cwd)
+	while (true) {
+		const candidate = path.join(dir, ".pi", "artifacts", "TODO.md")
+		if (fs.existsSync(candidate)) return candidate
+		const parent = path.dirname(dir)
+		if (parent === dir) return null
+		dir = parent
+	}
+}
+
 function checkTodoFile(cwd: string): { exists: boolean; fresh: boolean; ageMinutes: number } {
-	const todoPath = path.join(cwd, ".pi", "artifacts", "TODO.md")
-	if (!fs.existsSync(todoPath)) {
+	const todoPath = findCanonicalTodo(cwd)
+	if (!todoPath) {
 		return { exists: false, fresh: false, ageMinutes: -1 }
 	}
 	const stats = fs.statSync(todoPath)

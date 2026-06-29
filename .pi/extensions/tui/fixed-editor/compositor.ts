@@ -67,6 +67,31 @@ const CONTEXT_MENU_CLIPBOARD_RESTORE_INTERVAL_MS = 100;
 const SCROLLBAR_TRACK = "\x1b[48;5;238m \x1b[0m";
 const SCROLLBAR_THUMB = "\x1b[48;5;244m \x1b[0m";
 
+// Shift+Enter sequences across terminals. The pi-tui editor's default
+// new-line check (kb.matches on tui.input.newLine) only fires when the
+// runtime keybinding system parses the data as "shift+enter", which
+// depends on the terminal sending a recognized CSI sequence. To make
+// shift+enter work reliably on any terminal — not just ones that have
+// completed the kitty keyboard protocol handshake — we intercept the
+// common raw sequences here and transform them to a plain LF. The
+// underlying editor's `(data === "\n" && data.length === 1)` condition
+// then inserts a newline.
+const SHIFT_ENTER_PATTERNS: readonly RegExp[] = [
+  /^\x1b\[13;2u$/,    // Kitty CSI u: ESC [ Ps;Pu (shift+enter)
+  /^\x1b\[13;2~$/,    // xterm modifyOtherKeys (without u protocol)
+  /^\x1b\[27;2;13~$/, // xterm modifyOtherKeys CSI 27;modifier;key~
+  /^\x1b\r$/,          // Legacy xterm / mintty: ESC + CR
+  /^\x1b\[Z$/,         // rxvt / urxvt: ESC [ Z
+  /^\x1bO2u$/,         // WezTerm SS3 with kitty modifier
+];
+
+function isShiftEnter(data: string): boolean {
+  for (const pattern of SHIFT_ENTER_PATTERNS) {
+    if (pattern.test(data)) return true;
+  }
+  return false;
+}
+
 // ── Renderable patch ────────────────────────────────────────────────────────
 
 interface PatchedRenderable {
@@ -772,6 +797,15 @@ export class FixedEditorCompositor {
   /** Handle scroll input — only intercepts scroll keys, passes everything else through. */
   private handleInput(data: string): { consume?: boolean; data?: string } | undefined {
     if (this.disposed || this.hasVisibleOverlay()) return undefined;
+
+    // Transform Shift+Enter to a plain newline. The underlying editor's
+    // new-line check matches "\n" (one char), so passing "\n" through
+    // here inserts a newline without firing the submit keybinding
+    // (which expects "\r"). This catches terminals that haven't
+    // completed the kitty keyboard protocol handshake at startup.
+    if (isShiftEnter(data)) {
+      return { consume: true, data: "\n" };
+    }
 
     const packets = parseSgrMouse(data);
     if (packets) {
