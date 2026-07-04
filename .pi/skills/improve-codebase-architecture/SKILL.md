@@ -6,77 +6,85 @@ version: 1.0.0
 
 # Improve Codebase Architecture
 
-Surface architectural friction and propose **deepening opportunities** — refactors that turn shallow modules into deep ones. The aim is testability and AI-navigability.
+## Iron Laws
 
-## Glossary
+<EXTREMELY-IMPORTANT>
+- **Architecture change = behavior-preserving.** Tests stay green.
+- **One axis at a time.** Not naming + layering + packaging in one PR.
+- **Each step independently shippable.** Strangler fig, not big-bang.
+- **Measure before and after.** Cyclomatic complexity, coupling, build time.
+- **Make easy changes easy, hard changes possible.** Not "perfect". Just better.
+</EXTREMELY-IMPORTANT>
 
-Use these terms exactly in every suggestion. Consistent language is the point — don't drift into "component," "service," "API," or "boundary." Full definitions in [LANGUAGE.md](LANGUAGE.md).
+## When to Use
 
-- **Module** — anything with an interface and an implementation (function, class, package, slice).
-- **Interface** — everything a caller must know to use the module: types, invariants, error modes, ordering, config. Not just the type signature.
-- **Implementation** — the code inside.
-- **Depth** — leverage at the interface: a lot of behaviour behind a small interface. **Deep** = high leverage. **Shallow** = interface nearly as complex as the implementation.
-- **Seam** — where an interface lives; a place behaviour can be altered without editing in place. (Use this, not "boundary.")
-- **Adapter** — a concrete thing satisfying an interface at a seam.
-- **Leverage** — what callers get from depth.
-- **Locality** — what maintainers get from depth: change, bugs, knowledge concentrated in one place.
+"Improve the architecture"; module too coupled; tests hard to write; "this class is too big"; AI tools struggle; build/test time high; on-boarding painful.
 
-Key principles (see [LANGUAGE.md](LANGUAGE.md) for the full list):
+## When NOT to Use
 
-- **Deletion test**: imagine deleting the module. If complexity vanishes, it was a pass-through. If complexity reappears across N callers, it was earning its keep.
-- **The interface is the test surface.**
-- **One adapter = hypothetical seam. Two adapters = real seam.**
+Architecture is fine; "redesign" without a problem; rewrites (different risk); user wants features.
 
-This skill is _informed_ by the project's domain model. The domain language gives names to good seams; ADRs record decisions the skill should not re-litigate.
+## The Refactoring Ladder
 
-## Process
+```
+1. Rename    (~hours, high signal)
+2. Extract   (~hours)
+3. Move      (~hours)
+4. Restructure (interface, layering — ~days)
+5. Repackage (~weeks)
+6. Rewrite   (~months)
+```
 
-### 1. Explore
+Start at the bottom. Don't jump to 5.
 
-Read the project's domain glossary and any ADRs in the area you're touching first.
+## Approach
 
-Then use the Agent tool with `subagent_type=Explore` to walk the codebase. Don't follow rigid heuristics — explore organically and note where you experience friction:
+1. **Identify the smell.** Don't refactor what isn't broken.
+2. **Measure baseline.** Coupling, complexity, build time. Record.
+3. **Pick the smallest change.** One rename, extract, or move.
+4. **Verify behavior preserved.** Tests pass.
+5. **Measure again.** Did the metric improve?
+6. **Commit.** One commit per change.
+7. **Repeat.** Or stop.
 
-- Where does understanding one concept require bouncing between many small modules?
-- Where are modules **shallow** — interface nearly as complex as the implementation?
-- Where have pure functions been extracted just for testability, but the real bugs hide in how they're called (no **locality**)?
-- Where do tightly-coupled modules leak across their seams?
-- Which parts of the codebase are untested, or hard to test through their current interface?
+## Common Smells
 
-Apply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A "yes, concentrates" is the signal you want.
+| Smell | Indicator | First move |
+|---|---|---|
+| Long method | > 30 lines, multiple responsibilities | Extract method |
+| God class | 1000+ lines, 20+ methods | Extract class |
+| Tight coupling | Changing A forces changes in B | Dependency injection |
+| Feature envy | Method uses B's data more | Move method to B |
+| Primitive obsession | Strings/numbers for domain | Value objects / branded |
+| Long parameter list | > 3 params, especially bools | Parameter object / options |
+| Shotgun surgery | One change touches 5+ files | Consolidate |
+| Divergent change | One class changes for many reasons | Split by axis |
 
-### 2. Present candidates as an HTML report
+## Module Boundaries
 
-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. Open it for the user — `xdg-open <path>` on Linux, `open <path>` on macOS, `start <path>` on Windows — and tell them the absolute path.
+**Good**: single purpose, small interface, changes localized, testable.
+**Bad**: two things, wide interface, one change touches many files, tests mock the world.
 
-The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals — use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
+## When to Stop
 
-For each candidate, the same template as before, but rendered as a card:
+Stop if tests are easy to write, build time decreased, new features easy, onboarding faster, AI tools navigate. Continue otherwise.
 
-- **Files** — which files/modules are involved
-- **Problem** — why the current architecture is causing friction
-- **Solution** — plain English description of what would change
-- **Benefits** — explained in terms of locality and leverage, and how tests would improve
-- **Before / After diagram** — side-by-side, custom-drawn, illustrating the shallowness and the deepening
-- **Recommendation strength** — one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge
+## Strangler Fig Pattern
 
-End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+For larger refactors:
+1. **Build new alongside old.** Both work.
+2. **Route traffic incrementally.** 10% → 50% → 100%.
+3. **Remove old path.** Once 100% on new.
+4. **One piece at a time.** Module by module.
 
-**Use CONTEXT.md vocabulary for the domain, and [LANGUAGE.md](LANGUAGE.md) vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
+## Common Mistakes
 
-**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
+Refactor without tests; big-bang rewrite; "perfect is the enemy" → over-polish; rename without target; refactor + feature in one PR; no measurement.
 
-See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
+## Red Flags
 
-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
+Refactor without tests; no baseline; "I think this is better" (no metric); "rewrite it"; multiple axes; refactor + feature; tests skipped; "moved it, better" (no proof).
 
-### 3. Grilling loop
+## Anti-Patterns
 
-Once the user picks a candidate, drop into a grilling conversation. Walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
-
-Side effects happen inline as decisions crystallize:
-
-- **Naming a deepened module after a concept not in `CONTEXT.md`?** Add the term to `CONTEXT.md` — same discipline as `/grill-with-docs` (see [CONTEXT-FORMAT.md](CONTEXT-FORMAT.md)). Create the file lazily if it doesn't exist.
-- **Sharpening a fuzzy term during the conversation?** Update `CONTEXT.md` right there.
-- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones. See [ADR-FORMAT.md](ADR-FORMAT.md).
-- **Want to explore alternative interfaces for the deepened module?** See [INTERFACE-DESIGN.md](INTERFACE-DESIGN.md).
+**Refactor without tests**; **no baseline**; **"rewrite"**; **multiple axes**; **refactor + feature**; **"I think"**; **"moved it"**; **one PR, many changes**.

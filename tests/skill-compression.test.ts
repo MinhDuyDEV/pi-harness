@@ -229,6 +229,67 @@ const TARGETS: SkillSpec[] = [
     maxWords: 500,
     markers: ["source", "verify", "version", "test", "hypothesis"],
   },
+  // --- Batch 4: next 12 most-loaded (2026-07-04) ---
+  {
+    name: "ast-grep",
+    maxWords: 500,
+    markers: ["pattern", "ast-grep", "structural", "rule", "rewrite"],
+  },
+  {
+    name: "deep-module-design",
+    maxWords: 500,
+    markers: ["interface", "deep", "shallow", "module", "test seam"],
+  },
+  {
+    name: "swift-concurrency",
+    maxWords: 500,
+    markers: ["actor", "Sendable", "Task", "isolation", "MainActor"],
+  },
+  {
+    name: "frontend-design",
+    maxWords: 500,
+    markers: ["shadcn", "server component", "use client", "Tailwind", "shadcn/ui"],
+  },
+  {
+    name: "pdf-extract",
+    maxWords: 500,
+    markers: ["pdfplumber", "scanned", "table", "OCR", "vision model"],
+  },
+  {
+    name: "minimalist-ui",
+    maxWords: 500,
+    markers: ["whitespace", "monochrome", "bento", "rounded", "minimal"],
+  },
+  {
+    name: "industrial-brutalist-ui",
+    maxWords: 500,
+    markers: ["mono", "border-radius", "hairline", "system chrome", "brutalist"],
+  },
+  {
+    name: "cloudflare",
+    maxWords: 500,
+    markers: ["wrangler", "V8 isolate", "binding", "D1", "compatibility_date"],
+  },
+  {
+    name: "improve-codebase-architecture",
+    maxWords: 500,
+    markers: ["refactor", "baseline", "smell", "strangler", "measure"],
+  },
+  {
+    name: "using-git-worktrees",
+    maxWords: 500,
+    markers: ["worktree", "branch", "sibling", "prune", "isolation"],
+  },
+  {
+    name: "agent-code-quality-gate",
+    maxWords: 500,
+    markers: ["gate", "scope", "duplication", "verification", "blocker"],
+  },
+  {
+    name: "spec-driven-development",
+    maxWords: 500,
+    markers: ["spec", "goal", "non-goals", "criteria", "interview"],
+  },
 ];
 
 /** Count words in the body of a SKILL.md, excluding the YAML frontmatter (between the first two `---` markers). */

@@ -6,93 +6,78 @@ version: 1.0.0
 
 # Agent Code Quality Gate
 
-## Overview
+## Iron Laws
 
-Code quality for an agent is not "clean-looking code." It is a small, reviewable, verified change that improves or preserves system health while solving the requested problem.
-
-Core rule: **do not claim completion until the diff is scoped, integrated, tested for behavior, and freshly verified.**
+<EXTREMELY-IMPORTANT>
+- **Code-changed-this-session → review required.** Not optional.
+- **Scope = diff scope.** Unrelated cleanup in the diff = wrong diff.
+- **Behavior tests = required.** No "trust me, it works."
+- **Duplication check = required.** AI agents duplicate by reflex.
+- **Verification evidence = required.** Agent ran the check, pastes output, human reviews.
+</EXTREMELY-IMPORTANT>
 
 ## When to Use
 
-Use before saying work is complete, fixed, passing, ready, or high quality after:
+Before declaring "done" after bugfix, feature edit, refactor, or subagent work. The agent's work passes through this gate before the user reviews.
 
-- implementing a feature or bugfix;
-- editing production code or tests;
-- receiving subagent/worker changes;
-- refactoring, optimizing, or migrating code;
-- touching security, auth, data, concurrency, payments, accessibility, performance, or public APIs.
+## The Gate (5 Checks)
 
-Do not use as a substitute for specialist review. For final merge/security/API review, also load the relevant review/security/API skill.
+1. **Scope.** Does the diff match the stated problem? Anything outside → split or revert.
+2. **Duplication.** Copy-paste instead of reusing? New file with high overlap? Flag for refactor.
+3. **Behavior tests.** For new behavior: a test. For bug fixes: a regression test. For refactors: existing tests still pass.
+4. **Verification evidence.** Named check ran, exit 0, output captured. Not "should work".
+5. **Regressions.** No new failures, no removed tests, no skipped tests.
 
-## Quality Gate
+## Workflow
 
-Answer every item. If any answer is "no" or "unknown," either fix it, verify it, or report the remaining risk explicitly.
+1. **Get the diff.** `git diff` (or staged, or branch vs main).
+2. **Scope check.** Is every line traceable to the stated problem?
+3. **Duplication check.** Scan for repeated blocks. Flag or fix.
+4. **Test check.** New code has tests. Bug fix has regression test. Refactor: green tests.
+5. **Verification check.** Named command run, output captured.
+6. **Regression check.** No new failures, no skipped tests.
+7. **Pass / fail.** If any check fails, work is not done.
 
-| Gate | Pass condition | Reject if |
-| --- | --- | --- |
-| Goal | The change satisfies the user's actual request and acceptance criteria. | It solves a nearby or imagined problem. |
-| Scope | Every changed line traces to the current request. | Drive-by cleanup, broad formatting, or speculative refactor is mixed in. |
-| Design fit | The change belongs in the touched layer and follows existing architecture. | It adds a parallel pattern, hidden business logic, or misplaced abstraction. |
-| Simplicity | The solution is the smallest clear working change. | It adds flexibility for hypothetical future needs. |
-| Duplication | Existing helpers/components/patterns were searched and reused. | A second home for the same concept was created. |
-| Behavior | Relevant happy path, edge cases, and failure path were considered. | Only the obvious path works. |
-| Tests | Tests are meaningful for behavior and would fail if the behavior broke. | Tests only assert mocks, snapshots, implementation details, or coverage numbers. |
-| Verification | Fresh relevant lint/typecheck/test/build/manual check evidence exists. | Success is inferred from code appearance or a subagent report. |
-| Regressions | Security, reliability, performance, accessibility, compatibility, and developer workflow are not worsened. | Any regression is unexamined or hand-waved. |
-| Reviewability | Diff is coherent and easy to review. | Reviewer must reverse-engineer why unrelated changes exist. |
+## Common Findings
 
-## Agent-Specific Failure Modes
+| Finding | Action |
+|---|---|
+| "While I'm here" cleanup | Split or revert |
+| Copy-pasted helper | Extract to common module |
+| New test that doesn't test | Rewrite or delete |
+| Skipped test (`.skip`) | Un-skip or fix |
+| Removed test | Add back, or justify |
+| No regression test | Add one |
+| Output truncated | Show full output |
 
-Brutally check for these before completion:
+## Severity Tells
 
-- **Hallucinated API:** Did you verify signatures/options against local types, source, or official docs?
-- **Fake confidence:** Are you saying "should work" instead of citing command output or runtime evidence?
-- **Subagent trust:** Did you read changed files and verify independently instead of trusting a summary?
-- **Mock theater:** Do tests prove production behavior, or just that mocks were called?
-- **Coverage worship:** Coverage can reveal untested code; it does not prove test quality.
-- **Speculative abstraction:** Did you add generic hooks/options/classes before the actual need exists?
-- **Duplicate utility:** Did you search before creating a helper/component/schema wrapper?
-- **Generated-file edit:** Did you modify generated output instead of the canonical schema/generator/input?
-- **Silent behavior change:** Did any external behavior, API shape, data format, or command contract change without explicit approval?
-- **Unreviewable diff:** Did formatting churn or cleanup obscure the real behavior change?
+| Tell | Action |
+|---|---|
+| `[blocker]` | Must fix. Violated invariant. |
+| `[should-fix]` | Worth fixing now. Real cost. |
+| `[nit]` | Cosmetic. Note, don't block. |
+| `[question]` | Need clarification. |
 
-## Minimal Completion Procedure
+## When to Override
 
-1. Re-read the user request and acceptance criteria.
-2. Inspect the diff, not just the files.
-3. Remove unrelated or speculative changes.
-4. Search for existing concepts before keeping new helpers/components.
-5. Check behavioral edges: invalid input, empty state, permission failure, error path, concurrency/race risk where relevant.
-6. Run the smallest relevant verification first; expand only if risk requires it.
-7. If tests were added or changed, run those tests directly and confirm they fail for the right reason when practical.
-8. Record exact evidence in the final response: command/check + result + remaining risk.
+| Override | When |
+|---|---|
+| "Scope creep is acceptable" | User explicitly approved the extra work |
+| "Duplication is acceptable" | One-time use, extraction premature |
+| "Skipped test is acceptable" | Flaky, in test-quarantine |
+| "Removed test is acceptable" | Replaced by a better test |
 
-## Source-Backed Principles
+Document the override in the commit. Don't hide it.
 
-- Google Engineering Practices: approve changes that improve overall code health; reject changes that worsen it even if they appear functional. Review design, functionality, complexity, tests, names, comments, style, consistency, docs, and every relevant line.
-- Martin Fowler on test coverage: coverage is useful for finding untested code, but high coverage is not proof of good tests.
-- OWASP Secure Coding Practices: quality includes input validation, output encoding, auth/session/access control, cryptography, error handling/logging, data protection, database/file/memory safety, and general secure coding.
+## Common Mistakes
 
-## Final Response Evidence Pattern
+Skipping the gate; "I checked, it's fine" (no evidence); scope creep unmarked; tests that don't test; "I'll add tests later"; blockers downgraded to nits.
 
-Use this shape when reporting completion:
+## Red Flags
 
-```text
-Changed <what> in <file:line> to satisfy <requirement>.
-Verification: <command/check> passed/failed with <specific result>.
-Risk: <none known | untested area and why>.
-```
+"Should work" (run); "I tested it" (show run); truncated output; "tests later"; .skip on new; removed unmarked; "while I'm here" unmarked; scope creep unmarked.
 
-Never say "done," "fixed," "passes," or "high quality" without fresh evidence.
+## Anti-Patterns
 
-## Skill Result Contract
-
-```xml
-<skill_result>
-  <skill>agent-code-quality-gate</skill>
-  <status>success|partial|blocked|failure</status>
-  <evidence>Diff reviewed, scope checked, tests/verification run, sources checked if APIs used</evidence>
-  <artifacts>Files reviewed or commands run</artifacts>
-  <risks>Remaining unverified paths or none</risks>
-</skill_result>
-```
+**"I checked"** (no evidence); **"should work"**; **truncated output**; **"tests later"**; **.skip on new**; **removed unmarked**; **"while I'm here" unmarked**; **blockers unmarked**.

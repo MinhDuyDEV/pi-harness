@@ -8,259 +8,82 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Using Git Worktrees
+# Git Worktrees
 
 ## When to Use
 
-- When starting feature work that needs an isolated workspace or before executing an implementation plan.
+Starting a feature that needs isolation from current workspace; multi-agent work in same repo; long-running branch that doesn't conflict with main; need to test a PR without disrupting the working copy; switching between contexts without `git stash`; running CI / tests in parallel.
 
 ## When NOT to Use
 
-- When a simple change can safely be done in the current working tree or the repo does not allow worktrees.
+Trivial change on main; one-line fix; the branch is already on a worktree; you need to commit and move on quickly.
 
-## Overview
+## What a Worktree Is
 
-Git worktrees create isolated workspaces sharing the same repository, allowing work on multiple branches simultaneously without switching.
+A worktree is a separate working directory for the same git repo. Each has its own branch, but they share the `.git` directory. Cheap to create, instant to switch between.
 
-**Core principle:** Systematic directory selection + safety verification = reliable isolation.
+```
+~/code/myapp          ← main worktree, on `main`
+~/code/myapp-feature  ← worktree, on `feature/auth`
+```
 
-**Announce at start:** "I'm using the using-git-worktrees skill to set up an isolated workspace."
+Both share history. Both can be on different branches. Both are full working copies.
 
-## Directory Selection Process
-
-Follow this priority order:
-
-### 1. Check Existing Directories
+## Create a Worktree
 
 ```bash
-# Check in priority order
-ls -d .worktrees 2>/dev/null     # Preferred (hidden)
-ls -d worktrees 2>/dev/null      # Alternative
+# New branch + new worktree
+git worktree add -b feature/auth ~/code/myapp-feature main
+
+# Existing branch
+git worktree add ~/code/myapp-feature feature/auth
+
+# PR (just the work, not the branch)
+git worktree add --detach ~/code/myapp-pr origin/pr/123
 ```
 
-**If found:** Use that directory. If both exist, `.worktrees` wins.
+`add -b` creates a new branch. Without, the existing branch is checked out.
 
-### 2. Check AGENTS.md
+## Common Patterns
+
+| Pattern | Command |
+|---|---|
+| Feature work, isolated | `git worktree add -b feature/X ../X main` |
+| Switch back to main | `cd ../myapp && git checkout main` |
+| Compare two branches | Two worktrees, diff between them |
+| Review a PR | `git worktree add --detach ../pr-123 origin/pr/123` |
+| Cleanup old | `git worktree remove ../X && git worktree prune` |
+
+## Smart Directory Selection
+
+```
+~/code/myapp          ← existing
+~/code/myapp-feature  ← new, sibling
+```
+
+Use a sibling directory, not nested. Avoids confusion with `pwd`.
 
 ```bash
-grep -i "worktree.*director" AGENTS.md 2>/dev/null
+# Inside myapp/, create sibling myapp-<branch>
+git worktree add -b $BRANCH ../myapp-$BRANCH main
 ```
 
-**If preference specified:** Use it without asking.
+## Safety Checks
 
-### 3. Ask User
-
-If no directory exists and no AGENTS.md preference:
-
-```
-No worktree directory found. Where should I create worktrees?
-
-1. .worktrees/ (project-local, hidden)
-2. ~/.pi/worktrees/<project-name>/ (global location)
-
-Which would you prefer?
-```
-
-## Safety Verification
-
-### For Project-Local Directories (.worktrees or worktrees)
-
-**MUST verify .gitignore before creating worktree:**
-
-```bash
-# Check if directory pattern in .gitignore
-grep -q "^\.worktrees/$" .gitignore || grep -q "^worktrees/$" .gitignore
-```
-
-**If NOT in .gitignore:**
-
-Per Jesse's rule "Fix broken things immediately":
-
-1. Add appropriate line to .gitignore
-2. Commit the change
-3. Proceed with worktree creation
-
-**Why critical:** Prevents accidentally committing worktree contents to repository.
-
-### For Global Directory (~/.pi/worktrees)
-
-No .gitignore verification needed - outside project entirely.
-
-## Creation Steps
-
-### 1. Detect Project Name
-
-```bash
-project=$(basename "$(git rev-parse --show-toplevel)")
-```
-
-### 2. Create Worktree
-
-```bash
-# Determine full path
-case $LOCATION in
-  .worktrees|worktrees)
-    path="$LOCATION/$BRANCH_NAME"
-    ;;
-  ~/.pi/worktrees/*)
-    path="~/.pi/worktrees/$project/$BRANCH_NAME"
-    ;;
-esac
-
-# Create worktree with new branch
-git worktree add "$path" -b "$BRANCH_NAME"
-cd "$path"
-```
-
-## Worktree Tracking
-
-After creating a worktree, persist its absolute path for session resume:
-
-```bash
-# After creating worktree
-mkdir -p .beads/artifacts/$BEAD_ID
-echo "/absolute/path/to/worktree" > .beads/artifacts/$BEAD_ID/worktree.txt
-```
-
-On session resume, restore the active worktree if tracking exists:
-
-```bash
-# Check if worktree exists for active bead
-if [ -f .beads/artifacts/$BEAD_ID/worktree.txt ]; then
-  WORKTREE_PATH=$(cat .beads/artifacts/$BEAD_ID/worktree.txt)
-  cd "$WORKTREE_PATH"
-fi
-```
-
-On worktree cleanup (after merge), remove the tracking file:
-
-```bash
-rm -f .beads/artifacts/$BEAD_ID/worktree.txt
-```
-
-### 3. Run Project Setup
-
-Auto-detect and run appropriate setup:
-
-```bash
-# Node.js
-if [ -f package.json ]; then npm install; fi
-
-# Rust
-if [ -f Cargo.toml ]; then cargo build; fi
-
-# Python
-if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-if [ -f pyproject.toml ]; then poetry install; fi
-
-# Go
-if [ -f go.mod ]; then go mod download; fi
-```
-
-### 4. Verify Clean Baseline
-
-Run tests to ensure worktree starts clean:
-
-```bash
-# Examples - use project-appropriate command
-npm test
-cargo test
-pytest
-go test ./...
-```
-
-**If tests fail:** Report failures, ask whether to proceed or investigate.
-
-**If tests pass:** Report ready.
-
-### 5. Report Location
-
-```
-Worktree ready at <full-path>
-Tests passing (<N> tests, 0 failures)
-Ready to implement <feature-name>
-```
-
-## Quick Reference
-
-| Situation                   | Action                      |
-| --------------------------- | --------------------------- |
-| `.worktrees/` exists        | Use it (verify .gitignore)  |
-| `worktrees/` exists         | Use it (verify .gitignore)  |
-| Both exist                  | Use `.worktrees/`           |
-| Neither exists              | Check AGENTS.md → Ask user  |
-| Directory not in .gitignore | Add it immediately + commit |
-| Tests fail during baseline  | Report failures + ask       |
-| No package.json/Cargo.toml  | Skip dependency install     |
+Before creating a worktree:
+- **Is the branch already on a worktree?** `git worktree list` shows all.
+- **Is the working copy dirty?** `git status` — commit or stash first.
+- **Is the target directory empty?** Don't overwrite.
+- **Is the path absolute?** `git worktree add` requires absolute paths in some configs.
 
 ## Common Mistakes
 
-**Skipping .gitignore verification**
-
-- **Problem:** Worktree contents get tracked, pollute git status
-- **Fix:** Always grep .gitignore before creating project-local worktree
-
-**Assuming directory location**
-
-- **Problem:** Creates inconsistency, violates project conventions
-- **Fix:** Follow priority: existing > AGENTS.md > ask
-
-**Proceeding with failing tests**
-
-- **Problem:** Can't distinguish new bugs from pre-existing issues
-- **Fix:** Report failures, get explicit permission to proceed
-
-**Hardcoding setup commands**
-
-- **Problem:** Breaks on projects using different tools
-- **Fix:** Auto-detect from project files (package.json, etc.)
-
-## Example Workflow
-
-```
-You: I'm using the using-git-worktrees skill to set up an isolated workspace.
-
-[Check .worktrees/ - exists]
-[Verify .gitignore - contains .worktrees/]
-[Create worktree: git worktree add .worktrees/auth -b feature/auth]
-[Run npm install]
-[Run npm test - 47 passing]
-
-Worktree ready at /Users/jesse/myproject/.worktrees/auth
-Tests passing (47 tests, 0 failures)
-Ready to implement auth feature
-```
+Creating a worktree inside the repo (nested paths confuse `pwd`); trying to check out the same branch in two worktrees (refused); leaving dead worktrees around (prune them); pushing to the wrong branch (you have two now); not committing before switching (lost work, not in stash); "I created a worktree for a 5-line fix" (overhead); forgetting which directory you're in (the worktree problem).
 
 ## Red Flags
 
-**Never:**
+Worktree inside the repo; same branch in two worktrees; dead worktrees not pruned; "I lost my changes" (didn't commit before switching); "which directory am I in?"; pushing to wrong branch; "I have 5 worktrees" (prune, focus); worktree for one-line fix.
 
-- Create worktree without .gitignore verification (project-local)
-- Skip baseline test verification
-- Proceed with failing tests without asking
-- Assume directory location when ambiguous
-- Skip AGENTS.md check
+## Anti-Patterns
 
-**Always:**
-
-- Follow directory priority: existing > AGENTS.md > ask
-- Verify .gitignore for project-local
-- Auto-detect and run project setup
-- Verify clean test baseline
-
-## Integration
-
-**Called by:**
-
-- **brainstorming** (Phase 4) - REQUIRED when design is approved and implementation follows
-- Any skill needing isolated workspace
-
-**Pairs with:**
-
-- **finishing-a-development-branch** - REQUIRED for cleanup after work complete
-- **executing-plans** or **subagent-driven-development** - Work happens in this worktree
-
-
-## Consolidated Workspace Setup
-
-This is the canonical active skill for isolated workspace setup. Former workspace-setup content is archived as redundant. Prefer worktrees when the active worktree is dirty or when parallel implementation could collide with user changes.
+**Nested worktrees** (sibling); **same branch twice**; **dead worktrees** (prune); **uncommitted switch** (lost work); **"which dir"** (single-purpose worktree, finish or prune); **worktree for one-liner**; **5 worktrees** (focus, prune).
