@@ -270,7 +270,7 @@ function normalizeUsage(raw: any): NormalizedUsage | null {
 	const output = toNumber(raw.output ?? raw.output_tokens ?? raw.completion_tokens);
 	const cacheRead = toNumber(raw.cacheRead ?? raw.cache_read_input_tokens ?? raw.cache_read_tokens ?? raw.cache_read);
 	const cacheWrite = toNumber(raw.cacheWrite ?? raw.cache_creation_input_tokens ?? raw.cache_write_tokens ?? raw.cache_write);
-	const thinking = toNumber(raw.thinking ?? raw.thinking_tokens);
+	const thinking = toNumber(raw.thinking ?? raw.thinking_tokens ?? raw.reasoning);
 	const cost = toNumber(raw.cost?.total ?? raw.cost_total ?? raw.cost);
 
 	// Ignore empty usage payloads
