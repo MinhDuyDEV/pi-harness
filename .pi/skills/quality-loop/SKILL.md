@@ -1,7 +1,7 @@
 ---
 name: quality-loop
 version: 1.0.0
-description: "After implementation, run an iterative fix-verify loop until all quality gates pass or max iterations reached. Wraps verification into a loop that auto-fixes issues and re-verifies — prevents the 'single-shot verification' failure mode where a fix introduces new issues."
+description: "Use after implementation when an iterative fix-verify loop is needed until all quality gates pass or max iterations reached. Prevents the 'single-shot verification' failure mode where a fix introduces new issues."
 tags: [workflow, code-quality, verification]
 dependencies: [verification-before-completion]
 agent_types: [worker, reviewer]

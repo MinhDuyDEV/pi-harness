@@ -1,6 +1,6 @@
 ---
 name: spec-driven-development
-description: Guides agents from vague request to concrete specification before implementation. Use when starting a new feature, significant change, product idea, or when requirements are ambiguous.
+description: Use when starting a new feature, significant change, product idea, or when requirements are ambiguous and need a concrete specification before implementation.
 version: 1.0.0
 tags: [workflow, planning, product]
 dependencies: []

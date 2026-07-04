@@ -1,6 +1,6 @@
 ---
 name: incremental-implementation
-description: Delivers changes in thin verified slices. Use when implementing any feature, refactor, or change touching more than one file, or when tempted to write a large patch before testing.
+description: Use when implementing any feature, refactor, or change touching more than one file, or when tempted to write a large patch before testing.
 version: 1.0.0
 tags: [workflow, implementation, safety]
 dependencies: [verification-before-completion]

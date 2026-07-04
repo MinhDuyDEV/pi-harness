@@ -1,6 +1,6 @@
 ---
 name: planning-and-task-breakdown
-description: Decomposes a spec into small verifiable tasks with dependencies and acceptance checks. Use when a feature/change has a spec or clear goal and needs an executable implementation plan.
+description: Use when a feature/change has a spec or clear goal and needs an executable implementation plan.
 version: 1.0.0
 tags: [workflow, planning, agent-coordination]
 dependencies: [spec-driven-development]

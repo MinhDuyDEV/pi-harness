@@ -1,6 +1,6 @@
 ---
 name: code-review-and-quality
-description: Reviews code for correctness, regressions, security, maintainability, and goal completion. Use before merge, after subagent work, or when asked for a review. Bloat Review mode hunts over-engineering only (delete-list with tagged findings).
+description: Use before merge, after subagent work, or when asked for a code review. Bloat Review mode hunts over-engineering only (delete-list with tagged findings).
 version: 1.0.0
 tags: [review, code-quality, verification]
 dependencies: [verification-before-completion]

@@ -1,6 +1,6 @@
 ---
 name: debugging-and-error-recovery
-description: Guides root-cause debugging and safe recovery from failures. Use when tests fail, builds break, behavior is unexpected, or multiple fix attempts have not worked.
+description: Use when tests fail, builds break, behavior is unexpected, or multiple fix attempts have not worked.
 version: 1.0.0
 tags: [debugging, workflow, verification]
 dependencies: [test-driven-development, verification-before-completion]

@@ -1,6 +1,6 @@
 ---
 name: browser-tools
-description: Interactive browser automation via Chrome DevTools Protocol. Use when needing to interact with web pages, test frontends, or use a visible browser.
+description: Use when needing to interact with web pages, test frontends, or use a visible browser.
 version: 1.0.0
 tags: [browser, automation, testing]
 dependencies: []

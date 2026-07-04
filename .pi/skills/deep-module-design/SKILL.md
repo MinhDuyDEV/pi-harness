@@ -1,6 +1,6 @@
 ---
 name: deep-module-design
-description: Applies Ousterhout's deep module principles to code design — small interfaces, information hiding, pull complexity downward. Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.
+description: Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.
 version: 1.0.0
 tags: [architecture, code-quality, ousterhout]
 dependencies: []

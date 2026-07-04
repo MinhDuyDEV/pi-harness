@@ -1,6 +1,6 @@
 ---
 name: memory
-description: Persistent learnings, prior decisions, and project context. ALWAYS check this skill at the start of any task to recall prior context, established patterns, and historical decisions before responding. The user's memory file is loaded on-demand via `read`.
+description: ALWAYS check at the start of any task to recall prior context, established patterns, and historical decisions. The user's memory file is loaded on-demand via `read`.
 ---
 
 # Memory

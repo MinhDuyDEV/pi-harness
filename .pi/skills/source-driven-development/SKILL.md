@@ -1,6 +1,6 @@
 ---
 name: source-driven-development
-description: Grounds implementation decisions in official docs, source code, and cited references. Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance.
+description: Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance and need to ground decisions in official docs, source code, and cited references.
 version: 1.0.0
 tags: [research, implementation, verification]
 dependencies: []

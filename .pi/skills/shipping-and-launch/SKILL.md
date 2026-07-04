@@ -1,6 +1,6 @@
 ---
 name: shipping-and-launch
-description: Guides final readiness checks, rollback planning, documentation, and release handoff. Use when preparing to merge, deploy, release, or declare a development branch complete.
+description: Use when preparing to merge, deploy, release, or declare a development branch complete.
 version: 1.0.0
 tags: [shipping, workflow, release]
 dependencies: [verification-before-completion, documentation-and-adrs]
