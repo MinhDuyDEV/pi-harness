@@ -13,11 +13,9 @@ export const WORKING_QUOTES: readonly string[] = [
   "Pondering...",
   "Brewing thoughts...",
   "Crunching tokens...",
-  "Thinking...",
   "Cooking up an answer...",
   "Reading the matrix...",
   "Paging the silicon...",
-  "Reasoning...",
   "Drafting...",
   "Connecting neurons...",
   "Synthesizing...",
@@ -25,7 +23,6 @@ export const WORKING_QUOTES: readonly string[] = [
   "Considering options...",
   "Parsing intent...",
   "Loading wisdom...",
-  "Spinning up...",
   "Engaging...",
   "Compiling thoughts...",
 ];
@@ -54,3 +51,4 @@ export function readWorkingPaddingTop(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 1;
   return Math.max(0, Math.min(8, Math.floor(value)));
 }
+
