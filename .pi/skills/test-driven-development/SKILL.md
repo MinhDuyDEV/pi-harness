@@ -36,6 +36,7 @@ Write the test first. Watch it fail. Write minimal code to pass.
 
 **Violating the letter of the rules is violating the spirit of the rules.**
 
+<HARD-GATE>
 ## The Iron Law
 
 ```
@@ -43,6 +44,7 @@ NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
 ```
 
 Write code before the test? Delete it. Start over.
+</HARD-GATE>
 
 **No exceptions:**
 

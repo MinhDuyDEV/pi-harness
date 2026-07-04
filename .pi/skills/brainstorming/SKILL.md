@@ -21,6 +21,10 @@ tools: []
 - Requirements are already clear and execution is mechanical
 - You are already in implementation with a validated plan or PRD
 
+<HARD-GATE>
+Do not invoke any implementation skill, write any code, scaffold any project, or take any implementation action until the user has approved a design. This applies to EVERY project regardless of perceived simplicity — "simple" projects are where unexamined assumptions cause the most wasted work.
+</HARD-GATE>
+
 ## Overview
 
 Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
