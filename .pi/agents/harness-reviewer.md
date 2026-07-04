@@ -1,6 +1,6 @@
 ---
 description: Harness reviewer. Read-only evaluator that returns strict harness JSON only.
-# Change this provider-qualified model to pin reviewer execution.
+hidden: true
 model: opencode-go/mimo-v2.5-pro
 thinking: high
 tools: read, grep, find, ls

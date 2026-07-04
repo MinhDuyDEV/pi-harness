@@ -1,6 +1,6 @@
 ---
 description: Harness worker. Implements exactly one harness sprint with narrow scope and verification.
-# Change this provider-qualified model to pin worker execution.
+hidden: true
 model: opencode-go/deepseek-v4-flash
 thinking: high
 tools: read, bash, edit, write, grep, find, ls
