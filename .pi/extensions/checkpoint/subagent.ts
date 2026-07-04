@@ -80,6 +80,7 @@
   filesRead: string[];
   filesModified: string[];
   activeTasks: string;
+  memoryObservations?: string;
 }
 
 /**
