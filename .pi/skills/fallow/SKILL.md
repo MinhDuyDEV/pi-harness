@@ -10,208 +10,82 @@ tools: [bash]
 
 # Fallow — Codebase Intelligence
 
-Fallow is a deterministic static analysis engine for TypeScript/JavaScript. It answers questions about dead code, duplication, complexity, architecture drift, and (optionally) production runtime behavior. It does not generate code — it provides evidence.
+Deterministic static analysis for TS/JS. Answers: dead code, duplication, complexity, architecture drift, (optionally) runtime behavior. **Does not generate code** — provides evidence.
 
-**Always use `--format json` for structured output** that's easy to parse and reason about.
+**Always `--format json`** for structured output.
 
 ## When to Use
 
-- **Before cleanup**: find unused files, exports, dependencies
-- **Before refactoring**: identify complexity hotspots and refactor targets
-- **Before editing**: check blast radius of changes with `fallow audit`
-- **After generating code**: verify no dead code or new duplication was introduced
-- **When reviewing**: check if changed code landed on hot paths or complex functions
+- **Before cleanup**: find unused files, exports, deps
+- **Before refactor**: complexity hotspots + targets
+- **Before editing**: blast radius via `fallow audit`
+- **After generation**: verify no dead code or new duplication
+- **When reviewing**: did the change land on a hot path?
 
 ## When NOT to Use
 
-- Non-TS/JS projects (Fallow is JS/TS only)
-- Quick one-line edits (overhead isn't worth it)
-- Runtime/production data without first setting up the runtime layer
+Non-TS/JS (Fallow is JS/TS only); one-line edits (overhead); runtime data without the runtime layer set up.
 
-## CLI Quick Reference
-
-### Full suite (3 analyses in one pass)
+## Core Commands
 
 ```bash
-npx fallow
+# Dead code: unused exports, files, deps
+fallow dead --format json
+
+# Duplication: similar code blocks
+fallow dupes --format json
+
+# Health: complexity, size, blast radius per file
+fallow health --format json
+
+# Audit: change impact
+fallow audit --changed-since main --format json
+
+# Combined report
+fallow report --format json
 ```
 
-### Individual commands
-
-| Command | What it finds | Key flags |
-|---|---|---|
-| `npx fallow dead-code` | Unused files, exports, types, deps, circular deps, boundary violations | `--format json`, `--changed-since <ref>` |
-| `npx fallow dupes` | Repeated logic across files | `--format json`, `--mode semantic` |
-| `npx fallow health` | Complexity hotspots, file scores, refactor targets | `--format json`, `--coverage <path>` |
-| `npx fallow fix --dry-run` | Preview of auto-removable dead code | `--format json` |
-| `npx fallow fix --yes` | Apply auto-fixes | `--format json` |
-| `npx fallow audit` | Changed-file gate check (pass/warn/fail) | `--base main`, `--gate new-only` |
-| `npx fallow list` | Project info: plugins, entry points, files | `--format json` |
-| `npx fallow flags` | Feature flag usage across codebase | `--format json` |
-
-### Agent-specific flags
-
-- `--format json` — structured output, always use this
-- `--changed-since main` — only analyze files changed since a ref
-- `--production` — only production entry points (skip test/dev configs)
-
-## Workflows
-
-### Cleanup workflow
-
-```bash
-# 1. Full scan
-npx fallow --format json
-
-# 2. Focus on specific category
-npx fallow dead-code --format json
-npx fallow dupes --format json
-npx fallow health --format json
-
-# 3. Preview auto-fixes
-npx fallow fix --dry-run --format json
-
-# 4. Apply auto-fixes
-npx fallow fix --yes --format json
-```
-
-### Pre-edit check
-
-```bash
-# Before making changes, check current state of files you'll touch
-npx fallow health --format json | grep -i "file-youre-editing"
-```
-
-### Post-edit verification
-
-```bash
-# After changes, verify no new issues introduced
-npx fallow audit --base main --gate new-only --format json
-```
-
-### Repo-wide bloat audit
-
-Use when the user asks to audit the whole repo for over-engineering, bloat, or "what can we delete" — not just the current diff. Composes with `aislop` and hands off to `code-review-and-quality` Bloat Review mode for the narrative delete-list.
-
-**Do not use for:** structural architecture deepening — use `improve-codebase-architecture` instead (HTML report, module boundaries).
-
-```bash
-# 1. Complexity and dead-code hotspots
-npx fallow health --format json
-npx fallow dead-code --format json
-
-# 2. Duplication candidates
-npx fallow dupes --format json
-
-# 3. AI slop and security patterns in changed or target scope
-npx aislop scan --json
-# or for diff-only:
-npx aislop scan --changes --json
-
-# 4. Optional: gate check on branch
-npx fallow audit --base main --gate new-only --format json
-```
-
-**Rank findings biggest cut first** (map fallow/aislop signals to tags: unused → `delete:`, dupes → `shrink:`, single-impl abstractions → `yagni:`). Format and score per **Bloat Review mode** in `code-review-and-quality`. Lists findings only — no fixes. Diff-focused: `/verify --review --bloat`.
-
-## Reading the Output
-
-### Dead code
-
-```
-● Unused files (N)
-  path/to/file.ts
-  ...
-  Files not reachable from any entry point
-
-● Unlisted dependencies (N)
-  package-name
-  Packages imported in code but missing from package.json
-
-● Circular dependencies (N)
-  file-a.ts → file-b.ts → file-a.ts
-```
-
-**Caveat for Pi projects**: `.pi/` extensions are dynamically loaded by the Pi runtime. Fallow may flag them as unused. If confident they're runtime-loaded, ignore those findings or add `.pi/` to `ignorePatterns` in a `fallow.json` config.
-
-### Duplication
-
-```
-● Duplicates (N clone groups)
-
-    XX lines  N instances  dup:hexhash
-    file-a.ts:start-end
-    file-b.ts:start-end
-
-● Clone families (N with multiple groups)
-  X groups, XX lines across file-a.ts, file-b.ts
-    → Extract shared function (X lines) from file-a.ts, file-b.ts
-```
-
-### Health / Complexity
-
-```
-● Large functions (N total)
-  file.ts:line  functionName  XX lines
-
-● High complexity functions (N)
-  file.ts:line functionName [CRITICAL|HIGH]
-    XX cyclomatic  XX cognitive  XX lines  XX.X CRAP
-
-● File health scores (N files)
-  XX.X    file.ts                        [risk|structure]
-          XXX LOC    X fan-in    X fan-out   XX% dead
-
-● Refactoring targets (N)
-  XX.X  pri:XX.X    file.ts
-        [complexity|dead code] · effort:[low|medium|high]
-```
-
-## Common Findings & Responses
-
-| Finding | Likely cause | Response |
-|---|---|---|
-| 100% unused files under `.pi/` | Dynamic Pi extension loading | Ignore or add to `ignorePatterns` in config |
-| High dead-export % | Extensions export many symbols for dynamic dispatch | Check if they're `registerExtension()` or similar pattern |
-| Circular dependencies | Import cycle in a module chain | Break the cycle by extracting shared logic or using lazy imports |
-| Duplicate code blocks | Copy-pasted logic across files | Extract shared function, especially for clone families >2 groups |
-| CRITICAL CRAP score | Function is complex AND untested | Split function, add tests, or both |
-| Accelerating hotspot | File with high churn + high complexity | Prioritize refactoring before complexity compounds |
-
-## Config
-
-Fallow works without config. To customize:
-
-```bash
-npx fallow init
-```
-
-This auto-detects project structure and generates a `fallow.json`. It also adds `.fallow/` to `.gitignore`.
-
-For Pi projects where `.pi/` is dynamically loaded, consider:
+## Interpreting Output
 
 ```json
 {
-  "ignorePatterns": [".pi/**"]
-}
-```
-
-Or use `--production` to only analyze production entry points.
-
-## MCP Integration (Optional)
-
-When Fallow's MCP server is configured, agents can call structured tools directly instead of parsing CLI output:
-
-```json
-{
-  "mcpServers": {
-    "fallow": {
-      "command": "fallow-mcp"
-    }
+  "dead": {
+    "files": ["src/legacy/foo.ts"],
+    "exports": [{" file": "...", "name": "bar", "used": false }],
+    "deps": ["lodash.debounce"]
+  },
+  "dupes": {
+    "blocks": [{" files": ["a.ts", "b.ts"], "lines": 12, "hash": "..." }]
+  },
+  "health": {
+    "files": [{
+      "path": "src/services/user.ts",
+      "complexity": 23,        // high
+      "blast": 47,            // files affected
+      "lines": 312
+    }]
   }
 }
 ```
 
-Available MCP tools: `analyze`, `check_changed`, `find_dupes`, `check_health`, `audit`, `fix_preview`, `fix_apply`, `get_hot_paths`, `get_blast_radius`, `project_info`, `feature_flags`.
+Read the JSON. Cite the files and line counts. Don't paraphrase — the numbers are the evidence.
 
-Without MCP, use CLI with `--format json` — same data, one more step.
+## Workflow
+
+1. **Baseline first.** Run `fallow health` before changes. Save the JSON.
+2. **Make your change.**
+3. **Re-run.** Compare new JSON to baseline. Did complexity go up? New dead code? New dupes?
+4. **Clean up.** If new dead code, delete. If new dupes, extract. If complexity spike, split.
+5. **Verify.** Run typecheck + tests + the diff didn't grow unrelated changes.
+
+## Common Mistakes
+
+Reading summary without JSON (loses precision); running fallow but not acting on output; treating "low dead code %" as the goal (the goal is fewer bugs); not setting baseline; "delete this unused export" without checking who imports it (might be a public API); running on a 5k LOC project and trying to clean everything at once.
+
+## Red Flags
+
+"Code quality" claim without Fallow output; Fallow ignored because "we know it's bad"; dead code deleted without checking consumers; "we'll clean up later" (later never comes); no baseline = no diff = no signal; running once and never again; treating fallow output as a checklist instead of evidence.
+
+## Anti-Patterns
+
+**"I know it's bad"** (run Fallow); **"small project, no need"** (even small projects have dead code); **"delete all dead"** (check public API first); **"summary is enough"** (JSON is the contract); **"fallow said so"** (Fallow is evidence, not authority — use judgment).

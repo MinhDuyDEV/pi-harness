@@ -10,229 +10,76 @@ tools: []
 
 # Performance Optimization
 
-> **Replaces** premature optimization and gut-feeling tuning with measurement-driven improvements that target actual bottlenecks
+## Iron Laws
+
+<EXTREMELY-IMPORTANT>
+- **Measure first.** Intuition is wrong more often than not.
+- **One change at a time.** 5% + 10% ≠ 15% if you didn't isolate.
+- **The slowest thing is usually not where you think.** Profile.
+- **Algorithmic > micro-opt.** O(n²) → O(n log n) beats any cache line.
+- **Don't break correctness for speed.** Fast bug is still a bug.
+</EXTREMELY-IMPORTANT>
 
 ## When to Use
 
-- Application is measurably slow (user reports, metrics, profiler data)
-- Setting up performance budgets for a new project
-- Reviewing code for common performance anti-patterns
-- Performance regression detected in CI or monitoring
+Real-world slowness; Core Web Vitals failing; high p99; user "feels slow"; capacity planning; before a perf task without a number.
 
 ## When NOT to Use
 
-- No evidence of a performance problem — premature optimization wastes time
-- Micro-optimizations that save nanoseconds in non-hot paths
-- Choosing "fast" over "correct" — correctness first, always
+Premature optimization; "I think this is slow"; "make it faster" without target; rewriting to dodge profiling.
 
-## Overview
+## Workflow
 
-Performance optimization is an empirical process. Measure, identify, fix, verify. Never optimize without profiling first.
+1. **Define the target.** p99 < 200ms. LCP < 2.5s. Number, not "feels faster."
+2. **Measure baseline.** Profile, capture traces. Record the number.
+3. **Identify the bottleneck.** The slow part is usually obvious once you see it.
+4. **Hypothesize.** "X is slow because Y." Testable.
+5. **One change.** Smallest change targeting the bottleneck.
+6. **Re-measure.** Compare to baseline. Keep or revert.
+7. **Repeat.** Until target met.
 
-**Core principle:** Measure before optimizing. Optimize the bottleneck, not the code you happen to be reading. Verify the improvement with numbers.
+## Core Web Vitals
 
-## Measure-First Workflow
+| Metric | Target | What |
+|---|---|---|
+| LCP | < 2.5s | Main content renders |
+| INP | < 200ms | Interaction response |
+| CLS | < 0.1 | Visual stability |
+| TTFB | < 800ms | Server response |
+| FCP | < 1.8s | First render |
 
-```
-1. MEASURE   — Profile to identify actual bottlenecks (not guessed ones)
-2. IDENTIFY  — Find the specific hot path or resource constraint
-3. FIX       — Apply targeted optimization to the bottleneck
-4. VERIFY    — Measure again to confirm improvement
-5. GUARD     — Add budget/benchmark to prevent regression
-```
+LCP + INP + CLS are the "Core" (Google ranks on these).
 
-**Rule:** Skip to step 3 only if you have measurement data that justifies the optimization.
+## Common Bottlenecks (Web)
 
-## Performance Targets
+JS bundle size (1MB = 1s+ parse+exec → code-split, tree-shake); render-blocking resources (inline critical, defer the rest); images (80% of weight → WebP/AVIF, responsive, lazy); network waterfalls (parallelize); re-renders (memo where it matters); layout thrashing (batch).
 
-### Core Web Vitals (Web)
+## Common Bottlenecks (Backend)
 
-| Metric                          | Good    | Needs Improvement | Poor    |
-| ------------------------------- | ------- | ----------------- | ------- |
-| LCP (Largest Contentful Paint)  | ≤ 2.5s  | ≤ 4.0s            | > 4.0s  |
-| INP (Interaction to Next Paint) | ≤ 200ms | ≤ 500ms           | > 500ms |
-| CLS (Cumulative Layout Shift)   | ≤ 0.1   | ≤ 0.25            | > 0.25  |
-
-### General Targets
-
-| Context             | Target       | Measure                |
-| ------------------- | ------------ | ---------------------- |
-| API response (p95)  | < 200ms      | Server-side timing     |
-| CLI command startup | < 500ms      | `time` or `perf_hooks` |
-| Build time          | < 60s        | CI pipeline metrics    |
-| Bundle size (JS)    | < 200KB gzip | Bundler output         |
-| Database query      | < 50ms       | Query EXPLAIN + timing |
-
-## Common Anti-Patterns & Fixes
-
-### N+1 Queries
-
-```typescript
-// ❌ N+1: One query per user
-const users = await db.query("SELECT * FROM users");
-for (const user of users) {
-  user.posts = await db.query("SELECT * FROM posts WHERE user_id = ?", [user.id]);
-}
-
-// ✅ Batch: Two queries total
-const users = await db.query("SELECT * FROM users");
-const userIds = users.map((u) => u.id);
-const posts = await db.query("SELECT * FROM posts WHERE user_id IN (?)", [userIds]);
-// Group posts by user_id in application code
-```
-
-### Unbounded Fetching
-
-```typescript
-// ❌ Fetch everything
-const allItems = await db.query("SELECT * FROM items");
-
-// ✅ Paginate
-const items = await db.query("SELECT * FROM items LIMIT ? OFFSET ?", [pageSize, offset]);
-```
-
-### Missing Memoization
-
-```typescript
-// ❌ Recompute on every render
-function ExpensiveList({ items }) {
-  const sorted = items.sort((a, b) => complexSort(a, b)); // sorts on every render
-  return <List items={sorted} />;
-}
-
-// ✅ Memoize expensive computation
-function ExpensiveList({ items }) {
-  const sorted = useMemo(
-    () => [...items].sort((a, b) => complexSort(a, b)),
-    [items]
-  );
-  return <List items={sorted} />;
-}
-```
-
-### Large Bundle Size
-
-```typescript
-// ❌ Import entire library
-import _ from "lodash";
-const result = _.debounce(fn, 300);
-
-// ✅ Import only what you need
-import debounce from "lodash/debounce";
-const result = debounce(fn, 300);
-
-// ✅✅ Use native (no dependency)
-function debounce(fn, ms) {
-  /* ... */
-}
-```
-
-### Missing Image Optimization
-
-```html
-<!-- ❌ Unoptimized -->
-<img src="hero.png" />
-
-<!-- ✅ Optimized -->
-<img
-  src="hero.webp"
-  srcset="hero-400.webp 400w, hero-800.webp 800w, hero-1200.webp 1200w"
-  sizes="(max-width: 600px) 400px, (max-width: 1024px) 800px, 1200px"
-  loading="lazy"
-  decoding="async"
-  width="1200"
-  height="630"
-  alt="Hero image"
-/>
-```
-
-### Unnecessary Re-renders (React)
-
-```typescript
-// ❌ New object every render causes child re-render
-function Parent() {
-  return <Child style={{ color: 'red' }} onClick={() => doThing()} />;
-}
-
-// ✅ Stable references
-const style = { color: 'red' };
-function Parent() {
-  const handleClick = useCallback(() => doThing(), []);
-  return <Child style={style} onClick={handleClick} />;
-}
-```
+N+1 queries (use joins or batch); sync I/O in async path; no caching; pool too small; logger in hot path.
 
 ## Profiling Tools
 
-| Context          | Tool                             | What It Shows                     |
-| ---------------- | -------------------------------- | --------------------------------- |
-| Web (browser)    | Chrome DevTools Performance      | Paint, scripting, layout, network |
-| Web (field data) | CrUX, PageSpeed Insights         | Real-user Core Web Vitals         |
-| Node.js          | `node --prof` + `--prof-process` | V8 profiling ticks per function   |
-| Node.js          | `clinic.js`                      | Flamegraphs, event loop delays    |
-| React            | React DevTools Profiler          | Component render times            |
-| SQL              | `EXPLAIN ANALYZE`                | Query execution plan              |
-| Bundle           | `source-map-explorer`            | Module size breakdown             |
-| Network          | `lighthouse`                     | Loading performance audit         |
+| Domain | Tool |
+|---|---|
+| Web | DevTools Performance, Lighthouse, WebPageTest |
+| React | React DevTools Profiler, why-did-you-render |
+| Node | `node --prof`, clinic.js, 0x |
+| DB | `EXPLAIN ANALYZE`, pg_stat_statements |
+| General | flame graphs, OpenTelemetry |
 
-## Performance Budget
+## Anti-Patterns
 
-### Setting Budgets
+Premature optimization (no measurement); micro-optimization (0.1% gain); wrong layer (3 days on CSS, real issue is 3MB JS); cache everything (cache has cost); speculative complexity ("1M users?"); perf without correctness; big-bang rewrite ("we'll rewrite in Rust" rarely ships).
 
-```json
-{
-  "budgets": [
-    { "metric": "js-bundle", "max": "200KB", "warn": "150KB" },
-    { "metric": "css-bundle", "max": "50KB", "warn": "40KB" },
-    { "metric": "lcp", "max": "2500ms", "warn": "2000ms" },
-    { "metric": "api-p95", "max": "200ms", "warn": "150ms" }
-  ]
-}
-```
+## Common Mistakes
 
-### Enforcing Budgets in CI
+No measurement; "I think this is slow" (no); no baseline; multiple changes at once; cache invalidation bugs; rewriting to dodge profiling; ignoring algorithmic; breaking correctness; no regression test.
 
-```yaml
-- name: Check bundle size
-  run: |
-    npx bundlesize --config .bundlesizerc.json
+## Red Flags
 
-- name: Lighthouse audit
-  run: |
-    npx lighthouse $URL --output json --chrome-flags="--headless"
-    # Parse and assert against budgets
-```
+"I think X is slow" (measure first); no baseline; change without re-measuring; perf that breaks tests; micro-opt while N² is there; "rewrite in Rust"; perf claim without number; "I added caching" without key + invalidation; no regression test.
 
-## Common Rationalizations
+## Self-Quiz
 
-| Excuse                            | Rebuttal                                                                           |
-| --------------------------------- | ---------------------------------------------------------------------------------- |
-| "It's fast enough on my machine"  | Test on low-end devices and slow networks. Your machine isn't representative.      |
-| "We'll optimize later"            | Performance debt compounds. Set budgets now, optimize when they're breached.       |
-| "This micro-optimization matters" | Profile first. If it's not in the hot path, it doesn't matter.                     |
-| "Users won't notice 200ms"        | Studies show 100ms delays reduce conversions. Users notice more than you think.    |
-| "Adding metrics is overhead"      | The overhead of measurement is trivial compared to the cost of blind optimization. |
-| "Caching will fix it"             | Caching masks problems. Fix the root cause, then add caching as defense.           |
-
-## Red Flags — STOP
-
-- Optimizing without profiling data
-- Adding caching to mask a fundamentally slow operation
-- Micro-optimizing code that runs once per request
-- Bundle size growing without review
-- No performance budget or monitoring in place
-- Using `SELECT *` in production queries
-
-## Verification
-
-- [ ] Bottleneck identified with profiling data (not intuition)
-- [ ] Optimization shows measurable improvement in profiler
-- [ ] Performance budget is set and enforced in CI
-- [ ] No regressions in existing benchmarks
-- [ ] Optimization doesn't sacrifice correctness or readability
-
-## See Also
-
-- **react-best-practices** — React-specific performance patterns (server components, bundle optimization)
-- **ci-cd-and-automation** — Enforcing performance budgets in CI
-- **code-simplification** — Simplifying code often improves performance as a side effect
+Did I define a number? Measure baseline? Make ONE change then re-measure? Target the trace's bottleneck? Preserve correctness? Regression test?

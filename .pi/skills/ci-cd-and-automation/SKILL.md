@@ -10,200 +10,104 @@ tools: []
 
 # CI/CD & Automation
 
-> **Replaces** manual deployment checklists and ad-hoc scripts with repeatable, auditable automation pipelines
+## Iron Laws
+
+<EXTREMELY-IMPORTANT>
+- **CI runs on every PR.** No exceptions. PRs without green CI do not merge.
+- **Main is always deployable.** If main is broken, team is blocked. Fix or revert.
+- **Cache dependencies, not source.** Key on lockfile. 90% of CI is install.
+- **Secrets via platform store.** Never in workflow YAML. Never in logs.
+- **Fast feedback.** 5-min CI > 30-min CI.
+</EXTREMELY-IMPORTANT>
 
 ## When to Use
 
-- Setting up or modifying CI/CD pipelines (GitHub Actions, GitLab CI, etc.)
-- Adding automated testing, linting, or type-checking to a repository
-- Configuring deployment automation or release workflows
-- Optimizing CI performance (caching, parallelism, conditional runs)
+Setting up CI for a new project; adding a job (lint, typecheck, test, security, build, deploy); caching slow steps; secrets in CI; release workflow (semver, changelog, npm publish); matrix builds; deploy previews.
 
 ## When NOT to Use
 
-- Local development scripts (use Makefile or package.json scripts)
-- One-time migration scripts that don't repeat
-- Infrastructure provisioning (use infrastructure-as-code tools directly)
+Manual deploys (CI is the answer); one-off scripts (use Make or just); long-running batch jobs (use a queue, not CI); a workflow that runs > 30 min (split it).
 
-## Overview
+## Pipeline Anatomy
 
-CI/CD pipelines are the quality gates between code and production. A well-designed pipeline catches problems early, runs fast, and deploys safely.
+```
+[Trigger] → [Setup + Cache] → [Lint] → [Typecheck] → [Test] → [Build] → [Deploy]
+```
 
-**Core principle:** Every step that a human does manually before merging or deploying should be automated in the pipeline. If it can be automated, it must be.
+| Step | Budget |
+|---|---|
+| Lint | < 30s |
+| Typecheck | < 1m |
+| Test (unit) | < 5m |
+| Test (integration) | < 10m |
+| Build | < 5m |
+| Deploy preview | < 10m |
+| Deploy prod | < 15m |
 
-## Pipeline Design
+Over budget → separate job (parallel).
 
-### Verification Pipeline (PR/Push)
+## Caching
 
 ```yaml
-# Ordered by speed: fastest gates first
-steps:
-  1. Lint          # seconds — catches formatting/style issues
-  2. Typecheck     # seconds — catches type errors
-  3. Unit tests    # seconds-minutes — catches logic bugs
-  4. Build         # minutes — catches compilation issues
-  5. Integration   # minutes — catches integration bugs
-  6. E2E tests     # minutes — catches user-facing bugs (optional per-PR)
-```
-
-**Fail-fast rule:** Run cheapest checks first. Don't waste 10 minutes on E2E tests if linting fails in 5 seconds.
-
-### Deployment Pipeline (Main/Release)
-
-```
-1. All verification steps pass
-2. Build production artifacts
-3. Deploy to staging
-4. Run smoke tests against staging
-5. Deploy to production (manual gate or auto)
-6. Run smoke tests against production
-7. Monitor error rates for rollback window
-```
-
-## GitHub Actions Patterns
-
-### Basic PR Verification
-
-```yaml
-name: verify
-on: [pull_request]
-jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: ".node-version"
-          cache: "pnpm"
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
-```
-
-### Caching Strategy
-
-| What         | Cache Key         | Restore Key | Impact       |
-| ------------ | ----------------- | ----------- | ------------ |
-| Dependencies | `lockfile hash`   | `os-deps-`  | 30-60s saved |
-| Build output | `source hash`     | `os-build-` | 1-5min saved |
-| Test cache   | `test files hash` | `os-test-`  | Variable     |
-
-```yaml
-- uses: actions/cache@v4
+- uses: actions/cache@v3
   with:
-    path: ~/.pnpm-store
-    key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-    restore-keys: ${{ runner.os }}-pnpm-
+    path: |
+      ~/.npm
+      node_modules
+    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    restore-keys: |
+      ${{ runner.os }}-node-
 ```
 
-### Parallel Jobs
+Key on the lockfile hash, restore-key as fallback. Cache the install dir, not the source.
+
+## Secrets
 
 ```yaml
-jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps: [checkout, setup, "pnpm lint"]
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps: [checkout, setup, "pnpm typecheck"]
-
-  test:
-    runs-on: ubuntu-latest
-    steps: [checkout, setup, "pnpm test"]
-
-  build:
-    needs: [lint, typecheck, test] # Only build after all checks pass
-    runs-on: ubuntu-latest
-    steps: [checkout, setup, "pnpm build"]
+- name: Deploy
+  env:
+    API_TOKEN: ${{ secrets.API_TOKEN }}
+  run: ./deploy.sh
 ```
 
-## Secrets Management
+`secrets.*` in env. Never `echo` the secret. Never `set -x` with secrets. Use `::add-mask::` if a secret might leak.
 
-| Rule                                       | Reason                                        |
-| ------------------------------------------ | --------------------------------------------- |
-| Never echo secrets in CI logs              | Logs are often accessible to all contributors |
-| Use GitHub Secrets / environment variables | Encrypted at rest, masked in logs             |
-| Rotate secrets on exposure                 | Assume compromised if ever logged             |
-| Separate secrets per environment           | Staging keys ≠ production keys                |
-| Use OIDC for cloud providers               | No long-lived credentials needed              |
-
-## Release Automation
-
-### Semantic Versioning
-
-```
-MAJOR.MINOR.PATCH
-  │      │     └── Bug fixes (backward compatible)
-  │      └──────── New features (backward compatible)
-  └─────────────── Breaking changes
-```
-
-### Tag-Based Release
+## Matrix Builds
 
 ```yaml
-on:
-  push:
-    tags: ["v*"]
-jobs:
-  release:
-    steps:
-      - uses: actions/checkout@v4
-      - run: pnpm build
-      - run: pnpm publish # or deploy
-      - uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
+strategy:
+  matrix:
+    node: [18, 20, 22]
+    os: [ubuntu-latest, macos-latest]
 ```
 
-## Common Rationalizations
+Don't test dead versions. Update when the floor moves.
 
-| Excuse                              | Rebuttal                                                                          |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| "CI is slow, I'll test locally"     | Local tests miss environment-specific issues. Optimize CI instead of skipping it. |
-| "We can add CI later"               | Every merged PR without CI is a potential regression. Set up day one.             |
-| "The pipeline is too complex"       | Complexity means you're catching real issues. Simplify steps, not coverage.       |
-| "Manual deploy is faster"           | Until someone deploys the wrong branch. Automation prevents human error.          |
-| "Caching is premature optimization" | 5 minutes saved per PR × 20 PRs/week = 100 minutes/week. Cache from day one.      |
+## Deploy Strategies
 
-## CI Performance Optimization
+| Strategy | When |
+|---|---|
+| Rolling | Default for most services |
+| Blue/green | Zero-downtime, canary-able |
+| Canary | Small % of traffic, ramp |
+| Recreate | Acceptable downtime, stateless |
 
-| Technique              | Savings                   | Effort                 |
-| ---------------------- | ------------------------- | ---------------------- |
-| Dependency caching     | 30-60s per run            | Low — add cache action |
-| Parallel jobs          | 50-70% of sequential time | Low — split into jobs  |
-| Conditional runs       | Skip unchanged paths      | Medium — path filters  |
-| Build artifact caching | 1-5min per run            | Medium — cache config  |
-| Self-hosted runners    | Faster hardware           | High — infrastructure  |
+## Release Workflow
 
-## Red Flags — STOP
+```
+PR merge → [CI: tests + build] → [Release: bump version] → [Publish] → [Deploy]
+```
 
-- CI pipeline takes >15 minutes for a PR check
-- Secrets hardcoded in workflow files
-- No caching configured despite slow builds
-- Tests skipped in CI "to save time"
-- Manual deployment steps in the release process
-- No rollback mechanism for failed deployments
+Use release-please or similar. Manual bumps = drift = bugs.
 
-## Verification
+## Common Mistakes
 
-- [ ] All verification steps run on every PR
-- [ ] Pipeline fails fast (cheapest checks first)
-- [ ] Dependencies are cached
-- [ ] Secrets are never printed in logs
-- [ ] Release process is tag-triggered and automated
-- [ ] Rollback procedure is documented and tested
+CI only on main (bugs caught late); no cache; secrets in logs; one giant job; "skip ci" bypass; deploy on every PR (preview instead); no artifact upload; matrix with dead versions; manual release; flaky tests not quarantined; no notifications.
 
-## See Also
+## Red Flags
 
-- **verification-gates** — Detecting project type and running appropriate checks
-- **git-workflow-and-versioning** — Branch strategy and commit conventions
-- **security-and-hardening** — Secrets management and supply chain security
+CI only on main; no cache (5+ min install); secrets visible in logs; single big job; "skip ci" used; deploy on PR; no notifications; flaky tests pass/fail randomly; matrix with 3-year-old versions; "the CI is broken, just push to main".
 
+## Anti-Patterns
 
-## Core Lifecycle Role
-
-This skill is core because CI/CD is part of shipping safely: shift-left verification, fast feedback, feature flags, quality gates, and repeatable deploy pipelines.
+**CI on main only**; **no cache**; **secrets in logs**; **one big job**; **deploy on PR**; **manual release**; **"skip ci"**; **no notifications**.

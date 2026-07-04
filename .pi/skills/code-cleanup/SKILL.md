@@ -12,141 +12,49 @@ tools: []
 
 ## When to Use
 
-- Tests/build/typecheck already pass, but the changed code is clumsy
-- A feature works, but the diff contains duplication, over-nesting, dead code, or awkward naming
-- You want a final simplification pass before review or merge
-- You encountered a "broken window" (messy code, bad pattern, dead comment) that needs boarding up
+Tests/build/typecheck pass but the diff is clumsy; feature works but has duplication, over-nesting, dead code, awkward naming; final simplification before review/merge; "broken window" needs boarding up.
 
 ## When NOT to Use
 
-- Behavior is still broken or unverified
-- You are tempted to redesign architecture under the cover of "cleanup"
-- The cleanup would spread into unrelated files
-- You have not yet established how to prove nothing broke
+Behavior is broken or unverified; "cleanup" is cover for redesign; cleanup spreads to unrelated files; can't prove nothing broke.
 
 ## Core Principle
 
-**Lock behavior first. Then simplify. Then re-verify.**
+**Lock behavior first. Then simplify. Then re-verify.** Sequence: behavior locked → simplify → re-verify nothing changed. If any step fails, stop.
 
-No cleanup claim counts unless the same verification still passes after the cleanup edits.
+## Workflow
 
-## Why Cleanup Matters: Software Entropy
+1. **Lock behavior.** Run the relevant tests + typecheck + lint. Save the output. This is your "before" baseline.
+2. **Identify smell.** Use `fallow` (if available) for dead code, dupes, complexity. Otherwise: read the diff, mark spots that feel off.
+3. **Simplify, in order:**
+   - **Delete** (dead code, comments that restate, unused exports) — easiest, highest impact
+   - **Rename** (clearer names, remove prefixes/suffixes) — cheap, high signal
+   - **Extract** (a variable, a helper) — only if nameable and reused
+   - **Inline** (a one-use wrapper) — only if the wrapper adds no clarity
+   - **Restructure** (split a function, lift a conditional) — last resort, highest risk
+4. **Re-verify.** Same tests, same typecheck, same lint. Outputs match "before" baseline.
+5. **Diff review.** Anything outside the cleanup scope? Split it out.
 
-Left unrepaired, every messy piece of code gives permission for the next one. This is the "broken windows" theory from *The Pragmatic Programmer*: a bad design, wrong decision, or poor code left in place signals that quality doesn't matter — and more broken windows follow.
+## Anti-Simplification Patterns
 
-AI agents accelerate this. A messy module invites the next AI to add more mess. A clean module with clear patterns invites the next AI to follow those patterns. Cleanup is not cosmetic — it's **entropy containment**. It's the difference between a codebase that decays with each AI pass and one that stabilizes.
+- Adding an abstraction for "future use" — speculative, not cleanup
+- "Improving" the architecture under cover of "cleanup" — separate change
+- Renaming things the user named (breaks their mental model)
+- "Fixing" unrelated lint warnings in the same diff
+- Reformatting the whole file (no behavior change, but noise in diff)
 
-**When full cleanup is impossible, board it up.** Add a comment marking the issue, stub out the dead path, isolate the bad code behind a clear boundary. The goal is to contain the damage so it doesn't spread, even if you can't fix it right now.
+## Common Mistakes
 
-## Cleanup Targets
+Cleanup before behavior is locked (can't prove nothing broke); expanding scope (renaming across the codebase); adding abstractions for "future reuse"; deleting without checking consumers; reformatting the whole file; "improving" code style in unrelated parts; "we'll add tests after" (the tests are how you prove nothing broke).
 
-Prefer cleanup that removes friction without changing behavior:
+## Red Flags
 
-- delete dead branches, unused variables, stale comments
-- collapse repeated logic when the abstraction is already obvious
-- simplify conditionals and nesting
-- improve names where the blast radius is small and verified
-- remove AI-ish filler comments, duplicated guards, or ceremony
-- **fix broken windows**: inconsistent patterns, dead TODOs, misnamed functions, formatting rot
-- harvest and resolve **`pikit:` debt markers** (see below)
+Cleanup before tests pass; "I just want to refactor this"; expanding into unrelated files; "while I'm here" fixes; tests deleted (not the cleanup target); reformatting the whole file; rename of public API; no baseline saved; re-verify skipped; "I'll write tests for the new structure later".
 
-Avoid:
+## Self-Quiz
 
-- cross-system rewrites
-- new abstractions with speculative value
-- changing public APIs unless explicitly requested
-- moving many files just because structure feels imperfect
-
-## Process
-
-### Phase 1: Lock Behavior
-
-1. Identify the verification commands that prove the current behavior
-2. Run them and save the baseline result
-3. List the exact files that are eligible for cleanup
-
-### Phase 2: Create a Cleanup Plan
-
-Use a small table before editing:
-
-| File | Smell | Planned simplification | Risk |
-| ---- | ----- | ---------------------- | ---- |
-| ...  | ...   | ...                    | ...  |
-
-Rules:
-- Prefer deletion over abstraction
-- Prefer local simplification over shared utilities
-- If risk is medium or higher, make smaller passes
-
-### Phase 3: Simplify
-
-Apply cleanup in small, reviewable edits:
-
-1. Make one simplification
-2. Re-run the relevant verification
-3. Continue only if behavior remains locked
-
-### Phase 4: Re-verify
-
-Re-run the same commands used to lock behavior.
-
-Minimum acceptable output:
-- what was simplified
-- what was deleted
-- what verification was rerun
-- any remaining ugly areas intentionally left alone
-
-## `pikit:` Debt Convention
-
-When you deliberately defer simplification during a fix or refactor, mark it in code so "later" does not rot into "never":
-
-```typescript
-// pikit: global lock, per-account locks if throughput matters
-```
-
-Convention: `pikit: <ceiling>, <upgrade path>`
-
-- **ceiling** — the known limit of the shortcut (global lock, O(n²) scan, naive heuristic)
-- **upgrade path** — the trigger to revisit (profiler says so, second implementation exists, throughput > X)
-
-Trivial one-liners need no marker. Do not use `pikit:` for prose that merely mentions the convention.
-
-### Debt harvest
-
-Before cleanup on a directory or repo slice, scan for existing markers:
-
-```bash
-grep -rnE '(#|//) ?pikit:' .pi/extensions
-```
-
-Add other comment prefixes if your stack uses them (`/* pikit:`, `# pikit:`).
-
-**Output:** one row per marker, grouped by file:
-
-```text
-<file>:<line> — <what was simplified>. ceiling: <limit>. upgrade: <trigger>.
-```
-
-Flag markers with no upgrade path or trigger as `no-trigger` (rot risk).
-
-End with: `<N> markers, <M> with no trigger.` Nothing found: `No pikit: debt. Clean ledger.`
-
-Reads and reports only during harvest — resolve markers only when explicitly asked or when the upgrade trigger is met.
-
-## Output Checklist
-
-- [ ] Baseline verification captured before cleanup
-- [ ] Only changed files or directly adjacent support files touched
-- [ ] Same verification rerun after cleanup
-- [ ] Simplifications reported concretely
-- [ ] No hidden architecture drift
-
-
-## Consolidated Simplification Workflow
-
-This is the canonical active simplification skill. It absorbs code-simplification. Only simplify after behavior is protected by tests or explicit verification. Avoid broad refactors bundled with feature work.
-
-
-## Agent-Skills Compatibility
-
-This skill is Pi's canonical equivalent of `code-simplification`: simplify working code while preserving exact behavior, respecting Chesterton's Fence, and re-verifying after cleanup.
+- Is behavior locked (tests + typecheck + lint passing before)?
+- Is each change *deletion or simplification*, not addition?
+- Did I re-run the same checks after, and compare to baseline?
+- Are all changes scoped to what was actually noisy?
+- Did I avoid renaming public APIs or restructuring unrelated code?

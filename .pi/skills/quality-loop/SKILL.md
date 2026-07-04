@@ -8,133 +8,65 @@ agent_types: [worker, reviewer]
 tools: [bash, grep, find, read]
 ---
 
-# Quality Loop — Iterative Fix-Verify
+# Quality Loop
 
 ## When to Use
 
-- After implementing a feature, fix, or refactor
-- Before claiming completion, committing, or creating a PR
-- After any change that could break existing behavior — especially multi-file changes
-
-Supplements `verification-before-completion` by adding the **loop** structure: verify → fix → re-verify until clean.
+Implementation is "done" but a quality gate fails (test, typecheck, lint, security, perf); iterative refinement is needed; "fix and re-verify" loop is the right shape.
 
 ## When NOT to Use
 
-- During active prototyping or exploration where breakage is expected
-- For trivial one-line fixes — use direct verification instead
-- When verification commands take >30s per run — the loop becomes impractical
+Trivial one-line change (just fix it); first attempt at the implementation (no baseline yet); problem is in the design, not the implementation (use `diagnose` or `brainstorming`); the gate is unclear (define it first).
 
-## Flow
+## Core Principle
+
+**Fix → verify → assess → repeat, with an iteration cap.** Each iteration: identify the gap, fix the smallest thing, verify, decide if to continue or escalate. A loop without a cap is a sink.
+
+## The Loop
 
 ```
-for iteration in 1..MAX_ITERATIONS:
-   1. Run all quality gates
-   2. if ALL pass → break, report success
-   3. Collect failures (specific errors, file:line)
-   4. Auto-fix each failure
-   5. if no progress since last iteration → break
-   6. Commit fixes (if in a git context)
-   7. Next iteration
-
-if exited with failures:
-   Report remaining issues, suggest next steps
+for i in 1..N:
+  run_quality_gate()
+  if pass: return success
+  if i == N: return failure (with all errors listed)
+  smallest_fix_for_largest_gap()
 ```
 
-Default max: **3 iterations**. Override via skill metadata if the task complexity warrants more.
+Where:
+- `run_quality_gate` is the named check (test/typecheck/lint/security)
+- `smallest_fix_for_largest_gap` = the fix that resolves the most failing checks with the least change
+- N is a cap (typically 3-5 iterations)
 
-## Gate Priority
+## When to Iterate vs Escalate
 
-Run in this order so cheaper gates catch issues before expensive ones:
-
-| Priority | Gate | Check | Auto-fix? |
-|---|---|---|---|
-| 1 | **Type check** | `npx tsc --noEmit` or project's typecheck command | Yes — fix types or code |
-| 2 | **Lint** | `npx eslint .` or project's lint command | Yes — `--fix` flag |
-| 3 | **Unit tests** | `npx vitest run` or project's test command | Conditional — fix implementation to match test |
-| 4 | **Intergration tests** | Only if project has them and unit tests pass | Conditional |
-| 5 | **TODO.md** | All `[ ]` boxes checked off to `[x]` | Yes — verify and check off |
-| 6 | **Stub detection** | Search for `TODO`, `FIXME`, `placeholder`, `return null`, `<div>Component</div>` | Yes — replace with real implementation |
-| 7 | **Sprint/plan criteria** | Custom criteria from the sprint or plan | Conditional |
-
-Skip gates that don't apply (e.g., no typecheck in plain JS projects). Always run at least typecheck + tests + TODO.md.
-
-## Auto-Fix Rules
-
-For each gate failure, apply the narrowest fix:
-
-| Failure | Fix |
+| Continue | Stop |
 |---|---|
-| **Type error** | Fix the type annotation or the code producing incompatible types |
-| **Lint error** | `npx eslint --fix .` (or equivalent) — if still failing, fix manually |
-| **Test failure** | Read the test to understand expectations, fix implementation |
-| **Missing `[x]`** | Verify the step is actually done, then check it off |
-| **Stub (TODO/FIXME in code)** | Replace with working implementation |
-| **Stub (empty component)** | Wire up real props, handlers, and rendering |
-| **Criterion not met** | Look at what's missing, implement it |
+| Same kind of failure, fix is clear | Different kind of failure (signal of deeper issue) |
+| Errors decreasing | Errors plateauing or increasing |
+| Root cause narrowing | New errors introduced each iteration |
+| Fix scope understood | Fix scope growing each iteration |
 
-## Exit Conditions
+## Iteration Cap
 
-Stop when any of these are true:
+Always set N. The cap protects against:
+- Loops where the fix introduces new errors
+- Loops where the gap is unclear (you'll burn the whole session)
+- Loops where the design is wrong (fixing implementation won't help)
 
-1. **All gates pass** — success, work is clean
-2. **Max iterations reached** — report remaining issues honestly
-3. **No progress** — the same failures exist as the previous iteration (nothing left to auto-fix). Report and stop instead of spinning.
+After N iterations with the same shape of error, **escalate**: the problem is probably upstream of the implementation.
 
-## Multi-File Changes
+## Common Mistakes
 
-For changes spanning 3+ files:
-- After auto-fixing in an iteration, run the full gate suite again — fixing one file may break another
-- Pay special attention to integration points (imports, type exports, function signatures)
-- Check that the diff still makes sense after fixes — auto-fixes can produce weird code
+No iteration cap (infinite loop); counting iterations on a single tool (each tool call doesn't count); fixing the symptom not the cause; re-running the gate before the fix (why?); reverting to "no change" between iterations (lost progress); treating "fewer errors" as success (errors could beplate, not decrease); iterating past the cap; scope creep in the fix (now you're doing cleanup, not fix).
 
-## Report
+## Red Flags
 
-Always output this summary after the loop:
+Loop has no max; iterations counted wrong; "fix" introduces new errors (regression); same Nth attempt as 1st (no learning); scope grew with each iteration (now you're redesigning); error count isn't actually decreasing; gate changed between iterations (different test); "I think it's better" without re-running the gate.
 
-```
-Quality loop: <iterations>/<max> iterations
-  Typecheck:  pass | fail (<details>)
-  Lint:       pass | fail (<details>)
-  Tests:      pass (<N>/<N>) | fail (<details>)
-  TODO.md:    pass (<N>/<N>) | fail (<details>)
-  Stubs:      pass | fail (<details>)
-  Criteria:   pass | fail (<details>)
-  Fixes applied: <N>
-  Clean:      yes | no
+## Self-Quiz
 
-  Remaining (if any):
-  - file:line — description
-  - file:line — description
-```
-
-## Example
-
-```markdown
-Quality loop: 2/3 iterations
-  Typecheck:  pass
-  Lint:       pass
-  Tests:      pass (14/14)
-  TODO.md:    pass (6/6)
-  Stubs:      pass
-  Criteria:   pass
-  Fixes applied: 2
-  Clean:      yes
-```
-
-Not clean:
-
-```markdown
-Quality loop: 3/3 iterations
-  Typecheck:  pass
-  Lint:       fail (2 warnings — no-console, unused-vars)
-  Tests:      pass (14/14)
-  TODO.md:    pass (6/6)
-  Stubs:      pass
-  Criteria:   pass
-  Fixes applied: 3
-  Clean:      no
-
-  Remaining:
-  - src/utils.ts:42 — unused variable 'temp'
-  - src/auth.ts:15 — console.log left in production code
-```
+- Is the gate named explicitly? (not "tests" but `npm test` or specific file)
+- Is there a cap? What is it?
+- Are iterations on the gate, not on guesses?
+- Is each fix the smallest that resolves the most?
+- Am I escalating when the cap is hit (or sooner)?

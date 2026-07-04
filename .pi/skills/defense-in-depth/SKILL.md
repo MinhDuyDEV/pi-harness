@@ -8,183 +8,75 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Defense-in-Depth Validation
-
-> **Replaces** single-layer validation where bad data propagates silently until it causes cryptic failures deep in execution
+# Defense in Depth
 
 ## When to Use
 
-- A bug is caused by invalid data flowing through multiple layers
-- One validation check is insufficient because data crosses boundaries
+Invalid data causes failures deep in the stack; type system alone isn't enough; trust boundary crossing is unclear; "valid here, invalid there" recurs.
 
 ## When NOT to Use
 
-- Simple, single-layer validation at an obvious entry point is enough
-- The issue is unrelated to invalid data or boundary checks
+Single boundary (one validation point is enough); internal data flow; perf-critical and re-validation cost is real (rare).
 
-## Common Rationalizations
+## Core Principle
 
-| Rationalization                                  | Rebuttal                                                                                                  |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| "One validation at the entry point is enough"    | Different code paths, refactors, and mocks all bypass a single gate — each layer catches what others miss |
-| "This adds too much boilerplate"                 | Each validation is 2-3 lines. The bug it prevents costs hours of debugging                                |
-| "The caller already validates this"              | You don't control the caller. New callers won't know your assumptions                                     |
-| "Tests will catch it"                            | Tests run after the fact. Validation prevents the bug from existing                                       |
-| "This is an internal function, input is trusted" | Internal functions get called from new paths during refactors. Trust no input                             |
+**Validate at every layer data passes through.** Each layer is a trust boundary. Boundaries exist at: network, persistence, third-party, internal module, type-changing transformation. Each boundary gets a schema.
+
+Don't trust upstream to validate. Don't trust downstream to be robust. Validate at the boundary you're crossing.
+
+## Layer Map
+
+```
+[Network]  ←  schema validation
+   ↓
+[Controller]  ←  decode + parse path/query/body
+   ↓
+[Service]  ←  validate pre-conditions + domain rules
+   ↓
+[Repository]  ←  validate shape, sanitize for SQL
+   ↓
+[Database]  ←  constraints, types, CHECK
+```
+
+Each arrow is a boundary. Each boundary validates.
+
+## When to Validate
+
+| Boundary | Validate? | Why |
+|---|---|---|
+| HTTP request | YES | Untrusted input from anywhere |
+| Job queue input | YES | Queued by another service / version |
+| Internal function call | NO | Types should be enough |
+| DB read into domain type | YES | DB schema ≠ domain schema |
+| Config / env var | YES | Operator can set anything |
+| User-provided file | YES | Untrusted bytes |
+
+Anything from outside the type system (network, queue, file, env, DB) gets validated. Within (function calls), trust the type.
+
+## Defense Patterns
+
+1. **Schema at the boundary.** Decode unknown → typed value.
+2. **Domain validation.** "User with this email exists" — service layer.
+3. **DB constraints.** Belt and suspenders: even if app validation fails, the DB refuses.
+4. **Type narrowing.** `unknown` → narrow → use. Never use `any` to skip.
+5. **Errors as data.** Failed validation is a typed error, not an exception.
+
+## Why Multiple Validations
+
+- **App validation** catches the most common cases (UX matters)
+- **DB constraints** catch the rest (safety net, race conditions)
+- **Multiple checks** mean a bug in one layer doesn't propagate
+
+The cost of re-validating is real but small compared to the cost of corrupt data.
+
+## Common Mistakes
+
+Validation only at network (deep code trusts the type, gets garbage); validation only at DB (bad UX); `as any` to skip; "we trust this source" (sources change); validation scattered; validation in business logic; no validation for env vars or queue messages.
+
+## Red Flags
+
+`as any` near boundary; validation only at network; "we trust this source"; no validation for env / queue; validation in middle of function (should be at boundary); try/catch for validation (errors are data); no DB constraints; "the type system catches it" (catches what you typed, not what user sent).
 
 ## Anti-Patterns
 
-| Anti-Pattern                                             | Why It Fails                                  | Instead                                                      |
-| -------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------ |
-| Validating only at the entry point (trusting downstream) | Alternate paths and refactors bypass one gate | Add independent checks at each boundary                      |
-| Duplicating identical validation at every layer          | Creates noise without improving safety        | Tailor each layer to boundary-specific invariants            |
-| Catching and swallowing errors silently                  | Hides failures and delays detection           | Raise explicit errors with actionable context                |
-| Mixing validation with business logic                    | Makes behavior hard to reason about and test  | Keep validation checks explicit and separate from core logic |
-
-## Overview
-
-When you fix a bug caused by invalid data, adding validation at one place feels sufficient. But that single check can be bypassed by different code paths, refactoring, or mocks.
-
-**Core principle:** Validate at EVERY layer data passes through. Make the bug structurally impossible.
-
-## Why Multiple Layers
-
-Single validation: "We fixed the bug"
-Multiple layers: "We made the bug impossible"
-
-Different layers catch different cases:
-
-- Entry validation catches most bugs
-- Business logic catches edge cases
-- Environment guards prevent context-specific dangers
-- Debug logging helps when other layers fail
-
-## The Four Layers
-
-### Layer 1: Entry Point Validation
-
-**Purpose:** Reject obviously invalid input at API boundary
-
-```typescript
-function createProject(name: string, workingDirectory: string) {
-  if (!workingDirectory || workingDirectory.trim() === "") {
-    throw new Error("workingDirectory cannot be empty");
-  }
-  if (!existsSync(workingDirectory)) {
-    throw new Error(`workingDirectory does not exist: ${workingDirectory}`);
-  }
-  if (!statSync(workingDirectory).isDirectory()) {
-    throw new Error(`workingDirectory is not a directory: ${workingDirectory}`);
-  }
-  // ... proceed
-}
-```
-
-### Layer 2: Business Logic Validation
-
-**Purpose:** Ensure data makes sense for this operation
-
-```typescript
-function initializeWorkspace(projectDir: string, sessionId: string) {
-  if (!projectDir) {
-    throw new Error("projectDir required for workspace initialization");
-  }
-  // ... proceed
-}
-```
-
-### Layer 3: Environment Guards
-
-**Purpose:** Prevent dangerous operations in specific contexts
-
-```typescript
-async function gitInit(directory: string) {
-  // In tests, refuse git init outside temp directories
-  if (process.env.NODE_ENV === "test") {
-    const normalized = normalize(resolve(directory));
-    const tmpDir = normalize(resolve(tmpdir()));
-
-    if (!normalized.startsWith(tmpDir)) {
-      throw new Error(`Refusing git init outside temp dir during tests: ${directory}`);
-    }
-  }
-  // ... proceed
-}
-```
-
-### Layer 4: Debug Instrumentation
-
-**Purpose:** Capture context for forensics
-
-```typescript
-async function gitInit(directory: string) {
-  const stack = new Error().stack;
-  logger.debug("About to git init", {
-    directory,
-    cwd: process.cwd(),
-    stack,
-  });
-  // ... proceed
-}
-```
-
-## Applying the Pattern
-
-When you find a bug:
-
-1. **Trace the data flow** - Where does bad value originate? Where used?
-2. **Map all checkpoints** - List every point data passes through
-3. **Add validation at each layer** - Entry, business, environment, debug
-4. **Test each layer** - Try to bypass layer 1, verify layer 2 catches it
-
-## Example from Session
-
-Bug: Empty `projectDir` caused `git init` in source code
-
-**Data flow:**
-
-1. Test setup → empty string
-2. `Project.create(name, '')`
-3. `WorkspaceManager.createWorkspace('')`
-4. `git init` runs in `process.cwd()`
-
-**Four layers added:**
-
-- Layer 1: `Project.create()` validates not empty/exists/writable
-- Layer 2: `WorkspaceManager` validates projectDir not empty
-- Layer 3: `WorktreeManager` refuses git init outside tmpdir in tests
-- Layer 4: Stack trace logging before git init
-
-**Result:** All 1847 tests passed, bug impossible to reproduce
-
-## Key Insight
-
-All four layers were necessary. During testing, each layer caught bugs the others missed:
-
-- Different code paths bypassed entry validation
-- Mocks bypassed business logic checks
-- Edge cases on different platforms needed environment guards
-- Debug logging identified structural misuse
-
-**Don't stop at one validation point.** Add checks at every layer.
-
-## Verification
-
-- Test with invalid input at each layer boundary — each should reject independently.
-- Remove one validation layer — the next layer should still catch the error.
-
-## See Also
-
-- **structured-edit** - Reliable read/verify/edit workflow when changing validation code across layers
-
-## Skill Result Contract
-
-```xml
-<skill_result>
-  <skill>defense-in-depth</skill>
-  <status>success|partial|blocked|failure</status>
-  <evidence>Verification checklist results and commands/checks run</evidence>
-  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
-  <risks>Skipped checks, unresolved assumptions, or none</risks>
-</skill_result>
-```
+**Validation only at network**; **validation only at DB**; **`as any` to skip**; **no env validation**; **validation in business logic**; **try/catch for validation**; **"we trust this"**; **no DB constraints**.

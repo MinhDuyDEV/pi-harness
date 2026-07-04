@@ -10,230 +10,98 @@ tools: []
 
 # Documentation & ADRs
 
-> **Replaces** undocumented architectural decisions and stale wiki pages with living documentation that stays close to code
-
 ## When to Use
 
-- Making a significant architectural decision that should be recorded
-- Writing or updating project documentation (README, guides, API docs)
-- Onboarding documentation needs updating
-- Code has complex behavior that isn't obvious from reading it
+Project docs (README, contributing, onboarding); real architectural decisions (ADR); API docs; design docs that outlive the conversation; postmortems; runbooks.
 
 ## When NOT to Use
 
-- Code is self-documenting (clear naming, simple logic, typed interfaces)
-- Writing comments that restate what the code does (comment the why, not the what)
-- Documentation for throwaway prototypes
+Doc is a code comment; no real decision was made; "let me document this" without audience; ephemeral context (use chat).
 
-## Overview
+## Doc Hierarchy
 
-Documentation has two purposes: **decisions** (why things are the way they are) and **usage** (how to use them). ADRs handle the first. Guides, READMEs, and API docs handle the second.
+```
+README.md          ← first thing. What is this, who is it for, how to use it.
+ARCHITECTURE.md    ← system shape, modules, data flow.
+docs/
+  adr/             ← WHY we chose X over Y.
+  api/             ← API reference.
+  guides/          ← task-oriented.
+  runbooks/        ← operational.
+  postmortems/     ← incident retrospectives.
+```
 
-**Core principle:** Document decisions when they're made, not months later when context is lost. Keep docs next to the code they describe.
+Don't mix levels. A guide is not an ADR. A runbook is not a guide.
 
-## Architecture Decision Records (ADRs)
-
-### When to Write an ADR
-
-- Choosing between technologies, frameworks, or approaches
-- Establishing a pattern that the team should follow
-- Deviating from an existing convention (and why)
-- Any decision you'd want to explain to a new team member in 6 months
-
-### ADR Template
+## ADR Format
 
 ```markdown
-# ADR-NNN: [Decision Title]
+# ADR-NNN: Title
 
-## Status
-
-[Proposed | Accepted | Deprecated | Superseded by ADR-XXX]
-
-## Context
-
-What is the issue we're facing? What constraints exist?
-[2-5 sentences describing the problem and constraints]
-
-## Decision
-
-What did we decide to do?
-[1-3 sentences stating the decision clearly]
-
-## Alternatives Considered
-
-| Option   | Pros | Cons | Verdict            |
-| -------- | ---- | ---- | ------------------ |
-| Option A | ...  | ...  | Chosen             |
-| Option B | ...  | ...  | Rejected: [reason] |
-| Option C | ...  | ...  | Rejected: [reason] |
-
-## Consequences
-
-### Positive
-
-- [Good outcomes]
-
-### Negative
-
-- [Trade-offs accepted]
-
-### Risks
-
-- [Things that could go wrong]
+**Status:** proposed | accepted | deprecated | superseded by ADR-XXX
+**Date:** YYYY-MM-DD
+**Context:** [What is the situation? What forces are at play?]
+**Decision:** [What did we choose?]
+**Consequences:** [What becomes easier? What becomes harder? What did we give up?]
+**Alternatives considered:** [What else was on the table, and why not?]
 ```
 
-### ADR File Location
+**Context** and **Consequences** are the most-skipped and most-load-bearing. Without them, the next person can't tell if the decision still applies.
 
-```
-docs/adr/
-├── 001-use-typescript.md
-├── 002-choose-react-over-vue.md
-├── 003-api-versioning-strategy.md
-└── template.md
-```
+## When to Write an ADR
 
-**Naming:** `NNN-kebab-case-title.md` — numbered for ordering, kebab-case for readability.
+- Two+ viable options, with real trade-offs.
+- Hard to reverse.
+- Will be questioned later.
+- Affects system shape, not just implementation detail.
 
-## README Structure
+## When NOT to Write an ADR
 
-### Minimum Viable README
-
-```markdown
-# Project Name
-
-One-line description of what this does.
-
-## Quick Start
-
-[3-5 commands to get running]
-
-## Development
-
-[How to build, test, lint]
-
-## Architecture
-
-[Brief overview or link to docs/]
-
-## Contributing
-
-[Link to CONTRIBUTING.md or inline guide]
-```
-
-### README Anti-Patterns
-
-| Anti-Pattern                        | Fix                             |
-| ----------------------------------- | ------------------------------- |
-| "See wiki for docs" (wiki is stale) | Keep docs in repo, next to code |
-| Huge README (>500 lines)            | Split into docs/ directory      |
-| No Quick Start section              | First thing a new dev needs     |
-| Setup instructions that don't work  | CI should verify setup steps    |
-
-## API Documentation
-
-### In-Code Documentation
-
-````typescript
-/**
- * Create a new project workspace.
- *
- * @param name - Project name (1-100 chars, alphanumeric + hyphens)
- * @param options - Configuration options
- * @returns The created project with generated ID
- * @throws {ValidationError} If name is invalid
- * @throws {ConflictError} If project name already exists
- *
- * @example
- * ```typescript
- * const project = await createProject('my-app', { template: 'react' });
- * console.log(project.id); // "proj_abc123"
- * ```
- */
-export async function createProject(
-  name: string,
-  options?: CreateProjectOptions,
-): Promise<Project> {
-````
-
-### Documentation Comments Rules
-
-| Do                                               | Don't                                |
-| ------------------------------------------------ | ------------------------------------ |
-| Document the **why**                             | Restate the code as prose            |
-| Document **contracts** (inputs, outputs, errors) | Document obvious getters/setters     |
-| Document **non-obvious behavior**                | Document every function              |
-| Include **examples** for complex APIs            | Write examples for self-evident APIs |
+- One viable option (just the way it is).
+- Implementation detail (variable name, function sig).
+- Easy to reverse (do it; document in code).
+- No real trade-off.
 
 ## Keeping Docs in Sync
 
-### Documentation Debt Signals
+- Doc-as-code: docs live in the same repo, same review process.
+- Update on the same PR as the code change.
+- Stale doc = no doc. A wrong doc is worse than no doc.
+- Doc rot = 6+ months untouched. Delete or update.
 
-- README references files that don't exist
-- Setup instructions fail on clean checkout
-- API docs describe removed/renamed endpoints
-- ADRs reference superseded decisions without linking forward
+## README Anatomy
 
-### Automation
+```markdown
+# Project Name
+[One sentence: what is this?]
 
-```yaml
-# CI check: verify docs are not stale
-- name: Check links
-  run: npx markdown-link-check README.md docs/**/*.md
+## Why
+[One paragraph: why does this exist? What problem does it solve?]
 
-- name: Verify setup instructions
-  run: |
-    # Run the Quick Start commands from README
-    npm install
-    npm run build
-    npm test
+## Install
+[Exact commands. Tested on a fresh machine.]
+
+## Usage
+[Smallest working example.]
+
+## Architecture
+[One diagram or paragraph. Link to ARCHITECTURE.md for details.]
+
+## Contributing
+[Link to CONTRIBUTING.md. Or inline if small.]
+
+## License
+[SPDX identifier.]
 ```
 
-## Common Rationalizations
+## Common Mistakes
 
-| Excuse                         | Rebuttal                                                                |
-| ------------------------------ | ----------------------------------------------------------------------- |
-| "The code is self-documenting" | Code shows what, not why. Decisions need context.                       |
-| "Nobody reads the docs"        | Because the docs are stale. Fresh docs get read.                        |
-| "I'll document it later"       | You won't. Context decays faster than you think.                        |
-| "ADRs are overhead"            | An ADR takes 10 minutes. Re-debating the decision takes hours.          |
-| "We use Notion/Confluence"     | Docs in external tools drift from code. Keep docs in repo.              |
-| "Comments get stale"           | So delete stale comments. But contracts and decisions need documenting. |
+ADR for every choice (noise); doc that's just code comments copy-pasted; doc written once and never updated; "comprehensive" docs no one reads; ADR without alternatives; runbooks that assume context; no table of contents; mixing levels; outdated examples; missing "Why" section.
 
-## Red Flags — STOP
+## Red Flags
 
-- Architecture changed but no ADR recorded
-- README setup instructions haven't been tested in >30 days
-- API docs describe behavior that doesn't match implementation
-- Decision was made in Slack/meeting with no written record
-- New team member can't set up the project from docs alone
+Doc rot (> 6 months); ADR without context or consequences; runbook without commands; README without "Why" or "Install"; no link between doc and code; doc only in chat (lost); "we'll document later"; examples that don't run.
 
-## Verification
+## Anti-Patterns
 
-- [ ] Significant decisions have ADRs with status, context, and alternatives
-- [ ] README Quick Start works on a clean checkout
-- [ ] API functions with complex behavior have JSDoc with examples
-- [ ] No dead links in documentation
-- [ ] Docs live in the repo (not external wiki only)
-
-## See Also
-
-- **api-and-interface-design** — API docs are part of the interface contract
-- **deprecation-and-migration** — Deprecation decisions warrant ADRs
-- **prd** — Product requirements docs (higher-level than ADRs)
-
-## Skill Result Contract
-
-```xml
-<skill_result>
-  <skill>documentation-and-adrs</skill>
-  <status>success|partial|blocked|failure</status>
-  <evidence>Verification checklist results and commands/checks run</evidence>
-  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
-  <risks>Skipped checks, unresolved assumptions, or none</risks>
-</skill_result>
-```
-
-
-## Consolidated Knowledge Documentation
-
-`index-knowledge` was removed as a separate optional skill. Keep durable project knowledge, hierarchical docs, architectural notes, and AGENTS.md-style documentation updates in this documentation workflow.
+**ADR for trivial**; **doc without audience**; **stale doc**; **"comprehensive" wall**; **no link to code**; **ADR with no alternatives**.

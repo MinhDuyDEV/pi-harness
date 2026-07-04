@@ -10,171 +10,77 @@ tools: []
 
 # API & Interface Design
 
-> **Replaces** ad-hoc API creation where endpoints, error shapes, and versioning are afterthoughts
+## Iron Laws
 
-## When to Use
+<EXTREMELY-IMPORTANT>
+- **Contract first, implementation second.** The API is the contract. Internal code can change freely; the contract cannot.
+- **Version explicitly.** `/v1/`, `/v2/`, or header. Implied versions break unexpectedly.
+- **Errors are part of the contract.** Shape them as deliberately as the success response.
+- **Backward compatibility is a feature.** Breaking changes cost users; every break must justify.
+- **Document what you ship, not what you intended.** Generated docs from the schema, not hand-written.
+</EXTREMELY-IMPORTANT>
 
-- Designing a new API endpoint, SDK method, or public module interface
-- Reviewing or extending an existing API for backward compatibility
-- Defining error responses, pagination, or authentication contracts
+## Contract-First Design
 
-## When NOT to Use
+1. **Write the schema** (OpenAPI, GraphQL SDL, Protobuf, JSON Schema).
+2. **Generate types** from the schema (client + server).
+3. **Validate** at the boundary (decode unknown → typed value).
+4. **Implement** against the types, not the raw input.
 
-- Internal-only helper functions that no external code calls
-- Prototyping where the API shape will change frequently (use after stabilization)
+Never let a request body reach the implementation as `any` or `unknown`. Decode first.
 
-## Overview
+## Versioning Strategy
 
-APIs are contracts. Once published, they're hard to change without breaking consumers. Design the contract first, implement second.
+| Strategy | When |
+|---|---|
+| URL path (`/v1/`, `/v2/`) | Public API, multiple versions live simultaneously |
+| Header (`Accept: application/vnd.api+json;v=2`) | Internal API, more flexible |
+| Query param (`?v=2`) | Web-only, simple cases |
+| None (breaking is breaking) | Internal-only, single consumer |
 
-**Core principle:** Define the contract (types, errors, versioning) before writing implementation. Make breaking changes impossible through careful interface design.
+For public APIs, prefer URL path. It's visible, cacheable, and easy to reason about.
 
-**Aim for deep endpoints.** A "deep endpoint" has a small, stable interface (few params, consistent response shape, simple error model) that hides significant backend complexity. A "shallow endpoint" requires callers to understand database structure, job scheduling, or domain internals to use it correctly. Every API endpoint should hide more than it reveals.
+## Error Shape
 
-**Pull complexity downward** — if an operation is complex, handle it server-side, not in the client. The API should absorb complexity so callers don't have to.
-
-## Contract-First Process
-
-```
-1. DEFINE  — Write TypeScript types / OpenAPI schema for request & response
-2. REVIEW  — Check backward compatibility, error coverage, naming consistency
-3. IMPLEMENT — Code against the contract, not the other way around
-4. VERIFY  — Validate implementation matches contract exactly
-```
-
-## API Design Checklist
-
-### Naming
-
-- [ ] Resource-oriented URLs (nouns, not verbs): `/users/{id}` not `/getUser`
-- [ ] Consistent casing (camelCase for JSON fields, kebab-case for URLs)
-- [ ] Plural collection names: `/users` not `/user`
-- [ ] Avoid abbreviations — `configuration` not `config` in public APIs
-
-### Request Design
-
-- [ ] Use appropriate HTTP methods (GET reads, POST creates, PUT replaces, PATCH updates, DELETE removes)
-- [ ] Validate all input with schemas (zod, JSON Schema) at the boundary
-- [ ] Accept only what you need — reject unknown fields
-- [ ] Use query params for filtering/pagination, body for creation/mutation
-
-### Response Design
-
-- [ ] Consistent envelope: `{ data, error, meta }` or flat depending on convention
-- [ ] Include pagination metadata: `{ total, page, pageSize, hasMore }`
-- [ ] Return created/updated resource in mutation responses
-- [ ] Use ISO 8601 for dates, UTC always
-
-### Error Design
-
-```typescript
-// Consistent error shape
-interface ApiError {
-  code: string; // machine-readable: "VALIDATION_ERROR", "NOT_FOUND"
-  message: string; // human-readable description
-  details?: unknown; // field-level errors, context
-  requestId?: string; // correlation ID for debugging
+```json
+{
+  "error": {
+    "code": "user_not_found",
+    "message": "User 123 not found",
+    "details": { "userId": "123" },
+    "traceId": "abc-def-ghi"
+  }
 }
 ```
 
-- [ ] Use standard HTTP status codes correctly (400 vs 422 vs 500)
-- [ ] Never expose stack traces or internal errors to clients
-- [ ] Include actionable error messages
-- [ ] Document all possible error codes per endpoint
+Always: machine-readable `code` (stable, never localized), human-readable `message` (localized OK), `details` (structured context), `traceId` (correlation). Never: stack traces, internal paths, secrets.
 
-### Versioning
+## Backward Compatibility
 
-| Strategy      | When                               | Example                               |
-| ------------- | ---------------------------------- | ------------------------------------- |
-| URL prefix    | Breaking changes to resources      | `/v1/users`, `/v2/users`              |
-| Header        | Breaking changes, same URL desired | `Accept: application/vnd.api.v2+json` |
-| Query param   | Simple, low-ceremony               | `/users?version=2`                    |
-| No versioning | Internal APIs, single consumer     | Direct updates                        |
+**Add only.** Don't change existing field meanings. Don't tighten validation. Don't remove fields. Don't rename.
 
-**Default:** URL prefix versioning for public APIs, no versioning for internal.
+If you must break: new version, deprecation period, migration guide, codemod if possible.
 
-### Backward Compatibility Rules
+## Idempotency
 
-| Safe (Non-Breaking)       | Unsafe (Breaking)        |
-| ------------------------- | ------------------------ |
-| Add optional fields       | Remove or rename fields  |
-| Add new endpoints         | Change field types       |
-| Add new enum values       | Remove enum values       |
-| Widen input validation    | Tighten input validation |
-| Add optional query params | Change URL structure     |
+`PUT` should be idempotent. `POST` for creation can be made idempotent with an `Idempotency-Key` header. `DELETE` should be idempotent. The client should be able to retry safely.
 
-## Common Rationalizations
+## Pagination
 
-| Excuse                           | Rebuttal                                                                 |
-| -------------------------------- | ------------------------------------------------------------------------ |
-| "It's just an internal API"      | Internal APIs become external. Design the contract now.                  |
-| "We can change it later"         | Every consumer you add makes changes harder. Get it right early.         |
-| "The frontend team will adapt"   | Consumers shouldn't break because you didn't plan the interface.         |
-| "Error handling is boilerplate"  | Inconsistent errors cause more debugging than any boilerplate saves.     |
-| "Versioning is overkill for now" | Adding versioning later requires migrating all consumers simultaneously. |
+Prefer **cursor-based** for feeds and large lists. Skip-relations are slow on big tables. Return a `nextCursor` and `hasMore`. Document the cursor format if you can.
 
-## TypeScript Patterns
+## Rate Limiting
 
-### Strict Input/Output Types
+Return headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After` (on 429). Make limits visible. Document them.
 
-```typescript
-// ✅ Separate input and output types
-interface CreateUserInput {
-  name: string;
-  email: string;
-}
+## Common Mistakes
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  createdAt: string; // ISO 8601
-}
+Schema after impl (backwards); no version; generic errors; no idempotency; no pagination (returns 10k items); no rate limit headers; breaking without bump; hand-written docs; field reused for new purpose; no `traceId`; asymmetric shapes.
 
-// ✅ Validate at boundary
-const createUserSchema = z.object({
-  name: z.string().min(1).max(100),
-  email: z.string().email(),
-});
-```
+## Red Flags
 
-### Discriminated Unions for Results
+`/api/` (no version); error as string; no idempotency; no pagination; no rate limit; hand-written docs; breaking in minor; field reused; no `traceId`; "schema is in the code".
 
-```typescript
-type ApiResult<T> = { success: true; data: T } | { success: false; error: ApiError };
-```
+## Anti-Patterns
 
-## Red Flags — STOP
-
-- Endpoint returns different shapes depending on internal state
-- Error responses have no consistent structure
-- URL contains verbs (`/createUser`, `/deleteItem`)
-- No input validation at the API boundary
-- Response includes internal database IDs or implementation details
-- Breaking change deployed without version bump
-
-## Verification
-
-- [ ] All endpoints have typed request/response schemas
-- [ ] Error responses follow the consistent error shape
-- [ ] Breaking changes increment the API version
-- [ ] Input validation rejects invalid/extra fields
-- [ ] Response matches documented contract exactly
-
-## See Also
-
-- **defense-in-depth** — Validation at every layer, not just the API boundary
-- **incremental-implementation** — Build API endpoints as thin vertical slices
-- **test-driven-development** — Write API contract tests before implementation
-
-## Skill Result Contract
-
-```xml
-<skill_result>
-  <skill>api-and-interface-design</skill>
-  <status>success|partial|blocked|failure</status>
-  <evidence>Verification checklist results and commands/checks run</evidence>
-  <artifacts>Files, docs, tests, or decisions created/changed</artifacts>
-  <risks>Skipped checks, unresolved assumptions, or none</risks>
-</skill_result>
-```
+**Schema after impl**; **no version**; **generic errors**; **breaking without bump**; **hand-written docs**; **no idempotency**; **no pagination**; **silent breaking**.

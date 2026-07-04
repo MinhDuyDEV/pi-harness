@@ -168,6 +168,67 @@ const TARGETS: SkillSpec[] = [
     maxWords: 500,
     markers: ["tautology", "mock", "seam", "behavior", "production"],
   },
+  // --- Batch 3: next 12 most-loaded (2026-07-04) ---
+  {
+    name: "figma",
+    maxWords: 500,
+    markers: ["FIGMA_API_KEY", "node_id", "tokens", "fetch"],
+  },
+  {
+    name: "fallow",
+    maxWords: 500,
+    markers: ["dead", "dupes", "health", "format json", "evidence"],
+  },
+  {
+    name: "code-cleanup",
+    maxWords: 500,
+    markers: ["lock behavior", "simplify", "delete", "verify", "scope"],
+  },
+  {
+    name: "quality-loop",
+    maxWords: 500,
+    markers: ["iterate", "cap", "gate", "fix", "escalate"],
+  },
+  {
+    name: "root-cause-tracing",
+    maxWords: 500,
+    markers: ["trace backward", "boundary", "hypothesis", "symptom", "regression test"],
+  },
+  {
+    name: "documentation-and-adrs",
+    maxWords: 500,
+    markers: ["ADR", "context", "consequences", "alternatives", "doc rot"],
+  },
+  {
+    name: "deprecation-and-migration",
+    maxWords: 500,
+    markers: ["deprecate", "migration", "codemod", "changelog", "major"],
+  },
+  {
+    name: "api-and-interface-design",
+    maxWords: 500,
+    markers: ["contract", "version", "idempotency", "error", "schema"],
+  },
+  {
+    name: "ci-cd-and-automation",
+    maxWords: 500,
+    markers: ["PR", "cache", "secret", "matrix", "deploy"],
+  },
+  {
+    name: "defense-in-depth",
+    maxWords: 500,
+    markers: ["boundary", "validate", "schema", "trust", "constraints"],
+  },
+  {
+    name: "performance-optimization",
+    maxWords: 500,
+    markers: ["measure", "baseline", "bottleneck", "Core Web Vitals", "algorithmic"],
+  },
+  {
+    name: "opensrc",
+    maxWords: 500,
+    markers: ["source", "verify", "version", "test", "hypothesis"],
+  },
 ];
 
 /** Count words in the body of a SKILL.md, excluding the YAML frontmatter (between the first two `---` markers). */
