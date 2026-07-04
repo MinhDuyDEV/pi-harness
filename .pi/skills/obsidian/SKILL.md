@@ -8,146 +8,75 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Obsidian Vault (MCP)
+# Obsidian (MCP)
 
 ## When to Use
 
-- When you need MCP-based read/write/search operations in an Obsidian vault.
+Reading, writing, or searching notes in an Obsidian vault via MCP; managing tags; creating new notes; importing content; organizing the vault; using Obsidian as a knowledge base.
 
 ## When NOT to Use
 
-- When the task does not involve an Obsidian vault or MCP access.
+Plain text files outside a vault (use regular file tools); "I'll just use Obsidian for this" when a file tool is faster; no Obsidian MCP available.
 
-## Available Tools
+## Core Operations
 
-### Read Operations
+| Action | Use |
+|---|---|
+| Read a note | `read_note` — by path, returns markdown |
+| Search notes | `search_notes` — full-text search |
+| Create note | `create_note` — path + content |
+| Update note | `update_note` — path + new content |
+| List notes in a folder | `list_notes` — by folder path |
+| Get tags | `get_tags` — all tags in the vault |
+| Add tag | `add_tag` — to a note |
+| Search by tag | `search_by_tag` — all notes with tag |
 
-| Tool                  | Purpose                           | Arguments                                         |
-| --------------------- | --------------------------------- | ------------------------------------------------- |
-| `read_note`           | Read note with parsed frontmatter | `path`, `prettyPrint`                             |
-| `read_multiple_notes` | Batch read (max 10)               | `paths[]`, `includeContent`, `includeFrontmatter` |
-| `get_frontmatter`     | Extract only frontmatter          | `path`                                            |
-| `get_notes_info`      | Get metadata without content      | `paths[]`                                         |
-| `list_directory`      | List files and directories        | `path`                                            |
+## Note Convention
 
-### Write Operations
+```markdown
+title: My Note
+tags: [project, reference]
+created: 2024-01-01
+aliases: [prod, main system]
 
-| Tool                 | Purpose                               | Arguments                                |
-| -------------------- | ------------------------------------- | ---------------------------------------- |
-| `write_note`         | Write note (overwrite/append/prepend) | `path`, `content`, `frontmatter`, `mode` |
-| `update_frontmatter` | Update frontmatter only               | `path`, `frontmatter`, `merge`           |
-| `delete_note`        | Delete note (requires confirmation)   | `path`, `confirmPath`                    |
-| `move_note`          | Move/rename note                      | `oldPath`, `newPath`, `overwrite`        |
+# My Note
 
-### Search & Tags
-
-| Tool           | Purpose                       | Arguments                                              |
-| -------------- | ----------------------------- | ------------------------------------------------------ |
-| `search_notes` | Search by content/frontmatter | `query`, `limit`, `searchContent`, `searchFrontmatter` |
-| `manage_tags`  | Add/remove/list tags          | `path`, `operation`, `tags[]`                          |
-
-## Write Modes
-
-| Mode        | Description                           |
-| ----------- | ------------------------------------- |
-| `overwrite` | Replace entire file content (default) |
-| `append`    | Add content to end of file            |
-| `prepend`   | Add content to beginning of file      |
-
-## Usage Examples
-
-### Read Notes
-
-```typescript
-// Read a single note
-read_note({ path: "projects/project-ideas.md" });
-
-// Read multiple notes
-read_multiple_notes({ paths: ["note1.md", "note2.md"], includeContent: true });
-
-// List directory
-list_directory({ path: "Projects" });
+Content in markdown. Use wikilinks `[[Other Note]]` for cross-references.
+Use `#tags` for inline tags. Use frontmatter for metadata.
 ```
 
-### Write Notes
+- One concept per note.
+- Wiki-links for cross-references.
+- Frontmatter for metadata.
+- Tags for categorization.
+- Folders for organization.
 
-```typescript
-// Create new note (overwrite)
-write_note({
-  path: "meeting-notes.md",
-  content: "# Team Meeting\n\n## Agenda\n- Project updates",
-  frontmatter: { title: "Team Meeting", date: "2025-02-13", tags: ["meetings", "team"] },
-  mode: "overwrite",
-});
+## Common Patterns
 
-// Append to existing note
-write_note({ path: "daily-log.md", content: "\n\n## 3:00 PM\n- Completed review", mode: "append" });
+```markdown
+# Daily Note (YYYY-MM-DD)
+## What I did
+- Task 1
+- Task 2
+
+## What I learned
+- Insight 1
+- Insight 2
+
+## Open questions
+- Question 1
 ```
 
-### Search & Tags
+Use daily notes for session logs, project notes for persistent knowledge, reference notes for external documentation.
 
-```typescript
-// Search notes
-search_notes({ query: "machine learning", limit: 5, searchContent: true });
+## Common Mistakes
 
-// Add tags
-manage_tags({ path: "research-notes.md", operation: "add", tags: ["important", "ai"] });
+One giant note (split it); no tags (can't find it); no frontmatter (missing metadata); broken wiki-links (typo); content in wrong folder; "I'll organize it later" (do it now); importing without categorization; no daily note for long sessions; duplication across notes; notes with no links (lonely notes); overwriting existing notes; using Obsidian for ephemeral content (use chat instead).
 
-// List tags
-manage_tags({ path: "research-notes.md", operation: "list" });
-```
+## Red Flags
 
-### Delete (Safe)
+"Giant note with everything"; no tags; no frontmatter; broken links; wrong folder; "organize later"; no daily note; duplicate notes; lonely notes; overwrite without merge; ephemeral content in vault; unlinked references; "I'll remember the structure" (you won't).
 
-```typescript
-// Delete requires confirmation (both paths must match)
-delete_note({ path: "old-draft.md", confirmPath: "old-draft.md" });
-```
+## Anti-Patterns
 
-## Configuration
-
-### Environment Variable
-
-Set your vault path:
-
-```bash
-export OBSIDIAN_VAULT_PATH="/path/to/your/obsidian/vault"
-```
-
-Or configure in opencode.json:
-
-```json
-{
-  "mcp": {
-    "obsidian": {
-      "command": "npx",
-      "args": ["@mauricio.wolff/mcp-obsidian", "/path/to/vault"]
-    }
-  }
-}
-```
-
-## Security
-
-- Path traversal protection: prevents access outside vault
-- Auto-excludes: `.obsidian`, `.git`, `node_modules`
-- Frontmatter validation: blocks dangerous objects
-- Confirmation required for deletions
-
-## Common Use Cases
-
-| Task                 | Tool             | Example                                                                       |
-| -------------------- | ---------------- | ----------------------------------------------------------------------------- |
-| List vault files     | `list_directory` | `list_directory({ path: "" })`                                                |
-| Read specific note   | `read_note`      | `read_note({ path: "tasks/project.md" })`                                     |
-| Create/update note   | `write_note`     | `write_note({ path: "new.md", content: "...", mode: "overwrite" })`           |
-| Search notes         | `search_notes`   | `search_notes({ query: "API", limit: 10 })`                                   |
-| Add tags             | `manage_tags`    | `manage_tags({ path: "note.md", operation: "add", tags: ["urgent"] })`        |
-| Append to daily note | `write_note`     | `write_note({ path: "daily/2025-02-13.md", content: "...", mode: "append" })` |
-
-## Tips
-
-- Use `prettyPrint: true` for debugging, `false` (default) for production
-- Batch reads with `read_multiple_notes` (max 10)
-- Search supports content and frontmatter filtering
-- Frontmatter is auto-parsed on read
+**One giant note** (split); **no tags**; **no frontmatter**; **broken links**; **wrong folder**; **"organize later"**; **no daily note**; **duplicate notes**; **overwriting**; **ephemeral content**; **no links**.

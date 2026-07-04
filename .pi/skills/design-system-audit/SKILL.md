@@ -10,151 +10,81 @@ tools: []
 
 # Design System Audit
 
-> **Replaces** separate, overlapping design review skills — unified design analysis covering UI patterns, design tokens, and visual properties
-
-Use this skill for end-to-end design analysis across code, screenshots, and design specs.
-
 ## When to Use
 
-- Auditing UI consistency across a component library or app
-- Documenting existing patterns before refactor or migration
-- Extracting/validating design tokens from implementation and visuals
-- Comparing rendered output against mockups/Figma/screenshots
+Reviewing an existing design system for consistency; checking token coverage; comparing implementation vs Figma spec; checking for silent drift; pre-launch visual QA; "does our design system hold together?"
 
-## When NOT to Use
+## Core Principle
 
-- Pure backend work with no user-facing UI
-- One-off micro tweak where system-level consistency is irrelevant
+**A design system is a contract between designers and developers.** The audit checks if both sides are honoring it. Broken tokens, mismatched spec, inconsistent patterns — each is a breach.
 
-## Modes
+## Audit Layers
 
-### UI Pattern Analysis
-Analyze component patterns, identify inconsistencies, document undocumented patterns.
+1. **Token coverage** — are all spec tokens implemented? Any missing?
+2. **Token usage** — are tokens used? Or raw values?
+3. **Component consistency** — does every component use the tokens?
+4. **Spec alignment** — does the component match the Figma spec?
+5. **Composition patterns** — do the components compose as expected?
 
-Focus areas:
+## Token Audit
 
-- Component variants and usage drift
-- Repeated interaction patterns (forms, tables, dialogs, navigation)
-- Pattern ownership (where canonical implementation should live)
-- Inconsistent states (hover/focus/disabled/error/loading)
-
-Deliverables:
-
-- Pattern inventory with file references
-- Consolidation candidates
-- Priority fixes by user impact
-
-### Design Token Audit
-Extract and verify color, typography, spacing tokens against implementation.
-
-Focus areas:
-
-- Color token usage vs one-off literals
-- Typography scale consistency (size/weight/line-height)
-- Spacing/radius/shadow value normalization
-- Semantic token gaps (text-muted, border-subtle, success, warning, etc.)
-
-Deliverables:
-
-- Token map (source of truth + current usage)
-- Drift report (where implementation diverges)
-- Proposed canonical token set and migration order
-
-### Visual Comparison
-Compare rendered output against mockups/specs with specific measurements.
-
-Focus areas:
-
-- Pixel-level spacing/sizing mismatches
-- Color differences (hex-level)
-- Typography mismatches (font, size, weight, line height)
-- Layout/responsive behavior across breakpoints
-
-Deliverables:
-
-- Spec-vs-implementation discrepancy list
-- Severity-ranked visual defects
-- Concrete fix list with measurable targets
-
-## Recommended Workflow
-
-1. **Scope**
-   - Identify target surfaces (pages/components/states/breakpoints)
-   - Gather artifacts (code paths, screenshots, mockups)
-
-2. **Inventory**
-   - Capture pattern and token inventory from code + visuals
-   - Note duplicates, drift, and undocumented conventions
-
-3. **Cross-Reference**
-   - Validate findings against design system tokens/components
-   - Distinguish intentional exceptions from accidental drift
-
-4. **Measure**
-   - Record measurable values for each issue:
-     - hex color
-     - px/rem size
-     - spacing/gap/padding values
-     - breakpoint-specific behavior
-
-5. **Report**
-   - Produce actionable findings with file:line and target value
-   - Group by severity and migration effort
-
-## Audit Output Template
-
-```markdown
-## Design Audit: [Scope]
-
-### Findings
-1. [Severity] [Issue]
-   - File: `path/to/file.tsx:123`
-   - Current: `#6B7280`, `14px`, `gap: 10px`
-   - Expected: `var(--color-text-muted)`, `13px`, `gap: 8px`
-   - Impact: [consistency/accessibility/brand mismatch]
-
-### Token Drift Summary
-- Colors: X one-offs, Y missing semantic mappings
-- Typography: X non-scale values
-- Spacing: X non-token values
-
-### Priority Actions
-- P0: [high impact, low effort]
-- P1: [high impact, medium effort]
-- P2: [design debt cleanup]
+```json
+{
+  "missing": ["color.warning.bg", "spacing.6xl"],
+  "raw-values": [
+    "16px margin in Dialog (should use spacing.4)",
+    "#333 instead of color.text.secondary in Tooltip"
+  ],
+  "drifted": ["Button radius is 8px, spec says 6px"]
+}
 ```
+
+Every raw value is a breach. Every missing token is a gap. Every drift is a visual inconsistency.
+
+## Pattern Checks
+
+- "How many distinct button styles exist?" (should be 3-5: primary, secondary, outline, ghost, danger)
+- "How many spacing values are used?" (should be 5-10, not 30+)
+- "How many typography styles?" (should be 8-12, not 1 or 30)
+- "Are borders consistent?" (same width, same color across components)
+- "Are focus states present?" (every interactive element)
+- "Is there a dark mode?" (and does it handle all tokens?)
+
+## Spec Alignment
+
+Compare the implementation against the design spec:
+
+| Check | Method |
+|---|---|
+| Color | Hex values vs spec tokens |
+| Typography | Family, size, weight, line-height |
+| Spacing | Padding, margin, gap |
+| Radius | Border radius on every component |
+| Shadow | Shadow tokens |
+| Iconography | Size, stroke, alignment |
+| States | Hover, active, disabled, focus, error |
+| Motion | Duration, easing, transforms |
+
+## Reporting
+
+For each finding:
+```
+[severity] Component / Token: What is wrong
+  - Expected: <spec>
+  - Found: <implementation>
+  - Fix: <what to change>
+```
+
+Severity: BLOCKER, SHOULD-FIX, NIT.
+
+## Common Mistakes
+
+No token audit (misses the most common drift); audit from memory, not from the spec; "looks fine" without measuring; checking only one layer (tokens but not patterns); no severity; "I'll fix it later" (fix now); audit on outdated codebase; comparing against an old spec; missing dark mode; missing focus states; "the component works" (does it adhere to the system?).
+
+## Red Flags
+
+Raw values where tokens exist; 5+ button variants; 30+ distinct spacing values; missing focus states; no dark mode (or dark mode just inverts); "looks fine" without measuring; spec and code diverge; missing states (hover, disabled, error); component in Figma ≠ component in code; no audit at all.
 
 ## Anti-Patterns
 
-| Anti-Pattern | Why It Hurts | Better Approach |
-| --- | --- | --- |
-| Vague feedback ("looks good") instead of specific measurements | Not actionable, impossible to verify | Report concrete values (hex, px/rem, exact delta) |
-| Not checking existing design tokens before proposing new values | Creates token sprawl and inconsistency | Map to existing tokens first; add new tokens only when justified |
-| Auditing in isolation without cross-referencing the design system | Flags intentional patterns as bugs | Validate each finding against canonical component/token sources |
-| Reporting visual issues without checking responsive breakpoints | Misses major UX regressions on mobile/tablet | Verify each issue across defined breakpoints and states |
-
-## Verification
-
-After audit: every finding should reference a specific file:line and measurable value (hex color, px size, etc.)
-
-Minimum quality gate:
-
-- Each finding has location + current value + expected value
-- Each recommendation maps to token/system guidance
-- Responsive states checked for impacted components
-
-## Storage
-
-- Save audits to `.pi/memory/design/audits/`
-- Save extracted token snapshots to `.pi/memory/design/tokens/`
-
-## See Also
-
-- `mockup-to-code`
-- `frontend-design`
-- `accessibility-audit`
-
-
-## Consolidated Pattern Research
-
-`ui-ux-research` and part of `web-design-guidelines` were removed as separate optional skills. Use this skill to analyze existing UI patterns, compare design-system implementations, audit consistency, and ground redesign decisions before changing UI.
+**No token audit**; **"looks fine"**; **one layer only**; **no severity**; **"fix later"**; **audit on outdated code**; **compare against old spec**; **missing dark mode**; **missing focus states**; **spec ≠ code**.

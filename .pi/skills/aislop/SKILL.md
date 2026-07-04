@@ -4,114 +4,56 @@ version: 1.0.0
 description: "Use when checking for AI-generated code slop — narrative comments, swallowed exceptions, console.log leftovers, as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind"
 ---
 
-# aislop — AI Slop Detection
+# AI Slop Detection
 
-Detect and remove patterns that AI coding agents leave behind: narrative comments, swallowed exceptions, debug leftovers, dead patterns, and more. 50+ rules across 8 languages. Deterministic (no LLM), sub-second scans.
+## Iron Laws
 
-**Install:** `npm install -g aislop` or `npx aislop@latest scan`
+- **Slop is not an opinion.** "This comment is unhelpful" is preference. "This comment restates the code" is fact.
+- **Narrative comments** — "Let me think about this…", "Now I'll check…", "The user is asking…". Remove them.
+- **Swallowed exceptions** — `catch(e) {}` or `catch(e) { console.error(e) }` with no handling. Surface them.
+- **`console.log` leftovers** — Debug output in production code. Delete them.
+- **`as any` casts** — "Just to unblock" translates to "permanently untyped". Flag them.
+- **Thin wrappers** — `callApi = () => api.call()` with no transformation. Remove them.
+- **Generic names** — `helper`, `util`, `manager`, `service` — the name tells you nothing. Rename them.
 
-**Hook:** Already installed — `aislop hook install --pi` runs after every Pi edit automatically.
+## When to Use
 
-## What it catches
+Code review after AI generation; checking a PR for AI tells; before merge; "this looks like AI wrote it" review; code-cleanup target identification.
 
-| Category | Examples |
-|---|---|
-| **Narrative comments** | `// Import React`, `// Return the value`, decorative separators, phase headers |
-| **Swallowed errors** | Empty `catch` blocks, catch-only-to-log, silent recovery |
-| **Debug leftovers** | `console.log`, `print()`, `dbg!()`, `todo!()` |
-| **Unnecessary code** | `as any`, `as unknown as X`, thin wrappers, redundant try-catch |
-| **Generic names** | `helper_1`, `data2`, `temp1` |
-| **Stubs** | Empty functions, TODO/FIXME without tracking, unreachable code |
-| **Dead code** | Unused imports, duplicate imports, duplicate type declarations |
-| **Security** | Hardcoded secrets, eval, SQL injection, vulnerable dependencies |
+## When NOT to Use
 
-## Commands
+The code is handwritten; the slop is already cleaned up; one-line change that's obviously correct.
 
-```bash
-# Quick scan (current dir)
-aislop scan                    # Text output
-aislop scan --json             # Structured JSON for agents
-aislop scan --changes          # Only changed files from HEAD
-aislop scan --staged           # Only staged files
+## The Slop Checklist
 
-# Auto-fix what's safe
-aislop fix                     # Auto-fix mechanical issues
-aislop fix --safe              # Only reversible fixes (imports, comments)
-aislop fix -f                  # Aggressive: deps, unused files
+- [ ] Comments that narrate ("Let me think", "First I'll", "Now I'll")
+- [ ] `console.log` / `print` / `console.warn` in production code
+- [ ] `catch` with empty body or only logging
+- [ ] `as any` or `as unknown as T` casts
+- [ ] Wrapper that does no transformation
+- [ ] `helper` / `util` / `manager` names
+- [ ] Dead code (exported but unused)
+- [ ] `TODO:` without owner or date
+- [ ] Duplicate code blocks (copy-paste)
+- [ ] Imported but unused
+- [ ] AI-shaped comments ("Let me add validation here")
 
-# CI gate
-aislop ci                      # Exit 1 if score < threshold
-aislop ci --changes --base origin/main  # Gate only PR changes
+## Defense
 
-# Init (creates .aislop/config.yml)
-aislop init                    # Default config
-aislop init --strict           # Enterprise: all engines, failBelow 85
+- Read the diff, not just the final file.
+- Check for narrative. Agents narrate; humans don't.
+- Run `rg 'console\.(log|warn|error)' --type ts` before commit.
+- Run `npx fallow dead --format json` before merge.
+- Don't approximate — each slop finding is a yes/no.
 
-# Other
-aislop rules                   # List all rules
-aislop badge                   # README badge URL
-aislop doctor                  # Check engines
-```
+## Common Mistakes
 
-## How it's integrated
+Calling structural issues "slop" (it's design, use a different skill); opinion masquerading as slop check ("I don't like this" is not slop); flagging AI comments in private code (the user wrote them); "I'll clean it up later" (clean now); missing `as any` because it's in a deep file; missing `console.log` because it's in a test.
 
-Three layers in Pi:
+## Red Flags
 
-| Layer | When | What |
-|---|---|---|
-| **Auto-inject** | After every write/edit | The `aislop` Pi extension (installed via `aislop hook install --pi`) catches slop in real time |
-| **Explicit diagnostics** | On-demand (`diagnostics` tool) | `aislop scan --json` runs alongside `tsc` and Fallow |
-| **Manual** | When you ask | Run `aislop scan --json` via `bash` for deeper investigation |
+"Let me think about this" comment; `catch (e) {}`; `as any`; wrapper that does nothing; `helper.ts`; `console.log` left; dead code; TODO without owner; copy-paste block; unused import; "I'll clean later".
 
-## Slop score
+## Anti-Patterns
 
-aislop outputs a 0-100 score:
-- **80-100**: Clean
-- **50-79**: Some slop — review findings
-- **0-49**: Heavy slop — needs cleanup
-
-Configure a minimum score gate in `.aislop/config.yml`:
-```yaml
-ci:
-  failBelow: 70
-```
-
-## Configuration
-
-Create `.aislop/config.yml` in your project root:
-
-```yaml
-# Severity overrides
-rules:
-  ai-slop/narrative-comment: warning
-  ai-slop/trivial-comment: "off"
-  security/hardcoded-secret: error
-
-# Exclusion paths
-exclude:
-  - "**/*.test.ts"
-  - src/generated
-
-# CI gate threshold
-ci:
-  failBelow: 70
-```
-
-Or suppress inline:
-```typescript
-// aislop-ignore-next-line ai-slop/empty-fallback -- options is validated upstream
-const opts = { ...defaults, ...(input || {}) };
-const legacy = doThing(); // aislop-ignore-line
-// aislop-ignore-file  -- place at top of file to skip it entirely
-```
-
-## Languages
-
-| Language | What's checked |
-|---|---|
-| TypeScript / JavaScript | All engines: formatting, linting, code quality, AI slop, security, architecture |
-| Python | AI slop (imports, exceptions, comments, `print` debug), security, code quality |
-| Go | AI slop, security, code quality |
-| Rust | AI slop (unwrap, todo!), security, code quality |
-| Ruby | AI slop, security, code quality |
-| PHP | AI slop, code quality |
+**Opinions as slop** ("I don't like"); **narrative in private code**; **"clean later"**; **miss `as any`**; **miss `console.log`**; **call design "slop"** (use code-review skill).

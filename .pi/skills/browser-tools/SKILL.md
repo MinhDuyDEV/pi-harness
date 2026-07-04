@@ -8,194 +8,68 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Browser Tools
-
-Chrome DevTools Protocol tools for agent-assisted web automation. These tools connect to Chrome running on `:9222` with remote debugging enabled.
-
-## Setup
-
-Run once before first use:
-
-```bash
-cd {baseDir}/browser-tools
-npm install
-```
-
-## Start Chrome
-
-```bash
-{baseDir}/browser-start.js              # Fresh profile
-{baseDir}/browser-start.js --profile    # Copy user's profile (cookies, logins)
-```
-
-Launch Chrome with remote debugging on `:9222`. Use `--profile` to preserve user's authentication state.
-
-## Navigate
-
-```bash
-{baseDir}/browser-nav.js https://example.com
-{baseDir}/browser-nav.js https://example.com --new
-```
-
-Navigate to URLs. Use `--new` flag to open in a new tab instead of reusing current tab.
-
-## Evaluate JavaScript
-
-```bash
-{baseDir}/browser-eval.js 'document.title'
-{baseDir}/browser-eval.js 'document.querySelectorAll("a").length'
-```
-
-Execute JavaScript in the active tab. Code runs in async context. Use this to extract data, inspect page state, or perform DOM operations programmatically.
-
-## Screenshot
-
-```bash
-{baseDir}/browser-screenshot.js
-```
-
-Capture current viewport and return temporary file path. Use this to visually inspect page state or verify UI changes.
-
-## Pick Elements
-
-```bash
-{baseDir}/browser-pick.js "Click the submit button"
-```
-
-**IMPORTANT**: Use this tool when the user wants to select specific DOM elements on the page. This launches an interactive picker that lets the user click elements to select them. The user can select multiple elements (Cmd/Ctrl+Click) and press Enter when done. The tool returns CSS selectors for the selected elements.
-
-Common use cases:
-- User says "I want to click that button" → Use this tool to let them select it
-- User says "extract data from these items" → Use this tool to let them select the elements
-- When you need specific selectors but the page structure is complex or ambiguous
-
-## Cookies
-
-```bash
-{baseDir}/browser-cookies.js
-```
-
-Display all cookies for the current tab including domain, path, httpOnly, and secure flags. Use this to debug authentication issues or inspect session state.
-
-## Extract Page Content
-
-```bash
-{baseDir}/browser-content.js https://example.com
-```
-
-Navigate to a URL and extract readable content as markdown. Uses Mozilla Readability for article extraction and Turndown for HTML-to-markdown conversion. Works on pages with JavaScript content (waits for page to load).
+# Browser Interaction
 
 ## When to Use
 
-- Testing frontend code in a real browser
-- Interacting with pages that require JavaScript
-- When user needs to visually see or interact with a page
-- Debugging authentication or session issues
-- Scraping dynamic content that requires JS execution
+You need to visibly interact with a web page (not headless); click, type, scroll, read rendered content; test a frontend (not just API); take screenshots for review; debug flaky CI by reproducing locally; "show me the page" requests.
 
----
+## When NOT to Use
 
-## Efficiency Guide
+Headless is sufficient (use Playwright); the task is API-level (use curl or fetch); no visual interaction needed (use `webclaw_scrape` or `web_fetch`); static page that doesn't need JS execution.
 
-### DOM Inspection Over Screenshots
+## Capabilities
 
-**Don't** take screenshots to see page state. **Do** parse the DOM directly:
+| Action | Use |
+|---|---|
+| Navigate to URL | `page.goto(url)` |
+| Get page content | `page.content()` — full HTML |
+| Screenshot | `page.screenshot()` |
+| Click element | `page.click("[data-testid=...]")` |
+| Type into input | `page.fill("[name=email]", "a@b.com")` |
+| Evaluate JS | `page.evaluate(() => document.title)` |
+| Console logs | `page.on("console", ...)` logs to output |
+| Network requests | `page.on("request", ...)` — watch XHR |
+
+## Common Patterns
+
+```python
+# Python (playwright)
+page = browser.new_page()
+page.goto("https://example.com")
+page.fill("input[name=email]", "user@example.com")
+page.click("button[type=submit]")
+page.wait_for_selector(".result")
+content = page.content()
+```
 
 ```javascript
-// Get page structure
-document.body.innerHTML.slice(0, 5000)
-
-// Find interactive elements
-Array.from(document.querySelectorAll('button, input, [role="button"]')).map(e => ({
-  id: e.id,
-  text: e.textContent.trim(),
-  class: e.className
-}))
+// JavaScript (playwright)
+await page.goto("https://example.com")
+await page.fill("input[name=email]", "user@example.com")
+await page.click("button[type=submit]")
+await page.waitForSelector(".result")
+const content = await page.content()
 ```
 
-### Complex Scripts in Single Calls
+## When to Fall Back
 
-Wrap everything in an IIFE to run multi-statement code:
+| Case | Fallback |
+|---|---|
+| Page needs login | Use `page.goto` with pre-set cookies |
+| Page blocks non-proxied browsers | Use `webclaw_scrape` for static content |
+| Page is a heavy SPA (React, Vue) | Browser tool is the right choice |
+| Just need text | `web_fetch` is cheaper |
+| Need to debug CSS | Browser tool — screenshot is best |
 
-```javascript
-(function() {
-  // Multiple operations
-  const data = document.querySelector('#target').textContent;
-  const buttons = document.querySelectorAll('button');
-  
-  // Interactions
-  buttons[0].click();
-  
-  // Return results
-  return JSON.stringify({ data, buttonCount: buttons.length });
-})()
-```
+## Common Mistakes
 
-### Batch Interactions
+`page.goto` without waiting (content not loaded); `screenshot` without visible layout; `click` on invisible element; `fill` before input is focused; not handling popups or new tabs; using browser for what Playwright CLI does faster; taking screenshots for text extraction; not closing the page (memory leaks).
 
-**Don't** make separate calls for each click. **Do** batch them:
+## Red Flags
 
-```javascript
-(function() {
-  const actions = ["btn1", "btn2", "btn3"];
-  actions.forEach(id => document.getElementById(id).click());
-  return "Done";
-})()
-```
+`page.goto` without `waitForSelector`; screenshot for text; browser for API tasks; not closing pages; ignoring console errors; "I'll just screenshot it" (use text extraction); using browser for static HTML (use web_fetch); too many tabs open at once.
 
-### Typing/Input Sequences
+## Anti-Patterns
 
-```javascript
-(function() {
-  const text = "HELLO";
-  for (const char of text) {
-    document.getElementById("key-" + char).click();
-  }
-  document.getElementById("submit").click();
-  return "Submitted: " + text;
-})()
-```
-
-### Reading App/Game State
-
-Extract structured state in one call:
-
-```javascript
-(function() {
-  const state = {
-    score: document.querySelector('.score')?.textContent,
-    status: document.querySelector('.status')?.className,
-    items: Array.from(document.querySelectorAll('.item')).map(el => ({
-      text: el.textContent,
-      active: el.classList.contains('active')
-    }))
-  };
-  return JSON.stringify(state, null, 2);
-})()
-```
-
-### Waiting for Updates
-
-If DOM updates after actions, add a small delay with bash:
-
-```bash
-sleep 0.5 && {baseDir}/browser-eval.js '...'
-```
-
-### Investigate Before Interacting
-
-Always start by understanding the page structure:
-
-```javascript
-(function() {
-  return {
-    title: document.title,
-    forms: document.forms.length,
-    buttons: document.querySelectorAll('button').length,
-    inputs: document.querySelectorAll('input').length,
-    mainContent: document.body.innerHTML.slice(0, 3000)
-  };
-})()
-```
-
-Then target specific elements based on what you find.
+**`goto` without wait**; **screenshot for text**; **browser for API**; **not closing pages**; **ignoring console errors**; **browser for static**; **too many tabs**.

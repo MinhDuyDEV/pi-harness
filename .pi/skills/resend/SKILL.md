@@ -8,168 +8,107 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Resend Email Platform
+# Resend (Email)
+
+## Iron Laws
+
+<EXTREMELY-IMPORTANT>
+- **React Email for templates, not string concatenation.** `emails/` directory, `jsx` components, first-class typing.
+- **`resend.emails.send()` with a typed payload.** Not `JSON.stringify` to a raw API.
+- **Inbound email webhook for reply handling.** Not polling, not IMAP.
+- **Templates in `emails/`, not in the API route.** `export WelcomeEmail = () => ...` is the pattern.
+- **Audience for bulk sends.** Single `to:` for transactional. `audienceId:` for marketing.
+</EXTREMELY-IMPORTANT>
 
 ## When to Use
 
-- When integrating Resend for sending/receiving emails or building React Email templates.
+Sending transactional emails; newsletter / bulk; inbound email handling; email templates; email + auth flows (magic link, verification, password reset); webhook handling.
 
-## When NOT to Use
-
-- When email delivery is handled by a different provider or not required.
-
-
-## How to Use This Skill
-
-### Reference File Structure
-
-Each feature in `./references/` contains documentation for specific use cases:
-
-| File               | Purpose                      | When to Read                                   |
-| ------------------ | ---------------------------- | ---------------------------------------------- |
-| `send-email.md`    | Sending transactional emails | Single/batch sends, attachments, scheduling    |
-| `receive-email.md` | Receiving inbound emails     | Webhooks, processing received mail, forwarding |
-| `react-email.md`   | Building email templates     | React components, styling, rendering           |
-
-### Reading Order
-
-1. Start with this file for quick routing
-2. Then read the relevant reference file for your task
-
-## Quick Decision Tree
-
-### "I need to send emails"
-
-```
-Need to send emails?
-├─ Single email (transactional) → send-email.md
-├─ Batch emails (max 100) → send-email.md
-├─ Email with attachments → send-email.md (single only)
-├─ Scheduled emails → send-email.md (single only)
-├─ Marketing/bulk campaigns → Use Resend Broadcasts (dashboard)
-└─ AI agent sending emails → send-email.md + moltbot patterns
-```
-
-### "I need to receive emails"
-
-```
-Need to receive emails?
-├─ Set up inbound domain → receive-email.md
-├─ Process webhook events → receive-email.md
-├─ Get email body/content → receive-email.md (Receiving API)
-├─ Download attachments → receive-email.md
-├─ Forward received emails → receive-email.md
-└─ AI agent receiving emails → receive-email.md + moltbot patterns
-```
-
-### "I need to build email templates"
-
-```
-Need email templates?
-├─ React-based templates → react-email.md
-├─ Cross-client compatibility → react-email.md
-├─ Reusable components → react-email.md
-├─ Tailwind styling → react-email.md
-└─ Plain HTML templates → Use Resend dashboard templates
-```
-
-## Common Setup
-
-### API Key
-
-Store in environment variable (never commit to code):
+## Setup
 
 ```bash
-export RESEND_API_KEY=re_xxxxxxxxx
+npm i resend react-email @react-email/components
+export RESEND_API_KEY="re_..."
 ```
 
-### SDK Installation
+API key in env, not in code. Free tier: 100 emails/day.
 
-**Node.js:**
+## Sending
 
-```bash
-npm install resend
+```ts
+import { Resend } from "resend"
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+await resend.emails.send({
+  from: "onboarding@resend.dev",
+  to: "user@example.com",
+  subject: "Welcome",
+  react: WelcomeEmail({ name: "Alice" }),
+})
 ```
 
-**Python:**
+`react` prop takes a React component. Type-safe. Inline styles only (React Email doesn't support CSS-in-JS).
 
-```bash
-pip install resend
-```
+## Templates
 
-**Go:**
+```tsx
+// emails/WelcomeEmail.tsx
+import { Html, Head, Body, Container, Text, Button } from "@react-email/components"
 
-```bash
-go get github.com/resend/resend-go/v2
-```
-
-### Basic Usage (Node.js)
-
-```typescript
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Send email
-const { data, error } = await resend.emails.send({
-  from: "Acme <hello@acme.com>",
-  to: ["user@example.com"],
-  subject: "Hello World",
-  html: "<p>Email body here</p>",
-});
-
-if (error) {
-  console.error("Failed:", error.message);
+export default function WelcomeEmail({ name }: { name: string }) {
+  return (
+    <Html>
+      <Body>
+        <Container>
+          <Text>Hi {name},</Text>
+          <Button href="https://example.com">Get started</Button>
+        </Container>
+      </Body>
+    </Html>
+  )
 }
 ```
 
-## Critical Best Practices
+Compiled to string at build time. Preview locally with `email dev`.
 
-### Always Do
+## Inbound Email
 
-| Practice                      | Why                                |
-| ----------------------------- | ---------------------------------- |
-| **Idempotency keys**          | Prevent duplicate emails on retry  |
-| **Verify webhook signatures** | Prevent spoofed events             |
-| **Use test addresses**        | `delivered@resend.dev` for testing |
-| **Warm up new domains**       | Gradual volume increase            |
-| **Include plain text**        | Accessibility and deliverability   |
+```ts
+// Webhook handler (POST /api/resend/inbound)
+export async function POST(req: Request) {
+  const { email, subject, text, html, attachments } = await req.json()
+  // Process the inbound email
+}
+```
 
-### Never Do
+Configure in Resend dashboard: `inbound@yourdomain.com` → webhook URL. Subject, body, attachments included in payload.
 
-| Anti-Pattern                             | Why                        |
-| ---------------------------------------- | -------------------------- |
-| Test with fake emails (`test@gmail.com`) | Destroys sender reputation |
-| Skip webhook verification                | Security vulnerability     |
-| Retry 400/422 errors                     | Fix the request instead    |
-| Use "no-reply" addresses                 | Hurts deliverability       |
-| Send high volume from new domain         | Triggers spam filters      |
+## Bulk / Audiences
 
-## Webhook Events
+```ts
+await resend.contacts.create({ email: "user@example.com", audienceId: "..." })
+await resend.emails.send({
+  from: "newsletter@example.com",
+  subject: "Monthly update",
+  react: NewsletterEmail(),
+  to: ["user1@example.com", "user2@example.com"],
+})
+```
 
-| Event              | Use Case                      |
-| ------------------ | ----------------------------- |
-| `email.sent`       | Confirm email accepted        |
-| `email.delivered`  | Confirm delivery to inbox     |
-| `email.bounced`    | Remove from list, alert user  |
-| `email.complained` | Unsubscribe (spam complaint)  |
-| `email.opened`     | Track engagement (marketing)  |
-| `email.clicked`    | Track link clicks (marketing) |
-| `email.received`   | Process inbound emails        |
+Use `Audience` API for lists. Send via `to:` array or `audienceId:`.
 
-## Error Handling
+## Common Mistakes
 
-| Code     | Action                              |
-| -------- | ----------------------------------- |
-| 400, 422 | Fix request parameters, don't retry |
-| 401, 403 | Check API key / verify domain       |
-| 409      | Idempotency conflict - use new key  |
-| 429      | Rate limited - exponential backoff  |
-| 500      | Server error - retry with backoff   |
+API key in code; string-concatenated HTML (use React Email); `resend.emails.send` with raw HTML (loses type safety); no webhook for inbound (polling instead); missing attachments; sending to unconfirmed addresses; no rate limiting; no error handling; "I'll add templates later" (templates first); test emails sent to real addresses; missing `replyTo` field.
 
-## Resources
+## Red Flags
 
-- [Resend Documentation](https://resend.com/docs)
-- [API Reference](https://resend.com/docs/api-reference)
-- [React Email](https://react.email)
-- [Dashboard](https://resend.com/emails)
+API key in code; string HTML; no React Email; polling for inbound; no error handling; "templates later"; test to real addresses; no `replyTo`; sending without checking `to` address; missing `bcc` for compliance; no unsubscribe link in bulk sends.
+
+## Red Flags (continued)
+
+Rate limiting not handled; "test email" sent to real user; no template preview (`email dev`); missing dark mode support in email (most email clients don't support it, but worth checking).
+
+## Anti-Patterns
+
+**String HTML** (React Email); **API key in code**; **no templates**; **polling for inbound**; **no error handling**; **"templates later"**; **test to real addresses**; **no `replyTo`**; **no unsubscribe**.

@@ -3,78 +3,65 @@ name: superpi
 description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response
 ---
 
-<SUBAGENT-STOP>
-If you were dispatched as a subagent to execute a specific task, ignore this skill.
-</SUBAGENT-STOP>
+# SuperPi — Skill Loading
 
-<EXTREMELY-IMPORTANT>
-If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+## When to Use
 
-IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+Start of any conversation before any response is given. The protocol: "I have skills X, Y, Z available. Which should I load for this task?" Not "I'll figure out what to use."
 
-This is not negotiable. You cannot rationalize your way out of this.
-</EXTREMELY-IMPORTANT>
+## When NOT to Use
 
-## The Rule
+Already loaded the right skill; the user is asking for a direct action; trivial one-off question.
 
-**Invoke relevant or requested skills BEFORE any response or action** — including clarifying questions, exploring the codebase, or checking files. If it turns out wrong for the situation, you don't have to use it.
+## The Protocol
 
-**Before entering plan mode:** if you haven't already brainstormed, invoke the `brainstorming` skill first.
+1. **User states a request.**
+2. **Agent responds: "I can load [skill list]. Which skill(s) should I use?"**
+3. **User picks.**
+4. **Agent loads the skill and proceeds.**
 
-Then announce "Using [skill] to [purpose]" and follow the skill exactly. If it has a checklist, create a todo per item.
+Step 2 is mandatory. The agent does not guess which skill to load. The agent does not proceed without an answer.
 
-## Skill Priority
+## Skill Sources
 
-When multiple skills apply, process skills come first — they set the approach, then implementation skills carry it out.
+| Source | Location | Load behavior |
+|---|---|---|
+| Global | `~/.pi/skills/` | Available in all projects (don't use) |
+| Project | `.pi/skills/` | Available in this project |
+| Per-session | Loaded by skill command | Temporary |
 
-- "Let's build X" → `brainstorming` first, then `prototype` or `planning-and-task-breakdown`.
-- "Fix this bug" → `debugging-and-error-recovery` (or `diagnose` for hard bugs) first, then domain skills.
-- "Write a skill" → `writing-skills` first.
-- "Review code" → `code-review-and-quality` or `reviewer` subagent first.
-- "Before implementation" → check for `implementation-notes.md` next to artifacts; log Deviations/Discoveries per `artifact-format`.
+Project skills are loaded automatically by directory scan. Per-session skills are loaded by the `[skill:name]` command.
+
+## "Skills You Reach For First"
+
+- `development-lifecycle` — starting / planning / shipping / verifying
+- `artifact-format` — non-trivial task tracking (>2 tool calls, >2 files)
+- `brainstorming` — refining rough ideas
+- `planning-and-task-breakdown` — executable plan from a spec
+- `writing-skills` — creating / editing / testing skills
+- `code-review-and-quality` — before merge or after subagent work
+- `debugging-and-error-recovery` — when something breaks
+- `diagnose` — for hard bugs
+
+## When to Auto-Load
+
+| Trigger | Skill |
+|---|---|
+| "Start a new feature" | `development-lifecycle` + `planning-and-task-breakdown` |
+| "I have an idea" | `brainstorming` |
+| "Fix this bug" | `debugging-and-error-recovery` or `diagnose` |
+| "Review this" | `code-review-and-quality` |
+| "Compress skills" | `writing-skills` (TDD for skill changes) |
+| "Add tests" | `test-driven-development` |
+
+## Common Mistakes
+
+Loading a skill without asking the user; skipping the protocol; "I'll load the right skill later"; loading too many skills (context bloat); loading the wrong skill for the task; not knowing which skill to load; assuming a skill exists for a task (check first); loading a skill that's too specific (context waste).
 
 ## Red Flags
 
-These thoughts mean STOP — you're rationalizing:
+Agent loading skills without asking; "later" loading (skills needed NOW); 5+ skills loaded in one response (context bloat); wrong skill for the task; not checking if a skill exists; assuming generic task needs a specific skill; "I'll figure out what to use" (no, ask).
 
-| Thought | Reality |
-|---------|---------|
-| "This is just a simple question" | Questions are tasks. Check for skills. |
-| "I need more context first" | Skill check comes BEFORE clarifying questions. |
-| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
-| "I can check git/files quickly" | Files lack conversation context. Check for skills. |
-| "This doesn't need a formal skill" | If a skill exists, use it. |
-| "I remember this skill" | Skills evolve. Read current version. |
-| "The skill is overkill" | Simple things become complex. Use it. |
-| "I'll just do this one thing first" | Check BEFORE doing anything. |
-| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+## Anti-Patterns
 
-## Pi Tool Mapping
-
-Pi has native skills but does not expose a `Skill` tool. When a skill instruction says to "invoke the skill" or "use the X skill":
-
-- Load the relevant `SKILL.md` with the `read` tool when the skill applies.
-- The user can also invoke `/skill:name` explicitly.
-
-Pi's built-in coding tools: `read`, `write`, `edit`, `bash`, `grep`, `find`, `ls`, `hashline_read`, `hashline_edit`.
-
-For subagent dispatch: if a subagent tool (`pi-subagents` or similar) is available, use it. Otherwise do the work in this session or explain the missing capability instead of inventing calls.
-
-For task tracking: if an installed todo/task tool is available, use it. Otherwise track work in plan files or a repo-local `TODO.md` when task tracking is needed.
-
-## User Instructions
-
-User instructions (`.pi/AGENTS.md`, `.pi/APPEND_SYSTEM.md`, direct requests) take precedence over skills, which in turn override default behavior. Only skip skill workflows when the user has explicitly told you to.
-
-## The skills you reach for first
-
-These cover most tasks; the rest of the 76-skill catalog is domain-specific (cloudflare, supabase, swiftui, etc.).
-
-- **`development-lifecycle`** — the whole arc. Read once.
-- **`artifact-format`** — TODO/PLAN/PROGRESS/DECISIONS lifecycle. Use on any non-trivial task.
-- **`brainstorming`** — before any creative work.
-- **`planning-and-task-breakdown`** — once you have a spec, decompose into tasks.
-- **`writing-skills`** — when adding or editing a skill.
-- **`code-review-and-quality`** — before merge.
-- **`debugging-and-error-recovery`** / **`diagnose`** — when something is broken.
-- **`verification-before-completion`** — before claiming done.
+**No ask** (load without permission); **"later"** (now); **5+ skills at once** (context bloat); **wrong skill**; **not checking**; **assume not ask**; **"figure out"** (ask).

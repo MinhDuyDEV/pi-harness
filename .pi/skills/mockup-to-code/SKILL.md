@@ -8,184 +8,77 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Mockup to Code Skill
-
-> **Replaces** manual pixel-by-pixel CSS translation from designs — structured extraction of layout, colors, typography, and components from visual references
+# Mockup to Code
 
 ## When to Use
 
-- Converting Figma/Sketch mockups to React/Vue/HTML
-- Implementing pixel-perfect designs
-- Building component libraries from design systems
-- Rapid prototyping from wireframes
+You have a visual design (Figma, Sketch, screenshot, wireframe, hand-drawn mockup) and need to implement it in code. The design exists as pixels, the code must match.
 
-## When NOT to Use
+## Core Principle
 
-- No visual reference or mockup to implement.
+**The design is the spec.** If the code doesn't match the design, the code is wrong. "Close enough" is a design debt.
 
 ## Workflow
 
-1. **Analyze** — Use vision agent to extract: layout structure, color palette, typography, spacing, components
-2. **Map** — Match extracted elements to existing design tokens/components in the codebase
-3. **Implement** — Build components using extracted specs, reusing existing tokens where possible
-4. **Verify** — Screenshot the result and compare visually to the original mockup
+1. **Audit the design.** What components exist? What states? What tokens? Screenshot every state.
+2. **Set up tokens.** Colors, typography, spacing, radius — extract from the design. No magic numbers.
+3. **Build the components.** One at a time, in isolation. Button → Input → Card → Layout.
+4. **Compose the page.** Components into sections, sections into pages.
+5. **Validate against the design.** Pixel-precision on spacing, type, color. Screenshot and compare.
+6. **Iterate.** Design feedback → adjust → re-validate.
 
-## Core Workflow
+## Token Extraction
 
-### Phase 1: Design Analysis
+Map the visual design to a design system:
+- Colors → `--color-*` CSS variables or theme tokens
+- Typography → font family, size, weight, line-height
+- Spacing → smallest unit in the design (often 4px or 8px)
+- Radius → button, card, input radii
+- Shadows → depth levels (elevation, modal, tooltip)
 
-```
-Analyze this UI mockup and extract:
+"Magic numbers" in the implementation mean the token is missing.
 
-1. LAYOUT STRUCTURE
-   - Grid system (columns, gutters, margins)
-   - Component hierarchy
-   - Container widths
+## Component Order
 
-2. VISUAL SPECIFICATIONS
-   - Colors (hex values)
-   - Typography (sizes, weights)
-   - Spacing (padding, margins, gaps)
-   - Border radius, shadows
+Build in this order:
+1. **Typography** (headings, body, labels — the base layer)
+2. **Color tokens** (background, text, border, accent)
+3. **Layout primitives** (Container, Stack, Grid)
+4. **Atomic components** (Button, Input, Tag, Badge)
+5. **Composite components** (Card, Modal, Form, Table)
+6. **Page sections** (Header, Hero, Sidebar, Footer)
+7. **Full page** (compose the sections)
 
-3. COMPONENTS IDENTIFIED
-   - List each distinct component
-   - Note variations
-   - Identify reusable patterns
+Each step validates the previous.
 
-4. RESPONSIVE CONSIDERATIONS
-   - How might this adapt to mobile?
-   - Collapsible sections
-   - Priority content
+## Validation
 
-Output as structured JSON.
-```
-
-### Phase 2: Component Breakdown
-
-```markdown
-## Component: [Name]
-
-**Priority:** High/Medium/Low
-**Complexity:** Simple/Medium/Complex
-**Reusability:** One-off/Reusable/Design System
-
-**Props Interface:**
-
-- variant: 'primary' | 'secondary'
-- size: 'sm' | 'md' | 'lg'
-- disabled?: boolean
-
-**Accessibility:**
-
-- Keyboard navigation
-- ARIA labels
-- Focus management
+```ts
+// Compare screenshot vs design
+// Option 1: overlay (screenshot overlay, adjust opacity)
+// Option 2: Playwright screenshot comparison
+// Option 3: manual review (designer inspects the implementation)
 ```
 
-### Phase 3: Implementation
+If the designer can't tell the difference, it's done. If they can, fix the gap.
 
-Implement with comparison loop:
+## When the Design Is Incomplete
 
-```
-Compare mockup vs implementation:
+- Missing states (hover, error, loading, empty): ask or define based on the system.
+- Missing responsive: ask or define for mobile first.
+- Missing tokens: extract from the design, or ask.
+- Missing dark mode: ask or ship light only.
 
-1. What differences do you see?
-2. What's missing?
-3. Spacing/sizing adjustments needed?
-4. Color accuracy?
-5. Typography match?
+Document the decisions. "Assumed hover state based on spec for button."
 
-Prioritize fixes by visual impact.
-```
+## Common Mistakes
 
-## Technology Patterns
+"No token" (magic numbers); "close enough" (visible gap); missing states (no hover, no error); "I'll add responsive later" (mobile-first); "I'll fix the tokens later" (tokens first); component order wrong (skip typography, build carousel); no validation step; "designer says it's fine" (ask specifically); building from memory, not from the design.
 
-### React + Tailwind
+## Red Flags
 
-```
-Convert to React with Tailwind CSS.
-
-Requirements:
-- Functional components with TypeScript
-- Tailwind utility classes
-- Extract repeated patterns
-- Semantic HTML
-- Responsive classes (sm:, md:, lg:)
-```
-
-### Vue 3
-
-```
-Convert to Vue 3 component.
-
-Requirements:
-- Composition API with <script setup>
-- Scoped styles
-- Props with TypeScript
-```
-
-### Plain HTML/CSS
-
-```
-Convert to semantic HTML and CSS.
-
-Requirements:
-- Semantic HTML5 elements
-- CSS Grid/Flexbox layout
-- CSS custom properties
-```
-
-## Quality Checklist
-
-### Visual Fidelity
-
-- [ ] Colors match exactly
-- [ ] Typography matches
-- [ ] Spacing is consistent
-- [ ] Border radius matches
-- [ ] Shadows correct
-
-### Responsiveness
-
-- [ ] Desktop layout matches
-- [ ] Tablet works
-- [ ] Mobile is usable
-- [ ] No horizontal scroll
-
-### Interactions
-
-- [ ] Hover states
-- [ ] Focus states
-- [ ] Transitions smooth
-
-### Code Quality
-
-- [ ] Properly typed
-- [ ] Sensible defaults
-- [ ] Uses tokens (no hardcoded values)
-- [ ] Accessible markup
+Magic numbers; "close enough"; missing states; no tokens; "responsive later"; no validation; component order wrong; building from memory; design not accessible; design and code diverge; "I'll fix it later" for visual gaps.
 
 ## Anti-Patterns
 
-| Anti-Pattern                                                           | Why It Fails                                                | Instead                                                                 |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Hardcoding colors/sizes instead of using design tokens                 | Creates inconsistency and makes global updates expensive    | Map values to existing tokens first; add new tokens only when truly new |
-| Building from scratch when existing components cover 80% of the design | Reintroduces solved problems and increases maintenance cost | Compose and extend existing components, then patch gaps                 |
-| Pixel-perfect matching without responsive considerations               | Breaks on different viewport sizes and device classes       | Match intent at multiple breakpoints and validate mobile/tablet/desktop |
-| Not extracting reusable components from repeated patterns              | Duplicates code and drifts visual behavior over time        | Promote repeated UI blocks into reusable components with variants       |
-
-## Storage
-
-Save implementations to `.pi/memory/design/implementations/`
-
-## See Also
-
-- `frontend-design`
-- `visual-analysis`
-- `accessibility-audit`
-
-
-## Consolidated Visual Analysis
-
-`visual-analysis` was removed as a separate optional skill. Treat screenshot/mockup inspection, color/typography/layout extraction, and visual difference analysis as the input phase of mockup-to-code work.
+**Magic numbers** (tokens); **"close enough"** (design is the spec); **missing states**; **"responsive later"**; **no tokens**; **no validation**; **wrong component order**; **"from memory"**; **"fix later"**.

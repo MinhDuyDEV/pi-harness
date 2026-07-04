@@ -8,191 +8,62 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Accessibility Audit Skill
+# Accessibility Audit
+
+## Iron Laws
+
+<EXTREMELY-IMPORTANT>
+- **Keyboard = primary UX.** If a feature isn't keyboard-accessible, it doesn't exist for some users.
+- **Color contrast ≥ 4.5:1 for body text.** No exceptions. Use the WebAIM contrast checker.
+- **All interactive elements need focus states.** `:focus-visible` is the standard.
+- **Forms need labels.** `<input>` without `<label>` is an a11y failure. Always.
+- **Screen reader testing is not optional.** `aria-label` helps but doesn't replace real testing.
+</EXTREMELY-IMPORTANT>
 
 ## When to Use
 
-- Reviewing UI components for accessibility compliance
-- Auditing pages for WCAG conformance
-- Identifying keyboard navigation issues
-- Checking color contrast
-- Pre-launch accessibility verification
+Pre-launch audit; checking WCAG conformance; keyboard nav issues; color contrast problems; IMAGE/button missing alt text; form validation; dynamic content updates.
 
-## When NOT to Use
+## WCAG Basics
 
-- Non-UI work where accessibility isn't applicable.
+| Level | What |
+|---|---|
+| A | Minimum. Keyboard access, alt text, captions. |
+| AA | Standard. Color contrast ≥ 4.5:1, error identification. |
+| AAA | Advanced. Enhanced contrast, sign language. |
 
+Target AA for most projects. A is for emergencies.
 
-## Core Workflow
+## Common Issues and Fixes
 
-### Phase 1: Visual Accessibility Analysis
+| Issue | WCAG | Fix |
+|---|---|---|
+| No alt text | 1.1.1 | `alt="description"` or `role="presentation"` |
+| Low contrast | 1.4.3 | Adjust colors, ≥ 4.5:1 body, ≥ 3:1 large |
+| Keyboard trap | 2.1.2 | Allow focus to exit (Tab, Escape) |
+| Missing labels | 3.3.2 | `<label for="input">` |
+| Focus state missing | 2.4.7 | `:focus-visible` on all interactive |
+| Live region missing | 4.1.3 | `aria-live="polite"` for dynamic content |
+| Error not announced | 4.1.3 | `role="alert"` or `aria-errormessage` |
+| Skip nav missing | 2.4.1 | Skip link to main content |
 
-```
-Perform a comprehensive accessibility audit:
+## Audit Workflow
 
-1. COLOR CONTRAST
-   - Check text/background contrast ratios
-   - WCAG AA: 4.5:1 normal text, 3:1 large text
-   - Identify failing elements
+1. **Keyboard audit.** Tab through every interactive element. Can you navigate all of it?
+2. **Contrast audit.** Grab colors, check against spec. Fix violators.
+3. **Screen reader audit.** VoiceOver (macOS) or NVDA (Windows). Can you use the app?
+4. **Focus audit.** Every button, link, input needs a visible `:focus-visible` state.
+5. **Label audit.** Every input has a label. Every button has text or `aria-label`.
+6. **Dynamic content audit.** Alerts, notifications, loading states have `aria-live`.
 
-2. VISUAL HIERARCHY
-   - Heading structure (logical H1-H6)
-   - Visual grouping of related elements
-   - Touch targets (44x44px minimum)
+## Common Mistakes
 
-3. CONTENT ACCESSIBILITY
-   - Images needing alt text
-   - Icons without text labels
-   - Color-only information
+Color contrast checked manually (use a checker); alt text on decorative images (use `role="presentation"`); `aria-label` everywhere (use proper html); keyboard-only mode ignored; missing focus states; "I'll fix a11y later" (do it now); testing only desktop (test mobile); "the validator passed" (automated check catches < 30% of issues); screen reader testing skipped; "it's a component library, it's accessible" (verify); dynamic content without live regions.
 
-4. INTERACTIVE ELEMENTS
-   - Buttons/links with unclear purpose
-   - Form fields without labels
-   - Missing error states
+## Red Flags
 
-5. MOTION
-   - Auto-playing content
-   - Potential vestibular triggers
+No keyboard audit; `<div onClick={...}>` without `role="button"` + `tabindex`; missing `:focus-visible`; `aria-label="..."` without proper html; "a11y later"; no screen reader test; contrast < 4.5:1; forms without labels; dynamic content without live regions; skip nav missing; "the tool said it's fine" (automated misses real issues).
 
-Provide WCAG criterion references for each issue.
-```
+## Anti-Patterns
 
-### Phase 2: Component Checklist
-
-For each interactive component:
-
-```markdown
-## Component: [Name]
-
-### Keyboard Navigation
-
-- [ ] Focusable with Tab
-- [ ] Visible focus indicator
-- [ ] Operable with Enter/Space
-- [ ] Escape closes modals
-- [ ] Arrow keys for menus
-
-### Screen Reader
-
-- [ ] Meaningful accessible name
-- [ ] Role announced correctly
-- [ ] State changes announced
-- [ ] Errors associated with inputs
-
-### Visual
-
-- [ ] 4.5:1 contrast ratio (text)
-- [ ] 3:1 contrast ratio (UI)
-- [ ] 44x44px touch targets
-- [ ] No color-only information
-
-### Motion
-
-- [ ] Respects prefers-reduced-motion
-- [ ] No auto-play >5 seconds
-```
-
-## WCAG Quick Reference
-
-### Level A (Minimum)
-
-| Criterion | Description            | Fix               |
-| --------- | ---------------------- | ----------------- |
-| 1.1.1     | Non-text Content       | Add alt text      |
-| 1.3.1     | Info and Relationships | Use semantic HTML |
-| 2.1.1     | Keyboard               | All via keyboard  |
-| 2.4.1     | Bypass Blocks          | Skip links        |
-| 4.1.2     | Name, Role, Value      | ARIA labels       |
-
-### Level AA (Recommended)
-
-| Criterion | Description   | Fix                    |
-| --------- | ------------- | ---------------------- |
-| 1.4.3     | Contrast      | 4.5:1 text, 3:1 UI     |
-| 1.4.4     | Resize Text   | Support 200% zoom      |
-| 2.4.6     | Headings      | Descriptive headings   |
-| 2.4.7     | Focus Visible | Clear focus indicators |
-
-## Common Fixes
-
-### Accessible Button
-
-```tsx
-// Bad
-<div onClick={handleClick}>Click me</div>
-
-// Good
-<button type="button" onClick={handleClick}>
-  Click me
-</button>
-```
-
-### Accessible Icon Button
-
-```tsx
-// Bad
-<button><Icon /></button>
-
-// Good
-<button aria-label="Close dialog">
-  <Icon aria-hidden="true" />
-</button>
-```
-
-### Form with Error
-
-```tsx
-<label htmlFor="email">Email</label>
-<input
-  id="email"
-  aria-describedby="email-error"
-  aria-invalid={hasError}
-/>
-{hasError && (
-  <span id="email-error" role="alert">
-    Please enter a valid email
-  </span>
-)}
-```
-
-## Report Template
-
-```markdown
-# Accessibility Audit Report
-
-**Date:** [Date]
-**Page:** [Name]
-**WCAG Level:** AA
-
-## Summary
-
-- Critical Issues: X
-- Major Issues: X
-- Minor Issues: X
-
-## Issues
-
-### [Issue Title]
-
-- **Severity:** Critical/Major/Minor
-- **WCAG:** [X.X.X]
-- **Element:** [selector]
-- **Issue:** [Description]
-- **Fix:** [Recommendation]
-```
-
-## Storage
-
-Save audit reports to `.pi/memory/design/accessibility/`
-
-## Related Skills
-
-| Need           | Skill             |
-| -------------- | ----------------- |
-| Design quality | `frontend-design` |
-| UI research    | `ui-ux-research`  |
-
-
-## Consolidated UI Review Guidance
-
-`web-design-guidelines` was removed as a separate optional skill. Keep accessibility, keyboard, contrast, UX review, and pre-launch interface checks here, paired with design-system-audit when consistency/token review is needed.
+**No keyboard audit**; **no contrast check**; **`div` for buttons**; **missing focus**; **"a11y later"**; **no screen reader**; **low contrast**; **unlabeled forms**; **no live regions**; **skip nav missing**; **"automated pass = done"**.

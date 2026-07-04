@@ -290,6 +290,67 @@ const TARGETS: SkillSpec[] = [
     maxWords: 500,
     markers: ["spec", "goal", "non-goals", "criteria", "interview"],
   },
+  // --- Batch 5: next 12 most-loaded (2026-07-04) ---
+  {
+    name: "grill-me",
+    maxWords: 500,
+    markers: ["grill", "assumption", "question", "plan", "hole"],
+  },
+  {
+    name: "react-best-practices",
+    maxWords: 500,
+    markers: ["server component", "useEffect", "bundle", "React.memo", "code-split"],
+  },
+  {
+    name: "design-system-audit",
+    maxWords: 500,
+    markers: ["token", "audit", "spec", "component", "breach"],
+  },
+  {
+    name: "mockup-to-code",
+    maxWords: 500,
+    markers: ["design", "token", "component", "validate", "spec"],
+  },
+  {
+    name: "resend",
+    maxWords: 500,
+    markers: ["React Email", "templates", "inbound", "webhook", "send"],
+  },
+  {
+    name: "browser-tools",
+    maxWords: 500,
+    markers: ["goto", "click", "fill", "screenshot", "content"],
+  },
+  {
+    name: "superpi",
+    maxWords: 500,
+    markers: ["skill", "load", "protocol", "reach for", "first"],
+  },
+  {
+    name: "obsidian",
+    maxWords: 500,
+    markers: ["note", "tag", "vault", "frontmatter", "MCP"],
+  },
+  {
+    name: "webclaw",
+    maxWords: 500,
+    markers: ["scrape", "llm", "format", "fetch", "403"],
+  },
+  {
+    name: "accessibility-audit",
+    maxWords: 500,
+    markers: ["WCAG", "contrast", "keyboard", "focus", "label"],
+  },
+  {
+    name: "aislop",
+    maxWords: 500,
+    markers: ["narrative", "console.log", "as any", "wrapper", "slop"],
+  },
+  {
+    name: "core-data-expert",
+    maxWords: 500,
+    markers: ["fetch", "predicate", "migration", "merge", "batch"],
+  },
 ];
 
 /** Count words in the body of a SKILL.md, excluding the YAML frontmatter (between the first two `---` markers). */
