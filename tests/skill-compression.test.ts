@@ -92,6 +92,82 @@ const TARGETS: SkillSpec[] = [
     maxWords: 500,
     markers: ["evidence", "assertion", "verif", "claim"],
   },
+  // --- Batch 2: next 15 most-loaded (2026-07-04) ---
+  {
+    name: "test-driven-development",
+    maxWords: 500,
+    markers: ["RED", "GREEN", "REFACTOR", "Iron Law", "failing test", "behavior"],
+  },
+  {
+    name: "inference-service",
+    maxWords: 500,
+    markers: ["queue", "circuit", "batching", "abort", "fallback"],
+  },
+  {
+    name: "opencode-ts-service",
+    maxWords: 500,
+    markers: ["Tag", "Layer", "Effect", "errors as data", "any"],
+  },
+  {
+    name: "design-taste-frontend",
+    maxWords: 500,
+    markers: ["typography", "whitespace", "spacing", "scale"],
+  },
+  {
+    name: "opencode-ts-package",
+    maxWords: 500,
+    markers: ["exports", "workspace", "peerDependencies", "barrel"],
+  },
+  {
+    name: "typescript-coding-standards",
+    maxWords: 500,
+    markers: ["any", "errors as data", "branded", "pure"],
+  },
+  {
+    name: "effect-schema",
+    maxWords: 500,
+    markers: ["Schema", "decodeUnknown", "branded", "TaggedError", "boundary"],
+  },
+  {
+    name: "redesign-existing-projects",
+    maxWords: 500,
+    markers: ["audit", "tokens", "component", "functionality"],
+  },
+  {
+    name: "effect-http-api",
+    maxWords: 500,
+    markers: ["HttpApi", "endpoint", "schema", "error", "status"],
+  },
+  {
+    name: "swiftui-expert-skill",
+    maxWords: 500,
+    markers: ["State", "Observable", "view", "state", "NavigationStack"],
+  },
+  {
+    name: "high-end-visual-design",
+    maxWords: 500,
+    markers: ["typography", "restraint", "real", "premium", "agency"],
+  },
+  {
+    name: "playwright",
+    maxWords: 500,
+    markers: ["locator", "role", "wait", "test", "user"],
+  },
+  {
+    name: "customize-pi",
+    maxWords: 500,
+    markers: ["settings", "model", "context", "extension", "skill"],
+  },
+  {
+    name: "security-and-hardening",
+    maxWords: 500,
+    markers: ["boundary", "authn", "authz", "secrets", "bcrypt", "rate limit"],
+  },
+  {
+    name: "testing-anti-patterns",
+    maxWords: 500,
+    markers: ["tautology", "mock", "seam", "behavior", "production"],
+  },
 ];
 
 /** Count words in the body of a SKILL.md, excluding the YAML frontmatter (between the first two `---` markers). */

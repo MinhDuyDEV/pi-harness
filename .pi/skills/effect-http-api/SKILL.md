@@ -4,641 +4,132 @@ version: 1.0.0
 description: "Use when building HTTP APIs with Effect HttpApi — defining typed endpoints and groups, implementing handlers with Effect services, mapping service errors to HTTP errors with proper status codes, adding SSE streaming endpoints, implementing auth middleware with typed provides, generating OpenAPI documentation, and serving production HTTP servers. MUST load before writing any HttpApi endpoint or handler."
 ---
 
-# Effect HttpApi
+# Effect HTTP API
 
-## Overview
+## Iron Laws
 
-Effect HttpApi (`effect/unstable/httpapi`) is a schema-first HTTP framework. Define your API once with Effect Schema — you get type-safe handlers, automatic request/response validation, generated OpenAPI documentation, and a fully typed client. It's the HTTP layer that sits on top of the Effect service architecture (`Context.Tag` + `Layer`).
+<EXTREMELY-IMPORTANT>
+- **Schema-first, never raw handlers.** `HttpApiEndpoint` + `HttpApiGroup` define the contract; handlers implement it.
+- **Domain errors map to HTTP status.** `UserNotFound → 404`, `ValidationError → 400`. Never return 500 for a known business error.
+- **Services are provided at the group level.** `HttpApiGroup.make("users").pipe(Layer.provide(UserRepoLive))`.
+- **SSE is a first-class endpoint type.** `HttpApiEndpoint.get(...).pipe(HttpApiResponse.stream(...))`. No manual `EventSource` server.
+- **Auth is a `Security` middleware, not a handler concern.** `HttpAuthMiddleware` with a typed `Security` provider.
+</EXTREMELY-IMPORTANT>
 
-This skill covers the patterns that Effect's own docs (fragmented across a separate wiki and marked `unstable`) don't connect: the full lifecycle from service definition to HTTP endpoint with typed error mapping, SSE streaming, middleware/auth, and OpenAPI generation.
+## Basic Endpoint
 
-## When to Use
+```ts
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiError } from "@effect/platform"
 
-- Building HTTP APIs on top of an Effect service layer
-- Replacing Express/Hono/Fastify in an Effect-based codebase
-- Generating OpenAPI specs from TypeScript types
-- Building type-safe client/server HTTP applications
+const getUser = HttpApiEndpoint.get("getUser", "/users/:id")
+  .setPath(Schema.Struct({ id: UserId }))
+  .addSuccess(User)
+  .addError(UserNotFound, { status: 404 })
 
-## When NOT to Use
-
-- Simple proxies or thin pass-throughs (Express with a few routes is faster)
-- Frontend-only applications (React, Vue, etc.)
-- Projects not using Effect at all
-
----
-
-## Part 1: The Full Lifecycle
-
-An Effect HttpApi application has four layers:
-
-```
-1. Schema types           (effect-schema skill)
-2. Effect services        (opencode-ts-service skill: Context.Tag + Layer)
-3. HttpApi definition     (endpoints + groups + API)
-4. HttpApi handlers       (implement endpoints using Effect services)
-5. Serve                  (wire everything, start server)
+const usersGroup = HttpApiGroup.make("users")
+  .add(getUser)
+  .pipe(Layer.provide(UserRepoLive))
 ```
 
-This skill covers steps 3-5. Steps 1-2 are covered by the companion skills.
+The schema drives type checking, OpenAPI generation, and request validation.
 
----
+## Group Composition
 
-## Part 2: Defining the API
-
-### Endpoints and Groups
-
-```typescript
-// src/api/users.ts
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi"
-import { Schema } from "effect"
-
-// Response schemas (defined in the service module or here for API-specific shapes)
-class User extends Schema.Class<User>("User")({
-  id: Schema.Number,
-  name: Schema.String,
-  email: Schema.String,
-}) {}
-
-// Endpoint group — a collection of related endpoints
-class UsersApi extends HttpApiGroup.make("users")
-  // GET /users — list all users
-  .add(
-    HttpApiEndpoint.get("list", "/users")(
-      Schema.Array(User)        // success response
-    )
-  )
-  // GET /users/:id — get by ID
-  .add(
-    HttpApiEndpoint.get("getById", "/users/:id")(
-      User,                    // success response
-      { path: Schema.Struct({ id: Schema.NumberFromString }) }  // path params
-    )
-  )
-  // POST /users — create
-  .add(
-    HttpApiEndpoint.post("create", "/users")(
-      User,
-      { body: Schema.Struct({ name: Schema.String, email: Schema.String }) }
-    )
-  )
-  // DELETE /users/:id — delete
-  .add(
-    HttpApiEndpoint.del("remove", "/users/:id")(
-      Schema.Void,
-      { path: Schema.Struct({ id: Schema.NumberFromString }) }
-    )
-  )
-{}
+```ts
+const api = HttpApi.make("myApp")
+  .add(usersGroup)
+  .add(postsGroup)
+  .add(authGroup)
+  .prefix("/api/v1")
 ```
 
-### Available Endpoint Methods
+## Handler Implementation
 
-```typescript
-HttpApiEndpoint.get("name", "/path")(successSchema, options?)
-HttpApiEndpoint.post("name", "/path")(successSchema, options?)
-HttpApiEndpoint.put("name", "/path")(successSchema, options?)
-HttpApiEndpoint.patch("name", "/path")(successSchema, options?)
-HttpApiEndpoint.del("name", "/path")(successSchema, options?)
-```
-
-Options can include:
-- `path` — path parameters as a Struct
-- `body` — request body schema
-- `headers` — request headers schema
-- `query` — query parameters schema
-- `middleware` — middleware tags to apply
-
-### Composing Groups into an API
-
-```typescript
-// src/api/index.ts
-import { HttpApi } from "effect/unstable/httpapi"
-
-class SystemApi extends HttpApiGroup.make("system")
-  .add(HttpApiEndpoint.get("health", "/health")(Schema.Void))
-{}
-
-export class Api extends HttpApi.make("my-api")
-  .add(UsersApi)
-  .add(SystemApi)
-{}
-```
-
----
-
-## Part 3: Implementing Handlers
-
-### The Handler Pattern
-
-```typescript
-// src/api/users-handlers.ts
-import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { Api } from "./index"
-
-export const UsersApiHandlers = HttpApiBuilder.group(
-  Api,
-  "users",
-  Effect.fn(function* (handlers) {
-    // Access Effect services via yield*
-    const userService = yield* UserService
-
-    return handlers
-      .handle("list", () =>
-        userService.listUsers()
+```ts
+const usersHandler = HttpApiBuilder.group(api, "users", (group) =>
+  Effect.gen(function* () {
+    const repo = yield* UserRepo
+    return group.handle("getUser", ({ path }) =>
+      repo.findById(path.id).pipe(
+        Effect.orElseFail(() => new UserNotFound({ id: path.id }))
       )
-      .handle("getById", ({ path }) =>
-        userService.getUserById(path.id)
-      )
-      .handle("create", ({ body }) =>
-        userService.createUser(body.name, body.email)
-      )
-      .handle("remove", ({ path }) =>
-        userService.deleteUser(path.id)
-      )
+    )
   })
 )
 ```
 
-`Effect.fn` names the handler for tracing. The handler parameters are typed automatically from the endpoint definition — path params, body, headers, and query are all type-safe.
+Handlers are pure (no HTTP concerns). They take a request, return an effect that produces a value or fails with a domain error. The framework maps errors to HTTP.
 
-### Accessing Request Data
+## Error → HTTP Status
 
-```typescript
-.handle("getById", ({ path, headers, query }) => {
-  // path.id    — typed from path schema
-  // headers    — typed from headers schema
-  // query      — typed from query schema
-})
+```ts
+.addError(UserNotFound, { status: 404 })
+.addError(ValidationError, { status: 400 })
+.addError(Unauthorized, { status: 401 })
+.addError(Forbidden, { status: 403 })
+.addError(NotFound, { status: 404 })
+.addError(Conflict, { status: 409 })
+.addError(RateLimited, { status: 429 })
 ```
 
----
+Domain errors map to the right status. Don't return 500 for a 404.
 
-## Part 4: Error Mapping (Service Errors -> HTTP Errors)
+## SSE Streaming
 
-This is the most important HttpApi pattern and the one least documented by Effect.
+```ts
+const stream = HttpApiEndpoint.get("stream", "/events")
+  .addSuccess(HttpApiResponse.stream(User))
+  .addError(Unauthorized, { status: 401 })
 
-### The Problem
-
-Your Effect service returns typed errors:
-
-```typescript
-class UserNotFound extends Schema.TaggedErrorClass<UserNotFound>()(
-  "UserNotFound",
-  { userId: Schema.Number }
-) {}
-class ValidationFailed extends Schema.TaggedErrorClass<ValidationFailed>()(
-  "ValidationFailed",
-  { message: Schema.String }
-) {}
-
-// Service method returns Effect<User, UserNotFound | ValidationFailed, ...>
-```
-
-But HTTP doesn't understand `UserNotFound` — it needs HTTP status codes and wire bodies.
-
-### Solution: Map Errors at the HTTP Boundary
-
-```typescript
-// src/api/users-handlers.ts
-import { Effect } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
-
-export const UsersApiHandlers = HttpApiBuilder.group(
-  Api,
-  "users",
-  Effect.fn(function* (handlers) {
-    const userService = yield* UserService
-
-    return handlers
-      .handle("getById", ({ path }) =>
-        userService.getUserById(path.id).pipe(
-          // Map service errors to HTTP errors
-          Effect.catchTags({
-            UserNotFound: () =>
-              Effect.fail(HttpApiBuilder.notFound("User not found")),
-            ValidationFailed: (e) =>
-              Effect.fail(HttpApiBuilder.badRequest(e.message)),
-          })
-        )
-      )
-  })
-)
-```
-
-### Built-in HTTP Error Factories
-
-```typescript
-HttpApiBuilder.notFound("User not found")            // 404
-HttpApiBuilder.badRequest("Invalid input")            // 400
-HttpApiBuilder.unauthorized("Missing token")          // 401
-HttpApiBuilder.forbidden("Insufficient permissions")  // 403
-HttpApiBuilder.internalServerError("Something broke") // 500
-HttpApiBuilder.conflict("Resource exists")            // 409
-HttpApiBuilder.tooManyRequests("Rate limited")        // 429
-```
-
-### Declaring Errors on Endpoints (for OpenAPI)
-
-To get errors in the generated OpenAPI spec, declare them on the endpoint:
-
-```typescript
-import { HttpApiEndpoint } from "effect/unstable/httpapi"
-import { Schema } from "effect"
-
-// 1. Define HTTP error schemas
-class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()(
-  "NotFoundError",
-  { message: Schema.String },
-  { httpApiStatus: 404 }  // ← this maps to HTTP status
-) {}
-
-class BadRequestError extends Schema.TaggedErrorClass<BadRequestError>()(
-  "BadRequestError",
-  { message: Schema.String },
-  { httpApiStatus: 400 }
-) {}
-
-// 2. Declare on endpoint
-class UsersApi extends HttpApiGroup.make("users")
-  .add(
-    HttpApiEndpoint.get("getById", "/users/:id")(
-      User,
-      { path: Schema.Struct({ id: Schema.NumberFromString }) },
-      { error: [NotFoundError, BadRequestError] }  // ← declared errors
-    )
-  )
-{}
-```
-
-### Mapping to Declared Errors
-
-```typescript
-.handle("getById", ({ path }) =>
-  userService.getUserById(path.id).pipe(
-    Effect.catchTags({
-      UserNotFound: () => Effect.fail(new NotFoundError({ message: "User not found" })),
-      ValidationFailed: (e) => Effect.fail(new BadRequestError({ message: e.message })),
-    })
+// Handler
+group.handle("stream", () =>
+  Stream.fromQueue(eventQueue).pipe(
+    Stream.map(eventToUser),
+    Stream.encodeJson()
   )
 )
 ```
 
-**Rule:** Keep service errors and HTTP errors as separate classes. Service errors carry internal data (retry hints, low-level causes). HTTP errors carry public wire bodies. Never leak internal error data to API clients.
+The framework handles the SSE protocol. The handler just produces a stream of values.
 
----
+## Auth Middleware
 
-## Part 5: SSE Streaming
-
-Effect HttpApi supports streaming responses natively via `Stream`:
-
-```typescript
-// Define a streaming endpoint
-class ChatApi extends HttpApiGroup.make("chat")
-  .add(
-    HttpApiEndpoint.post("completions", "/chat/completions")(
-      HttpApiEndpoint.EventStream,  // ← signals SSE response
-      { body: Schema.Struct({ prompt: Schema.String }) }
-    )
-  )
-{}
-
-// Implement
-const ChatApiHandlers = HttpApiBuilder.group(
-  Api,
-  "chat",
-  Effect.fn(function* (handlers) {
-    return handlers
-      .handle("completions", ({ body }) =>
-        Effect.succeed(
-          HttpApiBuilder.EventStream(
-            generateTokens(body.prompt).pipe(
-              Stream.map((token) => ({ data: JSON.stringify({ text: token }) }))
-            )
-          )
-        )
-      )
-  })
-)
-```
-
-The `EventStream` wrapper takes a `Stream` of events and encodes them as SSE. Each event object is serialized and sent as `data: {...}\n\n`.
-
----
-
-## Part 6: Middleware (Auth)
-
-### Defining Middleware
-
-```typescript
-import { HttpApiMiddleware } from "effect/unstable/httpapi"
-import { Schema } from "effect"
-
-// Define what the middleware provides
-class Auth extends HttpApiMiddleware.Tag<Auth>()("Auth", {
-  failure: Schema.Struct({
-    _tag: Schema.Literal("Unauthorized"),
-    message: Schema.String,
-  }),
-  provides: Schema.Struct({
-    userId: Schema.String,
-    orgId: Schema.String,
-  }),
-}) {}
-```
-
-### Applying Middleware to Endpoints
-
-```typescript
-class UsersApi extends HttpApiGroup.make("users")
-  .add(
-    HttpApiEndpoint.get("profile", "/profile")(
-      User,
-      { middleware: Auth }  // ← requires Auth middleware
-    )
-  )
-{}
-```
-
-### Implementing Middleware (Server-Side)
-
-```typescript
-const AuthServer = HttpApiMiddleware.layerServer(
-  Auth,
-  Effect.fn(function* ({ next, request }) {
-    const token = request.headers.get("authorization")
-    if (!token) {
-      return yield* Effect.fail({
-        _tag: "Unauthorized" as const,
-        message: "Missing authorization header",
-      })
+```ts
+const authMiddleware = HttpAuthMiddleware.basicAuth((creds) =>
+  Effect.gen(function* () {
+    const users = yield* UserRepo
+    const user = yield* users.findByEmail(creds.username)
+    if (!(yield* verifyPassword(creds.password, user.passwordHash))) {
+      return yield* Effect.fail(new Unauthorized())
     }
-    const decoded = yield* verifyToken(token)
-    return yield* next({ userId: decoded.sub, orgId: decoded.org })
+    return { user }
   })
 )
+
+const api = HttpApi.make(...).middleware(authMiddleware)
 ```
 
-`provides` fields (userId, orgId) are available to downstream handlers:
+`Security` is a typed provider. Handlers access the auth context via `Effect<Request, ...>` with the security shape.
 
-```typescript
-.handle("profile", ({ middleware }) => {
-  // middleware.userId — provided by Auth middleware
-  // middleware.orgId  — provided by Auth middleware
-  return userService.getProfile(middleware.userId)
-})
+## OpenAPI Generation
+
+```ts
+import { OpenApi } from "effect"
+
+const spec = OpenApi.fromApi(api)
+// Serve at /api/openapi.json or generate a static file
 ```
 
-### Applying Middleware to Client
-
-```typescript
-const AuthClient = HttpApiMiddleware.layerClient(
-  Auth,
-  Effect.fn(function* ({ next, request }) {
-    const token = yield* getToken()
-    const modified = HttpClientRequest.bearerToken(request, token)
-    return yield* next(modified)
-  })
-)
-```
-
----
-
-## Part 7: OpenAPI Documentation
-
-### Auto-Generated OpenAPI
-
-```typescript
-import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { HttpApiScalar } from "effect/unstable/httpapi"
-
-const ApiRoutes = HttpApiBuilder.layer(Api, {
-  openapiPath: "/openapi.json",
-  info: {
-    title: "My API",
-    version: "1.0.0",
-    description: "A type-safe API built with Effect",
-  },
-})
-
-// Serve Scalar UI for interactive docs
-const DocsRoute = HttpApiScalar.layer(Api, {
-  path: "/docs",
-})
-
-const AllRoutes = Layer.mergeAll(ApiRoutes, DocsRoute)
-```
-
-Every schema, error, and endpoint becomes part of the OpenAPI spec automatically.
-
-### OpenAPI Customization
-
-```typescript
-HttpApiBuilder.layer(Api, {
-  openapiPath: "/openapi.json",
-  info: {
-    title: "My API",
-    version: "1.0.0",
-  },
-  servers: [{ url: "https://api.example.com" }],
-})
-```
-
-Error schemas with `{ httpApiStatus: 404 }` annotations become OpenAPI error responses with the correct status code.
-
----
-
-## Part 8: The Typed Client
-
-```typescript
-import { HttpApiClient } from "effect/unstable/httpapi"
-import { FetchHttpClient, HttpClient } from "effect/unstable/http"
-import { Effect, Layer, Schedule } from "effect"
-
-class ApiClient extends ServiceMap.Service<
-  ApiClient,
-  HttpApiClient.ForApi<typeof Api>
->()("app/ApiClient") {
-  static readonly layer = Layer.effect(
-    ApiClient,
-    HttpApiClient.make(Api, {
-      transformClient: (client) =>
-        client.pipe(
-          HttpClient.mapRequest(
-            HttpClientRequest.prependUrl("http://localhost:3000")
-          ),
-          HttpClient.retryTransient({
-            schedule: Schedule.exponential(100),
-            times: 3,
-          })
-        )
-    })
-  ).pipe(
-    Layer.provide(FetchHttpClient.layer)
-  )
-}
-
-// Usage
-const program = Effect.gen(function* () {
-  const client = yield* ApiClient
-  const users = yield* client.users.list()
-  const user = yield* client.users.getById({ path: { id: 123 } })
-})
-```
-
-Every call is fully typed — path params, body, query, headers, and response.
-
----
-
-## Part 9: Serving the API
-
-### Production Server
-
-```typescript
-// src/main.ts
-import { NodeHttpServer, NodeRuntime } from "@effect/platform-node"
-import { HttpRouter } from "effect/unstable/http"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { Layer } from "effect"
-import { createServer } from "node:http"
-
-// Compose all handler layers
-const HandlerLayer = Layer.mergeAll(
-  UsersApiHandlers,
-  SystemApiHandlers,
-)
-
-// Build the API routes
-const ApiRoutes = HttpApiBuilder.layer(Api, {
-  openapiPath: "/openapi.json",
-}).pipe(
-  Layer.provide(HandlerLayer),
-  Layer.provide(AppServices),   // your Effect service layers
-)
-
-// Serve
-const server = HttpRouter.serve(ApiRoutes).pipe(
-  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 }))
-)
-
-Layer.launch(server).pipe(NodeRuntime.runMain)
-```
-
-### Server Lifecycle
-
-`Layer.launch` starts the server and waits for SIGTERM/SIGINT. On shutdown, it:
-1. Stops accepting new connections
-2. Drains in-flight requests
-3. Releases all Effect-scoped resources (DB connections, file handles, etc.)
-
-No manual shutdown handling needed — Effect's `Scope` handles it.
-
----
-
-## Part 10: Testing
-
-### Testing Handlers
-
-```typescript
-import { it } from "@effect/vitest"
-
-it.effect("should get user by id", () =>
-  Effect.gen(function* () {
-    const handler = yield* UsersApiHandlers
-    const result = yield* handler.handlers.getById({ path: { id: 1 } })
-    expect(result.id).toBe(1)
-  })
-)
-```
-
-### Testing via HTTP Client
-
-```typescript
-import { HttpRouter } from "effect/unstable/http"
-import { HttpClient, HttpClientRequest } from "effect/unstable/http"
-import { Layer, Effect } from "effect"
-
-it.effect("GET /users returns 200", () =>
-  Effect.gen(function* () {
-    const client = yield* HttpClient.HttpClient.pipe(
-      HttpClient.mapRequest(
-        HttpClientRequest.prependUrl("http://localhost:3000")
-      )
-    )
-    const response = yield* client.get("/users")
-    const body = yield* response.json
-    expect(Array.isArray(body)).toBe(true)
-  }).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        ApiTestLayer,  // replace real services with test layers
-        HttpRouter.serve(ApiRoutes),
-        NodeHttpServer.layer(createServer, { port: 0 }),
-      )
-    )
-  )
-)
-```
-
----
+The OpenAPI spec is derived from the schemas. No manual maintenance.
 
 ## Common Mistakes
 
-| Mistake | Problem | Fix |
-|---|---|---|
-| Service errors leaked in HTTP responses | Internal data exposed to clients | Map to separate HTTP error schemas with public bodies |
-| No `httpApiStatus` annotation on error schemas | OpenAPI shows wrong status codes | Add `{ httpApiStatus: 404 }` |
-| Hardcoded error messages everywhere | Inconsistent API responses | Use `HttpApiBuilder.notFound()`, `badRequest()`, etc. |
-| Giant handler with all endpoints | Hard to test, maintain | One handler group per domain (UsersApi, PaymentsApi, etc.) |
-| Using `HttpApi` for non-HTTP services | Over-engineering a CLI or worker | Only use HttpApi for HTTP endpoints |
-| Not using `Effect.fn` for handlers | No span names in traces | `Effect.fn(function* (handlers) { ... })` |
-| Manually constructing error responses | Wrong status code, wrong body | Use `HttpApiBuilder.*` error factories |
-| Catch-all error handlers | Swallows real bugs | Use typed catchTags, let defects propagate as 500s |
+Raw `HttpApp`; generic `Error`; business logic in handlers; auth in handler; manual SSE; manual OpenAPI; `JSON.parse` in handlers; 500 for known errors; missing `addError`; `try/catch`; no rate limit; no CORS; no `request.signal`.
 
-## Red Flags — STOP and Fix
+## Red Flags
 
-- Service error types leaked into HTTP error schemas — separate them
-- No `httpApiStatus` on error schemas — OpenAPI will be wrong
-- `any` in request/response types — HttpApi should never use any
-- Manually setting status codes in handlers — use HttpApiBuilder.*
-- Giant `catchAll` that hides defects — defects should crash the fiber, not be swallowed
-- SSE streams without proper typing — `HttpApiEndpoint.EventStream` handles the types
+Raw `HttpApp`; `throw new Error`; auth in handler; 500 on validation; manual EventSource; no rate limit; no validation; hand-maintained OpenAPI; missing CORS; no graceful shutdown; no backpressure; no size limits.
 
-## Quick Reference
+## Anti-Patterns
 
-```typescript
-import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi"
-import { HttpApiMiddleware } from "effect/unstable/httpapi"
-import { Schema, Effect, Layer, Stream } from "effect"
-
-// 1. Define API
-class MyApi extends HttpApiGroup.make("items")
-  .add(HttpApiEndpoint.get("list", "/items")(Schema.Array(ItemSchema)))
-  .add(HttpApiEndpoint.get("get", "/items/:id")(ItemSchema,
-    { path: Schema.Struct({ id: Schema.NumberFromString }) }
-  ))
-{}
-class Api extends HttpApi.make("api").add(MyApi) {}
-
-// 2. Implement handlers
-const Handlers = HttpApiBuilder.group(Api, "items",
-  Effect.fn(function* (h) {
-    const svc = yield* ItemService
-    return h
-      .handle("list", () => svc.list())
-      .handle("get", ({ path }) => svc.get(path.id).pipe(
-        Effect.catchTags({ NotFound: () => Effect.fail(HttpApiBuilder.notFound()) })
-      ))
-  })
-)
-
-// 3. Serve
-const Routes = HttpApiBuilder.layer(Api).pipe(
-  Layer.provide([Handlers, AppServices])
-)
-HttpRouter.serve(Routes).pipe(
-  Layer.provide(NodeHttpServer.layer(createServer, { port: 3000 })),
-  Layer.launch,
-  NodeRuntime.runMain,
-)
-```
+**"Just add a route"** (skip the schema); **"catch in handler"**; **"auth here is fine"** (middleware); **"manual SSE"**; **hand-written OpenAPI**.

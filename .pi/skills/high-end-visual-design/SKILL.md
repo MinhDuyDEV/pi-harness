@@ -8,109 +8,74 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-## When to Use
+# High-End Visual Design
 
-- When the user explicitly requests premium, agency-quality, or luxury visual design
-- Instead of design-taste-frontend when high-end aesthetics are the priority
-- For landing pages, marketing sites, or portfolio projects that need to feel expensive
+## Iron Laws
 
-## When NOT to Use
+<EXTREMELY-IMPORTANT>
+- **Typography does the work.** Editorial pairings, generous spacing. No system fonts in prod.
+- **Restraint signals quality.** Less is more. Empty space is content.
+- **Real type families.** Inter, Söhne, GT America, Editorial New, Migra, etc.
+- **Real motion.** Spring physics, view transitions, 60fps. No bounces.
+- **Real photography.** No stock, no AI-generated generic.
+</EXTREMELY-IMPORTANT>
 
-- For internal tools, admin panels, or dashboards where function > form
-- When minimalist-ui or industrial-brutalist-ui aesthetics are requested instead
-- For rapid prototyping where visual polish is not yet needed
+## Typography (Editorial)
 
+- **Display**: a serif or display sans (Editorial New, Migra, GT Sectra, Migra, Fraunces) for hero
+- **Body**: a clean grotesque (Söhne, Inter, GT America) for body
+- **Mono**: a real mono (Berkeley Mono, JetBrains Mono) for code
+- Sizes: 14-16 body, 18-20 subhead, 24-32 section, 48-96 hero, 120+ display
+- Letter-spacing: tight (-0.02em) for display, normal for body
+- Pair display + body + mono, never more
 
-# Agent Skill: Principal UI/UX Architect & Motion Choreographer (Awwwards-Tier)
+## Color (Restrained)
 
-## 1. Meta Information & Core Directive
-- **Persona:** `Vanguard_UI_Architect`
-- **Objective:** You engineer $150k+ agency-level digital experiences, not just websites. Your output must exude haptic depth, cinematic spatial rhythm, obsessive micro-interactions, and flawless fluid motion. 
-- **The Variance Mandate:** NEVER generate the exact same layout or aesthetic twice in a row. You must dynamically combine different premium layout archetypes and texture profiles while strictly adhering to the elite "Apple-esque / Linear-tier" design language.
+- **One brand color, used once or twice.** Not everywhere.
+- **Neutrals**: 9-step warm/cool ramp, not pure black/white
+- **Accents**: status only (success, warn, error)
+- High-contrast for hero, low-contrast for body
+- Test on real device, light + dark
 
-## 2. THE "ABSOLUTE ZERO" DIRECTIVE (STRICT ANTI-PATTERNS)
-If your generated code includes ANY of the following, the design instantly fails:
-- **Banned Fonts:** Inter, Roboto, Arial, Open Sans, Helvetica. (Assume premium fonts like `Geist`, `Clash Display`, `PP Editorial New`, or `Plus Jakarta Sans` are available).
-- **Banned Icons:** Standard thick-stroked Lucide, FontAwesome, or Material Icons. Use only ultra-light, precise lines (e.g., Phosphor Light, Remix Line).
-- **Banned Borders & Shadows:** Generic 1px solid gray borders. Harsh, dark drop shadows (`shadow-md`, `rgba(0,0,0,0.3)`). 
-- **Banned Layouts:** Edge-to-edge sticky navbars glued to the top. Symmetrical, boring 3-column Bootstrap-style grids without massive whitespace gaps.
-- **Banned Motion:** Standard `linear` or `ease-in-out` transitions. Instant state changes without interpolation.
+## Spacing
 
-## 3. THE CREATIVE VARIANCE ENGINE
-Before writing code, silently "roll the dice" and select ONE combination from the following archetypes based on the prompt's context to ensure the output is uniquely tailored but always premium:
+- 8pt base scale, generously applied
+- Section padding: 96-160px desktop, 48-80px mobile
+- Hero: 30-50% of viewport height
+- Whitespace is the design — don't fill
 
-### A. Vibe & Texture Archetypes (Pick 1)
-1. **Ethereal Glass (SaaS / AI / Tech):** Deepest OLED black (`#050505`), radial mesh gradients (e.g., subtle glowing purple/emerald orbs) in the background. Vantablack cards with heavy `backdrop-blur-2xl` and pure white/10 hairlines. Wide geometric Grotesk typography.
-2. **Editorial Luxury (Lifestyle / Real Estate / Agency):** Warm creams (`#FDFBF7`), muted sage, or deep espresso tones. High-contrast Variable Serif fonts for massive headings. Subtle CSS noise/film-grain overlay (`opacity-[0.03]`) for a physical paper feel.
-3. **Soft Structuralism (Consumer / Health / Portfolio):** Silver-grey or completely white backgrounds. Massive bold Grotesk typography. Airy, floating components with unbelievably soft, highly diffused ambient shadows.
+## Imagery
 
-### B. Layout Archetypes (Pick 1)
-1. **The Asymmetrical Bento:** A masonry-like CSS Grid of varying card sizes (e.g., `col-span-8 row-span-2` next to stacked `col-span-4` cards) to break visual monotony.
-   - **Mobile Collapse:** Falls back to a single-column stack (`grid-cols-1`) with generous vertical gaps (`gap-6`). All `col-span` overrides reset to `col-span-1`.
-2. **The Z-Axis Cascade:** Elements are stacked like physical cards, slightly overlapping each other with varying depths of field, some with a subtle `-2deg` or `3deg` rotation to break the digital grid.
-   - **Mobile Collapse:** Remove all rotations and negative-margin overlaps below `768px`. Stack vertically with standard spacing. Overlapping elements cause touch-target conflicts on mobile.
-3. **The Editorial Split:** Massive typography on the left half (`w-1/2`), with interactive, scrollable horizontal image pills or staggered interactive cards on the right.
-   - **Mobile Collapse:** Converts to a full-width vertical stack (`w-full`). Typography block sits on top, interactive content flows below with horizontal scroll preserved if needed.
+- **Photography**: real, specific, professional. Custom shoots > Unsplash.
+- **Illustration**: custom style, not generic. Editorial illustration if budget allows.
+- **Iconography**: minimal, single-style (line OR fill, not both), 1.5-2px stroke
+- **No stock photos of "people pointing at screens"**
+- **No AI-generated portraits** (uncanny valley, dated fast)
 
-**Mobile Override (Universal):** Any asymmetric layout above `md:` MUST aggressively fall back to `w-full`, `px-4`, `py-8` on viewports below `768px`. Never use `h-screen` for full-height sections — always use `min-h-[100dvh]` to prevent iOS Safari viewport jumping.
+## Motion
 
-## 4. HAPTIC MICRO-AESTHETICS (COMPONENT MASTERY)
+- **Real physics**: spring(0.6, 0.8) for entrances
+- **View transitions API** for page-to-page (where supported)
+- **No bounces, no elastic, no easeInOutBack** (LLM defaults)
+- **60fps target**. `transform` + `opacity` only.
+- **Reduced motion** is first-class.
 
-### A. The "Double-Bezel" (Doppelrand / Nested Architecture)
-Never place a premium card, image, or container flatly on the background. They must look like physical, machined hardware (like a glass plate sitting in an aluminum tray) using nested enclosures.
-- **Outer Shell:** A wrapper `div` with a subtle background (`bg-black/5` or `bg-white/5`), a hairline outer border (`ring-1 ring-black/5` or `border border-white/10`), a specific padding (e.g., `p-1.5` or `p-2`), and a large outer radius (`rounded-[2rem]`).
-- **Inner Core:** The actual content container inside the shell. It has its own distinct background color, its own inner highlight (`shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]`), and a mathematically calculated smaller radius (e.g., `rounded-[calc(2rem-0.375rem)]`) for concentric curves.
+## Detail Level
 
-### B. Nested CTA & "Island" Button Architecture
-- **Structure:** Primary interactive buttons must be fully rounded pills (`rounded-full`) with generous padding (`px-6 py-3`). 
-- **The "Button-in-Button" Trailing Icon:** If a button has an arrow (`↗`), it NEVER sits naked next to the text. It must be nested inside its own distinct circular wrapper (e.g., `w-8 h-8 rounded-full bg-black/5 dark:bg-white/10 flex items-center justify-center`) placed completely flush with the main button's right inner padding.
+- Custom cursor on hero (where appropriate)
+- Hover states with intent (color shift, slight scale, underline animation)
+- Loading skeletons that match the actual layout
+- Error states with character (illustrated, helpful, not apologetic)
+- Empty states that teach (illustration + CTA)
 
-### C. Spatial Rhythm & Tension
-- **Macro-Whitespace:** Double your standard padding. Use `py-24` to `py-40` for sections. Allow the design to breathe heavily.
-- **Eyebrow Tags:** Precede major H1/H2s with a microscopic, pill-shaped badge (`rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.2em] font-medium`).
+## Anti-Patterns (LLM premium defaults)
 
-## 5. MOTION CHOREOGRAPHY (FLUID DYNAMICS)
-Never use default transitions. All motion must simulate real-world mass and spring physics. Use custom cubic-beziers (e.g., `transition-all duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]`).
+Centered everything; gold/silver gradients; glassmorphism; "AI" purple/blue; abstract gradient hero; stock laptops; "tap to learn more"; 3-line testimonials; 20-logo "trusted by"; "we are passionate"; lorem ipsum; missing focus.
 
-### A. The "Fluid Island" Nav & Hamburger Reveal
-- **Closed State:** The Navbar is a floating glass pill detached from the top (`mt-6`, `mx-auto`, `w-max`, `rounded-full`).
-- **The Hamburger Morph:** On click, the 2 or 3 lines of the hamburger icon must fluidly rotate and translate to form a perfect 'X' (`rotate-45` and `-rotate-45` with absolute positioning), not just disappear.
-- **The Modal Expansion:** The menu should open as a massive, screen-filling overlay with a heavy glass effect (`backdrop-blur-3xl bg-black/80` or `bg-white/80`). 
-- **Staggered Mask Reveal:** The navigation links inside the expanded state do not just appear. They fade in and slide up from an invisible box (`translate-y-12 opacity-0` to `translate-y-0 opacity-100`) with a staggered delay (`delay-100`, `delay-150`, `delay-200` for each item).
+## The "Agency" Test
 
-### B. Magnetic Button Hover Physics
-- Use the `group` utility. On hover, do not just change the background color.
-- Scale the entire button down slightly (`active:scale-[0.98]`) to simulate physical pressing.
-- The nested inner icon circle should translate diagonally (`group-hover:translate-x-1 group-hover:-translate-y-[1px]`) and scale up slightly (`scale-105`), creating internal kinetic tension.
+If you showed this to a creative director at a top agency, would they say "nice work" or "I've seen this 100 times"? Aim for "nice work" — meaning the design has a perspective, not just a template.
 
-### C. Scroll Interpolation (Entry Animations)
-- Elements never appear statically on load. As they enter the viewport, they must execute a gentle, heavy fade-up (`translate-y-16 blur-md opacity-0` resolving to `translate-y-0 blur-0 opacity-100` over 800ms+).
-- For JavaScript-driven scroll reveals, use `IntersectionObserver` or Framer Motion's `whileInView`. Never use `window.addEventListener('scroll')` — it causes continuous reflows and kills mobile performance.
+## Red Flags
 
-## 6. PERFORMANCE GUARDRAILS
-- **GPU-Safe Animation:** Never animate `top`, `left`, `width`, or `height`. Animate exclusively via `transform` and `opacity`. Use `will-change: transform` sparingly and only on elements that are actively animating.
-- **Blur Constraints:** Apply `backdrop-blur` only to fixed or sticky elements (navbars, overlays). Never apply blur filters to scrolling containers or large content areas — this causes continuous GPU repaints and severe mobile frame drops.
-- **Grain/Noise Overlays:** Apply noise textures exclusively to fixed, `pointer-events-none` pseudo-elements (`position: fixed; inset: 0; z-index: 50`). Never attach them to scrolling containers.
-- **Z-Index Discipline:** Do not use arbitrary `z-50` or `z-[9999]`. Reserve z-indexes strictly for systemic layers: sticky nav, modals, overlays, tooltips.
-
-## 7. EXECUTION PROTOCOL
-When generating UI code, follow this exact sequence:
-1. **[SILENT THOUGHT]** Roll the Variance Engine (Section 3). Choose your Vibe and Layout Archetypes based on the prompt's context to ensure a unique output.
-2. **[SCAFFOLD]** Establish the background texture, macro-whitespace scale, and massive typography sizes.
-3. **[ARCHITECT]** Build the DOM strictly using the "Double-Bezel" (Doppelrand) technique for all major cards, inputs, and feature grids. Use exaggerated squircle radii (`rounded-[2rem]`).
-4. **[CHOREOGRAPH]** Inject the custom `cubic-bezier` transitions, the staggered navigation reveals, and the button-in-button hover physics.
-5. **[OUTPUT]** Deliver flawless, pixel-perfect React/Tailwind/HTML code. Do not include basic, generic fallbacks.
-
-## 8. PRE-OUTPUT CHECKLIST
-Evaluate your code against this matrix before delivering. This is the last filter.
-- [ ] No banned fonts, icons, borders, shadows, layouts, or motion patterns from Section 2 are present
-- [ ] A Vibe Archetype and Layout Archetype from Section 3 were consciously selected and applied
-- [ ] All major cards and containers use the Double-Bezel nested architecture (outer shell + inner core)
-- [ ] CTA buttons use the Button-in-Button trailing icon pattern where applicable
-- [ ] Section padding is at minimum `py-24` — the layout breathes heavily
-- [ ] All transitions use custom cubic-bezier curves — no `linear` or `ease-in-out`
-- [ ] Scroll entry animations are present — no element appears statically
-- [ ] Layout collapses gracefully below `768px` to single-column with `w-full` and `px-4`
-- [ ] All animations use only `transform` and `opacity` — no layout-triggering properties
-- [ ] `backdrop-blur` is only applied to fixed/sticky elements, never to scrolling content
-- [ ] The overall impression reads as "$150k agency build", not "template with nice fonts"
+System fonts in production; "AI purple" accent; abstract gradient hero; stock photos; bounce animations; emoji in copy; "trusted by" with fake logos; "we are passionate"; "tap to learn more"; lorem ipsum anywhere; multiple accent colors; missing focus states; pure black/white.
