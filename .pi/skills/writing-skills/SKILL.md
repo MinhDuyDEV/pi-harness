@@ -25,6 +25,8 @@ tools: []
 
 ## Overview
 
+**REQUIRED BACKGROUND:** `test-driven-development` — the TDD RED-GREEN-REFACTOR cycle is the same cycle this skill uses. Read the TDD skill first; everything below assumes you already know it.
+
 **Writing skills IS Test-Driven Development applied to process documentation.**
 
 **Personal skills live in agent-specific directories (`~/.claude/skills` for Claude Code, `~/.codex/skills` for Codex)**
