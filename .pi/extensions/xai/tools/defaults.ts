@@ -13,13 +13,13 @@
 export const XAI_DEFAULT_ENABLED_TOOLS = [
   "xai_web_search",
   "xai_x_search",
-  "xai_generate_image",
-  "xai_critique",
   "xai_analyze_image",
 ] as const;
 
 export const XAI_DEFAULT_DISABLED_TOOLS = [
   "xai_generate_text",
+  "xai_generate_image",
+  "xai_critique",
   "xai_multi_agent",
   "xai_code_execution",
   "xai_deep_research",
@@ -39,7 +39,10 @@ export function resolveXaiToolConfig(): Set<string> {
   if (extraRaw === "*") {
     for (const t of XAI_ALL_TOOL_NAMES) enabled.add(t);
   } else if (extraRaw) {
-    for (const t of extraRaw.split(",").map((s) => s.trim()).filter(Boolean)) {
+    for (const t of extraRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       if (XAI_ALL_TOOL_NAMES.includes(t as XaiToolName)) {
         enabled.add(t);
       } else {
@@ -52,7 +55,10 @@ export function resolveXaiToolConfig(): Set<string> {
   if (disabledRaw === "*") {
     enabled.clear();
   } else if (disabledRaw) {
-    for (const t of disabledRaw.split(",").map((s) => s.trim()).filter(Boolean)) {
+    for (const t of disabledRaw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)) {
       if (XAI_ALL_TOOL_NAMES.includes(t as XaiToolName)) {
         enabled.delete(t);
       } else {
