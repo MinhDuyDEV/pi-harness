@@ -1,7 +1,7 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { exec as execCb } from "child_process";
 import { existsSync, readFileSync, realpathSync } from "fs";
-import { mkdtemp, readdir, readFile, rm, stat } from "fs/promises";
+import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import type { Dirent } from "fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
