@@ -1,115 +1,93 @@
 ---
 name: diagnostics
-version: 1.1.0
-description: "Use when checking for code errors, type issues, or lint warnings after making changes, before committing, or when troubleshooting build failures"
+description: Use when checking for code errors, type issues, or lint warnings after making changes, before committing, or when troubleshooting build failures
 ---
 
-# Diagnostics Skill
+# Diagnostics
 
-Pi automatically runs code diagnostics (type checking, linting, static analysis) after you write or edit files, and appends any errors/warnings directly to the tool result. It **auto-detects project languages** by checking for known marker files.
+The `diagnostics` tool runs project diagnostics and returns structured results. The extension also auto-injects language diagnostics after `write`/`edit` (debounced).
 
-## Supported languages
+## When to Use
 
-| Language    | Marker file(s)          | Tool / Analysis                                    |
-|-------------|-------------------------|----------------------------------------------------|
-| TypeScript  | `tsconfig.json`         | `tsc --noEmit --pretty false` + **Fallow** (quality)|
-| Rust        | `Cargo.toml`            | `cargo check --quiet`                              |
-| Go          | `go.mod`                | `go vet ./...`                                     |
-| Python      | `pyproject.toml` / `setup.py` / `requirements.txt` | `ruff check .` → `mypy .`                |
+- After making code changes (especially TypeScript/JavaScript)
+- Before committing or creating PRs
+- When the user reports build/type errors
+- When troubleshooting why code doesn't compile
+- After non-trivial TS/JS work: prefer `scope: "changed"` before claiming done
 
-If a project has **multiple** languages (e.g., a Rust backend with a TypeScript frontend), diagnostics run for all detected languages.
+## Tool parameters
 
-## Fallow integration (TS/JS only)
+| Parameter | Default | Notes |
+|-----------|---------|--------|
+| `scope` | `full` | `changed` runs Fallow `check-changed` (git diff since `changedSince`) instead of health + dead-code |
+| `changedSince` | `PI_DIAGNOSTICS_CHANGED_SINCE` or `main` | Git ref for Fallow |
+| `languages` | all detected | e.g. `["typescript"]`, `["rust"]` |
+| `includeFallow` | `true` if `tsconfig.json` | TS/JS quality |
+| `includeAislop` | `true` unless env skips | Full-project aislop scan |
+| `file` | — | Only language runners matching this file's extension |
 
-When you call `diagnostics` in a TypeScript/JavaScript project, the extension also runs **Fallow** — a deterministic static analysis engine for TS/JS that detects:
+Example (agent):
 
-- **Dead code** — unused files, exports, and dependencies
-- **Complexity hotspots** — large functions, high cyclomatic complexity, CRAP scores
-- **Code quality issues** — file health scores, refactoring targets
-
-Fallow is auto-detected and runs via `npx fallow`. No separate install needed.
-
-Only runs in the explicit `diagnostics` tool, not in auto-injection (to keep post-edit feedback fast).
-
-### What the output looks like
-
-```
-<diagnostics tool="Fallow (code quality)">
-  3 high-complexity function(s):
-    - parseRequest (src/parser.ts:142) — CRITICAL
-    - handleAuth (src/auth.ts:89) — HIGH
-  Health scores (worst 5 of 42 files):
-    3.2  src/legacy/utils.ts (210 LOC, 34% dead)
-    5.1  src/api/handler.ts (156 LOC)
-</diagnostics>
-```
-
----
-
-## How it works
-
-### Auto-injection (no action needed)
-
-After writing or editing a file, diagnostics auto-run for matching languages:
-
-```
----
-<diagnostics tool="TypeScript (tsc)">
-  src/main.ts:42:5 - error TS2304: Cannot find name 'foo'
-</diagnostics>
-```
-
-The `<diagnostics tool="...">` tag tells you which language tool produced the output. Only diagnostics matching the edited file's language run (so editing a `.rs` file won't trigger TypeScript checks).
-
-### On-demand project-wide check
-
-Call the `diagnostics` tool to check **all** detected languages at once:
-
-```
-diagnostics
-→ TypeScript (tsc): no errors
-→ Rust (cargo check): error: unused variable `x`
-→ Python (ruff): no errors
-```
-
-### When diagnostics are skipped
-
-- `PI_DISABLE_AUTO_DIAGNOSTICS=true` is set
-- Editing config files (package.json, Cargo.toml, go.mod, lock files, etc.)
-- Same project checked within the last 15 seconds (debounce)
-- No supported language detected in the project
-
-## Configuration
-
-| Env Var                      | Default | Description                              |
-|------------------------------|---------|------------------------------------------|
-| `PI_DISABLE_AUTO_DIAGNOSTICS`| `false` | Disable automatic post-edit diagnostics  |
-| `PI_DIAGNOSTICS_TIMEOUT_MS`  | `30000` | Timeout per diagnostic run in ms         |
-
-## Adding a new language
-
-Edit `.pi/extensions/diagnostics.ts` and add a new entry to the `LANG_DIAGNOSTICS` array:
-
-```typescript
+```json
 {
-  name: "my-lang",
-  label: "MyLang (tool-name)",
-  extensions: [".my"],
-  detect(root) { return fs.existsSync(path.join(root, "my-project.config")); },
-  resolve(root) {
-    const bin = findBin(["path/to/tool"]);
-    return bin ? { bin, args: ["check"] } : null;
-  },
+  "scope": "changed",
+  "languages": ["typescript"],
+  "includeAislop": false
 }
 ```
 
-## Design rationale vs OpenCode LSP
+## What It Detects
 
-OpenCode spawns ~30 long-running LSP server processes. Pi's diagnostics use **one-off CLI subprocesses** instead:
+| Language | Marker | Tool |
+|----------|--------|------|
+| TypeScript/JS | `tsconfig.json` | `tsc --noEmit` |
+| Rust | `Cargo.toml` | `cargo check` |
+| Go | `go.mod` | `go vet ./...` |
+| Python | `pyproject.toml` / `setup.py` / etc. | `ruff check` or `mypy` |
 
-- **Zero resident memory** — no 100-500MB server processes
-- **Zero lifecycle management** — no crashes, version mismatches, or sync issues
-- **10% complexity** for 90% of agent-feedback value
-- Auto-cleanup via timeout
+### TypeScript/JS extras (explicit tool, when enabled)
 
-OpenCode's own docs: *"LSP can help... but it is not always a net positive. Language servers can get out of sync, use significant memory, vary by version or project, and slow down agent workflows."*
+- **Fallow** — `scope: full`: `health` + `dead-code` (JSON, human summary). `scope: changed`: root `check-changed`.
+- **aislop** — full-project `aislop scan --json` (skipped by default when `PI_AISLOP_AUTO=true` or `PI_DIAGNOSTICS_SKIP_AISLOP=true`).
+
+## Auto-injection
+
+After `write`/`edit`:
+
+- Runs **language runners** for the edited file's extension only (not full Fallow/aislop).
+- Optional: `PI_DIAGNOSTICS_AUTO_FALLOW=true` runs debounced Fallow `check-changed` on TS/JS edits.
+- Skips config/lockfiles and debounces 15s (`PI_DISABLE_AUTO_DIAGNOSTICS=true` disables).
+
+## Environment
+
+| Variable | Effect |
+|----------|--------|
+| `PI_DISABLE_AUTO_DIAGNOSTICS` | `true` — no auto-inject |
+| `PI_DIAGNOSTICS_AUTO_FALLOW` | `true` — auto Fallow on TS/JS edits |
+| `PI_DIAGNOSTICS_CHANGED_SINCE` | Default git ref (default `main`) |
+| `PI_DIAGNOSTICS_TIMEOUT_MS` | Subprocess timeout (default 30000; Fallow uses same, suggest 60000 for large repos) |
+| `PI_DIAGNOSTICS_SKIP_AISLOP` | `true` — default `includeAislop: false` |
+| `PI_AISLOP_AUTO` | `true` — default `includeAislop: false` (per-file hook owns aislop) |
+| `FALLOW_BIN` | Path to `fallow` CLI; else PATH, else `npx -y fallow` |
+| `PI_DIAGNOSTICS_ROOT` | Force project root (absolute or relative to session cwd) |
+| `PI_DIAGNOSTICS_ROOT_WALK` | Max parent directories to search for markers (default 6) |
+
+## Output
+
+- Human-readable `<diagnostics tool="...">` blocks in tool content (parsed in TUI by `renderResult`).
+- `details`: `{ cwd, projectRoot, walkedUp?, scope, detectedLanguages, blocks: [...] }`. When session cwd is e.g. `.pi`, runners use parent `projectRoot` where `tsconfig.json` lives.
+- Large Fallow/aislop text may truncate with a temp file path (Pi default line/byte limits).
+
+## Workflow
+
+1. Make code changes
+2. Read auto-injected diagnostics if present
+3. Call `diagnostics` with `scope: "changed"` for TS/JS quality gates
+4. Fix reported issues
+5. Re-run until clean
+
+## Limitations
+
+- Diagnostics are point-in-time; re-run after fixes
+- Fallow requires installable `fallow` or npx
+- Auto-inject does not replace explicit `diagnostics` before ship
