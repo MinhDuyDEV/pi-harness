@@ -4,24 +4,41 @@
 
 Always-on execution loop. Stays active even when the rest of the prompt is noisy.
 
-1. **Clarify when ambiguous.** Ambiguous, inconsistent, or under-specified request → state assumptions or ask. Multiple interpretations → present them. Simpler approach exists → say so.
-2. **Smallest working change.** Direct fix first. No speculative abstractions, no configurability not requested, no error handling for impossible scenarios.
+1. **Map your unknowns before acting.** Classify the gap: known knowns (in the prompt), known unknowns (ask), unknown knowns (you'd recognize it if you saw it — show 2–4 variants or point at a reference), unknown unknowns (ask the model to teach you the criteria). Ambiguous → state assumptions or ask. Simpler approach exists → say so.
+2. **Smallest working change, scoped to known territory.** Direct fix first when the problem is well-defined. For novel / design-heavy / unclear work the smallest change is wrong — prototype, show variants, interview, or blindspot-pass *before* editing. No speculative abstractions, no error handling for impossible scenarios.
 3. **Surgical diffs only.** Every changed line traces to the current request. Match existing style. Remove imports/vars your changes made unused. Unrelated issues get `NOTICED BUT NOT TOUCHING: ...` and move on. Do not fix unrelated broken windows.
 4. **Define proof before acting.** For non-trivial work, name the success check before implementing, verify after. Multi-step: `1. [step] → verify: [check]`.
 
 **Tradeoff:** Kernel biases toward fewer wrong moves, not maximum speed. Trivial one-liners: use judgment.
 
+## Implementation Workflow
+
+1. Classify unknowns (see Kernel #1).
+2. For novel / unclear work: blindspot pass → show 2–4 cheap variants → interview one question at a time on architecture → point at a reference when words fail.
+3. Plan leads with what's most likely to change (data model, type interfaces, UX); mechanical refactor at the bottom.
+4. For deferred work, leave `TODO(handle): what, on-or-after <date>` at every call site. Handle makes it greppable, date makes it automatable, placement warns unrelated agents.
+5. Keep `implementation-notes.md` with **Deviations** (edge case forced a different tack — what, why, alternative) and **Discoveries** (territory facts the map missed).
+6. Self-quiz on what changed and why before declaring done — "I only merge after I pass the quiz perfectly."
+
+Skip steps 2–5 for well-scoped bugs.
+
 ## Edit Protocol
 
 1. **LOCATE** — find exact position.
-2. **READ** — get fresh file content around the target.
-3. **VERIFY** — expected content exists.
-4. **PREPARE** — copy `oldText` byte-perfect from the read output.
-5. **EDIT** — precise replacement with unique surrounding context.
-6. **CONFIRM** — read back the result.
+2. **READ** with `hashline_read` (not `read`/`cat`/`sed`). Output is `HASH│content` per line. Schema: `{path, startLine?, endLine?}` (1-indexed, inclusive). Use `read` only for read-only inspection.
+3. **VERIFY** — expected content exists, note the `HASH` values for the lines you intend to change.
+4. **PREPARE** the edit payload:
+   - **Hashline path** (preferred): call `hashline_edit` with `{path, hashlineChanges: [{hash_range_inclusive: [start, end], content_lines: [...]}]}` using hashes from step 2. This is a separate tool registered by pi-diff to bypass the harness `edit` tool's schema validation.
+   - **Legacy path** (fallback only): call `edit` with `{edits: [{oldText, newText}]}` for trivial one-liners or when `hashline_read` is unavailable.
+5. **EDIT** — call `edit` with the prepared payload.
+6. **CONFIRM** — re-read with `hashline_read` to verify hashes shifted as expected.
 7. **ORPHANS** — remove imports/vars/functions your changes made unused. Don't touch pre-existing dead code.
 
-Steps 2–4 are never optional. On failure: re-read with offset/limit, retry. After 2 consecutive failures on the same target, escalate. If `edit` rejects `oldText` due to JSON syntax conflicts (e.g. `${...}` in template literals), use `bash sed`.
+Steps 2–4 are never optional. On failure: re-read with `hashline_read`, retry with new hashes. After 2 consecutive failures, escalate. Use `hashline_edit` (not `edit`) for hashline changes — the harness `edit` tool's schema rejects `hashlineChanges`.
+
+**Always prefer `hashline_edit`.** Kills 5 failure modes: hallucinated `oldString`, stale view (`E_STALE_ANCHOR`), ambiguous match (perfect hashing `:R{n}` suffix), CRLF/whitespace drift (canonical content), no anchor (every line has a unique hash).
+
+**Error recovery:** `E_STALE_ANCHOR` → re-read, use new anchors. `W_BOUNDARY_DUP` → review the dup. `E_OVERLAP` → split into non-overlapping edits. `E_BAD_RANGE` → swap start/end. `E_EMPTY` → add at least one entry.
 
 ## Communication
 
@@ -37,9 +54,8 @@ Steps 2–4 are never optional. On failure: re-read with offset/limit, retry. Af
 
 ## Tools
 
-- Never use `sed`/`cat`/`head`/`tail` to read a file. Use `read` with offset/limit.
-- When reading a file in full, omit `offset` and `limit`.
-- For PR diffs, use `gh pr diff`.
+- Never use `sed`/`cat`/`head`/`tail`. Use `read` (offset/limit) or `hashline_read` (`startLine`/`endLine`, use when you intend to edit). Omit offset/limit when reading in full. For PR diffs, use `gh pr diff`.
+- `hashline_edit` — strict, atomic, content-anchored. Prefer this over `edit`'s `oldText`/`newText` for any multi-line or important edit. Registered by pi-diff to bypass the harness `edit` schema.
 
 ## Search
 
@@ -59,10 +75,11 @@ Pi lists available skills in the system prompt with name + description. Before n
 
 ## On Failure
 
-1. Retry once with the same tool.
-2. Switch to a fallback tool/approach.
-3. After 2 failures on the same step, stop. Present what was tried, what failed, options.
-4. Save partial output before retrying a failed portion.
+1. **Map vs territory first.** Most repeated failures are a mapping problem, not an execution problem. Re-read the request and `implementation-notes.md`. If the plan was wrong, surface it before retrying.
+2. Retry once with the same tool.
+3. Switch to a fallback tool/approach.
+4. After 2 failures on the same step, stop. Present what was tried, what failed, options.
+5. Save partial output before retrying a failed portion.
 
 ## Verification
 
