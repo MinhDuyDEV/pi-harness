@@ -23,6 +23,7 @@ import type {
 import { Type } from "@sinclair/typebox";
 
 import type { DCPConfig, ProbeConfig } from "./config.js";
+import { renderCompressResult } from "./compress-render.js";
 import { applyCompressStrip } from "./compress-strip.js";
 import { applyDedup, applyPurgeErrors } from "./compress-dedup.js";
 import { pruneToolResults } from "./compress-prune.js";
@@ -1547,5 +1548,7 @@ export function registerCompressTool(
         },
       };
     },
+    renderResult: (result, options, theme) =>
+      renderCompressResult(result, options, theme),
   });
 }
