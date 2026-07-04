@@ -6,113 +6,70 @@ version: 1.0.0
 
 # Diagnose
 
-A discipline for hard bugs. Skip phases only when explicitly justified.
+## Core Principle
 
-When exploring the codebase, use the project's domain glossary to get a clear mental model of the relevant modules, and check ADRs in the area you're touching.
+**Root cause over local patch.** Fix the invariant that makes the failure class impossible, not the instance. A "fix" that only addresses the symptom and leaves the bug class possible is a paper-over, not a fix.
 
-## Phase 1 — Build a feedback loop
+## When to Use
 
-**This is the skill.** Everything else is mechanical. If you have a fast, deterministic, agent-runnable pass/fail signal for the bug, you will find the cause — bisection, hypothesis-testing, and instrumentation all just consume that signal. If you don't have one, no amount of staring at code will save you.
+User says "diagnose", "debug", "broken", "failing", "throws", "regression"; multiple fix attempts have not worked (per `debugging-and-error-recovery`); performance regression with unknown cause; symptom is reported, root cause is not.
 
-Spend disproportionate effort here. **Be aggressive. Be creative. Refuse to give up.**
+## When NOT to Use
 
-### Ways to construct one — try them in roughly this order
+Root cause is already known (use `incremental-implementation`); single-line change with a known cause; user only wants a workaround.
 
-1. **Failing test** at whatever seam reaches the bug — unit, integration, e2e.
-2. **Curl / HTTP script** against a running dev server.
-3. **CLI invocation** with a fixture input, diffing stdout against a known-good snapshot.
-4. **Headless browser script** (Playwright / Puppeteer) — drives the UI, asserts on DOM/console/network.
-5. **Replay a captured trace.** Save a real network request / payload / event log to disk; replay it through the code path in isolation.
-6. **Throwaway harness.** Spin up a minimal subset of the system (one service, mocked deps) that exercises the bug code path with a single function call.
-7. **Property / fuzz loop.** If the bug is "sometimes wrong output", run 1000 random inputs and look for the failure mode.
-8. **Bisection harness.** If the bug appeared between two known states (commit, dataset, version), automate "boot at state X, check, repeat" so you can `git bisect run` it.
-9. **Differential loop.** Run the same input through old-version vs new-version (or two configs) and diff outputs.
-10. **HITL bash script.** Last resort. If a human must click, drive _them_ with `scripts/hitl-loop.template.sh` so the loop is still structured. Captured output feeds back to you.
+## The Diagnose Loop
 
-Build the right feedback loop, and the bug is 90% fixed.
+```
+observe (symptom) ──> hypothesize (cause) ──> instrument (test) ──> confirm (or revise)
+   │                       │                      │                       │
+   │                       │                  add logging,              if false,
+   │                       │                  a probe, or a            loop back.
+   │                       │                  failing test.
+```
 
-### Iterate on the loop itself
+Each cycle is small. Do not stack 5 hypotheses before testing any. **A hypothesis that can't be tested is a guess, not a hypothesis.**
 
-Treat the loop as a product. Once you have _a_ loop, ask:
+## Workflow
 
-- Can I make it faster? (Cache setup, skip unrelated init, narrow the test scope.)
-- Can I make the signal sharper? (Assert on the specific symptom, not "didn't crash".)
-- Can I make it more deterministic? (Pin time, seed RNG, isolate filesystem, freeze network.)
+1. **Gather** — full error, logs, repro, recent changes, env. No fix proposal until symptom fits in one sentence.
+2. **Localize** — failing layer: input, validation, business logic, persistence, integration, env. Boundary is the search area.
+3. **Hypothesize** — one or two causes, each testable by probe / log / failing test.
+4. **Instrument** — minimum probe that distinguishes the candidates. Prefer a failing test (`test-driven-development`).
+5. **Confirm or revise** — run the probe. Falsify → loop. Confirm → root cause is the layer it points at.
+6. **Fix the invariant** — smallest change that makes the failure class impossible (type, guard, parse, contract). Not the instance band-aid.
+7. **Guard** — regression test that would have caught the original symptom. Without it, the class can reappear.
 
-A 30-second flaky loop is barely better than no loop. A 2-second deterministic loop is a debugging superpower.
+## Root-Cause Triggers
 
-### Non-deterministic bugs
+| Trigger | Implication |
+| --- | --- |
+| Dev / prod mismatch | Env, config, secrets, data, race |
+| "Was fine yesterday" | Recent change, deploy, data drift, dep bump |
+| "Only user X" | Data, identity, permissions |
+| "Sometimes" | Race, timing, cache, ordering |
+| "Friday's fix broke it" | Bisect, dep, schema |
 
-The goal is not a clean repro but a **higher reproduction rate**. Loop the trigger 100×, parallelise, add stress, narrow timing windows, inject sleeps. A 50%-flake bug is debuggable; 1% is not — keep raising the rate until it's debuggable.
+## Trace Backward
 
-### When you genuinely cannot build a loop
+When the failure is deep, trace backward: what input reached this function, what path produced it, what called it, what changed. Log at the boundary between suspect layers. **Don't fix the symptom layer** — fix the upstream cause.
 
-Stop and say so explicitly. List what you tried. Ask the user for: (a) access to whatever environment reproduces it, (b) a captured artifact (HAR file, log dump, core dump, screen recording with timestamps), or (c) permission to add temporary production instrumentation. Do **not** proceed to hypothesise without a loop.
+## Red Flags
 
-Do not proceed to Phase 2 until you have a loop you believe in.
+Multiple fix attempts without a hypothesis; "probably X" without a probe; patch hides the symptom without addressing why the bad state was reached; regression test skipped because "hard to reproduce" (guard absent); same area keeps breaking (invariant missing).
 
-## Phase 2 — Reproduce
+## Anti-Patterns
 
-Run the loop. Watch the bug appear.
+Shotgun debug (5 fixes, hope one); log without a hypothesis (noise, not signal); "just restart" (recovers ≠ diagnoses); blaming the user (a missing validator is missing, not user error).
 
-Confirm:
+## Skill Result Contract
 
-- [ ] The loop produces the failure mode the **user** described — not a different failure that happens to be nearby. Wrong bug = wrong fix.
-- [ ] The failure is reproducible across multiple runs (or, for non-deterministic bugs, reproducible at a high enough rate to debug against).
-- [ ] You have captured the exact symptom (error message, wrong output, slow timing) so later phases can verify the fix actually addresses it.
-
-Do not proceed until you reproduce the bug.
-
-## Phase 3 — Hypothesise
-
-Generate **3–5 ranked hypotheses** before testing any of them. Single-hypothesis generation anchors on the first plausible idea.
-
-Each hypothesis must be **falsifiable**: state the prediction it makes.
-
-> Format: "If <X> is the cause, then <changing Y> will make the bug disappear / <changing Z> will make it worse."
-
-If you cannot state the prediction, the hypothesis is a vibe — discard or sharpen it.
-
-**Show the ranked list to the user before testing.** They often have domain knowledge that re-ranks instantly ("we just deployed a change to #3"), or know hypotheses they've already ruled out. Cheap checkpoint, big time saver. Don't block on it — proceed with your ranking if the user is AFK.
-
-## Phase 4 — Instrument
-
-Each probe must map to a specific prediction from Phase 3. **Change one variable at a time.**
-
-Tool preference:
-
-1. **Debugger / REPL inspection** if the env supports it. One breakpoint beats ten logs.
-2. **Targeted logs** at the boundaries that distinguish hypotheses.
-3. Never "log everything and grep".
-
-**Tag every debug log** with a unique prefix, e.g. `[DEBUG-a4f2]`. Cleanup at the end becomes a single grep. Untagged logs survive; tagged logs die.
-
-**Perf branch.** For performance regressions, logs are usually wrong. Instead: establish a baseline measurement (timing harness, `performance.now()`, profiler, query plan), then bisect. Measure first, fix second.
-
-## Phase 5 — Fix + regression test
-
-Write the regression test **before the fix** — but only if there is a **correct seam** for it.
-
-A correct seam is one where the test exercises the **real bug pattern** as it occurs at the call site. If the only available seam is too shallow (single-caller test when the bug needs multiple callers, unit test that can't replicate the chain that triggered the bug), a regression test there gives false confidence.
-
-**If no correct seam exists, that itself is the finding.** Note it. The codebase architecture is preventing the bug from being locked down. Flag this for the next phase.
-
-If a correct seam exists:
-
-1. Turn the minimised repro into a failing test at that seam.
-2. Watch it fail.
-3. Apply the fix.
-4. Watch it pass.
-5. Re-run the Phase 1 feedback loop against the original (un-minimised) scenario.
-
-## Phase 6 — Cleanup + post-mortem
-
-Required before declaring done:
-
-- [ ] Original repro no longer reproduces (re-run the Phase 1 loop)
-- [ ] Regression test passes (or absence of seam is documented)
-- [ ] All `[DEBUG-...]` instrumentation removed (`grep` the prefix)
-- [ ] Throwaway prototypes deleted (or moved to a clearly-marked debug location)
-- [ ] The hypothesis that turned out correct is stated in the commit / PR message — so the next debugger learns
-
-**Then ask: what would have prevented this bug?** If the answer involves architectural change (no good test seam, tangled callers, hidden coupling) hand off to the `/improve-codebase-architecture` skill with the specifics. Make the recommendation **after** the fix is in, not before — you have more information now than when you started.
+```
+<skill_result>
+  <skill>diagnose</skill>
+  <status>success|partial|blocked|failure</status>
+  <evidence>Hypothesis, probe, root cause confirmed, invariant fix, guard</evidence>
+  <artifacts>Probe / test / fix / guard paths</artifacts>
+  <risks>Untested hypotheses, instance patch, missing guard, or none</risks>
+</skill_result>
+```

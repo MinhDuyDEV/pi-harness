@@ -8,118 +8,69 @@ agent_types: [planner, worker, reviewer]
 tools: []
 ---
 
-# Brainstorming Ideas Into Designs
+# Brainstorming
 
-> **Replaces** jumping straight to implementation without exploring alternatives, constraints, or edge cases
+<HARD-GATE>
+Do not write code, draft an implementation plan, or invoke `incremental-implementation` until the user has approved a design.
+</HARD-GATE>
+
 ## When to Use
 
-- You have a rough idea that needs clarification into a design or spec
-- You need to explore multiple approaches and validate trade-offs before coding
+- Rough idea, PRD, ADR draft, or vague feature request.
+- "What if we…", "I'm thinking…", "Let's try…" — before code.
+- Multiple plausible approaches exist; the choice is load-bearing.
 
 ## When NOT to Use
 
-- Requirements are already clear and execution is mechanical
-- You are already in implementation with a validated plan or PRD
+- Bug fixes with known root cause → `diagnose`.
+- Mechanical refactor with a clear spec → `incremental-implementation`.
+- Trivial one-liner or config value.
 
-<HARD-GATE>
-Do not invoke any implementation skill, write any code, scaffold any project, or take any implementation action until the user has approved a design. This applies to EVERY project regardless of perceived simplicity — "simple" projects are where unexamined assumptions cause the most wasted work.
-</HARD-GATE>
+## Core Principle
 
-## Overview
+**Classify unknowns before acting.** Distinguish:
+- **Known knowns** — in the prompt.
+- **Known unknowns** — ask the user.
+- **Unknown knowns** — you'd recognize the answer if you saw it. Show 2–4 cheap variants or point at a reference.
+- **Unknown unknowns** — ask the model to teach you the criteria.
 
-Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+Map the gap before proposing. A simpler approach often exists — say so.
 
-Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design in small sections (200-300 words), checking after each section whether it looks right so far.
+## Workflow
 
-**Part of:** `development-lifecycle` skill (Phase 1: Ideation)
+1. **Map unknowns** — classify the gap using the four categories above. State assumptions out loud for ambiguous cases. If the request is well-defined, do not brainstorm — just fix.
+2. **Variants** — for novel / design-heavy / unclear work, show 2–4 cheap variants *before* recommending one. Each variant names the trade-off it accepts.
+3. **Interview** — one question at a time on architecture / data-model / UX. Multiple-choice when 2–4 options are genuinely live. Reference-pointing beats 200 words of explanation.
+4. **Validate** — incremental check-in: "does this match what you wanted?" before going deeper.
+5. **Hand off** — once design is approved, switch to `planning-and-task-breakdown` (or `incremental-implementation` for trivial slices).
 
-**Output template:** `.pi/memory/_templates/design.md`
+## Cheat Sheet
 
-## The Process
+| Situation | Default action |
+|---|---|
+| Spec concrete, single-file | Skip brainstorm, implement. |
+| Spec concrete, multi-file or design-heavy | One question on the riskiest unknown, then plan. |
+| Spec vague | Variants first, then interview. |
+| "Sanity check" / "prototype" | Use `prototype` skill, not this one. |
+| Multiple valid approaches | Show 2–4 variants with trade-offs. |
+| New library / framework | Point at official docs/source. |
 
-**Understanding the idea:**
+## Red Flags
 
-- Check out the current project state first (files, docs, recent commits)
-- Ask questions one at a time to refine the idea
-- Prefer multiple choice questions when possible, but open-ended is fine too
-- Only one question per message - if a topic needs more exploration, break it into multiple questions
-- Focus on understanding: purpose, constraints, success criteria
-
-**Exploring approaches:**
-
-- Propose 2-3 different approaches with trade-offs
-- Present options conversationally with your recommendation and reasoning
-- Lead with your recommended option and explain why
-
-**Presenting the design:**
-
-- Once you believe you understand what you're building, present the design
-- Break it into sections of 200-300 words
-- Ask after each section whether it looks right so far
-- Cover: architecture, components, data flow, error handling, testing
-- Be ready to go back and clarify if something doesn't make sense
-
-## After the Design
-
-**Documentation:**
-
-- Write the validated design to `.beads/artifacts/<bead-id>/design.md`
-- Use template from `.pi/memory/_templates/design.md`
-- Use elements-of-style:writing-clearly-and-concisely skill if available
-- Commit the design document to git
-
-**Next Phase (if continuing):**
-
-- Ask: "Ready to create the PRD?"
-- Load next skill: `skill({ name: "prd" })`
-- This moves to Phase 2: Specification
-
-**Alternative paths:**
-
-- Use `skill({ name: "using-git-worktrees" })` to create isolated workspace first
-- Use `skill({ name: "writing-plans" })` if skipping formal PRD
-
-**Full lifecycle reference:**
-
-- Use `skill({ name: "development-lifecycle" })` to see all phases
-
-## Key Principles
-
-- **One question at a time** - Don't overwhelm with multiple questions
-- **Multiple choice preferred** - Easier to answer than open-ended when possible
-- **YAGNI ruthlessly** - Remove unnecessary features from all designs
-- **Explore alternatives** - Always propose 2-3 approaches before settling
-- **Incremental validation** - Present design in sections, validate each
-- **Be flexible** - Go back and clarify when something doesn't make sense
-
-## Example Flow
-
-**User request**: "Add dark mode to the app"
-
-**Good brainstorming questions**:
-1. "Should dark mode be system-preference-aware, manual toggle, or both?"
-2. "Where does theme state live — CSS variables, React context, localStorage?"
-3. "Are there existing color tokens, or do we need to create a design token system?"
-4. "What about images/icons — do they need dark variants?"
-
-**Bad brainstorming** (jumping to solution):
-1. "I'll add a ThemeContext with useState and toggle button" ← skipped alternatives
+Skipping variants for a design decision; asking 5 questions in one message (overwhelming); "we can add caching later" hand-waving in a production-bound design; starting code/plan before user approval; "YAGNI" used to dismiss the user's stated requirement (use it against speculative creep, not stated requirements).
 
 ## Anti-Patterns
 
-| Anti-Pattern | Why It Fails | Instead |
-| --- | --- | --- |
-| Asking questions the codebase can answer (search first) | Wastes turns and slows decisions; signals weak preparation | Do quick repo/docs lookup first, then ask only unresolved questions |
-| Brainstorming during mechanical/routine tasks | Adds overhead when execution is already clear | Skip to execution using the relevant implementation skill |
-| Generating 10+ alternatives without narrowing criteria | Creates analysis paralysis and no decision pressure | Present 2-3 viable options with explicit decision criteria |
-| Continuing to brainstorm after a clear direction emerges | Burns time and erodes momentum | Confirm direction, summarize decisions, transition to PRD/plan |
+**The 200-word answer** when 2–4 variants would surface the same trade-off; **the leading question** ("Should we use X, which is obvious?") collapses the brainstorm; **the silent assumption** picks a stack/pattern without naming it; **premature implementation** drafts a plan before the user approves the design.
 
-## See Also
+## Skill Result Contract
 
-- `writing-plans` - Turn validated direction into zero-ambiguity implementation tasks
-- `prd` - Capture behavioral requirements before implementation
-
-
-## Agent-Skills Compatibility
-
-This skill is Pi's canonical equivalent of `idea-refine`: divergent/convergent exploration that turns vague ideas into concrete proposals before specification.
+```xml
+<skill_result>
+  <skill>brainstorming</skill>
+  <status>success|partial|blocked|failure</status>
+  <evidence>Unknowns mapped, variants shown (if novel), design approved by user</evidence>
+  <artifacts>Design summary or "skipped — spec was concrete"</artifacts>
+  <risks>Unresolved questions, scope creep, premature commitment, or none</risks>
+</skill_result>
+```

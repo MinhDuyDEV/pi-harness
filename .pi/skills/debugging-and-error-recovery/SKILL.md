@@ -38,7 +38,7 @@ Core principle: reproduce, localize, reduce, fix, and guard before claiming reso
 6. Write a failing regression test when behavior can be tested.
 7. Fix the root cause, not only the symptom.
 8. Run the original reproduction and relevant regression checks.
-9. If three fix attempts fail, stop and escalate architecture/assumption risk.
+9. If three fix attempts fail, stop and escalate architecture/assumption risk. Retry policy: try once with the same tool, then a fallback approach. After 2 consecutive failures, escalate.
 
 ## Evidence Log
 
@@ -97,13 +97,6 @@ For complex bugs, maintain a short log in the response or a debug artifact:
 ```
 
 
-## Consolidated Debugging Workflow
+## Map vs Territory
 
-This is the canonical active debugging skill. It absorbs systematic-debugging while preserving root-cause discipline. Use root-cause-tracing as an advanced companion when the failure is deep in execution.
-
-Required posture:
-- reproduce or observe the failure before fixing;
-- state the hypothesis and evidence;
-- change one causal layer at a time;
-- verify the failure mode is gone;
-- record recovery actions and residual risk.
+Before any new fix attempt, run a map-vs-territory check: re-read the request and any notes file. If the plan was wrong, surface it before retrying the same path. Most repeated failures are a mapping problem, not an execution problem.

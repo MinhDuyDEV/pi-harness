@@ -10,85 +10,67 @@ tools: [TaskCreate, TaskUpdate, memory, grep, find, read]
 
 # Planning & Task Breakdown
 
-## Overview
-
-A good plan creates leverage for builders. It says what must become true, where to work, what not to touch, and how to prove success.
-
-Core principle: plan backward from observable truths into artifacts, wiring, tasks, dependencies, and verification.
-
 ## When to Use
 
-- A spec or clear goal exists and implementation is non-trivial.
-- Work spans multiple files, phases, or agents.
-- Tasks need dependency ordering or parallelization decisions.
-- You need a handoff artifact for worker agents.
+- Have a spec, PRD, ADR, or clear feature goal.
+- Implementation spans >1 file, >1 session, or >1 worker.
+- Need an executable plan a human or subagent can follow.
 
 ## When NOT to Use
 
-- Single-file fixes that can be implemented directly.
-- Requirements are still unclear; use `spec-driven-development` first.
-- You are debugging an active failure; use `debugging-and-error-recovery`.
+- Single-function fixes; mechanical refactors with obvious verification.
+- No spec exists yet — use `brainstorming` first.
+- Trivial one-liner with no acceptance criteria.
+
+## Core Principle
+
+**Lead with what is most-likely to change** (data model, type interfaces, UX). Mechanical refactor last. Stable parts of the plan go at the bottom; volatile parts at the top. If a section of the plan survives contact with implementation, it should be at the bottom.
 
 ## Workflow
 
-1. Restate the goal and constraints.
-2. Convert observable truths into required artifacts.
-3. Identify required wiring between artifacts.
-4. Mark key links most likely to break.
-5. Decompose into vertical slices, not horizontal layers.
-6. Limit each task to a small scope with exact files when known.
-7. Add acceptance checks and verification commands to every task.
-8. Build a dependency graph and execution order.
-9. Create tracked tasks or write a plan artifact.
+1. **Spec interview** — ask the questions the spec leaves open (data model, edge cases, non-goals, success criteria). One question at a time for non-obvious decisions.
+2. **Slice** — break work into vertical (tracer-bullet) slices via `incremental-implementation`. Each slice is independently verifiable.
+3. **Order** — most-likely-to-change first, mechanical refactor last. Risk-first when integration is unknown.
+4. **Risks + verification** — for each slice, name the verification command and the risk of getting it wrong.
+5. **Stop conditions** — for parallel work, define who stops whom on conflict.
 
-## Task Packet Template
+## Slice Quality
 
-```markdown
-## Task N: [Name]
+| Good slice | Bad slice |
+|---|---|
+| One complete path through all layers | One layer in isolation |
+| Independently verifiable (test/build/check passes) | Untestable until all layers done |
+| Adds user-visible behavior or fixes a bug | Pure prep with no signal |
+| Reverts cleanly | Tangles with unrelated code |
 
-Goal: [one sentence]
-Files in scope:
-- [path]
-Acceptance checks:
-- [behavior] -> verify with [command/check]
-Non-goals:
-- [explicit exclusion]
-Dependencies:
-- [task id/name or none]
-Review depth: targeted|standard|full
+## Plan Template
+
 ```
+## Goal
+[1 sentence]
 
-## Slicing Rules
+## Non-goals
+[explicit exclusions]
 
-- Prefer vertical slices that produce end-to-end behavior.
-- Put risky unknowns first.
-- Do not mix refactors with feature behavior unless the refactor is required.
-- If one task touches more than five files, split it.
-- If a task needs architectural judgment, route to `planner`, not `worker`.
+## Slices (ordered)
+1. <slice> — verify: <cmd> — risk: <what>
+2. ...
 
-## Common Rationalizations
+## Open questions
+[must-resolve before slice N]
 
-| Rationalization | Rebuttal |
-| --- | --- |
-| "I'll make tasks as I go" | Hidden dependencies appear too late. Plan the graph first. |
-| "Layer-by-layer is cleaner" | Horizontal layers delay integration and hide broken wiring. |
-| "Acceptance criteria are obvious" | Workers need objective checks, not intent. |
-| "One big task is simpler" | Big tasks are hard to review, rollback, and verify. |
+## Stop conditions
+[who blocks whom, on what]
+```
 
 ## Red Flags
 
-- Tasks named after vague activities like "update backend".
-- No verification command/check per task.
-- UI, API, and data work split so nothing works until the end.
-- Multiple agents assigned to overlapping files without sequencing.
-- Plan omits non-goals or rollback considerations.
-
-## Verification
-
-- Every task has goal, scope, acceptance checks, non-goals, dependencies.
-- Execution order respects dependencies.
-- Key links are identified for reviewer verification.
-- The first task can be implemented without further planning.
+- Plan starts with "setup" / "scaffold" / "infrastructure" — that's horizontal, not vertical.
+- Slice acceptance is "looks right" instead of a concrete command.
+- No explicit non-goals — scope will creep.
+- Mechanical refactor (rename, reformat) appears in slice 1 — moves the goalposts.
+- Risks only listed at the end, not per slice.
+- Open questions outnumber slices — spec is incomplete, go back to brainstorming.
 
 ## Skill Result Contract
 
@@ -96,21 +78,8 @@ Review depth: targeted|standard|full
 <skill_result>
   <skill>planning-and-task-breakdown</skill>
   <status>success|partial|blocked|failure</status>
-  <evidence>Plan/task packets include scope, dependencies, and verification</evidence>
-  <artifacts>Task ids or plan file path</artifacts>
-  <risks>Large tasks, unresolved dependencies, or none</risks>
+  <evidence>Spec gaps filled, slices defined and ordered, verification commands named</evidence>
+  <artifacts>Plan document or section</artifacts>
+  <risks>Unresolved open questions, unverified slices, or none</risks>
 </skill_result>
 ```
-
-
-## Consolidated Planning Workflow
-
-This is the canonical active planning skill. It absorbs PRD-to-plan and writing-plans responsibilities. Use spec-driven-development first when requirements are still unclear.
-
-Plans should include:
-- scope and non-goals;
-- ordered tasks with dependencies;
-- exact files or search targets when known;
-- acceptance checks per task;
-- review and verification gates;
-- handoff details for subagents with zero assumed context.

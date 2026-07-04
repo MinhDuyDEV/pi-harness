@@ -10,107 +10,44 @@ tools: [grep, find, read, bash, edit, write]
 
 # Incremental Implementation
 
-## Overview
+## Core Principle
 
-Build one **vertical slice** — a thin, end-to-end, independently verifiable piece of behavior — verify it, then continue. Large unverified patches compound mistakes and make rollback painful.
+**Smallest working change, scoped to known territory.** For novel / design-heavy / unclear work the smallest change is wrong — prototype, show variants, interview, or blindspot-pass *before* editing. No speculative abstractions, no error handling for impossible scenarios.
 
-**Why vertical, not horizontal**: Horizontal slicing (do all of layer X first, then all of layer Y) leaves every layer half-wired and unverifiable until the last piece lands. Vertical slicing (one complete path through all layers) makes each increment independently testable. For AI agents, vertical slices are critical: a shallow horizontal slice gives the AI no feedback signal until the entire layer is done, by which point errors have compounded. A thin vertical slice gives immediate feedback — type errors, test failures, wiring gaps — within minutes.
+**Rule of smallest:** if you cannot describe the next test in one sentence, you are about to write a large patch. Stop and break it down.
 
-**Tracer bullet approach**: Start with the thinnest possible end-to-end slice that proves the path works. It can be hardcoded, minimal, or use stub data — as long as it touches every layer and can be verified. Once the tracer bullet flies, expand it in safe increments rather than building from scratch.
+## The Slice Loop
 
-Core principle: each increment leaves the repo in a working, testable state.
+```
+1. [step]  ──>  verify: [check]  ──>  next step or done
+```
 
-## When to Use
-
-- Multi-file implementation.
-- Refactor with behavioral risk.
-- Plan execution with multiple tasks.
-- Any time more than about 100 lines may be written before testing.
-
-## When NOT to Use
-
-- Single-function edits with obvious verification.
-- Pure documentation edits; still verify links/format if relevant.
+Name the **success check before implementing**, then verify after. A "step" is the smallest unit that produces evidence: a test that runs, a function that returns, a command that exits 0.
 
 ## Workflow
 
-For each slice:
+1. **Pre-flight** — for novel work: blindspot pass → 2–4 cheap variants → interview (one question) → point at a reference. First edit should be obvious.
+2. **Slice** — pick the smallest next behavior. Skeleton first, one path through the layers.
+3. **RED** — write the failing test *first* (per `test-driven-development`). If you can't write a failing test, you don't know what you're building.
+4. **GREEN** — minimum code to pass. Duplication > one line? Stop, finish the slice, then extract.
+5. **REFACTOR** — close loopholes: name things better, remove seams, keep tests green. No new behavior.
+6. **Verify** — run the named check (typecheck, lint, test, build, probe). Record the result.
 
-1. Read the task packet and relevant files.
-2. Define the smallest complete slice.
-3. State scope and non-goals for the slice.
-4. If behavior changes, use `test-driven-development`.
-5. Implement only that slice.
-6. Run targeted verification.
-7. Inspect the diff for scope creep and stubs.
-8. Create a checkpoint when the user/repo workflow allows commits; otherwise record the verified state.
-9. Move to the next slice only when green.
+## Deferred Work
 
-If verification fails, fix within the current slice before continuing. Do not stack new slices on broken code.
+For work that is correctly out of scope for the current slice, leave `TODO(handle): what, on-or-after <date>` at every call site. `Handle` makes it greppable; `on-or-after <date>` makes it automatable; placement warns unrelated agents it's a real seam, not a typo. Format: `// TODO(handle): wire metric emit once feature flag is in. on-or-after 2026-09-01`
 
-## Slicing Strategies
+## Self-Quiz Before "Done"
 
-| Strategy | Use When | Example |
-| --- | --- | --- |
-| Vertical (tracer bullet) | Default — normal features | One API path + DB query + minimal UI — the thinnest complete path |
-| Contract-first | Frontend/backend can split | Types/schema first, then implementations |
-| Risk-first | Unknown integration | Prove external API or migration path first |
-| Additive | Risky refactors | Add new path, wire, then remove old path later |
-
-## Slice Size Guide
-
-| Size | Meaning |
-| --- | --- |
-| 1-30 lines | Ideal; easy to review and verify. |
-| 30-100 lines | Acceptable if one logical change. |
-| 100-200 lines | Usually too large; find a split point. |
-| 200+ lines | Stop. This is big-bang implementation. |
-
-## Checkpoint Policy
-
-- Prefer atomic commits as rollback points only when the user/repo workflow allows committing.
-- Never auto-commit in a dirty user worktree unless explicitly instructed.
-- If not committing, report a clear checkpoint: files changed, checks passed, next slice.
-- Each checkpoint should be independently revertable or easy to isolate.
-
-## Scope Discipline
-
-Do not:
-
-- Clean unrelated code.
-- Modernize syntax outside touched scope.
-- Add convenience features not in acceptance criteria.
-- Refactor while implementing unless the task requires it.
-- Leave incomplete feature visible without a guard/flag.
-
-If you notice adjacent issues, report them as follow-ups.
-
-## Common Rationalizations
-
-| Rationalization | Rebuttal |
-| --- | --- |
-| "It's faster to do it all at once" | It feels faster until debugging a 500-line diff. Complexity compounds from unverified code. |
-| "I'll test at the end" | Bugs in early slices poison later work. AI agents amplify this: a wrong assumption in slice 1 gets reinforced in slices 2-5 before anyone notices. |
-| "Horizontal layering is more efficient" | Horizontal leaves every layer half-wired. You can't verify anything until every layer is done — that's a batch, not an increment. |
-| "This refactor is small enough to include" | Mixed concerns make review and rollback harder. |
-| "The feature is incomplete, but hidden enough" | Incomplete user-visible behavior needs a flag or must not merge. |
+Can I name what changed and why in one sentence? Did I run the named verification command and see it pass? Did I leave `TODO(handle)` markers for unrequested scope? Did I update `TODO.md` / `PROGRESS.md`? Are there unrelated changes in the diff? If yes to the last, split them out before claiming done.
 
 ## Red Flags
 
-- More than 100 lines changed without verification.
-- Diff contains unrelated cleanup.
-- Multiple task goals in one patch.
-- Tests/build broken between increments.
-- TODO/stub/placeholder added without explicit acceptance.
-- Worker expands beyond 3 files without reporting scope growth.
+Large patch (>~100 lines) without intermediate test runs; "I'll add tests later" (there is no later — write the test now or don't write the code); refactor step adds behavior (split it out); step verification is "looks right" instead of a concrete command; multiple unrelated fixes in one commit (split or open a new TODO); `TODO(handle)` markers without `on-or-after <date>` (automatable cost lost).
 
-## Verification
+## Anti-Patterns
 
-- Targeted tests or checks run for each slice.
-- Typecheck/build/lint run when affected by the slice.
-- Diff reviewed for scope creep and stubs.
-- Acceptance criteria for the slice are satisfied.
-- Remaining slices are explicitly listed if work is partial.
+Big-bang patch (write everything, test at the end); premature abstraction (DRYing two call sites when one is speculative); hero commit (15 files, 3 features, 1 PR); "verify by inspection" (read carefully, *believe* it works — run the check).
 
 ## Skill Result Contract
 
@@ -118,8 +55,8 @@ If you notice adjacent issues, report them as follow-ups.
 <skill_result>
   <skill>incremental-implementation</skill>
   <status>success|partial|blocked|failure</status>
-  <evidence>Commands run, diff inspected, slice acceptance checks passed</evidence>
-  <artifacts>Changed files</artifacts>
-  <risks>Unverified checks, partial slices, or none</risks>
+  <evidence>Slices named, named verification command run green, self-quiz passed</evidence>
+  <artifacts>Files touched, tests added, TODO(handle) markers placed</artifacts>
+  <risks>Untested code paths, deferred work, unrelated changes, or none</risks>
 </skill_result>
 ```
