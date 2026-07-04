@@ -1,48 +1,73 @@
-# Agent Catalog
+# Agent roster
 
-Built-in agent types for the `task` tool. Project can add custom agents at `.pi/agents/<name>.md`.
+Specialist agents for the `task` tool and harness. Each file is a **standalone system prompt** — no `AGENTS.md` / `APPEND_SYSTEM.md` inheritance unless the parent passes rules in the task `prompt`.
 
-## Types
+The **session agent** is always the parent. Task agents match **OpenCode-style** builtins where applicable: `explore`, `scout`, `general`, plus `reviewer`. Harness uses `harness-*` via the `harness` tool.
 
-| Agent | Use for | Tool access |
-|-------|---------|-------------|
-| `scout` | External research, web/docs, cited guidance | Web tools only |
-| `explore` | Read-only code exploration, file:line evidence | read, grep, find, ls |
-| `planner` | Implementation plan + risk + acceptance, no edits | read, grep, find, ls |
-| `reviewer` | Post-change audit (correctness/security/regression), file:line evidence | read, grep, find, ls, diagnostics |
-| `vision` | UI/UX visual review from screenshots or code | read, image tools |
-| `worker` | Small scoped implementation, runs checks, reports files changed | All except `task` / `harness` |
+Routing: `~/.pi/agent/APPEND_SYSTEM.md` (Delegation). Rules: `AGENTS.md` / project `.pi/AGENTS.md`.
 
-## Task Tool Schema
+## Agent file template
 
-```ts
-{
-  agent_type:       string;   // required, see table above
-  description:      string;   // required, 3-5 words, UI label
-  prompt:           string;   // required, see Prompt Template
-  background?:      boolean;  // default false; true only if you can do other work first
-  conversation_id?: string;   // reuse for continuity with prior specialist call
-}
+```yaml
+---
+description: >
+  When the parent should choose this agent and when NOT to (cheaper tool).
+# proactive: true
+# hidden: true
+# readonly: true
+tools:
+  write: false
+---
 ```
 
-## Prompt Template (mandatory fields)
+### What pi-task implements
 
-- **Goal** — one sentence
-- **Non-goals** — what NOT to do
-- **Write policy** — edit / no-edit / allowed paths
-- **Read policy** — conventions, prior outputs to consume
-- **Expected output** — artifact path or report shape
-- **Stop condition** — when to stop
-- **Failure handling** — return partial / retry / stop
-- **Verification** — parent reads the file, never trusts the summary
+| Field | Enforced? |
+| ----- | --------- |
+| `description` | Yes — task tool catalog |
+| `tools` / `disallowed_tools` | Yes |
+| `hidden` / `proactive` / `readonly` | Yes |
+| `model`, `thinking` | Yes — passed to child `pi` |
 
-## Pick by Task Shape
+## Task agents (`task` tool)
 
-- find / research / cite → `scout`
-- map / locate / where is → `explore`
-- plan / design / how to implement → `planner`
-- review / audit / check this change → `reviewer`
-- UI / visual / layout → `vision`
-- implement / make this small change → `worker`
+| Agent | Use for | Do not use when |
+|-------|---------|-----------------|
+| `scout` | External research, web/docs, citations | In-repo mapping (`explore`) |
+| `explore` | Read-only code exploration, path:line | Single known file (`read`) |
+| `general` | Multi-step tasks, implementation, parallel tracks | Trivial 1–2 file parent work |
+| `reviewer` | Post-change audit, path:line evidence | Before code exists |
 
-**Do yourself** (don't delegate): ≤3 tool calls, 1-2 files, secrets, edits needing current-conversation nuance, anything you'd re-verify yourself.
+## Harness agents (`harness` tool)
+
+| Agent | Role |
+|-------|------|
+| `harness-planner` | Sprint manifest |
+| `harness-worker` | Implement sprint |
+| `harness-reviewer` | QA sprint |
+
+Prefer `hidden: true` on harness-only agents under `agents/`.
+
+## Pick by task
+
+| Task shape | Agent |
+|------------|-------|
+| How does X work in this repo? | `explore` |
+| Best practice / docs for Y? | `scout` |
+| Implement or multi-step delegated work | `general` |
+| Review diff / changes | `reviewer` |
+| Product from short prompt | `harness` |
+
+## Prompt template (parent → `task`)
+
+Include: goal, non-goals, write/read policy, expected output, stop condition, verification recipe.
+
+**Resume:** `task_id` / `conversation_id` from a prior run.
+
+## Proactive delegation
+
+**explore, scout, general, reviewer** use `proactive: true`. Parent rules: `APPEND_SYSTEM.md`.
+
+## Final message XML
+
+Task agents end with `<result>`. Parent must verify artifacts — never ship on subagent summary alone.
