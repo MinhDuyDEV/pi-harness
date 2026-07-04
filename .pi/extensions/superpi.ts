@@ -4,12 +4,12 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const EXTREMELY_IMPORTANT_MARKER = "<EXTREMELY-IMPORTANT>";
-const BOOTSTRAP_MARKER = "pikit:using-pikit-skills bootstrap";
+const BOOTSTRAP_MARKER = "pikit:superpi bootstrap";
 
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(extensionDir, "../..");
 const skillsDir = resolve(packageRoot, "skills");
-const bootstrapSkillPath = resolve(skillsDir, "using-pikit-skills", "SKILL.md");
+const bootstrapSkillPath = resolve(skillsDir, "superpi", "SKILL.md");
 
 let cachedBootstrap: string | null | undefined;
 
@@ -55,7 +55,7 @@ ${BOOTSTRAP_MARKER}
 
 You have pikit skills.
 
-The using-pikit-skills content is included below and is already loaded for this Pi session. Follow it now. Do not try to load using-pikit-skills again.
+The superpi content is included below and is already loaded for this Pi session. Follow it now. Do not try to load superpi again.
 
 ${body}
 ${EXTREMELY_IMPORTANT_MARKER}`;
@@ -66,7 +66,7 @@ ${EXTREMELY_IMPORTANT_MARKER}`;
 	}
 }
 
-export default function usingPikitSkillsExtension(pi: ExtensionAPI) {
+export default function superpiExtension(pi: ExtensionAPI) {
 	let injectBootstrap = true;
 
 	pi.on("resources_discover", async () => ({

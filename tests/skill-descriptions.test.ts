@@ -52,7 +52,7 @@ test("all skill descriptions start with an allowed prefix", () => {
 
 test("no skill description exceeds 500 characters (except well-known large skills)", () => {
 	const EXEMPT = new Set([
-		"using-pikit-skills",
+		"superpi",
 		"artifact-format",
 		"swift-concurrency",
 		"inference-service",

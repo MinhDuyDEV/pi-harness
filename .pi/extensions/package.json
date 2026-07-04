@@ -3,7 +3,7 @@
   "type": "module",
   "scripts": {
     "test:diagnostics": "node --test ../tests/diagnostics.test.ts ../tests/diagnostics-parse.test.ts",
-    "test:using-pikit-skills": "node --test ../../tests/using-pikit-skills.test.ts",
+    "test:superpi": "node --test ../../tests/superpi.test.ts",
     "test": "node --test ../../tests/*.test.ts",
     "eval:harness": "node scripts/run-harness-evals.mjs",
     "smoke:harness": "node scripts/smoke-harness.mjs && npm run eval:harness",

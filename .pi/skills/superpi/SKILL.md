@@ -1,5 +1,5 @@
 ---
-name: using-pikit-skills
+name: superpi
 description: Use when starting any conversation - establishes how to find and use skills, requiring skill invocation before ANY response
 ---
 
