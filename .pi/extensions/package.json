@@ -1,6 +1,8 @@
 {
   "private": true,
+  "type": "module",
   "scripts": {
+    "test:diagnostics": "node --test ../tests/diagnostics.test.ts ../tests/diagnostics-parse.test.ts",
     "eval:harness": "node scripts/run-harness-evals.mjs",
     "smoke:harness": "node scripts/smoke-harness.mjs && npm run eval:harness",
     "smoke:harness:config": "node scripts/smoke-harness.mjs",
@@ -9,9 +11,9 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "@earendil-works/pi-ai": "^0.79.0",
-    "@earendil-works/pi-coding-agent": "^0.79.0",
-    "@earendil-works/pi-tui": "^0.79.0",
+    "@earendil-works/pi-ai": "^0.80.0",
+    "@earendil-works/pi-coding-agent": "^0.80.0",
+    "@earendil-works/pi-tui": "^0.80.0",
     "@sinclair/typebox": "*"
   }
 }

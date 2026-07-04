@@ -85,3 +85,6 @@ pnpm-debug.log*
 
 # Cursor SDK local session state
 .pi/cursor-sdk*.json
+
+# playwright-cli
+.pi/.playwright-cli

@@ -2,11 +2,12 @@
   "defaultProvider": "opencode-go",
   "defaultModel": "minimax-m3",
   "defaultThinkingLevel": "high",
-  "editorPaddingX": 0,
+  "editorPaddingX": 1,
   "images": {
     "blockImages": false
   },
   "packages": [
+    "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-diff",
     "npm:@heyhuynhgiabuu/pi-search",
     "npm:@heyhuynhgiabuu/pi-task",
@@ -40,17 +41,17 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.80.2",
+  "lastChangelogVersion": "0.80.3",
   "treeFilterMode": "default",
   "transport": "auto",
   "hideThinkingBlock": true,
   "terminal": {
-    "showTerminalProgress": false,
+    "showTerminalProgress": true,
     "clearOnShrink": true,
     "showImages": false,
     "autoResize": true
   },
-  "collapseChangelog": false,
+  "collapseChangelog": true,
   "enableInstallTelemetry": false,
   "powerline": {
     "preset": "default",
@@ -64,5 +65,6 @@
   "autocompleteMaxVisible": 10,
   "quietStartup": false,
   "doubleEscapeAction": "tree",
-  "defaultProjectTrust": "always"
+  "defaultProjectTrust": "always",
+  "outputPad": 1
 }

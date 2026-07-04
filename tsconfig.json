@@ -1,17 +1,15 @@
 {
   "compilerOptions": {
-    "strict": true,
+    "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "target": "ES2023",
-    "lib": ["ES2023"],
+    "strict": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
   },
-  "include": [
-    ".pi/extensions/**/*.ts"
-  ],
-  "exclude": [
-    ".pi/extensions/task/smoke.ts"
-  ]
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", "build", ".pi"]
 }
