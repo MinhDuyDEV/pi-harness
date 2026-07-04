@@ -351,6 +351,17 @@ const TARGETS: SkillSpec[] = [
     maxWords: 500,
     markers: ["fetch", "predicate", "migration", "merge", "batch"],
   },
+  // --- Batch 6: final 2 (2026-07-04) ---
+  {
+    name: "stitch",
+    maxWords: 500,
+    markers: ["Stitch", "generate", "screen", "MCP"],
+  },
+  {
+    name: "diagnostics",
+    maxWords: 500,
+    markers: ["diagnostics", "scope", "fallow", "typecheck", "lint"],
+  },
 ];
 
 /** Count words in the body of a SKILL.md, excluding the YAML frontmatter (between the first two `---` markers). */
