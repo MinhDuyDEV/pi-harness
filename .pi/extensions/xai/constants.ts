@@ -18,7 +18,8 @@ export const XAI_PROVIDER_ID = "xai-auth";
 export const DEFAULT_XAI_MODEL = "grok-4.3";
 export const DEFAULT_XAI_IMAGE_MODEL = "grok-imagine-image-quality";
 
-export const XAI_CURSOR_TOOL_NAMES = ["Read", "Write", "StrReplace", "Edit", "Delete", "LS", "Grep", "Glob", "Shell", "WebSearch"];
+// Removed: XAI_CURSOR_TOOL_NAMES — only used by the dropped
+// Composer/Grok CLI compatibility shims (cursor-shims.ts).
 
 export const XAI_GROK_CLI_AUTH_SCOPE_KEY = `${XAI_OAUTH_ISSUER}::${XAI_OAUTH_CLIENT_ID}`;
 export const XAI_GROK_CLI_LEGACY_AUTH_SCOPE_KEY = "https://accounts.x.ai/sign-in";
