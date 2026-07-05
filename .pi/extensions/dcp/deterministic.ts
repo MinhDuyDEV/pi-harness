@@ -79,6 +79,12 @@ export function buildDeterministicSummary(
       ? goals.map((item) => `- ${item}`).join("\n")
       : "Continue the current task.",
     "",
+    "## How To Use This Summary",
+    "- Treat this as compacted observations, not a full transcript; use the live tail for the freshest intent.",
+    "- If this summary conflicts with current messages or files on disk, trust current messages and disk first.",
+    "- Before guessing about missing prior context, use DCP recall/expanded blocks when available.",
+    "- Preserve the distinction between observations (what happened) and decisions (why it happened).",
+    "",
   );
   sections.push(
     "## Progress",

@@ -49,8 +49,18 @@ export interface PurgeErrorsConfig {
 
 export interface AutoCompactConfig {
   enabled: boolean;
-  /** Context % threshold for auto-compaction */
+  /** Context % threshold (Pi branch meter via getContextUsage) for Zone 4 pressure */
   thresholdPercent: number;
+  /** Optional 0-1 ratio; when set, threshold = contextWindow * ratio. */
+  thresholdRatio?: number;
+  /**
+   * When true, call ctx.compact() once when threshold is crossed (Pi native compaction;
+   * DCP still hooks session_before_compact when deterministicCompaction is enabled).
+   * When false, only inject the critical nudge (legacy behavior).
+   */
+  invokeNativeCompact: boolean;
+  /** Which meter drives nudge zones and autoCompact (default max). */
+  pressureSource: "branch" | "outbound" | "max";
 }
 
 export interface StructuredSummaryConfig {
@@ -178,6 +188,9 @@ export const DEFAULT_CONFIG: DCPConfig = {
   autoCompact: {
     enabled: true,
     thresholdPercent: 80,
+    thresholdRatio: 0.8,
+    invokeNativeCompact: true,
+    pressureSource: "max",
   },
   structuredSummary: {
     enabled: true,

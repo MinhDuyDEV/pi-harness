@@ -38,6 +38,7 @@ import {
   incrementTurn,
   buildCompressedSummaryMessage,
   enrichCompactionResult,
+  computeRunPruneStats,
   getArtifactTracker,
   makeDcpStateEntryPayload,
   restoreDcpStateFromSessionEntries,
@@ -47,7 +48,16 @@ import {
   buildDeterministicSummary,
   type CompactionReason,
 } from "./deterministic.js";
+import { getSessionBranchMessages } from "./branch-messages.js";
 import { NudgeManager } from "./nudge.js";
+import {
+  buildContextMeterSnapshot,
+  estimateOutboundContextTokens,
+} from "./context-meter.js";
+import {
+  formatPressureSourceLabel,
+  resolveAutoCompactThreshold,
+} from "./pressure.js";
 import { registerRecallTool, searchDcpRecall } from "./recall.js";
 
 interface DcpCompactionMetadata {
@@ -81,7 +91,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
   // In-memory state
   const nudge = new NudgeManager(config);
-
+  let autoCompactInvokePending = false;
   // Guard: track whether ensureInitialized has run
   let initialized = false;
 
@@ -215,11 +225,56 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     }
   });
 
-  // ── Event: turn_end — check context usage ───────────────────────────
-  pi.on("turn_end", (_event: unknown, ctx: ExtensionContext) => {
+  // ── Event: turn_end — context meter, nudges, optional native compact ─
+  pi.on("turn_end", async (_event: unknown, ctx: ExtensionContext) => {
     try {
       ensureInitialized(ctx);
-      nudge.checkContext(ctx);
+      const sessionId = getDcpSessionId(ctx);
+      const branchMessages = getSessionBranchMessages(ctx);
+      const usage = ctx.getContextUsage();
+      const contextWindow = ctx.model?.contextWindow ?? 200_000;
+      const outboundTokens = estimateOutboundContextTokens(
+        branchMessages,
+        sessionId,
+        config,
+      );
+      const meter = buildContextMeterSnapshot(
+        usage?.tokens,
+        outboundTokens,
+        contextWindow,
+      );
+
+
+      const nudgeStateBefore = nudge.getState();
+      nudge.checkContext(ctx, meter);
+      const nudgeStateAfter = nudge.getState();
+
+      if (config.debug) {
+        const threshold = resolveAutoCompactThreshold(
+          config.autoCompact,
+          contextWindow,
+        );
+        console.log(
+          `[dcp] turn_end: branch=${meter.branchTokens} outbound=${meter.outboundTokens} delta=${meter.deltaTokens ?? 0} pressure=${Math.round(nudgeStateAfter.lastPressurePercent ?? meter.branchPercent ?? 0)}% source=${formatPressureSourceLabel(nudgeStateAfter.lastPressureSource ?? config.autoCompact.pressureSource ?? "max")} threshold=${Math.round(threshold.percent)}% (${threshold.tokens} tokens) stripped=${meter.strippedByDcp}`,
+        );
+      }
+
+      const crossedThreshold =
+        config.autoCompact.invokeNativeCompact &&
+        config.autoCompact.enabled &&
+        !nudgeStateBefore.autoCompactTriggered &&
+        nudgeStateAfter.autoCompactTriggered;
+
+      if (crossedThreshold && !autoCompactInvokePending) {
+        autoCompactInvokePending = true;
+        try {
+          await ctx.compact({ reason: "threshold" });
+        } catch {
+          // Pi may reject compact (in-flight turn, etc.)
+        } finally {
+          autoCompactInvokePending = false;
+        }
+      }
     } catch {
       // best-effort
     }
@@ -397,6 +452,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   pi.on("session_compact", (event, ctx: ExtensionContext) => {
     ensureInitialized(ctx);
     const metadata = getCompactionMetadata(event);
+    nudge.recordCompress();
     appendDcpStateEntry(ctx, `compaction:${metadata.reason}`);
   });
 
@@ -462,17 +518,41 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     async handler(_args: string, ctx: ExtensionContext) {
       ensureInitialized(ctx);
       const sessionId = getDcpSessionId(ctx);
-      const blocks = getBlocks(sessionId);
+      const usage = ctx.getContextUsage();
+      const contextWindow = ctx.model?.contextWindow ?? 200_000;
+      const outboundTokens = estimateOutboundContextTokens(
+        getSessionBranchMessages(ctx),
+        sessionId,
+        config,
+      );
+      const meter = buildContextMeterSnapshot(
+        usage?.tokens,
+        outboundTokens,
+        contextWindow,
+      );
+      nudge.refreshContextMeter(ctx, meter);
 
+      const blocks = getBlocks(sessionId);
       const stats = getStats(sessionId);
       const nudgeState = nudge.getState();
 
       const lines: string[] = [
         "## DCP Status",
         "",
-        `Context: ${nudgeState.lastContextTokens !== null ? `${Math.round(nudgeState.lastContextTokens / 1000)}k tokens` : "no data"}` +
+        `Context: ${nudgeState.lastContextTokens !== null ? `${Math.round(nudgeState.lastContextTokens / 1000)}k branch` : "no data"}` +
           (nudgeState.lastContextPercent !== null
             ? ` (${Math.round(nudgeState.lastContextPercent)}%)`
+            : "") +
+          (nudgeState.lastMeter
+            ? nudgeState.lastMeter.outboundTokens > 0
+              ? ` | outbound ${Math.round(nudgeState.lastMeter.outboundTokens / 1000)}k` +
+                (nudgeState.lastMeter.strippedByDcp
+                  ? ` (Δ${Math.round((nudgeState.lastMeter.deltaTokens ?? 0) / 1000)}k)`
+                  : "")
+              : " | outbound n/a (run after an agent turn for pruned estimate)"
+            : "") +
+          (nudgeState.lastPressurePercent != null
+            ? ` | pressure ${Math.round(nudgeState.lastPressurePercent)}% (${formatPressureSourceLabel(nudgeState.lastPressureSource ?? "max")})`
             : ""),
         "",
         "### Compression Blocks",
@@ -486,7 +566,14 @@ export default function dcpExtension(pi: ExtensionAPI): void {
               .join("\n"),
         "",
         `Total summary buffer: ~${stats.summaryTokens} tokens`,
-        `Total stripped: ~${stats.totalStrippedTokens} tokens across ${stats.totalPrunedCount} items`,
+        (() => {
+          const run = computeRunPruneStats(
+            getSessionBranchMessages(ctx),
+            sessionId,
+            config,
+          );
+          return `This run: ~${run.tokens} tokens stripped across ${run.count} prune ops (resets on Pi restart; recomputed from current branch)`;
+        })(),
         "",
       ];
 
@@ -494,14 +581,16 @@ export default function dcpExtension(pi: ExtensionAPI): void {
       if (config.qualityMetrics.enabled) {
         const qm = stats.qualityMetrics;
         if (qm.totalCompressions > 0) {
-          const reReadPct = Math.round(
-            (qm.reReadsAfterCompress / qm.totalCompressions) * 100,
-          );
           lines.push("### Quality Metrics");
           lines.push(`  Compressions: ${qm.totalCompressions}`);
           lines.push(
-            `  Re-reads after compress: ${qm.reReadsAfterCompress} (${reReadPct}%)`,
+            `  Re-read events (deduped read/hashline_read of compressed files): ${qm.reReadsAfterCompress}`,
           );
+          if (qm.totalCompressions > 0 && qm.reReadsAfterCompress > 0) {
+            lines.push(
+              `  Avg re-read events per compression: ${(qm.reReadsAfterCompress / qm.totalCompressions).toFixed(1)}`,
+            );
+          }
           lines.push(`  Clean streak: ${qm.cleanCompressions}`);
           if (qm.regressionLog.length > 0) {
             lines.push("  Recent regressions:");

@@ -12,7 +12,12 @@
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { DCPConfig } from "./config.js";
-
+import type { ContextMeterSnapshot } from "./context-meter.js";
+import {
+  resolveAutoCompactThreshold,
+  resolveContextPressure,
+  type ContextPressureSource,
+} from "./pressure.js";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -29,6 +34,10 @@ export interface NudgeState {
   qualityStatus: string;
   /** Suppress all nudges until this turn (set after compress) */
   suppressUntilTurn: number;
+  /** Last branch vs outbound meter snapshot (for /dcp and debugging) */
+  lastMeter: ContextMeterSnapshot | null;
+  lastPressurePercent: number | null;
+  lastPressureSource: ContextPressureSource | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -51,6 +60,9 @@ export class NudgeManager {
       blockCount: 0,
       qualityStatus: "",
       suppressUntilTurn: 0,
+      lastMeter: null,
+      lastPressurePercent: null,
+      lastPressureSource: null,
     };
   }
 
@@ -80,63 +92,117 @@ export class NudgeManager {
   }
 
   /**
+   * Refresh branch/outbound meter for status (/dcp) without nudge side effects.
+   */
+  refreshContextMeter(ctx: ExtensionContext, meter: ContextMeterSnapshot): void {
+    const usage = ctx.getContextUsage();
+    const contextWindow = meter.contextWindow;
+    const branchTokens = usage?.tokens ?? meter.branchTokens ?? 0;
+    this.state.lastContextTokens = branchTokens;
+    this.state.lastContextPercent =
+      branchTokens > 0 ? (branchTokens / contextWindow) * 100 : meter.branchPercent;
+    this.state.lastMeter = meter;
+    const pressure = resolveContextPressure(
+      meter,
+      this.config.autoCompact.pressureSource ?? "max",
+    );
+    this.state.lastPressurePercent = pressure.percent;
+    this.state.lastPressureSource = pressure.source;
+  }
+
+  /**
    * Check context usage and update nudge state.
    * Call from `turn_end` event.
    *
    * @returns the pending nudge message, if any
    */
-  checkContext(ctx: ExtensionContext): string | null {
+  checkContext(
+    ctx: ExtensionContext,
+    meter?: ContextMeterSnapshot,
+  ): string | null {
     const usage = ctx.getContextUsage();
     if (!usage?.tokens) return null;
 
+    if (meter) {
+      this.state.lastMeter = meter;
+    }
     const contextTokens = usage.tokens;
     const config = this.config.compress;
     const autoCfg = this.config.autoCompact;
 
-    // Estimate context percentage from model info
     const model = ctx.model;
     const contextWindow = model?.contextWindow ?? 200_000;
-    const contextPercent = (contextTokens / contextWindow) * 100;
+    const branchPercent = (contextTokens / contextWindow) * 100;
 
     this.state.lastContextTokens = contextTokens;
-    this.state.lastContextPercent = contextPercent;
+    this.state.lastContextPercent = branchPercent;
 
-    // Suppression: don't nudge right after a compress
+    const meterSnap: ContextMeterSnapshot =
+      meter ??
+      ({
+        branchTokens: contextTokens,
+        outboundTokens: 0,
+        branchPercent,
+        outboundPercent: null,
+        contextWindow,
+        deltaTokens: null,
+        strippedByDcp: false,
+      } satisfies ContextMeterSnapshot);
+
+    const pressure = resolveContextPressure(
+      meterSnap,
+      autoCfg.pressureSource ?? "max",
+    );
+    const autoThreshold = resolveAutoCompactThreshold(autoCfg, contextWindow);
+    const contextPercent = pressure.percent;
+    this.state.lastPressurePercent = pressure.percent;
+    this.state.lastPressureSource = pressure.source;
     if (this.currentTurn < this.state.suppressUntilTurn) return null;
 
-    // Re-arm autoCompactTriggered once context drops below the
-    // threshold. This is what makes Zone 4 a one-shot per high-context
-    // cycle: the trigger stays armed while the user is still over the
-    // threshold, and gets reset only when context is safely under it.
-    if (this.state.autoCompactTriggered && contextPercent < autoCfg.thresholdPercent) {
+    if (
+      this.state.autoCompactTriggered &&
+      contextPercent < autoThreshold.percent
+    ) {
       this.state.autoCompactTriggered = false;
     }
 
-    // Zone 1: Below minimum — no pressure
     if (contextPercent < config.minContextLimit) return null;
 
-    // Zone 4: Auto-compact threshold
-    if (autoCfg.enabled && contextPercent >= autoCfg.thresholdPercent && !this.state.autoCompactTriggered) {
+    if (
+      autoCfg.enabled &&
+      contextPercent >= autoThreshold.percent &&
+      !this.state.autoCompactTriggered
+    ) {
       this.state.autoCompactTriggered = true;
-      this.state.pendingNudge = this.buildCriticalNudge(contextTokens, contextPercent);
-      return this.state.pendingNudge;
+      if (!autoCfg.invokeNativeCompact) {
+        this.state.pendingNudge = this.buildCriticalNudge(
+          contextTokens,
+          contextPercent,
+          meterSnap,
+        );
+        return this.state.pendingNudge;
+      }
+      return null;
     }
 
-    // Zone 3: Above effective max — critical nudge
     if (contextPercent >= config.maxContextLimit) {
       if (this.state.autoCompactTriggered) return null;
-      this.state.pendingNudge = this.buildCriticalNudge(contextTokens, contextPercent);
+      this.state.pendingNudge = this.buildCriticalNudge(
+        contextTokens,
+        contextPercent,
+        meterSnap,
+      );
       this.state.lastNudgeTurn = this.currentTurn;
       return this.state.pendingNudge;
     }
 
-    // Zone 2: Between min and max — gentle nudges with frequency control
     const turnsSinceLastNudge = this.currentTurn - this.state.lastNudgeTurn;
     if (turnsSinceLastNudge < config.nudgeFrequency) return null;
 
-    this.state.pendingNudge = config.nudgeForce === "strong"
-      ? this.buildStrongNudge(contextTokens, contextPercent)
-      : this.buildGentleNudge(contextTokens, contextPercent);
+    this.state.pendingNudge =
+      config.nudgeForce === "strong"
+        ? this.buildStrongNudge(contextTokens, contextPercent)
+        : this.buildGentleNudge(contextTokens, contextPercent);
     this.state.lastNudgeTurn = this.currentTurn;
 
     return this.state.pendingNudge;
@@ -163,6 +229,9 @@ export class NudgeManager {
       blockCount: this.state.blockCount,
       qualityStatus: this.state.qualityStatus,
       suppressUntilTurn: this.state.suppressUntilTurn,
+      lastMeter: this.state.lastMeter,
+      lastPressurePercent: this.state.lastPressurePercent,
+      lastPressureSource: this.state.lastPressureSource,
     };
   }
 
@@ -210,11 +279,20 @@ export class NudgeManager {
     return parts.join(" ");
   }
 
-  private buildCriticalNudge(tokens: number, percent: number): string {
+  private buildCriticalNudge(
+    tokens: number,
+    percent: number,
+    meter?: ContextMeterSnapshot,
+  ): string {
     const parts = [
       `[DCP] CRITICAL: Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%) — approaching limit.`,
       this.buildActionSuggestion(),
     ];
+    if (meter?.strippedByDcp && meter.deltaTokens != null && meter.deltaTokens > 0) {
+      parts.push(
+        `Branch meter is ~${Math.round(meter.deltaTokens / 1000)}k tokens above what DCP sends to the model (${Math.round(meter.outboundTokens / 1000)}k outbound); Pi may still compact on branch usage.`,
+      );
+    }
     if (this.state.qualityStatus) {
       parts.push(`Quality: ${this.state.qualityStatus}`);
     }
@@ -228,6 +306,9 @@ export class NudgeManager {
     const pct = s.lastContextPercent !== null ? ` (${Math.round(s.lastContextPercent)}%)` : "";
     const nudge = s.pendingNudge ? " \uF071 pending" : "";
     const qual = s.qualityStatus ? ` | ${s.qualityStatus}` : "";
-    return `DCP: ${Math.round(s.lastContextTokens / 1000)}k tokens${pct}${nudge}${qual}`;
+    const meter = s.lastMeter
+      ? ` | outbound ${Math.round(s.lastMeter.outboundTokens / 1000)}k${s.lastMeter.strippedByDcp ? ` (Δ${Math.round((s.lastMeter.deltaTokens ?? 0) / 1000)}k)` : ""}`
+      : "";
+    return `DCP: ${Math.round(s.lastContextTokens / 1000)}k branch${pct}${meter}${nudge}${qual}`;
   }
 }

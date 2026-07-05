@@ -33,7 +33,7 @@ import {
   saveDurableSessionState,
   type DurableSessionState,
 } from "./storage.js";
-
+import { scanNewReReads, shouldLogRegression } from "./regression.js";
 export const DCP_STATE_ENTRY_TYPE = "dcp_state";
 
 export interface DcpStateEntryPayload {
@@ -197,30 +197,14 @@ export interface QualityMetricsData {
   lastProbeResults?: ProbeEvaluationResult;
   avgProbeScore: number;
   failedProbes: number;
-}
-
-// ---------------------------------------------------------------------------
-// In-memory block storage
-// ---------------------------------------------------------------------------
-
-export interface CompressionBlock {
-  blockId: number;
-  topic: string;
-  summary: string;
-  startLabel: string;
-  endLabel: string;
-  summaryTokens: number;
-  createdAt: number; // timestamp
-  metadata?: Record<string, unknown>;
+  /** Deduped toolCallId:path re-read events after compress */
 }
 
 export interface SessionState {
   blocks: CompressionBlock[];
   nextBlockId: number;
-  /** Cumulative tokens saved by compression stripping */
-  totalStrippedTokens: number;
-  /** Cumulative items pruned by dedup/purge */
-  totalPrunedCount: number;
+  nextBlockId: number;
+  /** P0: Persistent merged summary across all compressions */
   /** P0: Persistent merged summary across all compressions */
   persistentSummary: PersistentSessionSummary;
   /** P1: Artifact tracking per file */
@@ -231,6 +215,7 @@ export interface SessionState {
   recentCompressFiles: { files: string[]; turn: number } | null;
   /** Current turn counter */
   currentTurn: number;
+  reReadSeenKeys: Set<string>;
 }
 
 const sessions = new Map<string, SessionState>();
@@ -268,8 +253,7 @@ function newSessionState(): SessionState {
   return {
     blocks: [],
     nextBlockId: 1,
-    totalStrippedTokens: 0,
-    totalPrunedCount: 0,
+    persistentSummary: emptyPersistentSummary(),
     persistentSummary: emptyPersistentSummary(),
     artifactTracker: new Map(),
     qualityMetrics: {
@@ -282,6 +266,7 @@ function newSessionState(): SessionState {
     },
     recentCompressFiles: null,
     currentTurn: 0,
+    reReadSeenKeys: new Set(),
   };
 }
 
@@ -486,8 +471,6 @@ export function getStats(sessionId: string) {
   const s = getState(sessionId);
   return {
     blockCount: s.blocks.length,
-    totalStrippedTokens: s.totalStrippedTokens,
-    totalPrunedCount: s.totalPrunedCount,
     summaryTokens: s.blocks.reduce((sum, b) => sum + b.summaryTokens, 0),
     qualityMetrics: s.qualityMetrics,
   };
@@ -817,7 +800,7 @@ function extractStructuredFields(
 /**
  * Extract file path(s) from tool call arguments.
  */
-function extractPathFromArgs(
+export function extractPathFromArgs(
   toolName: string,
   args: Record<string, unknown>,
 ): string[] {
@@ -916,7 +899,7 @@ export function recordCompressEvent(
     files: [...new Set([...fields.files_read, ...fields.files_modified])],
     turn: state.currentTurn,
   };
-
+  state.reReadSeenKeys.clear();
   for (const f of [...fields.files_read, ...fields.files_modified]) {
     const entry = state.artifactTracker.get(f);
     if (entry) entry.wasCompressed = true;
@@ -945,33 +928,33 @@ export function checkCompressionRegression(
   }
 
   const compressedFiles = new Set(state.recentCompressFiles.files);
+  const { newKeys, paths } = scanNewReReads(
+    messages,
+    compressedFiles,
+    state.reReadSeenKeys,
+  );
 
-  for (const msg of messages) {
-    if (msg.role !== "assistant") continue;
-    const asst = msg as AssistantMessage;
-    if (!Array.isArray(asst.content)) continue;
-    for (const part of asst.content) {
-      if (part.type !== "toolCall") continue;
-      const tc = part as ToolCall;
-      if (!READ_TOOLS.has(tc.name)) continue;
+  if (newKeys.length === 0) {
+    persistState(sessionId);
+    return;
+  }
 
-      const paths = extractPathFromArgs(
-        tc.name,
-        tc.arguments as Record<string, unknown>,
-      );
-      for (const p of paths) {
-        if (compressedFiles.has(p)) {
-          state.qualityMetrics.reReadsAfterCompress++;
-          state.qualityMetrics.cleanCompressions = 0;
-          state.qualityMetrics.regressionLog.push({
-            blockId: state.blocks.length,
-            file: p,
-            turnGap,
-            timestamp: Date.now(),
-          });
-        }
-      }
-    }
+  state.qualityMetrics.reReadsAfterCompress += newKeys.length;
+  state.qualityMetrics.cleanCompressions = 0;
+
+  const blockId =
+    state.blocks.length > 0
+      ? state.blocks[state.blocks.length - 1]!.blockId
+      : 0;
+
+  for (let i = 0; i < paths.length; i++) {
+    if (!shouldLogRegression(turnGap)) continue;
+    state.qualityMetrics.regressionLog.push({
+      blockId,
+      file: paths[i]!,
+      turnGap,
+      timestamp: Date.now(),
+    });
   }
   persistState(sessionId);
 }
@@ -1167,40 +1150,70 @@ export function processContextMessages(
   sessionId: string,
   config: DCPConfig,
 ): Message[] {
-  const state = getState(sessionId);
+  // P2: regression detection runs against the raw (un-pruned) branch.
+  checkCompressionRegression(messages, sessionId, config);
+  return runContextStrategies(messages, sessionId, config).messages;
+}
 
-  // P2: Check for regression (re-reads of recently compressed files)
-  if (config.qualityMetrics.enabled && config.qualityMetrics.trackReReads) {
-    checkCompressionRegression(messages, sessionId, config);
-  }
+/**
+ * Run the four DCP context strategies on a shallow copy of the messages.
+ * Pure: no SessionState mutation, safe to call from /dcp to recompute run totals.
+ */
+export function runContextStrategies(
+  messages: Message[],
+  sessionId: string,
+  config: DCPConfig,
+): {
+  messages: Message[];
+  prunedTokens: number;
+  prunedCount: number;
+} {
+  // Deep-clone so strategy mutators (which write `__dcp` markers into
+  // `tc.arguments` and replace `tr.content` arrays) don't bleed into the
+  // caller's messages. structuredClone covers nested objects/arrays.
+  const working = messages.map((m) => structuredClone(m));
 
-  // 1. Compress-strip — now receives sessionId for persistent summary injection
-  const {
-    messages: afterStrip,
-    prunedTokens: stripTokens,
-    prunedCount: stripCount,
-  } = applyCompressStrip(messages, sessionId, config);
-
-  // 2. Dedup
+  const { messages: afterStrip, prunedTokens: stripTokens, prunedCount: stripCount } =
+    applyCompressStrip(working, sessionId, config);
   const { prunedTokens: dedupTokens, prunedCount: dedupCount } = applyDedup(
     afterStrip,
     config,
   );
-
-  // 3. Purge errors
-  const { prunedTokens: purgeTokens, prunedCount: purgeCount } =
-    applyPurgeErrors(afterStrip, config);
-
-  // 4. Tool-result pruning — selectively compact regeneratable tool outputs
-  const { prunedTokens: pruneTokens, prunedCount: pruneCount } =
-    pruneToolResults(afterStrip, config);
-
-  state.totalStrippedTokens +=
-    stripTokens + dedupTokens + purgeTokens + pruneTokens;
-  state.totalPrunedCount += stripCount + dedupCount + purgeCount + pruneCount;
-
-  return afterStrip;
+  const { prunedTokens: purgeTokens, prunedCount: purgeCount } = applyPurgeErrors(
+    afterStrip,
+    config,
+  );
+  const { prunedTokens: pruneTokens, prunedCount: pruneCount } = pruneToolResults(
+    afterStrip,
+    config,
+  );
+  return {
+    messages: afterStrip,
+    prunedTokens: stripTokens + dedupTokens + purgeTokens + pruneTokens,
+    prunedCount: stripCount + dedupCount + purgeCount + pruneCount,
+  };
 }
+
+/**
+ * Recompute DCP prune totals for the current run. Used by /dcp to surface
+ * lifetime-since-restart numbers; intentionally not durable (resets on Pi restart).
+ */
+export function computeRunPruneStats(
+  messages: Message[],
+  sessionId: string,
+  config: DCPConfig,
+): { tokens: number; count: number } {
+  const { prunedTokens, prunedCount } = runContextStrategies(
+    messages,
+    sessionId,
+    config,
+  );
+  return { tokens: prunedTokens, count: prunedCount };
+}
+
+
+
+
 
 // ── Step 4: Tool-Result Pruning ────────────────────────────────────────
 // Moved to ./compress-prune.ts.
