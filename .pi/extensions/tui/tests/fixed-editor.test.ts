@@ -197,6 +197,44 @@ test("scroll position is stable when root content grows past retention cap", () 
   fixture.compositor.dispose();
 });
 
+test("repeated scrollBy navigates large root content without drift", () => {
+  const lineCount = 500;
+  const fixture = makeCompositor({
+    rows: 10,
+    clusterLines: ["editor"],
+    rootRender: () =>
+      Array.from({ length: lineCount }, (_, i) => `line-${i.toString().padStart(5, "0")}`),
+  });
+
+  fixture.tui.render(80);
+  assert.equal(
+    fixture.compositor.getDiagnostics().scrollOffset,
+    0,
+    "starts at bottom of content (offset 0)",
+  );
+
+  const superPageUp = "\x1b[5;9~";
+  const superPageDown = "\x1b[6;9~";
+
+  // Scroll up 50 times in chunks of 10 rows (max offset for 500 lines/9 visible rows = 491).
+  for (let i = 0; i < 50; i++) {
+    assert.deepEqual(fixture.input(superPageUp), { consume: true });
+  }
+
+  const upState = fixture.compositor.getDiagnostics();
+  assert.equal(upState.scrollOffset, 491, "clamped at top of content");
+
+  // Scroll all the way back down with the same number of inputs; offset should return exactly to 0.
+  for (let i = 0; i < 50; i++) {
+    assert.deepEqual(fixture.input(superPageDown), { consume: true });
+  }
+
+  const downState = fixture.compositor.getDiagnostics();
+  assert.equal(downState.scrollOffset, 0, "returns to bottom of content without drift");
+
+  fixture.compositor.dispose();
+});
+
 test("emergency terminal reset exports a full terminal mode cleanup sequence", () => {
   assert.equal(typeof emergencyTerminalModeReset, "function");
   const reset = emergencyTerminalModeReset();
