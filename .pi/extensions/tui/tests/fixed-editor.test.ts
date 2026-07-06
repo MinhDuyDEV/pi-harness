@@ -262,6 +262,29 @@ test("repeated scrollBy stays correct through content growth and shrink", () => 
   fixture.compositor.dispose();
 });
 
+test("non-streaming root renders reuse the root-frame cache", () => {
+  let rootRenderCount = 0;
+  const fixture = makeCompositor({
+    rows: 5,
+    clusterLines: ["editor"],
+    rootRender: () => {
+      rootRenderCount++;
+      return ["render-" + rootRenderCount, "stable"];
+    },
+  });
+
+  // Two back-to-back renders with no scroll/state change should hit the cache.
+  fixture.tui.render(40);
+  fixture.tui.render(40);
+  assert.equal(
+    rootRenderCount,
+    1,
+    "non-streaming root-frame cache reuses the previous frame for the immediate follow-up render",
+  );
+
+  fixture.compositor.dispose();
+});
+
 test("emergency terminal reset exports a full terminal mode cleanup sequence", () => {
   assert.equal(typeof emergencyTerminalModeReset, "function");
   const reset = emergencyTerminalModeReset();

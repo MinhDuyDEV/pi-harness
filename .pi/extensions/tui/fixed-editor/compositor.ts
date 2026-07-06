@@ -81,6 +81,11 @@ const MAX_RETAINED_ROOT_LINES = 2_000;
 /** Throttle root render cache reuse during streaming (0 = disabled). */
 const STREAMING_ROOT_RENDER_THROTTLE_MS = 0;
 
+/** Root-frame cache TTL for non-streaming renders. A short window lets the
+ *  compositor reuse the most recent root frame for the follow-up render that
+ *  pi-tui schedules after a scroll input, eliminating the redundant second
+ *  root render per scroll step. Disabled during streaming to keep frames live. */
+const ROOT_RENDER_FRAME_CACHE_MS = 16;
 /** Scrollbar characters. */
 const SCROLLBAR_THUMB = "\x1b[48;5;244m \x1b[0m";
 const SCROLLBAR_TRACK = "\x1b[48;5;238m \x1b[0m";
@@ -721,7 +726,7 @@ export class FixedEditorCompositor {
    *  content-growth adjustment. Used by scrollBy() to merge its scroll step
    *  with the root render pass instead of rendering twice.
    */
-  private renderScrollableRoot(width: number, scrollOffsetDelta: number = 0): string[] {
+  private renderScrollableRoot(width: number, scrollOffsetDelta: number = 0, bypassCache: boolean = false): string[] {
     if (!this.originalTuiRender || this.disposed) {
       return this.originalTuiRender?.(width) ?? [];
     }
@@ -752,7 +757,10 @@ export class FixedEditorCompositor {
     );
 
     const now = Date.now();
-    const cached = this.reusableRootFrame(now, width, rawRows, mainWidth, cluster.lines.length);
+    const cached =
+      !bypassCache && scrollOffsetDelta === 0
+        ? this.reusableRootFrame(now, width, rawRows, mainWidth, cluster.lines.length)
+        : null;
     if (cached) {
       this.rootRenderCacheHits++;
       this.visibleRootStart = cached.visibleRootStart;
@@ -813,7 +821,7 @@ export class FixedEditorCompositor {
       return padLineToWidth(main, mainWidth);
     });
 
-    if (this.canCacheRootFrame() && STREAMING_ROOT_RENDER_THROTTLE_MS > 0) {
+    if (!bypassCache && this.canCacheRootFrame() && this.rootFrameCacheTtlMs() > 0) {
       this.cachedRootFrame = {
         width,
         rawRows,
@@ -836,11 +844,16 @@ export class FixedEditorCompositor {
 
   private canCacheRootFrame(): boolean {
     return Boolean(
-      this.hooks.isStreaming?.() &&
-        !this.sel.highlightVisible &&
+      !this.sel.highlightVisible &&
         !this.sel.dragging &&
         !this.sel.scrollbarDragging,
     );
+  }
+
+  private rootFrameCacheTtlMs(): number {
+    return this.hooks.isStreaming?.()
+      ? STREAMING_ROOT_RENDER_THROTTLE_MS
+      : ROOT_RENDER_FRAME_CACHE_MS;
   }
 
   private reusableRootFrame(
@@ -850,10 +863,12 @@ export class FixedEditorCompositor {
     mainWidth: number,
     clusterHeight: number,
   ): RootFrameCache | null {
-    if (STREAMING_ROOT_RENDER_THROTTLE_MS === 0) return null;
+    if (!this.canCacheRootFrame()) return null;
+    const ttl = this.rootFrameCacheTtlMs();
+    if (ttl === 0) return null;
     const cached = this.cachedRootFrame;
-    if (!cached || !this.canCacheRootFrame()) return null;
-    if (now - cached.renderedAt >= STREAMING_ROOT_RENDER_THROTTLE_MS) return null;
+    if (!cached) return null;
+    if (now - cached.renderedAt >= ttl) return null;
     if (cached.width !== width || cached.rawRows !== rawRows || cached.mainWidth !== mainWidth) return null;
     if (cached.clusterHeight !== clusterHeight || cached.scrollOffset !== this.scrollState.offset) return null;
     return cached;
@@ -923,7 +938,7 @@ export class FixedEditorCompositor {
 
   private jumpToTop(): boolean {
     const width = Math.max(1, this.terminal.columns || 80);
-    this.renderScrollableRoot(width);
+    this.renderScrollableRoot(width, 0, true); // bypass cache: needs live maxOffset
     if (this.scrollState.offset === this.scrollState.maxOffset) return false;
     this.clearSelection();
     (this.scrollState as MutableScrollState).offset = this.scrollState.maxOffset;
