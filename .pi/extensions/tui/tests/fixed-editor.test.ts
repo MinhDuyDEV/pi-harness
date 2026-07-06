@@ -235,6 +235,33 @@ test("repeated scrollBy navigates large root content without drift", () => {
   fixture.compositor.dispose();
 });
 
+test("repeated scrollBy stays correct through content growth and shrink", () => {
+  let lineCount = 800;
+  const fixture = makeCompositor({
+    rows: 10,
+    clusterLines: ["editor"],
+    rootRender: () => Array.from({ length: lineCount }, (_, i) => "line-" + i.toString().padStart(4, "0")),
+  });
+
+  fixture.tui.render(80);
+
+  const superPageUp = "[5;9~";
+  const superPageDown = "[6;9~";
+
+  for (let i = 0; i < 30; i++) fixture.input(superPageUp);
+  lineCount += 200;
+  fixture.tui.render(80);
+  for (let i = 0; i < 30; i++) fixture.input(superPageUp);
+  lineCount -= 100;
+  fixture.tui.render(80);
+  for (let i = 0; i < 80; i++) fixture.input(superPageDown);
+
+  const finalState = fixture.compositor.getDiagnostics();
+  assert.equal(finalState.scrollOffset, 0, "returns to bottom after mixed grow/shrink and 140 inputs");
+
+  fixture.compositor.dispose();
+});
+
 test("emergency terminal reset exports a full terminal mode cleanup sequence", () => {
   assert.equal(typeof emergencyTerminalModeReset, "function");
   const reset = emergencyTerminalModeReset();
