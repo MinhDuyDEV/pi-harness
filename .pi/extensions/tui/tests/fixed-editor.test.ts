@@ -157,6 +157,46 @@ test("keyboard scroll recognizes Kitty/super fallback sequences", () => {
   fixture.compositor.dispose();
 });
 
+test("scroll position is stable when root content grows past retention cap", () => {
+  let lineCount = 1900;
+  const fixture = makeCompositor({
+    rows: 10,
+    clusterLines: ["editor"],
+    rootRender: () =>
+      Array.from({ length: lineCount }, (_, i) => `line-${i.toString().padStart(5, "0")}`),
+  });
+
+  fixture.tui.render(80);
+
+  // Scroll up into the middle of the retained window (each super+PgUp increases offset by 10)
+  for (let i = 0; i < 50; i++) {
+    assert.deepEqual(fixture.input("\x1b[5;9~"), { consume: true });
+  }
+
+  const before = fixture.compositor.getDiagnostics();
+  assert.ok(
+    before.scrollOffset > 0 && before.scrollOffset < before.maxScrollOffset,
+    "scrolled into the middle of the retained window",
+  );
+
+  // Grow content from 1900 to 2200, crossing the 2000-line retention cap
+  lineCount += 300;
+  fixture.tui.render(80);
+
+  const after = fixture.compositor.getDiagnostics();
+  assert.ok(
+    after.scrollOffset > before.scrollOffset,
+    "offset must grow when content grows past retention cap",
+  );
+  assert.equal(
+    after.scrollOffset,
+    before.scrollOffset + 300,
+    "offset grows by the full line growth amount",
+  );
+
+  fixture.compositor.dispose();
+});
+
 test("emergency terminal reset exports a full terminal mode cleanup sequence", () => {
   assert.equal(typeof emergencyTerminalModeReset, "function");
   const reset = emergencyTerminalModeReset();

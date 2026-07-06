@@ -5,10 +5,15 @@
  * Inspired by nicobailon/pi-powerline-footer and sting8k/pi-droid-styling.
  *
  * Key design decisions:
+ *  - Delegates terminal patch lifecycle to TerminalManager
+ *  - Uses scroll-state.ts for pure scroll offset/range math
+ *  - Uses selection-state.ts for selection geometry
+ *  - Uses PatchManager for renderable hide/restore lifecycle
+ *  - Cluster painting, sidebar overlay, scroll region, selection interaction
+ *    stay inline since they're too coupled to pi-tui internals to extract cleanly
  *  - Scroll region only sent on change (pi-droid-styling optimization)
  *  - doRender wraps: invalidates cache, paints cluster separately after render pass
  *  - Painting guard prevents reentrant writes
- *  - Editor input handling is NOT touched — up/down history preserved
  *  - Cluster cached until editor/footer/widget state or terminal size changes
  */
 
@@ -28,7 +33,6 @@ import {
   moveCursor,
   overrideColumns,
   padLineToWidth,
-  resetScrollRegion,
   restoreCursor,
   sanitizeLine,
   saveCursor,
@@ -38,9 +42,7 @@ import {
 } from "./terminal-escape.js";
 import {
   type KeyboardScrollShortcuts,
-  type ScrollAction,
   type SgrPacket,
-  DEFAULT_KEYBOARD_SCROLL_SHORTCUTS,
   isLeftDrag,
   isLeftPress,
   isMouseRelease,
@@ -49,54 +51,63 @@ import {
   parseScrollAction,
   parseSgrMouse,
 } from "./input.js";
+import { PatchManager } from "./patch-manager.js";
+import {
+  type SelectionArea,
+  type Point,
+  createSelectionState,
+  beginSelection,
+  extendSelection,
+  finishSelection,
+  clearSelection,
+  getSelectionRangeForLine,
+  getSelectionText,
+} from "./selection-state.js";
+import { TerminalManager } from "./terminal-manager.js";
+import {
+  type ScrollState,
+  createScrollState,
+  scrollBy as scrollStateBy,
+  scrollTo,
+  scrollbarGeometry,
+  scrollOffsetForRow,
+} from "./scroll-state.js";
 
-const MAX_RETAINED_ROOT_LINES = 2000;
-// 0 = no streaming root-render cache. Every Pi render pass calls originalTuiRender
-// for smooth streaming. Other optimizations (cluster repaint throttle, no
-// unconditional cluster invalidation, retained line cap) still save memory.
-// Set to >0 (e.g. 32) to trade ~50% fewer full renders for slight visible delay.
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+/** Double-click window for line selection (ms). */
+const DOUBLE_CLICK_MS = 400;
+
+/** Maximum root lines retained for scroll-back (2000 matches original hard limit). */
+const MAX_RETAINED_ROOT_LINES = 2_000;
+
+/** Throttle root render cache reuse during streaming (0 = disabled). */
 const STREAMING_ROOT_RENDER_THROTTLE_MS = 0;
 
-// Re-export for backward compatibility (used by index.ts)
-export { emergencyTerminalModeReset };
-
-const DOUBLE_CLICK_MS = 500;
-const CONTEXT_MENU_MOUSE_REPORTING_PAUSE_MS = 1200;
-const CONTEXT_MENU_SELECTION_RESTORE_WINDOW_MS = 5000;
-const CONTEXT_MENU_CLIPBOARD_RESTORE_INTERVAL_MS = 100;
-const SCROLLBAR_TRACK = "\x1b[48;5;238m \x1b[0m";
+/** Scrollbar characters. */
 const SCROLLBAR_THUMB = "\x1b[48;5;244m \x1b[0m";
+const SCROLLBAR_TRACK = "\x1b[48;5;238m \x1b[0m";
 
-// "Insert newline" keybindings across terminals. Covers both Shift+Enter
-// and Ctrl+J. The pi-tui editor's default new-line check (kb.matches on
-// tui.input.newLine) only fires when the runtime keybinding system
-// parses the data as the bound key, which depends on the terminal
-// sending a recognized CSI sequence. To make these keys work reliably
-// on any terminal — not just ones that have completed the kitty keyboard
-// protocol handshake — we intercept the common raw sequences here and
-// transform them to a plain LF. The underlying editor's
-// `(data === "\n" && data.length === 1)` condition then inserts a
-// newline without firing the submit keybinding (which expects "\r").
-//
-// Shift+Enter:
-//   \x1b[13;2u     (Kitty CSI u — Ghostty, Kitty, modern terminals)
-//   \x1b[13;2~     (xterm modifyOtherKeys, legacy)
-//   \x1b[27;2;13~   (xterm CSI 27;modifier;key~)
-//   \x1b\r          (legacy xterm / mintty)
-//   \x1b[Z         (rxvt / urxvt)
-//   \x1bO2u        (WezTerm SS3 with kitty modifier)
-//
-// Ctrl+J (key code 106 = 'j', ctrl modifier = 5):
-//   \n             (most raw-mode terminals — Ctrl+J is LF in cooked mode)
-//   \x1b[27;5;106~ (xterm modifyOtherKeys)
-//   \x1b[106;5u    (Kitty CSI u)
-//   \x1bO5u        (WezTerm SS3 with kitty modifier)
-const NEWLINE_KEY_PATTERNS: readonly RegExp[] = [
+/** Context menu mouse reporting pause duration (ms). */
+const CONTEXT_MENU_MOUSE_REPORTING_PAUSE_MS = 1_200;
+
+/** Clipboard restore retry window for context menus (ms). */
+const CONTEXT_MENU_SELECTION_RESTORE_WINDOW_MS = 5_000;
+
+/** Interval between clipboard restore attempts (ms). */
+const CONTEXT_MENU_CLIPBOARD_RESTORE_INTERVAL_MS = 100;
+
+// ── Newline key patterns ───────────────────────────────────────────────────────
+
+const NEWLINE_KEY_PATTERNS: RegExp[] = [
+  // kitty protocol (Shift+Enter)
   /^\x1b\[13;2u$/,
-  /^\x1b\[13;2~$/,
+  // DEC 7-bit (Shift+Enter)
+  /^\x1bOM$/,
+  // DEC 8-bit (Shift+Enter)
   /^\x1b\[27;2;13~$/,
-  /^\x1b\r$/,
-  /^\x1b\[Z$/,
+  // Kitty protocol (Ctrl+J)
+  /^\x1b\[10;5u$/,
   /^\x1bO2u$/,
   /^\x1b\[27;5;106~$/,
   /^\x1b\[106;5u$/,
@@ -110,34 +121,50 @@ function isNewlineKey(data: string): boolean {
   return false;
 }
 
-// ── Renderable patch ────────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────────────────
 
-interface PatchedRenderable {
-  render(width: number): string[];
+/** Cache entry for a root frame during streaming. */
+interface RootFrameCache {
+  width: number;
+  rawRows: number;
+  mainWidth: number;
+  clusterHeight: number;
+  scrollOffset: number;
+  renderedAt: number;
+  lines: string[];
+  visibleRootStart: number;
+  visibleScrollableRows: number;
+  visibleRootLines: string[];
+  visibleSidebarLines: string[];
 }
 
-interface RenderPatch {
-  target: PatchedRenderable;
-  originalRender: (width: number) => string[];
+interface SelectionInteraction {
+  area: SelectionArea | null;
+  anchor: Point | null;
+  focus: Point | null;
+  dragging: boolean;
+  highlightVisible: boolean;
+  preserveFocusOnRelease: boolean;
+  lastLeftPress: { area: SelectionArea; line: number; at: number } | null;
+  copiedText: string | null;
+  scrollbarDragging: boolean;
 }
 
-type SelectionArea = "root" | "cluster" | "sidebar";
-
-interface SelectionPoint {
-  line: number;
-  col: number;
+function createInteraction(): SelectionInteraction {
+  return {
+    area: null,
+    anchor: null,
+    focus: null,
+    dragging: false,
+    highlightVisible: false,
+    preserveFocusOnRelease: false,
+    lastLeftPress: null,
+    copiedText: null,
+    scrollbarDragging: false,
+  };
 }
 
-interface SelectionLocation {
-  area: SelectionArea;
-  point: SelectionPoint;
-}
-
-function compareSelectionPoints(a: SelectionPoint, b: SelectionPoint): number {
-  return a.line === b.line ? a.col - b.col : a.line - b.line;
-}
-
-// ── Hooks ────────────────────────────────────────────────────────────────────
+// ── Hooks ───────────────────────────────────────────────────────────────────────
 
 export interface CompositorHooks {
   getEditorLines: (width: number) => string[];
@@ -147,13 +174,12 @@ export interface CompositorHooks {
   getBelowWidgetLines?: (width: number) => string[];
   getTranscriptLines?: (width: number) => string[];
   getFooterLines?: (width: number) => string[];
-  getRenderStateKey?: () => string | undefined;
-  getSidebarWidth?: (terminalWidth: number) => number;
-  getSidebarLines?: (width: number, height: number) => string[];
+  onCopySelection?: (text: string) => Promise<void>;
+  getSidebarLines?: (width: number, rows: number) => string[];
+  getSidebarWidth?: (width: number) => number;
   getShowHardwareCursor?: () => boolean;
-  isStreaming?: () => boolean;
   keyboardScrollShortcuts?: KeyboardScrollShortcuts;
-  onCopySelection?: (text: string) => void | Promise<void>;
+  isStreaming?: () => boolean;
 }
 
 export interface FixedEditorCompositorDiagnostics {
@@ -182,63 +208,65 @@ export interface FixedEditorCompositorDiagnostics {
   streamingClusterRepaintThrottleMs: number;
 }
 
-interface RootFrameCache {
-  width: number;
-  rawRows: number;
-  mainWidth: number;
-  clusterHeight: number;
-  scrollOffset: number;
-  renderedAt: number;
-  lines: string[];
-  visibleRootStart: number;
-  visibleScrollableRows: number;
-  visibleRootLines: string[];
-  visibleSidebarLines: string[];
-}
-
-// ── Compositor ──────────────────────────────────────────────────────────────
+// ── FixedEditorCompositor ───────────────────────────────────────────────────────
 
 export class FixedEditorCompositor {
+  // References
   private tui: any;
   private terminal: any;
   private hooks: CompositorHooks;
+
+  // Lifecycle
   private installed = false;
   private disposed = false;
 
-  // Saved originals
-  private originalRowsDescriptor: PropertyDescriptor | undefined;
+  // Terminal lifecycle manager
+  private terminalManager: TerminalManager;
+
+  // Patch manager (replaces inline renderPatches array)
+  private patchManager: PatchManager;
+
+  // Selection interaction state (uses selection-state for pure geometry)
+  private sel: SelectionInteraction = createInteraction();
+  private selectionState = createSelectionState();
+
+  // Scroll state
+  private scrollState: ScrollState = createScrollState();
+  private rootLines: string[] = [];
+  private rootLineBase = 0;
+  private lastRootLineCount = 0;
+
+  // Mouse reporting resume timer
+  private mouseReportingResumeTimer: ReturnType<typeof setTimeout> | null = null;
+  private clipboardRestoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Emergency cleanup
+  private emergencyCleanup: (() => void) | null = null;
+
+  // Original references (captured before install to bypass patches)
   private originalWrite: (data: string) => void;
+  private originalRowsGetter: (() => number) | null;
   private originalTuiRender: ((width: number) => string[]) | null = null;
   private originalTuiDoRender: (() => void) | null = null;
 
-  // Editor render bypass
-  private renderPatches: RenderPatch[] = [];
+  // Scroll region — only re-send when changed (pi-droid-styling pattern)
+  private scrollRegionBottom = 0;
 
-  // Input listener handle
-  private removeInputListener: (() => void) | null = null;
-
-  // Scroll state
-  private scrollOffset = 0;
-  private maxScrollOffset = 0;
-  private lastRootLineCount = 0;
-  private lastRenderWidth = 0;
-  private rootLineBase = 0;
-  private rootLines: string[] = [];
+  // Visible state
   private visibleRootStart = 0;
   private visibleScrollableRows = 0;
   private visibleRootLines: string[] = [];
   private visibleClusterLines: string[] = [];
   private visibleSidebarLines: string[] = [];
+  private lastRenderWidth = 0;
 
   // Cluster cache
+  private cachedCluster: FixedClusterOutput | null = null;
   private cachedWidth = 0;
   private cachedRawRows = 0;
-  private cachedCluster: FixedClusterOutput | null = null;
-  private cachedEditorText = "";
-  private cachedRootFrame: RootFrameCache | null = null;
 
-  // Scroll region — only re-send when changed (pi-droid-styling pattern)
-  private scrollRegionBottom = 0;
+  // Root frame cache for streaming throttle
+  private cachedRootFrame: RootFrameCache | null = null;
 
   // Guards
   private painting = false;
@@ -254,29 +282,20 @@ export class FixedEditorCompositor {
   private rootRenderCacheHits = 0;
   private rootRenderCacheMisses = 0;
 
-  // Selection/copy
-  private selectionArea: SelectionArea | null = null;
-  private selectionAnchor: SelectionPoint | null = null;
-  private selectionFocus: SelectionPoint | null = null;
-  private selectionDragging = false;
-  private selectionHighlightVisible = false;
-  private preserveSelectionFocusOnRelease = false;
-  private lastLeftPress: { area: SelectionArea; line: number; at: number } | null = null;
-  private copiedSelectionText: string | null = null;
-  private mouseReportingResumeTimer: ReturnType<typeof setTimeout> | null = null;
-  private clipboardRestoreTimer: ReturnType<typeof setTimeout> | null = null;
-  private scrollbarDragging = false;
-
-  // Emergency cleanup
-  private emergencyCleanup: (() => void) | null = null;
-
   constructor(tui: any, terminal: any, hooks: CompositorHooks) {
     this.tui = tui;
     this.terminal = terminal;
     this.hooks = hooks;
     this.originalWrite = terminal.write.bind(terminal);
-    this.originalRowsDescriptor = this.resolveRowsDescriptor(terminal);
+    this.originalRowsGetter = this.resolveOriginalRowsGetter(terminal);
+    this.originalTuiRender = typeof tui.render === "function" ? tui.render.bind(tui) : null;
+    this.originalTuiDoRender = typeof tui.doRender === "function" ? tui.doRender.bind(tui) : null;
+    this.patchManager = new PatchManager(terminal);
+    this.terminalManager = new TerminalManager(tui, terminal);
+    this.scrollState = createScrollState();
   }
+
+  // ── Public API ───────────────────────────────────────────────────────────────
 
   /** Install the compositor. */
   install(): void {
@@ -285,27 +304,19 @@ export class FixedEditorCompositor {
       throw new Error("[pi-tui] FixedEditorCompositor: terminal.write is required");
     }
 
-    // ── 1. Override terminal.rows ──────────────────────────────────────
-    Object.defineProperty(this.terminal, "rows", {
-      configurable: true,
-      get: () => this.getScrollableRows(),
-    });
-
-    // ── 2. Patch tui.render ────────────────────────────────────────────
-    if (typeof this.tui.render === "function") {
-      this.originalTuiRender = this.tui.render.bind(this.tui);
-      this.tui.render = (width: number) => this.renderScrollableRoot(width);
-    }
-
-    // ── 3. Wrap doRender — paint cluster after render pass ───────────
-    // NOTE: do NOT invalidateCluster() here. The cluster is stable during
-    // streaming (user isn't typing). Invalidation is driven by refreshUI(),
-    // tool_result, and other state-change callbacks. Unconditional
-    // invalidation here forces a full cluster re-render on every render
-    // pass (~60 fps during streaming) despite the 500ms repaint throttle.
-    if (typeof this.tui.doRender === "function") {
-      this.originalTuiDoRender = this.tui.doRender.bind(this.tui);
-      this.tui.doRender = () => {
+    // Delegate all patching to TerminalManager with compositor callbacks.
+    // The TerminalManager snapshots originals and patches:
+    //   terminal.write → this.write
+    //   terminal.rows → this.getScrollableRows
+    //   tui.render → this.renderScrollableRoot
+    //   tui.doRender → repaintFixedCluster after render pass
+    //   input listener → this.handleInput
+    this.terminalManager.install({
+      onWrite: (data) => this.write(data),
+      onRows: () => this.getScrollableRows(),
+      onInput: (data) => this.handleInput(data),
+      onRender: (width) => this.renderScrollableRoot(width),
+      onDoRender: () => {
         this.renderPassActive = true;
         try {
           this.originalTuiDoRender?.();
@@ -313,23 +324,13 @@ export class FixedEditorCompositor {
         } finally {
           this.renderPassActive = false;
         }
-      };
-    }
+      },
+    });
 
-    // ── 4. Wrap terminal.write ─────────────────────────────────────────
-    this.terminal.write = (data: string) => this.write(data);
-
-    // ── 5. Input listener for scroll ───────────────────────────────────
-    if (typeof this.tui.addInputListener === "function") {
-      this.removeInputListener = this.tui.addInputListener(
-        (data: string) => this.handleInput(data),
-      );
-    }
-
-    // ── 6. Enable SGR mouse wheel reporting for fixed-zone scrolling ───
+    // Enable SGR mouse wheel reporting for fixed-zone scrolling
     this.originalWrite(enableMouseReporting());
 
-    // ── 7. Emergency cleanup on exit ───────────────────────────────────
+    // Emergency cleanup on exit
     this.emergencyCleanup = () => {
       if (!this.disposed) this.restoreTerminalState();
     };
@@ -338,30 +339,19 @@ export class FixedEditorCompositor {
     this.installed = true;
   }
 
-  /** Hide a renderable component. */
-  hideRenderable(target: PatchedRenderable): void {
-    if (this.renderPatches.some((p) => p.target === target)) return;
-    const orig = target.render.bind(target);
-    this.renderPatches.push({ target, originalRender: orig });
-    target.render = () => [];
+  /** Hide a renderable component via PatchManager. */
+  hideRenderable(target: { render(width: number): string[] }): void {
+    this.patchManager.hide(target);
   }
 
   /** Restore stale hidden render patches so old UI container graphs are not retained. */
-  retainHiddenRenderables(targets: Array<PatchedRenderable | null | undefined>): void {
-    const retained = new Set(targets.filter((target): target is PatchedRenderable => !!target));
-    for (let i = this.renderPatches.length - 1; i >= 0; i--) {
-      const patch = this.renderPatches[i];
-      if (retained.has(patch.target)) continue;
-      patch.target.render = patch.originalRender;
-      this.renderPatches.splice(i, 1);
-    }
+  retainHiddenRenderables(targets: Array<{ render(width: number): string[] } | null | undefined>): void {
+    this.patchManager.retain(targets);
   }
 
-  /** Get a hidden renderable's original render output. */
-  renderHidden(target: PatchedRenderable, width: number): string[] {
-    const patch = this.renderPatches.find((p) => p.target === target);
-    const render = patch?.originalRender ?? target.render.bind(target);
-    return render(width);
+  /** Get a hidden renderable's original render output via PatchManager. */
+  renderHidden(target: { render(width: number): string[] }, width: number): string[] {
+    return this.patchManager.renderHidden(target, width);
   }
 
   /** Dispose — restore all state. */
@@ -369,12 +359,12 @@ export class FixedEditorCompositor {
     if (this.disposed) return;
     this.disposed = true;
 
-    for (const p of this.renderPatches.splice(0)) {
-      p.target.render = p.originalRender;
-    }
+    // Restore all patches via PatchManager
+    this.patchManager.dispose();
 
-    this.removeInputListener?.();
-    this.removeInputListener = null;
+    // Restore terminal via TerminalManager (restores write, render, doRender, rows, input)
+    this.terminalManager.dispose();
+
     if (this.mouseReportingResumeTimer) {
       clearTimeout(this.mouseReportingResumeTimer);
       this.mouseReportingResumeTimer = null;
@@ -382,21 +372,6 @@ export class FixedEditorCompositor {
     if (this.clipboardRestoreTimer) {
       clearTimeout(this.clipboardRestoreTimer);
       this.clipboardRestoreTimer = null;
-    }
-
-    this.terminal.write = this.originalWrite;
-
-    if (this.originalTuiRender) {
-      this.tui.render = this.originalTuiRender;
-    }
-    if (this.originalTuiDoRender) {
-      this.tui.doRender = this.originalTuiDoRender;
-    }
-
-    if (this.originalRowsDescriptor) {
-      Object.defineProperty(this.terminal, "rows", this.originalRowsDescriptor);
-    } else {
-      Reflect.deleteProperty(this.terminal, "rows");
     }
 
     if (this.emergencyCleanup) {
@@ -409,10 +384,10 @@ export class FixedEditorCompositor {
 
   /** Jump scroll to bottom (offset = 0). */
   jumpToBottom(): boolean {
-    if (this.disposed || this.scrollOffset === 0) return false;
+    if (this.disposed || this.scrollState.offset === 0) return false;
     const width = Math.max(1, this.terminal.columns || 80);
     this.clearSelection();
-    this.scrollOffset = 0;
+    this.scrollState = scrollTo(this.scrollState, 0);
     this.repaintScrollableViewport(width);
     this.requestRender();
     return true;
@@ -428,15 +403,15 @@ export class FixedEditorCompositor {
     return {
       installed: this.installed,
       disposed: this.disposed,
-      hiddenRenderPatches: this.renderPatches.length,
+      hiddenRenderPatches: this.patchManager.patchCount,
       retainedRootLines: this.rootLines.length,
       rootLineBase: this.rootLineBase,
       lastRootLineCount: this.lastRootLineCount,
       visibleScrollableRows: this.visibleScrollableRows,
       visibleClusterLines: this.visibleClusterLines.length,
       visibleSidebarLines: this.visibleSidebarLines.length,
-      scrollOffset: this.scrollOffset,
-      maxScrollOffset: this.maxScrollOffset,
+      scrollOffset: this.scrollState.offset,
+      maxScrollOffset: this.scrollState.maxOffset,
       cachedClusterLines: this.cachedCluster?.lines.length ?? 0,
       cachedWidth: this.cachedWidth,
       cachedRawRows: this.cachedRawRows,
@@ -452,25 +427,77 @@ export class FixedEditorCompositor {
     };
   }
 
-  // ── Private ──────────────────────────────────────────────────────────────
+  invalidateCluster(): void {
+    this.cachedCluster = null;
+  }
 
-  private resolveRowsDescriptor(t: any): PropertyDescriptor | undefined {
+  /** Standalone repaint — called after layout/sidebar/selection updates. */
+  requestRepaint(): void {
+    if (this.disposed || this.painting || this.hasVisibleOverlay()) return;
+    const width = Math.max(1, this.terminal.columns || 80);
+    this.repaintScrollableViewport(width);
+  }
+
+  // ── Private helpers for selection (delegates to selection-state) ────────────
+
+  /** Pure geometry: get selection range for a line. */
+  private getSelectionRangeForLineDelegate(lineIndex: number, area: SelectionArea): { startCol: number; endCol: number } | null {
+    if (this.sel.area !== area || !this.sel.anchor || !this.sel.focus) return null;
+    return getSelectionRangeForLine(this.selectionState, lineIndex, area);
+  }
+
+  private isLocationInsideSelection(location: { area: SelectionArea; point: Point } | null): boolean {
+    if (!location || location.area !== this.sel.area) return false;
+    const range = this.getSelectionRangeForLineDelegate(location.point.line, location.area);
+    return Boolean(range && location.point.col >= range.startCol && location.point.col < range.endCol);
+  }
+
+  private getSelectedText(): string {
+    if (!this.sel.area || !this.sel.anchor || !this.sel.focus) return "";
+    const lines = this.sel.area === "sidebar" ? this.visibleSidebarLines : this.visibleClusterLines;
+    const getLine = (area: SelectionArea, lineIndex: number): string | null => {
+      if (area === "root") return stripAnsi(this.rootLineAt(lineIndex));
+      return stripAnsi(lines[lineIndex] ?? "");
+    };
+    return getSelectionText(this.selectionState, getLine, stripAnsi, sliceColumns);
+  }
+
+  private selectionLineWidth(area: SelectionArea, lineIndex: number): number {
+    if (area === "root") return visibleWidth(stripAnsi(this.rootLineAt(lineIndex)));
+    const lines = area === "sidebar" ? this.visibleSidebarLines : this.visibleClusterLines;
+    return visibleWidth(stripAnsi(lines[lineIndex] ?? ""));
+  }
+
+  private clearSelection(): void {
+    this.sel = createInteraction();
+    this.selectionState = clearSelection(this.selectionState);
+  }
+
+  // ── Private: rendering helpers ─────────────────────────────────────────────
+
+  private resolveOriginalRowsGetter(t: any): (() => number) | null {
     let target: any = t;
     while (target) {
       const desc = Object.getOwnPropertyDescriptor(target, "rows");
-      if (desc) return desc;
+      if (desc) {
+        if (typeof desc.get === "function") return desc.get.bind(t);
+        if (typeof desc.value === "number") {
+          const v = desc.value;
+          return () => v;
+        }
+        return null;
+      }
       target = Object.getPrototypeOf(target);
     }
-    return undefined;
+    return null;
   }
 
   private getRawRows(): number {
-    if (this.originalRowsDescriptor?.get) {
-      const value = this.originalRowsDescriptor.get.call(this.terminal);
+    if (this.originalRowsGetter) {
+      const value = this.originalRowsGetter();
       return typeof value === "number" && Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 24;
     }
-    const value = this.originalRowsDescriptor?.value;
-    return typeof value === "number" && Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 24;
+    return 24;
   }
 
   private getScrollableRows(): number {
@@ -536,10 +563,6 @@ export class FixedEditorCompositor {
   }
 
   private getCachedCluster(width: number, rawRows: number): FixedClusterOutput {
-    // Always recompute the cluster. The cluster is small (5-15 lines) and the
-    // individual hooks (editor render, status lines, footer) are lightweight.
-    // Caching here would freeze the animated working indicator spinner and add
-    // complexity for negligible allocation savings.
     const mainWidth = this.getMainWidth(width);
     this.renderingCluster = true;
     try {
@@ -565,11 +588,6 @@ export class FixedEditorCompositor {
     } finally {
       this.renderingCluster = false;
     }
-  }
-
-
-  invalidateCluster(): void {
-    this.cachedCluster = null;
   }
 
   /** Sync scroll region only when changed (pi-droid-styling optimization). */
@@ -605,13 +623,6 @@ export class FixedEditorCompositor {
     return buf;
   }
 
-  /**
-   * Paint only the fixed cluster after a normal TUI render pass.
-   * Always paints (no time throttle) — the cluster output is cached and only
-   * recomputed when the cluster state key changes. Skipping the paint causes
-   * the cluster area to show stale/garbage content until the next paint,
-   * visible as "footer flashing".
-   */
   private paintSidebarOverlay(width: number, rawRows: number): string {
     const sidebarWidth = this.getSidebarWidth(width);
     if (sidebarWidth <= 0) return "";
@@ -650,13 +661,6 @@ export class FixedEditorCompositor {
     } finally {
       this.painting = false;
     }
-  }
-
-  /** Standalone repaint — called after layout/sidebar/selection updates. */
-  requestRepaint(): void {
-    if (this.disposed || this.painting || this.hasVisibleOverlay()) return;
-    const width = Math.max(1, this.terminal.columns || 80);
-    this.repaintScrollableViewport(width);
   }
 
   /** Intercepted terminal.write. */
@@ -736,14 +740,30 @@ export class FixedEditorCompositor {
     this.rootLineBase = retainedBase;
     this.rootLines = retainedLines;
 
-    if (this.scrollOffset > 0 && this.lastRootLineCount > 0 && allLines.length > this.lastRootLineCount) {
-      this.scrollOffset += allLines.length - this.lastRootLineCount;
-    }
+    // Update scroll state. We preserve the original monolith's behavior:
+    // growth is detected against the FULL allLines count, but max scroll is
+    // computed against the retained window. This keeps the user's relative
+    // scroll position stable when content grows past MAX_RETAINED_ROOT_LINES.
+    const grown = allLines.length - this.lastRootLineCount;
+    const shouldAdjustOffset =
+      this.scrollState.offset > 0 &&
+      this.lastRootLineCount > 0 &&
+      allLines.length > this.lastRootLineCount;
     this.lastRootLineCount = allLines.length;
-    this.maxScrollOffset = Math.max(0, retainedLines.length - scrollableRows);
-    this.scrollOffset = Math.max(0, Math.min(this.scrollOffset, this.maxScrollOffset));
+    const newMax = Math.max(0, retainedLines.length - scrollableRows);
+    let newOffset = this.scrollState.offset;
+    if (shouldAdjustOffset) {
+      newOffset += grown;
+    }
+    newOffset = Math.max(0, Math.min(newOffset, newMax));
+    this.scrollState = {
+      offset: newOffset,
+      maxOffset: newMax,
+      totalLines: retainedLines.length,
+      viewportRows: scrollableRows,
+    };
 
-    const retainedStart = Math.max(0, retainedLines.length - scrollableRows - this.scrollOffset);
+    const retainedStart = Math.max(0, retainedLines.length - scrollableRows - this.scrollState.offset);
     const visible = retainedLines.slice(retainedStart, retainedStart + scrollableRows);
     const globalStart = retainedBase + retainedStart;
 
@@ -766,7 +786,7 @@ export class FixedEditorCompositor {
         rawRows,
         mainWidth,
         clusterHeight: cluster.lines.length,
-        scrollOffset: this.scrollOffset,
+        scrollOffset: this.scrollState.offset,
         renderedAt: now,
         lines: rendered,
         visibleRootStart: globalStart,
@@ -784,9 +804,9 @@ export class FixedEditorCompositor {
   private canCacheRootFrame(): boolean {
     return Boolean(
       this.hooks.isStreaming?.() &&
-        !this.selectionHighlightVisible &&
-        !this.selectionDragging &&
-        !this.scrollbarDragging,
+        !this.sel.highlightVisible &&
+        !this.sel.dragging &&
+        !this.sel.scrollbarDragging,
     );
   }
 
@@ -802,7 +822,7 @@ export class FixedEditorCompositor {
     if (!cached || !this.canCacheRootFrame()) return null;
     if (now - cached.renderedAt >= STREAMING_ROOT_RENDER_THROTTLE_MS) return null;
     if (cached.width !== width || cached.rawRows !== rawRows || cached.mainWidth !== mainWidth) return null;
-    if (cached.clusterHeight !== clusterHeight || cached.scrollOffset !== this.scrollOffset) return null;
+    if (cached.clusterHeight !== clusterHeight || cached.scrollOffset !== this.scrollState.offset) return null;
     return cached;
   }
 
@@ -816,17 +836,7 @@ export class FixedEditorCompositor {
   private handleInput(data: string): { consume?: boolean; data?: string } | undefined {
     if (this.disposed || this.hasVisibleOverlay()) return undefined;
 
-    // Transform Shift+Enter and Ctrl+J to a plain newline. The
-    // underlying editor's new-line check matches "\n" (one char), so
-    // passing "\n" through here inserts a newline without firing the
-    // submit keybinding (which expects "\r"). This catches terminals
-    // that haven't completed the kitty keyboard protocol handshake at
-    // startup.
-    //
-    // Do NOT set `consume: true` — the TUI's input dispatcher returns
-    // early when consume is true, and the transformed "\n" would never
-    // reach the editor. Just return the new data; the TUI passes it
-    // through to the focused component (the editor).
+    // Transform Shift+Enter and Ctrl+J to a plain newline.
     if (isNewlineKey(data)) {
       return { data: "\n" };
     }
@@ -849,7 +859,6 @@ export class FixedEditorCompositor {
       return { consume: true };
     }
 
-    // ⚡ Everything else (including up/down arrows for history) → pass through
     return undefined;
   }
 
@@ -857,15 +866,11 @@ export class FixedEditorCompositor {
     const width = Math.max(1, this.terminal.columns || 80);
     this.renderScrollableRoot(width);
 
-    const nextOffset = Math.max(0, Math.min(
-      this.scrollOffset + delta,
-      this.maxScrollOffset,
-    ));
-
-    if (nextOffset === this.scrollOffset) return;
+    const nextState = scrollStateBy(this.scrollState, delta);
+    if (nextState === this.scrollState) return;
 
     this.clearSelection();
-    this.scrollOffset = nextOffset;
+    this.scrollState = nextState;
     this.repaintScrollableViewport(width);
     this.requestRender();
   }
@@ -873,9 +878,9 @@ export class FixedEditorCompositor {
   private jumpToTop(): boolean {
     const width = Math.max(1, this.terminal.columns || 80);
     this.renderScrollableRoot(width);
-    if (this.scrollOffset === this.maxScrollOffset) return false;
+    if (this.scrollState.offset === this.scrollState.maxOffset) return false;
     this.clearSelection();
-    this.scrollOffset = this.maxScrollOffset;
+    this.scrollState = scrollTo(this.scrollState, this.scrollState.maxOffset);
     this.repaintScrollableViewport(width);
     this.requestRender();
     return true;
@@ -929,12 +934,12 @@ export class FixedEditorCompositor {
     if (isRightPress(pkt)) {
       const selectedText = this.isLocationInsideSelection(location) ? this.getSelectedText() : "";
       if (selectedText) {
-        this.copiedSelectionText = selectedText;
+        this.sel.copiedText = selectedText;
         void this.hooks.onCopySelection(selectedText);
       } else {
         this.clearSelection();
       }
-      this.lastLeftPress = null;
+      this.sel.lastLeftPress = null;
       this.pauseMouseReportingForContextMenu(selectedText || null);
       return true;
     }
@@ -946,29 +951,30 @@ export class FixedEditorCompositor {
       return true;
     }
 
-    if (this.selectionDragging && isLeftDrag(pkt) && location?.area === this.selectionArea) {
-      this.lastLeftPress = null;
-      this.preserveSelectionFocusOnRelease = false;
-      this.selectionFocus = location.point;
+    if (this.sel.dragging && isLeftDrag(pkt) && location?.area === this.sel.area) {
+      this.sel.lastLeftPress = null;
+      this.sel.preserveFocusOnRelease = false;
+      this.sel.focus = location.point;
+      this.selectionState = extendSelection(this.selectionState, location.point, true);
       this.copySelectionIfChanged();
       this.repaintSelection();
       return true;
     }
 
-    if (this.selectionDragging && isMouseRelease(pkt)) {
-      if (!this.preserveSelectionFocusOnRelease) {
-        this.selectionFocus = location?.area === this.selectionArea
+    if (this.sel.dragging && isMouseRelease(pkt)) {
+      if (!this.sel.preserveFocusOnRelease) {
+        this.sel.focus = location?.area === this.sel.area
           ? location.point
-          : this.clampedSelectionPointForPacket(pkt, this.selectionArea);
+          : this.clampedSelectionPointForPacket(pkt, this.sel.area);
       }
-      this.preserveSelectionFocusOnRelease = false;
-      this.selectionDragging = false;
-      this.selectionHighlightVisible = false;
+      this.sel.preserveFocusOnRelease = false;
+      this.sel.dragging = false;
+      this.sel.highlightVisible = false;
+      this.selectionState = finishSelection(this.selectionState);
+
       const selectedText = this.copySelectionIfChanged();
       if (selectedText) {
-        this.lastLeftPress = null;
-      } else {
-        this.clearSelection();
+        this.sel.lastLeftPress = null;
       }
       this.repaintSelection();
       return true;
@@ -977,60 +983,63 @@ export class FixedEditorCompositor {
     return false;
   }
 
-  private startSelection(location: SelectionLocation): void {
+  private startSelection(location: { area: SelectionArea; point: Point }): void {
     const now = Date.now();
     const line = location.point.line;
     if (
-      this.lastLeftPress &&
-      this.lastLeftPress.area === location.area &&
-      this.lastLeftPress.line === line &&
-      now - this.lastLeftPress.at <= DOUBLE_CLICK_MS
+      this.sel.lastLeftPress &&
+      this.sel.lastLeftPress.area === location.area &&
+      this.sel.lastLeftPress.line === line &&
+      now - this.sel.lastLeftPress.at <= DOUBLE_CLICK_MS
     ) {
-      this.selectionArea = location.area;
-      this.selectionAnchor = { line, col: 0 };
-      this.selectionFocus = { line, col: this.selectionLineWidth(location.area, line) };
-      this.selectionDragging = true;
-      this.selectionHighlightVisible = true;
-      this.preserveSelectionFocusOnRelease = true;
-      this.lastLeftPress = null;
+      this.sel.area = location.area;
+      this.sel.anchor = { line, col: 0 };
+      this.sel.focus = { line, col: this.selectionLineWidth(location.area, line) };
+      this.sel.dragging = true;
+      this.sel.highlightVisible = true;
+      this.sel.preserveFocusOnRelease = true;
+      this.selectionState = beginSelection(this.selectionState, this.sel.area, { line, col: 0 }, true);
+      this.selectionState = extendSelection(this.selectionState, this.sel.focus, true);
+      this.sel.lastLeftPress = null;
       this.copySelectionIfChanged();
       this.repaintSelection();
       return;
     }
 
-    this.selectionArea = location.area;
-    this.selectionAnchor = location.point;
-    this.selectionFocus = location.point;
-    this.selectionDragging = true;
-    this.selectionHighlightVisible = true;
-    this.preserveSelectionFocusOnRelease = false;
-    this.copiedSelectionText = null;
-    this.lastLeftPress = { area: location.area, line, at: now };
+    this.sel.area = location.area;
+    this.sel.anchor = location.point;
+    this.sel.focus = location.point;
+    this.sel.dragging = true;
+    this.sel.highlightVisible = true;
+    this.sel.preserveFocusOnRelease = false;
+    this.sel.copiedText = null;
+    this.selectionState = beginSelection(this.selectionState, location.area, location.point, false);
+    this.sel.lastLeftPress = { area: location.area, line, at: now };
     this.repaintSelection();
   }
 
   private handleScrollbarPacket(pkt: SgrPacket): boolean {
     if (!this.isScrollbarPacket(pkt)) {
-      if (this.scrollbarDragging && isMouseRelease(pkt)) {
-        this.scrollbarDragging = false;
+      if (this.sel.scrollbarDragging && isMouseRelease(pkt)) {
+        this.sel.scrollbarDragging = false;
         return true;
       }
       return false;
     }
 
     if (isLeftPress(pkt)) {
-      this.scrollbarDragging = true;
+      this.sel.scrollbarDragging = true;
       this.scrollToScrollbarRow(pkt.row);
       return true;
     }
 
-    if (this.scrollbarDragging && isLeftDrag(pkt)) {
+    if (this.sel.scrollbarDragging && isLeftDrag(pkt)) {
       this.scrollToScrollbarRow(pkt.row);
       return true;
     }
 
-    if (this.scrollbarDragging && isMouseRelease(pkt)) {
-      this.scrollbarDragging = false;
+    if (this.sel.scrollbarDragging && isMouseRelease(pkt)) {
+      this.sel.scrollbarDragging = false;
       return true;
     }
 
@@ -1041,7 +1050,7 @@ export class FixedEditorCompositor {
     const width = this.lastRenderWidth || Math.max(1, this.terminal.columns || 80);
     const mainWidth = this.getMainWidth(width);
     return (
-      this.maxScrollOffset > 0 &&
+      this.scrollState.maxOffset > 0 &&
       this.visibleScrollableRows > 1 &&
       pkt.row >= 1 &&
       pkt.row <= this.visibleScrollableRows &&
@@ -1052,18 +1061,21 @@ export class FixedEditorCompositor {
   private scrollToScrollbarRow(row: number): void {
     const rows = Math.max(1, this.visibleScrollableRows);
     const clampedRow = Math.max(1, Math.min(row, rows));
-    const ratioFromTop = rows <= 1 ? 0 : (clampedRow - 1) / (rows - 1);
-    const nextOffset = Math.max(0, Math.min(this.maxScrollOffset, Math.round((1 - ratioFromTop) * this.maxScrollOffset)));
-    if (nextOffset === this.scrollOffset) return;
-    const wasDraggingScrollbar = this.scrollbarDragging;
+
+    // Use scroll-state for the row→offset conversion
+    const offset = scrollOffsetForRow(this.scrollState, clampedRow, rows);
+    const nextState = scrollTo(this.scrollState, offset);
+    if (nextState === this.scrollState) return;
+
+    const wasDraggingScrollbar = this.sel.scrollbarDragging;
     this.clearSelection();
-    this.scrollbarDragging = wasDraggingScrollbar;
-    this.scrollOffset = nextOffset;
+    this.sel.scrollbarDragging = wasDraggingScrollbar;
+    this.scrollState = nextState;
     this.repaintScrollableViewport(this.lastRenderWidth || Math.max(1, this.terminal.columns || 80));
     this.requestRender();
   }
 
-  private selectionLocationForPacket(pkt: SgrPacket): SelectionLocation | null {
+  private selectionLocationForPacket(pkt: SgrPacket): { area: SelectionArea; point: Point } | null {
     if (pkt.row < 1) return null;
     const width = this.lastRenderWidth || Math.max(1, this.terminal.columns || 80);
     const mainWidth = this.getMainWidth(width);
@@ -1082,21 +1094,22 @@ export class FixedEditorCompositor {
   }
 
   private scrollSelectionAtViewportEdge(pkt: SgrPacket): boolean {
-    if (!this.selectionDragging || this.selectionArea !== "root" || !isLeftDrag(pkt)) return false;
+    if (!this.sel.dragging || this.sel.area !== "root" || !isLeftDrag(pkt)) return false;
 
     const delta = pkt.row <= 1 ? 1 : pkt.row >= this.visibleScrollableRows ? -1 : 0;
     if (delta === 0) return false;
 
-    const nextOffset = Math.max(0, Math.min(this.scrollOffset + delta, this.maxScrollOffset));
-    if (nextOffset === this.scrollOffset) return false;
+    const nextState = scrollStateBy(this.scrollState, delta);
+    if (nextState === this.scrollState) return false;
 
-    this.lastLeftPress = null;
-    this.preserveSelectionFocusOnRelease = true;
-    this.scrollOffset = nextOffset;
+    this.sel.lastLeftPress = null;
+    this.sel.preserveFocusOnRelease = true;
+    this.scrollState = nextState;
     const start = this.updateVisibleRootWindow();
     const edgeLine = delta > 0 ? start : start + Math.max(0, this.visibleScrollableRows - 1);
-    this.selectionFocus = { line: edgeLine, col: Math.max(0, pkt.col - 1) };
-    this.selectionHighlightVisible = true;
+    this.sel.focus = { line: edgeLine, col: Math.max(0, pkt.col - 1) };
+    this.sel.highlightVisible = true;
+    this.selectionState = extendSelection(this.selectionState, this.sel.focus, true);
     this.copySelectionIfChanged();
     this.repaintSelection();
     return true;
@@ -1104,7 +1117,7 @@ export class FixedEditorCompositor {
 
   private updateVisibleRootWindow(scrollableRows = this.visibleScrollableRows): number {
     const rows = Math.max(1, scrollableRows);
-    const retainedStart = Math.max(0, this.rootLines.length - rows - this.scrollOffset);
+    const retainedStart = Math.max(0, this.rootLines.length - rows - this.scrollState.offset);
     const visible = this.rootLines.slice(retainedStart, retainedStart + rows);
     const globalStart = this.rootLineBase + retainedStart;
     while (visible.length < rows) visible.push("");
@@ -1123,15 +1136,15 @@ export class FixedEditorCompositor {
 
   private copySelectionIfChanged(): string {
     const selectedText = this.getSelectedText();
-    if (!selectedText || selectedText === this.copiedSelectionText) return selectedText;
-    this.copiedSelectionText = selectedText;
+    if (!selectedText || selectedText === this.sel.copiedText) return selectedText;
+    this.sel.copiedText = selectedText;
     void this.hooks.onCopySelection?.(selectedText);
     return selectedText;
   }
 
   private repaintSelection(): void {
     const width = Math.max(1, this.terminal.columns || 80);
-    if (this.selectionArea === "cluster") {
+    if (this.sel.area === "cluster") {
       this.requestRepaint();
     } else {
       this.repaintScrollableViewport(width);
@@ -1139,7 +1152,7 @@ export class FixedEditorCompositor {
     this.requestRender();
   }
 
-  private clampedSelectionPointForPacket(pkt: SgrPacket, area: SelectionArea | null): SelectionPoint {
+  private clampedSelectionPointForPacket(pkt: SgrPacket, area: SelectionArea | null): Point {
     const width = this.lastRenderWidth || Math.max(1, this.terminal.columns || 80);
     const mainWidth = this.getMainWidth(width);
     if (area === "cluster") {
@@ -1164,21 +1177,22 @@ export class FixedEditorCompositor {
   }
 
   private decorateScrollbar(line: string, viewportIndex: number, width: number): string {
-    if (width <= 1 || this.maxScrollOffset <= 0 || this.visibleScrollableRows <= 1) return line;
+    if (width <= 1 || this.scrollState.maxOffset <= 0 || this.visibleScrollableRows <= 1) return line;
 
     const rows = Math.max(1, this.visibleScrollableRows);
-    const total = Math.max(rows, this.rootLines.length || this.lastRootLineCount);
-    const thumbRows = Math.max(1, Math.min(rows, Math.floor((rows * rows) / total)));
-    const travel = Math.max(0, rows - thumbRows);
-    const ratioFromTop = 1 - (this.scrollOffset / Math.max(1, this.maxScrollOffset));
-    const thumbStart = Math.max(0, Math.min(travel, Math.round(ratioFromTop * travel)));
-    const marker = viewportIndex >= thumbStart && viewportIndex < thumbStart + thumbRows ? SCROLLBAR_THUMB : SCROLLBAR_TRACK;
+    // Use scroll-state for scrollbar geometry calculation
+    const geo = scrollbarGeometry(this.scrollState, rows);
+    if (!geo) return line;
+
+    const marker = viewportIndex >= geo.start && viewportIndex < geo.start + geo.height
+      ? SCROLLBAR_THUMB
+      : SCROLLBAR_TRACK;
     return padLineToWidth(line, width - 1) + marker;
   }
 
   private renderSelectionHighlight(line: string, lineIndex: number, area: SelectionArea): string {
-    if (!this.selectionHighlightVisible) return line;
-    const range = this.getSelectionRangeForLine(lineIndex, area);
+    if (!this.sel.highlightVisible) return line;
+    const range = this.getSelectionRangeForLineDelegate(lineIndex, area);
     if (!range) return line;
 
     const plain = stripAnsi(line);
@@ -1190,62 +1204,6 @@ export class FixedEditorCompositor {
     const selected = sliceColumns(plain, startCol, endCol);
     const after = sliceColumns(plain, endCol, Number.POSITIVE_INFINITY);
     return `${before}\x1b[7m${selected}\x1b[27m${after}`;
-  }
-
-  private selectionLineWidth(area: SelectionArea, lineIndex: number): number {
-    if (area === "root") return visibleWidth(stripAnsi(this.rootLineAt(lineIndex)));
-    const lines = area === "sidebar" ? this.visibleSidebarLines : this.visibleClusterLines;
-    return visibleWidth(stripAnsi(lines[lineIndex] ?? ""));
-  }
-
-  private getSelectionRangeForLine(lineIndex: number, area: SelectionArea): { startCol: number; endCol: number } | null {
-    if (this.selectionArea !== area || !this.selectionAnchor || !this.selectionFocus) return null;
-    const start = compareSelectionPoints(this.selectionAnchor, this.selectionFocus) <= 0
-      ? this.selectionAnchor
-      : this.selectionFocus;
-    const end = start === this.selectionAnchor ? this.selectionFocus : this.selectionAnchor;
-    if (lineIndex < start.line || lineIndex > end.line) return null;
-    return {
-      startCol: lineIndex === start.line ? start.col : 0,
-      endCol: lineIndex === end.line ? end.col : Number.POSITIVE_INFINITY,
-    };
-  }
-
-  private isLocationInsideSelection(location: SelectionLocation | null): boolean {
-    if (!location || location.area !== this.selectionArea) return false;
-    const range = this.getSelectionRangeForLine(location.point.line, location.area);
-    return Boolean(range && location.point.col >= range.startCol && location.point.col < range.endCol);
-  }
-
-  private getSelectedText(): string {
-    if (!this.selectionArea || !this.selectionAnchor || !this.selectionFocus) return "";
-    const start = compareSelectionPoints(this.selectionAnchor, this.selectionFocus) <= 0
-      ? this.selectionAnchor
-      : this.selectionFocus;
-    const end = start === this.selectionAnchor ? this.selectionFocus : this.selectionAnchor;
-    if (start.line === end.line && start.col === end.col) return "";
-
-    const lines = this.selectionArea === "sidebar" ? this.visibleSidebarLines : this.visibleClusterLines;
-    const selected: string[] = [];
-    for (let lineIndex = start.line; lineIndex <= end.line; lineIndex++) {
-      const sourceLine = this.selectionArea === "root" ? this.rootLineAt(lineIndex) : lines[lineIndex] ?? "";
-      const line = stripAnsi(sourceLine);
-      const startCol = lineIndex === start.line ? start.col : 0;
-      const endCol = lineIndex === end.line ? end.col : Number.POSITIVE_INFINITY;
-      selected.push(sliceColumns(line, startCol, endCol));
-    }
-    return selected.join("\n").replace(/[ \t]+$/gm, "").trimEnd();
-  }
-
-  private clearSelection(): void {
-    this.selectionArea = null;
-    this.selectionAnchor = null;
-    this.selectionFocus = null;
-    this.selectionDragging = false;
-    this.selectionHighlightVisible = false;
-    this.preserveSelectionFocusOnRelease = false;
-    this.copiedSelectionText = null;
-    this.scrollbarDragging = false;
   }
 
   private pauseMouseReportingForContextMenu(textToRestoreToClipboard: string | null = null): void {
@@ -1285,9 +1243,11 @@ export class FixedEditorCompositor {
 
   private restoreTerminalState(): void {
     try {
-      this.originalWrite(emergencyTerminalModeReset());
+      this.terminalManager.writeRaw(emergencyTerminalModeReset());
     } catch {
       // Best-effort cleanup during exit
     }
   }
 }
+
+export { emergencyTerminalModeReset };
