@@ -182,10 +182,6 @@ export interface CompositorHooks {
   getShowHardwareCursor?: () => boolean;
   keyboardScrollShortcuts?: KeyboardScrollShortcuts;
   isStreaming?: () => boolean;
-  /** Optional cache key for cluster/footer content. Return a stable string
-   *  that changes when the cluster content changes; the compositor will skip
-   *  re-rendering the cluster when the key is unchanged. */
-  getRenderStateKey?: (width: number) => string;
 }
 
 export interface FixedEditorCompositorDiagnostics {
@@ -272,7 +268,7 @@ export class FixedEditorCompositor {
   private cachedCluster: FixedClusterOutput | null = null;
   private cachedWidth = 0;
   private cachedRawRows = 0;
-  private cachedClusterStateKey: string | null = null;
+
   // Root frame cache for streaming throttle
   private cachedRootFrame: RootFrameCache | null = null;
 
@@ -580,17 +576,6 @@ export class FixedEditorCompositor {
 
   private getCachedCluster(width: number, rawRows: number): FixedClusterOutput {
     const mainWidth = this.getMainWidth(width);
-    // Reuse the previous cluster if the hook says nothing relevant changed.
-    const stateKey = this.hooks.getRenderStateKey?.(mainWidth);
-    if (
-      this.cachedCluster &&
-      this.cachedWidth === width &&
-      this.cachedRawRows === rawRows &&
-      stateKey !== undefined &&
-      this.cachedClusterStateKey === stateKey
-    ) {
-      return this.cachedCluster;
-    }
     this.renderingCluster = true;
     try {
       const cluster = this.withTerminalColumns(mainWidth, () => {
@@ -609,7 +594,6 @@ export class FixedEditorCompositor {
 
       this.cachedWidth = width;
       this.cachedRawRows = rawRows;
-      this.cachedClusterStateKey = stateKey ?? null;
       this.cachedCluster = cluster;
       this.visibleClusterLines = this.cachedCluster.lines;
       return this.cachedCluster;
