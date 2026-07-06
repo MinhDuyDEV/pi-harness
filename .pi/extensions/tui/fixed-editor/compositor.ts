@@ -722,11 +722,9 @@ export class FixedEditorCompositor {
   }
 
   /** Intercepted tui.render — clip to scrollable window.
-   *  @param scrollOffsetDelta Optional extra offset to add after applying
-   *  content-growth adjustment. Used by scrollBy() to merge its scroll step
-   *  with the root render pass instead of rendering twice.
-   */
-  private renderScrollableRoot(width: number, scrollOffsetDelta: number = 0, bypassCache: boolean = false): string[] {
+   *  @param bypassCache When true, skip the root-frame cache and force a real
+   *  render. Used by jumpToTop()'s pre-render, which needs live maxOffset. */
+  private renderScrollableRoot(width: number, bypassCache: boolean = false): string[] {
     if (!this.originalTuiRender || this.disposed) {
       return this.originalTuiRender?.(width) ?? [];
     }
@@ -757,10 +755,9 @@ export class FixedEditorCompositor {
     );
 
     const now = Date.now();
-    const cached =
-      !bypassCache && scrollOffsetDelta === 0
-        ? this.reusableRootFrame(now, width, rawRows, mainWidth, cluster.lines.length)
-        : null;
+    const cached = !bypassCache
+      ? this.reusableRootFrame(now, width, rawRows, mainWidth, cluster.lines.length)
+      : null;
     if (cached) {
       this.rootRenderCacheHits++;
       this.visibleRootStart = cached.visibleRootStart;
@@ -792,9 +789,6 @@ export class FixedEditorCompositor {
     if (shouldAdjustOffset) {
       newOffset += grown;
     }
-    // Apply the caller's scroll step in the same pass so scrollBy() can avoid
-    // rendering the root window twice per scroll step.
-    newOffset += scrollOffsetDelta;
     newOffset = Math.max(0, Math.min(newOffset, newMax));
     // Mutate in place to avoid allocating a new ScrollState object on every
     // render (hot path during streaming and rapid scrolling).
@@ -912,27 +906,18 @@ export class FixedEditorCompositor {
 
   private scrollBy(delta: number): void {
     const width = Math.max(1, this.terminal.columns || 80);
+    this.renderScrollableRoot(width, 0, true); // bypass cache: needs live maxOffset
 
     // Inline scroll math and mutate in place to avoid ScrollState allocation.
     const nextOffset = Math.max(
       0,
       Math.min(this.scrollState.offset + delta, this.scrollState.maxOffset),
     );
-
-    // We avoid the expensive pre-render that existed in the original monolith by
-    // folding the scroll delta into the same render pass as the viewport repaint.
-    // The early-return for no-op scrolls is safe only once we know scroll bounds
-    // (maxOffset > 0). At the min/max boundaries we always proceed in case the
-    // bounds are stale from streaming content growth/shrink.
-    const atMax = this.scrollState.offset === this.scrollState.maxOffset;
-    const atMin = this.scrollState.offset === 0;
-    const blockedAtBoundary = (delta > 0 && atMax) || (delta < 0 && atMin);
-    if (this.scrollState.maxOffset > 0 && nextOffset === this.scrollState.offset && !blockedAtBoundary) {
-      return;
-    }
+    if (nextOffset === this.scrollState.offset) return;
 
     this.clearSelection();
-    this.repaintScrollableViewport(width, delta);
+    (this.scrollState as MutableScrollState).offset = nextOffset;
+    this.repaintScrollableViewport(width);
     this.requestRender();
   }
 
@@ -947,14 +932,14 @@ export class FixedEditorCompositor {
     return true;
   }
 
-  private repaintScrollableViewport(width: number, scrollOffsetDelta: number = 0): void {
+  private repaintScrollableViewport(width: number): void {
     if (this.disposed || this.painting || this.hasVisibleOverlay()) return;
 
     this.fullViewportRepaints++;
     const rawRows = this.getRawRows();
     const cluster = this.getCachedCluster(width, rawRows);
     const scrollableRows = Math.max(1, rawRows - cluster.lines.length);
-    const visible = this.renderScrollableRoot(width, scrollOffsetDelta);
+    const visible = this.renderScrollableRoot(width);
 
     this.painting = true;
     try {
