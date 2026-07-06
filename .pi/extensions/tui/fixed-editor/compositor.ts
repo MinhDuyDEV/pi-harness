@@ -255,6 +255,8 @@ export class FixedEditorCompositor {
   private visibleRootLines: string[] = [];
   private visibleClusterLines: string[] = [];
   private visibleSidebarLines: string[] = [];
+  private scrollbarThumbStart = 0;
+  private scrollbarThumbRows = 0;
   private lastRenderWidth = 0;
 
   // Cluster cache
@@ -730,8 +732,26 @@ export class FixedEditorCompositor {
     const cluster = this.getCachedCluster(width, rawRows);
     const scrollableRows = Math.max(1, rawRows - cluster.lines.length);
     const mainWidth = this.getMainWidth(width);
-    const now = Date.now();
 
+    // Precompute scrollbar geometry once per root render; decorateScrollbar
+    // uses these cached values instead of redoing the math for every line.
+    const total = Math.max(scrollableRows, this.rootLines.length || this.lastRootLineCount);
+    this.scrollbarThumbRows = Math.max(
+      1,
+      Math.min(scrollableRows, Math.floor((scrollableRows * scrollableRows) / total)),
+    );
+    const travel = Math.max(0, scrollableRows - this.scrollbarThumbRows);
+    this.scrollbarThumbStart = Math.max(
+      0,
+      Math.min(
+        travel,
+        Math.round(
+          (1 - this.scrollState.offset / Math.max(1, this.scrollState.maxOffset)) * travel,
+        ),
+      ),
+    );
+
+    const now = Date.now();
     const cached = this.reusableRootFrame(now, width, rawRows, mainWidth, cluster.lines.length);
     if (cached) {
       this.rootRenderCacheHits++;
@@ -1200,22 +1220,18 @@ export class FixedEditorCompositor {
   }
 
   private renderScrollableLine(line: string, lineIndex: number, viewportIndex: number, width: number): string {
-    const highlighted = this.renderSelectionHighlight(line, lineIndex, "root");
+    const highlighted = this.sel.highlightVisible
+      ? this.renderSelectionHighlight(line, lineIndex, "root")
+      : line;
     return this.decorateScrollbar(highlighted, viewportIndex, width);
   }
 
   private decorateScrollbar(line: string, viewportIndex: number, width: number): string {
     if (width <= 1 || this.scrollState.maxOffset <= 0 || this.visibleScrollableRows <= 1) return line;
 
-    const rows = Math.max(1, this.visibleScrollableRows);
-    const total = Math.max(rows, this.rootLines.length || this.lastRootLineCount);
-    const thumbRows = Math.max(1, Math.min(rows, Math.floor((rows * rows) / total)));
-    const travel = Math.max(0, rows - thumbRows);
-    const ratioFromTop = 1 - this.scrollState.offset / Math.max(1, this.scrollState.maxOffset);
-    const thumbStart = Math.max(0, Math.min(travel, Math.round(ratioFromTop * travel)));
-
     const marker =
-      viewportIndex >= thumbStart && viewportIndex < thumbStart + thumbRows
+      viewportIndex >= this.scrollbarThumbStart &&
+      viewportIndex < this.scrollbarThumbStart + this.scrollbarThumbRows
         ? SCROLLBAR_THUMB
         : SCROLLBAR_TRACK;
     return padLineToWidth(line, width - 1) + marker;
