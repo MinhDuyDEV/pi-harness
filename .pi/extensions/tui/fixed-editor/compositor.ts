@@ -66,7 +66,6 @@ import { TerminalManager } from "./terminal-manager.js";
 import {
   type ScrollState,
   createScrollState,
-  scrollbarGeometry,
   scrollOffsetForRow,
 } from "./scroll-state.js";
 type MutableScrollState = { -readonly [K in keyof ScrollState]: ScrollState[K] };
@@ -1193,13 +1192,16 @@ export class FixedEditorCompositor {
     if (width <= 1 || this.scrollState.maxOffset <= 0 || this.visibleScrollableRows <= 1) return line;
 
     const rows = Math.max(1, this.visibleScrollableRows);
-    // Use scroll-state for scrollbar geometry calculation
-    const geo = scrollbarGeometry(this.scrollState, rows);
-    if (!geo) return line;
+    const total = Math.max(rows, this.rootLines.length || this.lastRootLineCount);
+    const thumbRows = Math.max(1, Math.min(rows, Math.floor((rows * rows) / total)));
+    const travel = Math.max(0, rows - thumbRows);
+    const ratioFromTop = 1 - this.scrollState.offset / Math.max(1, this.scrollState.maxOffset);
+    const thumbStart = Math.max(0, Math.min(travel, Math.round(ratioFromTop * travel)));
 
-    const marker = viewportIndex >= geo.start && viewportIndex < geo.start + geo.height
-      ? SCROLLBAR_THUMB
-      : SCROLLBAR_TRACK;
+    const marker =
+      viewportIndex >= thumbStart && viewportIndex < thumbStart + thumbRows
+        ? SCROLLBAR_THUMB
+        : SCROLLBAR_TRACK;
     return padLineToWidth(line, width - 1) + marker;
   }
 
