@@ -59,7 +59,6 @@ import {
   beginSelection,
   extendSelection,
   finishSelection,
-  clearSelection,
   getSelectionRangeForLine,
   getSelectionText,
 } from "./selection-state.js";
@@ -67,8 +66,6 @@ import { TerminalManager } from "./terminal-manager.js";
 import {
   type ScrollState,
   createScrollState,
-  scrollBy as scrollStateBy,
-  scrollTo,
   scrollbarGeometry,
   scrollOffsetForRow,
 } from "./scroll-state.js";
@@ -387,7 +384,7 @@ export class FixedEditorCompositor {
     if (this.disposed || this.scrollState.offset === 0) return false;
     const width = Math.max(1, this.terminal.columns || 80);
     this.clearSelection();
-    this.scrollState = scrollTo(this.scrollState, 0);
+    (this.scrollState as Record<string, unknown>).offset = 0;
     this.repaintScrollableViewport(width);
     this.requestRender();
     return true;
@@ -469,8 +466,16 @@ export class FixedEditorCompositor {
   }
 
   private clearSelection(): void {
-    this.sel = createInteraction();
-    this.selectionState = clearSelection(this.selectionState);
+    this.sel.area = null;
+    this.sel.anchor = null;
+    this.sel.focus = null;
+    this.sel.dragging = false;
+    this.sel.highlightVisible = false;
+    this.sel.preserveFocusOnRelease = false;
+    this.sel.lastLeftPress = null;
+    this.sel.copiedText = null;
+    this.sel.scrollbarDragging = false;
+    this.selectionState = createSelectionState();
   }
 
   // ── Private: rendering helpers ─────────────────────────────────────────────
@@ -756,12 +761,14 @@ export class FixedEditorCompositor {
       newOffset += grown;
     }
     newOffset = Math.max(0, Math.min(newOffset, newMax));
-    this.scrollState = {
+    // Mutate in place to avoid allocating a new ScrollState object on every
+    // render (hot path during streaming and rapid scrolling).
+    Object.assign(this.scrollState as Record<string, unknown>, {
       offset: newOffset,
       maxOffset: newMax,
       totalLines: retainedLines.length,
       viewportRows: scrollableRows,
-    };
+    });
 
     const retainedStart = Math.max(0, retainedLines.length - scrollableRows - this.scrollState.offset);
     const visible = retainedLines.slice(retainedStart, retainedStart + scrollableRows);
@@ -780,7 +787,7 @@ export class FixedEditorCompositor {
       return padLineToWidth(main, mainWidth);
     });
 
-    if (this.canCacheRootFrame()) {
+    if (this.canCacheRootFrame() && STREAMING_ROOT_RENDER_THROTTLE_MS > 0) {
       this.cachedRootFrame = {
         width,
         rawRows,
@@ -866,11 +873,15 @@ export class FixedEditorCompositor {
     const width = Math.max(1, this.terminal.columns || 80);
     this.renderScrollableRoot(width);
 
-    const nextState = scrollStateBy(this.scrollState, delta);
-    if (nextState === this.scrollState) return;
+    // Inline scroll math and mutate in place to avoid ScrollState allocation.
+    const nextOffset = Math.max(
+      0,
+      Math.min(this.scrollState.offset + delta, this.scrollState.maxOffset),
+    );
+    if (nextOffset === this.scrollState.offset) return;
 
     this.clearSelection();
-    this.scrollState = nextState;
+    (this.scrollState as Record<string, unknown>).offset = nextOffset;
     this.repaintScrollableViewport(width);
     this.requestRender();
   }
@@ -880,7 +891,7 @@ export class FixedEditorCompositor {
     this.renderScrollableRoot(width);
     if (this.scrollState.offset === this.scrollState.maxOffset) return false;
     this.clearSelection();
-    this.scrollState = scrollTo(this.scrollState, this.scrollState.maxOffset);
+    (this.scrollState as Record<string, unknown>).offset = this.scrollState.maxOffset;
     this.repaintScrollableViewport(width);
     this.requestRender();
     return true;
@@ -1062,15 +1073,13 @@ export class FixedEditorCompositor {
     const rows = Math.max(1, this.visibleScrollableRows);
     const clampedRow = Math.max(1, Math.min(row, rows));
 
-    // Use scroll-state for the row→offset conversion
     const offset = scrollOffsetForRow(this.scrollState, clampedRow, rows);
-    const nextState = scrollTo(this.scrollState, offset);
-    if (nextState === this.scrollState) return;
+    if (offset === this.scrollState.offset) return;
 
     const wasDraggingScrollbar = this.sel.scrollbarDragging;
     this.clearSelection();
     this.sel.scrollbarDragging = wasDraggingScrollbar;
-    this.scrollState = nextState;
+    (this.scrollState as Record<string, unknown>).offset = offset;
     this.repaintScrollableViewport(this.lastRenderWidth || Math.max(1, this.terminal.columns || 80));
     this.requestRender();
   }
@@ -1099,12 +1108,16 @@ export class FixedEditorCompositor {
     const delta = pkt.row <= 1 ? 1 : pkt.row >= this.visibleScrollableRows ? -1 : 0;
     if (delta === 0) return false;
 
-    const nextState = scrollStateBy(this.scrollState, delta);
-    if (nextState === this.scrollState) return false;
+    // Inline scroll math and mutate in place to avoid ScrollState allocation.
+    const nextOffset = Math.max(
+      0,
+      Math.min(this.scrollState.offset + delta, this.scrollState.maxOffset),
+    );
+    if (nextOffset === this.scrollState.offset) return false;
 
     this.sel.lastLeftPress = null;
     this.sel.preserveFocusOnRelease = true;
-    this.scrollState = nextState;
+    (this.scrollState as Record<string, unknown>).offset = nextOffset;
     const start = this.updateVisibleRootWindow();
     const edgeLine = delta > 0 ? start : start + Math.max(0, this.visibleScrollableRows - 1);
     this.sel.focus = { line: edgeLine, col: Math.max(0, pkt.col - 1) };
