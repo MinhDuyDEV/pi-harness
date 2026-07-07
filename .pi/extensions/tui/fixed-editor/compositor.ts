@@ -78,7 +78,7 @@ const DOUBLE_CLICK_MS = 400;
 /** Maximum root lines retained for scroll-back (2000 matches original hard limit). */
 const MAX_RETAINED_ROOT_LINES = 2_000;
 
-/** Throttle root render cache reuse during streaming (0 = disabled). */
+/** Throttle root render cache reuse during streaming (0 = no root caching during streaming). */
 const STREAMING_ROOT_RENDER_THROTTLE_MS = 0;
 
 /** Root-frame cache TTL for non-streaming renders. A short window lets the
@@ -264,10 +264,11 @@ export class FixedEditorCompositor {
   private scrollbarThumbRows = 0;
   private lastRenderWidth = 0;
 
-  // Cluster cache
+  // Cluster cache — render-pass-scoped: computed once per doRender(), reused for all writes within that pass.
   private cachedCluster: FixedClusterOutput | null = null;
   private cachedWidth = 0;
   private cachedRawRows = 0;
+  private renderPassCluster: { width: number; rawRows: number; cluster: FixedClusterOutput } | null = null;
 
   // Root frame cache for streaming throttle
   private cachedRootFrame: RootFrameCache | null = null;
@@ -322,11 +323,13 @@ export class FixedEditorCompositor {
       onRender: (width) => this.renderScrollableRoot(width),
       onDoRender: () => {
         this.renderPassActive = true;
+        this.renderPassCluster = null;
         try {
           this.originalTuiDoRender?.();
           this.repaintFixedCluster();
         } finally {
           this.renderPassActive = false;
+          this.renderPassCluster = null;
         }
       },
     });
@@ -384,6 +387,18 @@ export class FixedEditorCompositor {
     }
 
     this.restoreTerminalState();
+  }
+
+  /** Jump scroll to center (offset = maxOffset / 2). */
+  private jumpToCenter(): boolean {
+    const width = Math.max(1, this.terminal.columns || 80);
+    this.renderScrollableRoot(width, true); // bypass cache: needs live maxOffset
+    if (this.disposed || this.scrollState.maxOffset <= 0) return false;
+    this.clearSelection();
+    (this.scrollState as MutableScrollState).offset = Math.floor(this.scrollState.maxOffset / 2);
+    this.repaintScrollableViewport(width);
+    this.requestRender();
+    return true;
   }
 
   /** Jump scroll to bottom (offset = 0). */
@@ -575,6 +590,10 @@ export class FixedEditorCompositor {
   }
 
   private getCachedCluster(width: number, rawRows: number): FixedClusterOutput {
+    if (this.renderPassCluster && this.renderPassCluster.width === width && this.renderPassCluster.rawRows === rawRows) {
+      this.visibleClusterLines = this.renderPassCluster.cluster.lines;
+      return this.renderPassCluster.cluster;
+    }
     const mainWidth = this.getMainWidth(width);
     this.renderingCluster = true;
     try {
@@ -595,6 +614,9 @@ export class FixedEditorCompositor {
       this.cachedWidth = width;
       this.cachedRawRows = rawRows;
       this.cachedCluster = cluster;
+      if (this.renderPassActive) {
+        this.renderPassCluster = { width, rawRows, cluster };
+      }
       this.visibleClusterLines = this.cachedCluster.lines;
       return this.cachedCluster;
     } finally {
@@ -878,11 +900,6 @@ export class FixedEditorCompositor {
   private handleInput(data: string): { consume?: boolean; data?: string } | undefined {
     if (this.disposed || this.hasVisibleOverlay()) return undefined;
 
-    // Transform Shift+Enter and Ctrl+J to a plain newline.
-    if (isNewlineKey(data)) {
-      return { data: "\n" };
-    }
-
     const packets = parseSgrMouse(data);
     if (packets) {
       let consumed = false;
@@ -892,13 +909,20 @@ export class FixedEditorCompositor {
       return consumed ? { consume: true } : undefined;
     }
 
-    // Keyboard scroll/navigation — page, configured shortcuts, and top/bottom jumps.
+    // Keyboard scroll/navigation — checked BEFORE newline so ctrl+j/ctrl+k
+    // can be claimed for jump-to-top/jump-to-bottom.
     const action = parseScrollAction(data, this.hooks.keyboardScrollShortcuts);
     if (action) {
-      if (action.kind === "scroll") this.scrollBy(action.delta);
-      if (action.kind === "top") this.jumpToTop();
-      if (action.kind === "bottom") this.jumpToBottom();
+      if (action.kind === 'scroll') this.scrollBy(action.delta);
+      if (action.kind === 'top') this.jumpToTop();
+      if (action.kind === 'center') this.jumpToCenter();
+      if (action.kind === 'bottom') this.jumpToBottom();
       return { consume: true };
+    }
+
+    // Transform Shift+Enter and Ctrl+J to a plain newline.
+    if (isNewlineKey(data)) {
+      return { data: "\n" };
     }
 
     return undefined;
@@ -906,7 +930,7 @@ export class FixedEditorCompositor {
 
   private scrollBy(delta: number): void {
     const width = Math.max(1, this.terminal.columns || 80);
-    this.renderScrollableRoot(width, 0, true); // bypass cache: needs live maxOffset
+    this.renderScrollableRoot(width, true); // bypass cache: needs live maxOffset
 
     // Inline scroll math and mutate in place to avoid ScrollState allocation.
     const nextOffset = Math.max(
@@ -923,7 +947,7 @@ export class FixedEditorCompositor {
 
   private jumpToTop(): boolean {
     const width = Math.max(1, this.terminal.columns || 80);
-    this.renderScrollableRoot(width, 0, true); // bypass cache: needs live maxOffset
+    this.renderScrollableRoot(width, true); // bypass cache: needs live maxOffset
     if (this.scrollState.offset === this.scrollState.maxOffset) return false;
     this.clearSelection();
     (this.scrollState as MutableScrollState).offset = this.scrollState.maxOffset;

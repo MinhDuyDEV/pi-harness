@@ -17,6 +17,7 @@ export interface KeyboardScrollShortcuts {
 export type ScrollAction =
   | { kind: "scroll"; delta: number }
   | { kind: "top" }
+  | { kind: "center" }
   | { kind: "bottom" };
 
 export const DEFAULT_KEYBOARD_SCROLL_SHORTCUTS: Required<KeyboardScrollShortcuts> = {
@@ -54,12 +55,20 @@ export function parseScrollAction(
   if (
     matchesConfiguredShortcut(data, top) ||
     matchesKey(data, "ctrl+shift+home") ||
-    /^\x1b\[(?:1;6(?::[12])?H|57423;6(?::[12])?u|7;6(?::[12])?~)$/.test(data)
+    /^\x1b\[(?:1;6(?::[12])?H|57423;6(?::[12])?u|7;6(?::[12])?~)$/.test(data) ||
+    matchesKey(data, "f3") ||
+    /^\x1b\[13~$/.test(data)
   ) return { kind: "top" };
+  if (
+    matchesKey(data, "f4") ||
+    /^\x1b\[14~$/.test(data)
+  ) return { kind: "center" };
   if (
     matchesConfiguredShortcut(data, bottom) ||
     matchesKey(data, "ctrl+shift+end") ||
-    /^\x1b\[(?:1;6(?::[12])?F|57424;6(?::[12])?u|8;6(?::[12])?~)$/.test(data)
+    /^\x1b\[(?:1;6(?::[12])?F|57424;6(?::[12])?u|8;6(?::[12])?~)$/.test(data) ||
+    matchesKey(data, "f5") ||
+    /^\x1b\[15~$/.test(data)
   ) return { kind: "bottom" };
 
   if (

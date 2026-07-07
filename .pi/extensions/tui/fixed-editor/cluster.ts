@@ -1,11 +1,15 @@
 /**
- * Fixed-editor cluster: packs editor + status lines into reserved bottom rows.
+ * Fixed-editor cluster: packs editor + status + footer into reserved bottom rows.
  *
- * The cluster layout (bottom to top priority):
- *   1. Editor lines (always — capped to fit)
- *   2. Status line (working/thinking indicator, shown above editor)
- *   3. Transcript lines (bash output, shown above status)
+ * Layout (top to bottom):
+ *   [status]        — working/thinking indicator
+ *   [above widgets] — queue + widgets above editor
+ *   [footer]        — model label, tokens, cost (above editor to avoid streaming overlap)
+ *   [editor]        — input editor
+ *   [below widgets] — todos widget
+ *   [transcript]    — bash output
  *
+ * Allocation priority: editor > footer > above > below > status > transcript.
  * Cursor marker extraction is also handled here so the compositor
  * can paint a hardware cursor when one is available.
  */
@@ -99,16 +103,16 @@ export function extractCursor(lines: string[]): FixedClusterOutput {
  * Layout (top to bottom):
  *   [status]        — Pi working/status container
  *   [above widgets] — widgets above editor
+ *   [footer]        — Pi/custom footer (above editor to avoid streaming overlap)
  *   [editor]        — whole editor container, including autocomplete replacements
  *   [below widgets] — widgets below editor
  *   [transcript]    — optional fixed transcript lines
- *   [footer]        — Pi/custom footer at the physical bottom
  */
 export function renderFixedCluster(input: FixedClusterInput): FixedClusterOutput {
   const { width } = input;
   const maxRows = Math.max(1, Math.min(input.terminalRows - 1, MAX_CLUSTER_ROWS));
 
-  // Editor gets first claim. Footer/status/widgets only use leftover rows.
+  // Editor+footer get first claim; other widgets use leftover rows.
   let remaining = maxRows;
 
   const editorLines = pinEditorLines(norm(input.editorLines, width), remaining);
@@ -128,5 +132,5 @@ export function renderFixedCluster(input: FixedClusterInput): FixedClusterOutput
 
   const transcript = takeTail(norm(input.transcriptLines, width), remaining);
 
-  return extractCursor([...status, ...above, ...editorLines, ...below, ...transcript, ...footerLines]);
+  return extractCursor([...status, ...above, ...footerLines, ...editorLines, ...below, ...transcript]);
 }
