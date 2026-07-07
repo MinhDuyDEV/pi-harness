@@ -206,24 +206,6 @@ export interface FixedEditorCompositorDiagnostics {
   clusterOnlyRepaints: number;
   rootRenderCacheHits: number;
   rootRenderCacheMisses: number;
-  // Profile aggregates (total ms, count, max ms) for the hot methods.
-  // Use these to find the slow step during streaming scroll lag.
-  writeTotalMs: number;
-  writeCount: number;
-  writeMaxMs: number;
-  writeAvgMs: number;
-  scrollRepaintTotalMs: number;
-  scrollRepaintCount: number;
-  scrollRepaintMaxMs: number;
-  scrollRepaintAvgMs: number;
-  rootRenderTotalMs: number;
-  rootRenderCount: number;
-  rootRenderMaxMs: number;
-  rootRenderAvgMs: number;
-  clusterRenderTotalMs: number;
-  clusterRenderCount: number;
-  clusterRenderMaxMs: number;
-  clusterRenderAvgMs: number;
   streamingRootRenderThrottleMs: number;
   streamingClusterRepaintThrottleMs: number;
 }
@@ -304,22 +286,6 @@ export class FixedEditorCompositor {
   private rootRenderCacheHits = 0;
   private rootRenderCacheMisses = 0;
 
-  // Profile aggregates (total ms, count, max ms). performance.now() deltas
-  // around the hot methods let diagnostics pinpoint the slow step during
-  // streaming scroll lag. No per-call I/O.
-  private writeTotalMs = 0;
-  private writeCount = 0;
-  private writeMaxMs = 0;
-  private scrollRepaintTotalMs = 0;
-  private scrollRepaintCount = 0;
-  private scrollRepaintMaxMs = 0;
-  private rootRenderTotalMs = 0;
-  private rootRenderCount = 0;
-  private rootRenderMaxMs = 0;
-  private clusterRenderTotalMs = 0;
-  private clusterRenderCount = 0;
-  private clusterRenderMaxMs = 0;
-
   constructor(tui: any, terminal: any, hooks: CompositorHooks) {
     this.tui = tui;
     this.terminal = terminal;
@@ -358,9 +324,7 @@ export class FixedEditorCompositor {
         this.renderPassActive = true;
         try {
           this.originalTuiDoRender?.();
-          // Cluster is now painted by the write interceptor in the same
-          // synchronized block as the data, so we no longer call
-          // repaintFixedCluster() here.
+          this.repaintFixedCluster();
         } finally {
           this.renderPassActive = false;
         }
@@ -461,23 +425,7 @@ export class FixedEditorCompositor {
       fullViewportRepaints: this.fullViewportRepaints,
       clusterOnlyRepaints: this.clusterOnlyRepaints,
       rootRenderCacheHits: this.rootRenderCacheHits,
-rootRenderCacheMisses: this.rootRenderCacheMisses,
-      writeTotalMs: this.writeTotalMs,
-      writeCount: this.writeCount,
-      writeMaxMs: this.writeMaxMs,
-      writeAvgMs: this.writeCount > 0 ? this.writeTotalMs / this.writeCount : 0,
-      scrollRepaintTotalMs: this.scrollRepaintTotalMs,
-      scrollRepaintCount: this.scrollRepaintCount,
-      scrollRepaintMaxMs: this.scrollRepaintMaxMs,
-      scrollRepaintAvgMs: this.scrollRepaintCount > 0 ? this.scrollRepaintTotalMs / this.scrollRepaintCount : 0,
-      rootRenderTotalMs: this.rootRenderTotalMs,
-      rootRenderCount: this.rootRenderCount,
-      rootRenderMaxMs: this.rootRenderMaxMs,
-      rootRenderAvgMs: this.rootRenderCount > 0 ? this.rootRenderTotalMs / this.rootRenderCount : 0,
-      clusterRenderTotalMs: this.clusterRenderTotalMs,
-      clusterRenderCount: this.clusterRenderCount,
-      clusterRenderMaxMs: this.clusterRenderMaxMs,
-      clusterRenderAvgMs: this.clusterRenderCount > 0 ? this.clusterRenderTotalMs / this.clusterRenderCount : 0,
+      rootRenderCacheMisses: this.rootRenderCacheMisses,
       streamingRootRenderThrottleMs: STREAMING_ROOT_RENDER_THROTTLE_MS,
       streamingClusterRepaintThrottleMs: 0,
     };
@@ -628,7 +576,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
 
   private getCachedCluster(width: number, rawRows: number): FixedClusterOutput {
     const mainWidth = this.getMainWidth(width);
-    const _clusterStart = performance.now();
     this.renderingCluster = true;
     try {
       const cluster = this.withTerminalColumns(mainWidth, () => {
@@ -648,10 +595,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
       this.cachedWidth = width;
       this.cachedRawRows = rawRows;
       this.cachedCluster = cluster;
-      const _clusterMs = performance.now() - _clusterStart;
-      this.clusterRenderTotalMs += _clusterMs;
-      this.clusterRenderCount++;
-      if (_clusterMs > this.clusterRenderMaxMs) this.clusterRenderMaxMs = _clusterMs;
       this.visibleClusterLines = this.cachedCluster.lines;
       return this.cachedCluster;
     } finally {
@@ -734,7 +677,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
 
   /** Intercepted terminal.write. */
   private write(data: string): void {
-    const _writeStart = performance.now();
     this.interceptedWrites++;
     const overlayVisible = this.hasVisibleOverlay();
     if (this.painting || this.disposed || overlayVisible) {
@@ -761,15 +703,11 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
       const scrollBottom = rawRows - clusterHeight;
       this.syncScrollRegion(scrollBottom);
 
-      // Paint the cluster in the same synchronized block as the data. The
-      // previous design let repaintFixedCluster() do this in a second write,
-      // which left a one-frame window where the terminal showed the root
-      // without the cluster at the correct scroll region — the visible
-      // symptom was the editor footer overlapping the last root line during
-      // streaming. Keeping the paint atomic with the data write eliminates
-      // the race between getCachedCluster() calls in the two paths.
-      this.clusterOnlyRepaints++;
-      const body = data + this.paintCluster(cluster, rawRows, width) + this.paintSidebarOverlay(width, rawRows);
+      // During render pass, write data only — repaintFixedCluster() paints cluster + sidebar afterward.
+      // Outside render pass, append cluster paint and sidebar overlay to data.
+      const body = this.renderPassActive
+        ? data
+        : data + this.paintCluster(cluster, rawRows, width) + this.paintSidebarOverlay(width, rawRows);
       this.originalWrite(
         beginSynchronizedOutput() +
           disableAutoWrap() +
@@ -781,10 +719,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
     } finally {
       this.painting = false;
     }
-    const _writeMs = performance.now() - _writeStart;
-    this.writeTotalMs += _writeMs;
-    this.writeCount++;
-    if (_writeMs > this.writeMaxMs) this.writeMaxMs = _writeMs;
   }
 
   /** Intercepted tui.render — clip to scrollable window.
@@ -797,7 +731,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
 
     this.rootRenderPasses++;
     this.lastRenderWidth = Math.max(1, width);
-    const _rootRenderStart = performance.now();
     const rawRows = this.getRawRows();
     const cluster = this.getCachedCluster(width, rawRows);
     const scrollableRows = Math.max(1, rawRows - cluster.lines.length);
@@ -900,10 +833,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
       this.cachedRootFrame = null;
     }
 
-    const _rootRenderMs = performance.now() - _rootRenderStart;
-    this.rootRenderTotalMs += _rootRenderMs;
-    this.rootRenderCount++;
-    if (_rootRenderMs > this.rootRenderMaxMs) this.rootRenderMaxMs = _rootRenderMs;
     return rendered;
   }
 
@@ -1004,7 +933,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
   }
 
   private repaintScrollableViewport(width: number): void {
-    const _repaintStart = performance.now();
     if (this.disposed || this.painting || this.hasVisibleOverlay()) return;
 
     this.fullViewportRepaints++;
@@ -1034,10 +962,6 @@ rootRenderCacheMisses: this.rootRenderCacheMisses,
     } finally {
       this.painting = false;
     }
-    const _repaintMs = performance.now() - _repaintStart;
-    this.scrollRepaintTotalMs += _repaintMs;
-    this.scrollRepaintCount++;
-    if (_repaintMs > this.scrollRepaintMaxMs) this.scrollRepaintMaxMs = _repaintMs;
   }
 
   private handleMousePacket(pkt: SgrPacket): boolean {

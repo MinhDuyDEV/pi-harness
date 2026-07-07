@@ -133,30 +133,24 @@ test("streaming every render pass calls originalTuiRender (no root cache)", () =
 });
 
 test("cluster repaint fires on every render pass (no time throttle, recomputation cached)", () => {
-      const fixture = makeCompositor({
-        rows: 5,
-        clusterLines: ["editor"],
-        isStreaming: true,
-      });
+  const fixture = makeCompositor({
+    rows: 5,
+    clusterLines: ["editor"],
+    isStreaming: true,
+  });
 
-      // Wire the fake doRender to actually write to the terminal so the
-      // write interceptor runs and paints the cluster (the cluster is now
-      // painted in the same synchronized block as the data, not by a
-      // separate repaintFixedCluster call from onDoRender).
-      fixture.tui.doRender = () => {
-        fixture.terminal.write("render-pass\n");
-      };
+  for (let i = 0; i < 10; i++) fixture.tui.doRender();
 
-      for (let i = 0; i < 10; i++) fixture.tui.doRender();
+  assert.equal(
+    fixture.compositor.getDiagnostics().clusterOnlyRepaints,
+    10,
+    "every doRender paints the cluster from cache — no throttle skip, no footer flashing",
+  );
 
-      assert.equal(
-        fixture.compositor.getDiagnostics().clusterOnlyRepaints,
-        10,
-        "every doRender writes to the terminal and the write interceptor paints the cluster - no throttle skip, no footer flashing",
-      );
+  fixture.compositor.dispose();
+});
 
-      fixture.compositor.dispose();
-    });test("keyboard scroll recognizes Kitty/super fallback sequences", () => {
+test("keyboard scroll recognizes Kitty/super fallback sequences", () => {
   const fixture = makeCompositor({ rows: 6 });
   assert.deepEqual(fixture.input("\x1b[5;9~"), { consume: true });
   assert.ok(fixture.requestRenderCount() > 0, "super/page-up fallback scrolls and requests render");
