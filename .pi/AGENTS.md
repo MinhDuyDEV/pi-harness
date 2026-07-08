@@ -1,11 +1,11 @@
-# Project Agent Rules
+# Agent Rules
 
 ## Behavioral Kernel
 
 Always-on execution loop. Stays active even when the rest of the prompt is noisy.
 
 1. **Map your unknowns before acting.** Classify the gap: known knowns (in the prompt), known unknowns (ask), unknown knowns (you'd recognize it if you saw it — show 2–4 variants or point at a reference), unknown unknowns (ask the model to teach you the criteria). Ambiguous → state assumptions or ask. Simpler approach exists → say so.
-2. **Smallest working change, scoped to known territory.** Direct fix first when the problem is well-defined. For novel / design-heavy / unclear work the smallest change is wrong — prototype, show variants, interview, or blindspot-pass *before* editing. No speculative abstractions, no error handling for impossible scenarios.
+2. **Smallest working change, scoped to known territory.** Direct fix first when the problem is well-defined. For novel / design-heavy / unclear work the smallest change is wrong — prototype, show variants, interview, or blindspot-pass _before_ editing. No speculative abstractions, no error handling for impossible scenarios.
 3. **Surgical diffs only.** Every changed line traces to the current request. Match existing style. Remove imports/vars your changes made unused. Unrelated issues get `NOTICED BUT NOT TOUCHING: ...` and move on. Do not fix unrelated broken windows.
 4. **Define proof before acting.** For non-trivial work, name the success check before implementing, verify after. Multi-step: `1. [step] → verify: [check]`.
 
@@ -24,21 +24,19 @@ Skip steps 2–5 for well-scoped bugs.
 
 ## Edit Protocol
 
-1. **LOCATE** — find exact position.
-2. **READ** with `hashline_read` (not `read`/`cat`/`sed`). Output is `HASH│content` per line. Schema: `{path, startLine?, endLine?}` (1-indexed, inclusive). Use `read` only for read-only inspection.
-3. **VERIFY** — expected content exists, note the `HASH` values for the lines you intend to change.
-4. **PREPARE** the edit payload:
-   - **Hashline path** (preferred): call `hashline_edit` with `{path, hashlineChanges: [{hash_range_inclusive: [start, end], content_lines: [...]}]}` using hashes from step 2. This is a separate tool registered by pi-diff to bypass the harness `edit` tool's schema validation.
-   - **Legacy path** (fallback only): call `edit` with `{edits: [{oldText, newText}]}` for trivial one-liners or when `hashline_read` is unavailable.
-5. **EDIT** — call `edit` with the prepared payload.
-6. **CONFIRM** — re-read with `hashline_read` to verify hashes shifted as expected.
-7. **ORPHANS** — remove imports/vars/functions your changes made unused. Don't touch pre-existing dead code.
+1. **LOCATE** — find the exact file and lines with `rg -n`/`grep`.
+2. **READ** — inspect the exact region with `read` before editing. Use narrow ranges when possible.
+3. **VERIFY** — confirm the exact old text to replace. If using `edit`, confirm the target text is unique and that whitespace/indentation are correct.
+4. **CHOOSE tool** based on scope:
+   - **Single-file, one block** → `edit` with `{path, oldString, newText}` (or `{path, oldText, newText}`).
+   - **Same file, several nearby changes** → one merged `edit`.
+   - **Several distant changes, multi-file work, or add/delete/move** → `apply_patch` with `{changes: [{path, action, ...}]}`.
+5. **EDIT** — make the smallest exact change. Do not include large unchanged regions just to bridge distant edits.
+6. **CONFIRM** — re-read the changed region and verify the intended result landed.
+7. **ORPHANS** — remove imports/vars/functions your change made unused. Don't touch pre-existing dead code.
+8. **STALE VIEW RULE** — if a replacement fails, assume your view may be stale. Re-read the exact region before retrying.
 
-Steps 2–4 are never optional. On failure: re-read with `hashline_read`, retry with new hashes. After 2 consecutive failures, escalate. Use `hashline_edit` (not `edit`) for hashline changes — the harness `edit` tool's schema rejects `hashlineChanges`.
-
-**Always prefer `hashline_edit`.** Kills 5 failure modes: hallucinated `oldString`, stale view (`E_STALE_ANCHOR`), ambiguous match (perfect hashing `:R{n}` suffix), CRLF/whitespace drift (canonical content), no anchor (every line has a unique hash).
-
-**Error recovery:** `E_STALE_ANCHOR` → re-read, use new anchors. `W_BOUNDARY_DUP` → review the dup. `E_OVERLAP` → split into non-overlapping edits. `E_BAD_RANGE` → swap start/end. `E_EMPTY` → add at least one entry.
+Steps 2–4 are never optional. If multiple changes touch the same block or nearby lines, merge them into one edit. After 2 consecutive failures on the same block, stop and present options.
 
 ## Communication
 
@@ -54,12 +52,13 @@ Steps 2–4 are never optional. On failure: re-read with `hashline_read`, retry 
 
 ## Tools
 
-- Never use `sed`/`cat`/`head`/`tail`. Use `read` (offset/limit) or `hashline_read` (`startLine`/`endLine`, use when you intend to edit). Omit offset/limit when reading in full. For PR diffs, use `gh pr diff`.
-- `hashline_edit` — strict, atomic, content-anchored. Prefer this over `edit`'s `oldText`/`newText` for any multi-line or important edit. Registered by pi-diff to bypass the harness `edit` schema.
+- Never use `sed`/`cat`/`head`/`tail`. Use `read` (`startLine`/`endLine` to narrow scope). Omit offset/limit when reading in full. For PR diffs, use `gh pr diff`.
+- `edit` — single-file, single-replacement. Uses cascading text matching (exact → trimmed → fuzzy).
+- `apply_patch` — multi-file batch engine. One call can add, update, delete, or move multiple files atomically. Schema: `{changes: [{path, action, content?, oldText?, newText?, movePath?}]}`. Actions: `add`, `update`, `delete`, `move`.
 
 ## Search
 
-`rg -n` for text search. Dedicated `grep`/`multi_grep` for one-shots. Structural/AST: `skills/ast-grep/SKILL.md`. Full cheatsheet: `skills/rg/SKILL.md`.
+`rg -n` for text search. Dedicated `grep` for one-shots.
 
 **Never use shell `grep`/`egrep`/`fgrep`/`git grep`/`find -exec grep`/`awk`/`sed` for text search** — use `rg -n` or the dedicated `grep` tool. Always `-n`. Always scope by path/glob.
 
@@ -90,12 +89,12 @@ Pi lists available skills in the system prompt with name + description. Before n
 
 ## Constraints
 
-| Concern | Rule |
-|---------|------|
-| Security | Never expose or invent credentials. |
-| Git safety | Never force-push main/master; never bypass hooks. |
-| Git restore | Never `reset --hard`, `checkout .`, `clean -fd` without explicit request. |
-| Honesty | Never fabricate tool output; never guess URLs; label inferences. |
-| Paths | Use absolute paths for file operations. |
-| Search | Never use shell `grep`/`egrep`/`fgrep`/`git grep` in `bash`. Use `rg -n` or the dedicated `grep` tool. |
-| Reversibility | Ask first before destructive or irreversible actions. |
+| Concern       | Rule                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| Security      | Never expose or invent credentials.                                                                    |
+| Git safety    | Never force-push main/master; never bypass hooks.                                                      |
+| Git restore   | Never `reset --hard`, `checkout .`, `clean -fd` without explicit request.                              |
+| Honesty       | Never fabricate tool output; never guess URLs; label inferences.                                       |
+| Paths         | Use absolute paths for file operations.                                                                |
+| Search        | Never use shell `grep`/`egrep`/`fgrep`/`git grep` in `bash`. Use `rg -n` or the dedicated `grep` tool. |
+| Reversibility | Ask first before destructive or irreversible actions.                                                  |
