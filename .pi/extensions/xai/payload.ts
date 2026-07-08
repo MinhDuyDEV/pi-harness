@@ -1,6 +1,6 @@
 import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { normalizeXaiImageInput } from "./images";
-import { grokSupportsReasoningEffort, isGrokCliProxyModel } from "./models";
+import { grokSupportsReasoningEffort, isGrokCliProxyModel, normalizedXaiModelId } from "./models";
 import { textFromResponsesContent } from "./text";
 
 function normalizeResponsesImageParts(value: unknown): unknown {
@@ -92,6 +92,54 @@ function normalizeXaiResponsesInput(input: unknown[], model: Model<Api>): unknow
 }
 
 /** Rewrite generic OpenAI Responses payloads into xAI-compatible payloads. */
+function hoistInstructionsFromInput(
+  input: Record<string, any>[],
+  usesGrokCliProxy: boolean,
+): { input: Record<string, any>[]; instructionParts: string[] } {
+  const instructionParts: string[] = [];
+  if (usesGrokCliProxy) {
+    const filtered = input.filter((item) => {
+      if (!item || typeof item !== "object") return true;
+      if (item.type === "reasoning") return false;
+      if (typeof item.content === "string" && item.content.length === 0) return false;
+      if (item.role !== "developer" && item.role !== "system") return true;
+      const text = textFromResponsesContent(item.content).trim();
+      if (text) instructionParts.push(text);
+      return false;
+    });
+    return { input: filtered, instructionParts };
+  }
+
+  const next = [...input];
+  while (next.length > 0) {
+    const first = next[0];
+    if (!first || typeof first !== "object" || (first.role !== "developer" && first.role !== "system")) break;
+    const text = textFromResponsesContent(first.content).trim();
+    if (text) instructionParts.push(text);
+    next.shift();
+  }
+  return { input: next, instructionParts };
+}
+
+function normalizeReasoningEffort(body: Record<string, any>, modelId: string): void {
+  if (!body.reasoning || typeof body.reasoning !== "object") return;
+  const effort = typeof body.reasoning.effort === "string" ? body.reasoning.effort : null;
+  const normalizedModelId = normalizedXaiModelId(modelId);
+  if (effort && grokSupportsReasoningEffort(modelId)) {
+    if (effort === "minimal") {
+      body.reasoning = { effort: "low" };
+    } else if ((effort === "none" || effort === "off") && normalizedModelId.startsWith("grok-4.5")) {
+      body.reasoning = { effort: "low" };
+    } else if (effort !== "none" && effort !== "off") {
+      body.reasoning = { effort };
+    } else {
+      delete body.reasoning;
+    }
+  } else {
+    delete body.reasoning;
+  }
+}
+
 export function rewriteXaiResponsesPayload(payload: unknown, model: Model<Api>, options?: SimpleStreamOptions): unknown {
   if (!payload || typeof payload !== "object") return payload;
   const body: Record<string, any> = { ...(payload as Record<string, any>) };
@@ -103,35 +151,12 @@ export function rewriteXaiResponsesPayload(payload: unknown, model: Model<Api>, 
   // same Grok OAuth path with top-level instructions; xAI also rejects
   // image arrays in function_call_output.output, so normalize those here.
   if (Array.isArray(body.input)) {
-    let input = normalizeXaiResponsesInput([...body.input], model) as Record<string, any>[];
-    const instructionParts: string[] = [];
-
-    if (usesGrokCliProxy) {
-      input = input.filter((item) => {
-        if (!item || typeof item !== "object") return true;
-        if (item.type === "reasoning") return false;
-        if (typeof item.content === "string" && item.content.length === 0) return false;
-        if (item.role !== "developer" && item.role !== "system") return true;
-        const text = textFromResponsesContent(item.content).trim();
-        if (text) instructionParts.push(text);
-        return false;
-      });
-    } else {
-      while (input.length > 0) {
-        const first = input[0];
-        if (!first || typeof first !== "object" || (first.role !== "developer" && first.role !== "system")) break;
-        const text = textFromResponsesContent(first.content).trim();
-        if (text) instructionParts.push(text);
-        input.shift();
-      }
-    }
-
+    const normalized = normalizeXaiResponsesInput([...body.input], model) as Record<string, any>[];
+    const { input, instructionParts } = hoistInstructionsFromInput(normalized, usesGrokCliProxy);
     if (instructionParts.length > 0) {
       body.instructions = [body.instructions, ...instructionParts].filter((part) => typeof part === "string" && part).join("\n\n");
     }
     body.input = input;
-  } else if (typeof body.input === "string") {
-    // String input is valid and should stay string-shaped.
   }
 
   if (body.response_format && !body.text) {
@@ -139,14 +164,7 @@ export function rewriteXaiResponsesPayload(payload: unknown, model: Model<Api>, 
     delete body.response_format;
   }
 
-  if (body.reasoning && typeof body.reasoning === "object") {
-    const effort = body.reasoning.effort;
-    if (typeof effort === "string" && effort !== "none" && grokSupportsReasoningEffort(modelId)) {
-      body.reasoning = { effort: effort === "minimal" ? "low" : effort };
-    } else {
-      delete body.reasoning;
-    }
-  }
+  normalizeReasoningEffort(body, modelId);
 
   if (usesGrokCliProxy && Array.isArray(body.include)) {
     body.include = body.include.filter((item: unknown) => item !== "reasoning.encrypted_content");
@@ -160,3 +178,4 @@ export function rewriteXaiResponsesPayload(payload: unknown, model: Model<Api>, 
 
   return body;
 }
+

@@ -11,6 +11,15 @@ import {
 
 export const MODELS = [
   {
+    id: "grok-4.5",
+    name: "Grok 4.5",
+    reasoning: true,
+    input: ["text", "image"],
+    cost: { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 },
+    contextWindow: 500_000,
+    maxTokens: 131_072,
+  },
+  {
     id: "grok-4.3",
     name: "Grok 4.3",
     reasoning: true,
@@ -101,12 +110,10 @@ export function isGrokCliProxyModel(modelId: string): boolean {
   return normalized === "grok-build" || normalized === "grok-composer-2.5-fast";
 }
 
-/** Resolve the base URL used by a model. */
 export function xaiBaseUrlForModel(modelId: string): string {
   return isGrokCliProxyModel(modelId) ? XAI_CLI_BASE_URL : XAI_API_BASE_URL;
 }
 
-/** Resolve the Responses endpoint used by a model. */
 export function xaiResponsesUrlForModel(modelId: string): string {
   return isGrokCliProxyModel(modelId) ? XAI_CLI_RESPONSES_URL : XAI_RESPONSES_URL;
 }
@@ -134,6 +141,7 @@ export function grokSupportsReasoningEffort(modelId: string): boolean {
   return (
     normalized.startsWith("grok-3-mini") ||
     normalized.startsWith("grok-4.20-multi-agent") ||
-    normalized.startsWith("grok-4.3")
+    normalized.startsWith("grok-4.3") ||
+    normalized.startsWith("grok-4.5")
   );
 }
