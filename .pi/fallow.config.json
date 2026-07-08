@@ -1,0 +1,11 @@
+{
+  "entry": [
+    "extensions/xai-oauth.ts"
+  ],
+  "ignore": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/dist/**",
+    "git/**"
+  ]
+}

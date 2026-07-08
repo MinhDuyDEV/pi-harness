@@ -9,7 +9,6 @@ export interface XaiResponsesData {
   reasoning?: { content?: ReadonlyArray<{ text?: string }> };
 }
 
-/** xAI request body used by the tool execute functions and createXaiResponse. */
 export interface XaiResponsesBody {
   model: string;
   input: unknown;

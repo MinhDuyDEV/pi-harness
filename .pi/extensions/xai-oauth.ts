@@ -1,5 +1,6 @@
 // Fork of pi-xai-oauth v1.2.5 with the Cursor/Grok CLI compatibility
-// shims removed. See `.pi/extensions/xai/` for the modules and the
+// shims removed, plus the v1.2.6 image size/n parameter fix (167db38).
+// See `.pi/extensions/xai/` for the modules and the
 // "fork pi-xai-oauth locally" entry in `.pi/artifacts/TODO.md` for
 // context.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

@@ -16,7 +16,9 @@ function createForwardingAssistantStream() {
   const queue: AssistantStreamEvent[] = [];
   const waiting: Array<(result: IteratorResult<AssistantStreamEvent>) => void> = [];
   let done = false;
-  let resolveResult: (result: unknown) => void = () => {};
+  let resolveResult: (result: unknown) => void = () => {
+    // Placeholder until the deferred Promise assigns the real resolver.
+  };
   const resultPromise = new Promise<unknown>((resolve) => {
     resolveResult = resolve;
   });
