@@ -1,5 +1,14 @@
 import type { CompressionBlock, PersistentSessionSummary } from "./compress";
 
+import {
+  contentToText,
+  stableStringify,
+  splitSentences,
+  uniqueStrings,
+  oneLine,
+  quote,
+} from "./deterministic-helpers.js";
+
 export type CompactionReason = "manual" | "threshold" | "overflow" | "unknown";
 
 export interface DeterministicSummaryOptions {
@@ -352,70 +361,4 @@ function getMessageText(message: unknown): string {
   const content =
     obj.content ?? obj.message ?? obj.text ?? obj.output ?? obj.result;
   return contentToText(content);
-}
-
-function contentToText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (content == null) return "";
-  if (Array.isArray(content)) {
-    return content
-      .map((item) => {
-        if (typeof item === "string") return item;
-        if (item && typeof item === "object") {
-          const obj = item as Record<string, unknown>;
-          return contentToText(
-            obj.text ??
-              obj.content ??
-              obj.input ??
-              obj.output ??
-              obj.result ??
-              "",
-          );
-        }
-        return String(item ?? "");
-      })
-      .filter(Boolean)
-      .join("\n");
-  }
-  if (typeof content === "object") return stableStringify(content);
-  return String(content);
-}
-
-function stableStringify(value: unknown): string {
-  try {
-    return JSON.stringify(
-      value,
-      Object.keys(value as Record<string, unknown>).sort(),
-    );
-  } catch {
-    return String(value);
-  }
-}
-
-function splitSentences(text: string): string[] {
-  return text
-    .split(/(?<=[.!?])\s+|\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
-function uniqueStrings(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const value of values.map((item) => item.trim()).filter(Boolean)) {
-    const key = value.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(value);
-  }
-  return out;
-}
-
-function oneLine(text: string, max: number): string {
-  const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, Math.max(0, max - 1))}…` : flat;
-}
-
-function quote(text: string): string {
-  return text ? `"${text}"` : "";
 }

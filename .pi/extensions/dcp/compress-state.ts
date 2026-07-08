@@ -1,0 +1,280 @@
+import {
+  getSessionKey,
+  loadDurableSessionState,
+  saveDurableSessionState,
+  type DurableSessionState,
+} from "./storage.js";
+import type {
+  CompressionBlock,
+  PersistentSessionSummary,
+  SessionState,
+} from "./compress-types.js";
+
+// Session state management
+
+const sessions = new Map<string, SessionState>();
+
+function emptyPersistentSummary(): PersistentSessionSummary {
+  return {
+    files_read: [],
+    files_modified: [],
+    decisions: [],
+    narrative_parts: [],
+    next_steps: [],
+    last_updated: 0,
+    merged_block_ids: [],
+    topic: "session",
+  };
+}
+
+export function getDcpSessionId(ctx: {
+  cwd: string;
+  sessionManager: { getSessionFile: () => string | undefined };
+}): string {
+  return ctx.sessionManager.getSessionFile() ?? ctx.cwd;
+}
+
+function newSessionState(): SessionState {
+  return {
+    blocks: [],
+    nextBlockId: 1,
+    persistentSummary: emptyPersistentSummary(),
+    artifactTracker: new Map(),
+    qualityMetrics: {
+      reReadsAfterCompress: 0,
+      totalCompressions: 0,
+      cleanCompressions: 0,
+      regressionLog: [],
+      avgProbeScore: 0,
+      failedProbes: 0,
+    },
+    recentCompressFiles: null,
+    currentTurn: 0,
+    reReadSeenKeys: new Set(),
+  };
+}
+
+function sessionStateFromDurable(durable: DurableSessionState): SessionState {
+  const state = newSessionState();
+  state.blocks = durable.blocks.map((block, index) => ({
+    blockId: Number(block.id.replace(/^b/, "")) || index + 1,
+    topic: block.topic,
+    summary: block.summary,
+    startLabel: block.startMessageId ?? "durable",
+    endLabel: block.endMessageId ?? "durable",
+    summaryTokens: Math.ceil(block.summary.length / 4),
+    createdAt: block.createdAt,
+    metadata: {
+      files_read: block.filesRead,
+      files_modified: block.filesModified,
+      decisions: block.decisions,
+      next_steps: block.nextSteps,
+      start_message_id: block.startMessageId,
+      end_message_id: block.endMessageId,
+      bead_id: block.beadId,
+      source: block.source,
+    },
+  }));
+  state.nextBlockId = Math.max(
+    1,
+    ...state.blocks.map((b) => b.blockId + 1),
+  );
+  state.artifactTracker = new Map(
+    durable.artifacts.map((a) => [a.path, a]),
+  );
+  if (
+    durable.persistentSummary &&
+    typeof durable.persistentSummary === "object"
+  ) {
+    state.persistentSummary =
+      durable.persistentSummary as PersistentSessionSummary;
+  }
+  state.qualityMetrics.totalCompressions = durable.compressEventCount;
+  state.currentTurn = durable.lastCompressTurn;
+  return state;
+}
+
+function durableFromSessionState(
+  sessionId: string,
+  state: SessionState,
+): DurableSessionState {
+  return {
+    version: 1,
+    sessionId,
+    sessionKey: getSessionKey(sessionId),
+    blocks: state.blocks.map((block) => ({
+      id: `b${block.blockId}`,
+      topic: block.topic,
+      summary: block.summary,
+      filesRead: parseMetadataArray(block.metadata?.files_read),
+      filesModified: parseMetadataArray(block.metadata?.files_modified),
+      decisions: parseMetadataArray(block.metadata?.decisions),
+      nextSteps: parseMetadataArray(block.metadata?.next_steps),
+      createdAt: block.createdAt,
+      startMessageId: parseMetadataString(block.metadata?.start_message_id),
+      endMessageId: parseMetadataString(block.metadata?.end_message_id),
+      beadId: parseMetadataString(block.metadata?.bead_id),
+      source: parseMetadataString(block.metadata?.source),
+    })),
+    artifacts: Array.from(state.artifactTracker.entries()).map(
+      ([path, artifact]) => ({ path, ...artifact }),
+    ),
+    persistentSummary: state.persistentSummary,
+    processedMessageIds: [],
+    lastDigest: undefined,
+    compressEventCount: state.qualityMetrics.totalCompressions,
+    lastCompressTurn: state.currentTurn,
+    updatedAt: Date.now(),
+  };
+}
+
+function persistState(sessionId: string): void {
+  const state = sessions.get(sessionId);
+  if (!state) return;
+  saveDurableSessionState(durableFromSessionState(sessionId, state));
+}
+
+function parseMetadataArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  if (typeof value === "string")
+    return value
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  return [];
+}
+
+function parseMetadataString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+export function getState(sessionId: string): SessionState {
+  let s = sessions.get(sessionId);
+  if (!s) {
+    const durable = loadDurableSessionState(sessionId);
+    s = durable ? sessionStateFromDurable(durable) : newSessionState();
+    sessions.set(sessionId, s);
+  }
+  return s;
+}
+
+export function getPersistentSummary(
+  sessionId: string,
+): PersistentSessionSummary {
+  return getState(sessionId).persistentSummary;
+}
+
+export function getQualityMetrics(sessionId: string) {
+  return getState(sessionId).qualityMetrics;
+}
+
+export function getArtifactTracker(sessionId: string) {
+  return getState(sessionId).artifactTracker;
+}
+
+export function makeDcpStateEntryPayload(
+  sessionId: string,
+  reason: string,
+): import("./compress-types.js").DcpStateEntryPayload {
+  return {
+    version: 1 as const,
+    reason,
+    snapshot: durableFromSessionState(sessionId, getState(sessionId)),
+    createdAt: Date.now(),
+  };
+}
+
+export function restoreDcpStateSnapshot(
+  sessionId: string,
+  snapshot: DurableSessionState,
+): void {
+  const normalized: DurableSessionState = {
+    ...snapshot,
+    sessionId,
+    sessionKey: getSessionKey(sessionId),
+  };
+  sessions.set(sessionId, sessionStateFromDurable(normalized));
+  saveDurableSessionState(normalized);
+}
+
+export function restoreDcpStateFromSessionEntries(
+  sessionId: string,
+  entries: readonly unknown[],
+): boolean {
+  let latest:
+    | { timestamp: number; snapshot: DurableSessionState }
+    | undefined;
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const obj = entry as Record<string, unknown>;
+    const details =
+      obj.details && typeof obj.details === "object"
+        ? (obj.details as Record<string, unknown>)
+        : undefined;
+    const dcpDetails =
+      details?.dcp && typeof details.dcp === "object"
+        ? (details.dcp as Record<string, unknown>)
+        : undefined;
+    const data =
+      obj.data && typeof obj.data === "object"
+        ? (obj.data as Record<string, unknown>)
+        : undefined;
+    const payload = obj.customType === "dcp_state" ? data : undefined;
+    const snapshot = (payload?.snapshot ?? dcpDetails?.snapshot) as
+      | DurableSessionState
+      | undefined;
+    if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.blocks))
+      continue;
+    const timestamp = typeof obj.timestamp === "number" ? obj.timestamp : 0;
+    if (!latest || timestamp >= latest.timestamp)
+      latest = { timestamp, snapshot };
+  }
+  if (!latest) return false;
+  restoreDcpStateSnapshot(sessionId, latest.snapshot);
+  return true;
+}
+
+export function cleanupSession(sessionId: string): void {
+  sessions.delete(sessionId);
+}
+
+export function incrementTurn(sessionId: string): void {
+  getState(sessionId).currentTurn++;
+}
+
+export function addBlock(
+  sessionId: string,
+  topic: string,
+  summary: string,
+  startLabel: string,
+  endLabel: string,
+  metadata?: Record<string, unknown>,
+): CompressionBlock {
+  const state = getState(sessionId);
+  const block: CompressionBlock = {
+    blockId: state.nextBlockId++,
+    topic,
+    summary,
+    startLabel,
+    endLabel,
+    summaryTokens: Math.ceil(summary.length / 4),
+    createdAt: Date.now(),
+    metadata,
+  };
+  state.blocks.push(block);
+  persistState(sessionId);
+  return block;
+}
+
+export function getBlocks(sessionId: string): readonly CompressionBlock[] {
+  return getState(sessionId).blocks;
+}
+
+export function getStats(sessionId: string) {
+  const s = getState(sessionId);
+  return {
+    blockCount: s.blocks.length,
+    summaryTokens: s.blocks.reduce((sum, b) => sum + b.summaryTokens, 0),
+    qualityMetrics: s.qualityMetrics,
+  };
+}
