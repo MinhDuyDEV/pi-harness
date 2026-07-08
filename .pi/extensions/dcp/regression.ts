@@ -2,7 +2,7 @@
  * Re-read detection after compress (deduped, verify-friendly).
  */
 
-import type { AssistantMessage, Message, ToolCall } from "@mariozechner/pi-ai";
+import type { AssistantMessage, Message, ToolCall } from "@earendil-works/pi-ai";
 
 /** Tools that count toward re-read metrics (excludes broad search tools). */
 export const REGRESSION_READ_TOOLS = new Set(["read", "hashline_read"]);

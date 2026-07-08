@@ -64,15 +64,11 @@ import {
 import { fetchWithRetry } from "./deepseek/retry.js";
 import { readDeepSeekStream, type StreamAccumulator } from "./deepseek/sse.js";
 
-// ─── Constants ──────────────────────────────────────────────
-
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY";
 const USER_AGENT = "pikit-deepseek/1.0";
 const MAX_TOOL_RESULT_TOKENS = 40_000;
 const DEFAULT_MAX_TOKENS = 64_000;
-
-// ─── Model Definitions ──────────────────────────────────────
 
 // Official pricing as of 2026-05-26: https://api-docs.deepseek.com/quick_start/pricing
 //
@@ -162,8 +158,6 @@ const DEEPSEEK_MODELS: ProviderModelConfig[] = [
   },
 ];
 
-// ─── Extension Entry Point ──────────────────────────────────
-
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("deepseek", {
     name: "DeepSeek",
@@ -176,8 +170,6 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-// ─── Stream Handler ─────────────────────────────────────────
-
 const deepseekStreamSimple: NonNullable<ProviderConfig["streamSimple"]> = (
   model: Model<Api>,
   context: Context,
@@ -189,7 +181,6 @@ const deepseekStreamSimple: NonNullable<ProviderConfig["streamSimple"]> = (
 
   stream.push({ type: "start", partial: createEmptyPartial(model) });
 
-  // Run async — stream is returned immediately
   runStream(stream, model, context, options, abortSignal, stormBreaker).catch(
     (err) => {
       if (!abortSignal?.aborted) {
@@ -207,8 +198,6 @@ const deepseekStreamSimple: NonNullable<ProviderConfig["streamSimple"]> = (
 
   return stream;
 };
-
-// ─── Async Pipeline ─────────────────────────────────────────
 
 async function runStream(
   stream: ReturnType<typeof createAssistantMessageEventStream>,
@@ -401,10 +390,8 @@ async function runStream(
       (_, i) => !suppressedCalls.includes(rawToolCalls[i]!.name),
     );
 
-    // Build usage
     const usage = buildUsage(acc, model);
 
-    // Build content parts
     const contentParts: (TextContent | ThinkingContent | PiToolCall)[] = [];
     if (acc.reasoningContent)
       contentParts.push({ type: "thinking", thinking: acc.reasoningContent });
@@ -500,8 +487,6 @@ async function runStream(
     }
   }
 }
-
-// ─── Message Conversion ─────────────────────────────────────
 
 interface DsMsg {
   role: "system" | "user" | "assistant" | "tool";
@@ -668,8 +653,6 @@ function convertTools(tools: Context["tools"]): DsToolDef[] {
   );
 }
 
-// ─── Request Builder ────────────────────────────────────────
-
 function buildRequestBody(
   model: Model<Api>,
   messages: DsMsg[],
@@ -700,11 +683,6 @@ function buildRequestBody(
   return body;
 }
 
-// ─── Tool Call Finalization ─────────────────────────────────
-// Follows OpenCode's strict approach: missing id/name or malformed JSON
-// is propagated as an error, not silently swallowed.
-// See opencode-ai/opencode packages/llm/src/protocols/utils/tool-stream.ts
-
 interface FinalizedToolCall {
   id: string;
   name: string;
@@ -733,16 +711,12 @@ function finalizeDeepSeekToolCalls(
       ) as Record<string, unknown>;
       calls.push({ id: tc.id, name: tc.name, args });
     } catch (parseErr) {
-      // Propagate parse error instead of falling back to {}
-      errors.push(
-        `Tool call "${tc.name}" has malformed JSON arguments: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`,
-      );
+      const detail = parseErr instanceof Error ? parseErr.message : String(parseErr);
+      errors.push(`Tool call "${tc.name}" has malformed JSON arguments: ${detail}`);
     }
   }
   return { calls, errors };
 }
-
-// ─── Usage ──────────────────────────────────────────────────
 
 function buildUsage(acc: StreamAccumulator, model: Model<Api>): Usage {
   if (acc.usage) {
@@ -779,8 +753,6 @@ function zeroUsage(): Usage {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
   };
 }
-
-// ─── Helpers ────────────────────────────────────────────────
 
 function emptyPartial(model: Model<Api>): AssistantMessage {
   return {

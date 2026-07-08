@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AssistantMessage, Message } from "@mariozechner/pi-ai";
+import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import { computeRunPruneStats, runContextStrategies } from "./compress.js";
 import { DEFAULT_CONFIG, type DCPConfig } from "./config.js";
 

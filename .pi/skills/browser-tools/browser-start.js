@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
-import { spawn, execSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdirSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import puppeteer from "puppeteer-core";
 
 const useProfile = process.argv[2] === "--profile";
@@ -12,7 +14,15 @@ if (process.argv[2] && process.argv[2] !== "--profile") {
 	process.exit(1);
 }
 
-const SCRAPING_DIR = `${process.env.HOME}/.cache/browser-tools`;
+const home = process.env.HOME;
+if (!home) {
+	console.error("HOME is not set");
+	process.exit(1);
+}
+
+const SCRAPING_DIR = join(home, ".cache", "browser-tools");
+const CHROME_PROFILE_DIR = join(home, "Library", "Application Support", "Google", "Chrome");
+const CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 // Check if already running on :9222
 try {
@@ -23,39 +33,54 @@ try {
 	await browser.disconnect();
 	console.log("✓ Chrome already running on :9222");
 	process.exit(0);
-} catch {}
+} catch (err) {
+	// Not running yet — continue startup.
+	void err;
+}
 
-// Setup profile directory
-execSync(`mkdir -p "${SCRAPING_DIR}"`, { stdio: "ignore" });
+mkdirSync(SCRAPING_DIR, { recursive: true });
 
-// Remove SingletonLock to allow new instance
-try {
-	execSync(`rm -f "${SCRAPING_DIR}/SingletonLock" "${SCRAPING_DIR}/SingletonSocket" "${SCRAPING_DIR}/SingletonCookie"`, { stdio: "ignore" });
-} catch {}
+for (const name of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+	try {
+		unlinkSync(join(SCRAPING_DIR, name));
+	} catch (err) {
+		if (err && err.code !== "ENOENT") {
+			console.error(`warning: failed to remove ${name}: ${err.message || err}`);
+		}
+	}
+}
 
 if (useProfile) {
 	console.log("Syncing profile...");
-	execSync(
-		`rsync -a --delete \
-			--exclude='SingletonLock' \
-			--exclude='SingletonSocket' \
-			--exclude='SingletonCookie' \
-			--exclude='*/Sessions/*' \
-			--exclude='*/Current Session' \
-			--exclude='*/Current Tabs' \
-			--exclude='*/Last Session' \
-			--exclude='*/Last Tabs' \
-			"${process.env.HOME}/Library/Application Support/Google/Chrome/" "${SCRAPING_DIR}/"`,
-		{ stdio: "pipe" },
+	const result = spawnSync(
+		"rsync",
+		[
+			"-a",
+			"--delete",
+			"--exclude=SingletonLock",
+			"--exclude=SingletonSocket",
+			"--exclude=SingletonCookie",
+			"--exclude=*/Sessions/*",
+			"--exclude=*/Current Session",
+			"--exclude=*/Current Tabs",
+			"--exclude=*/Last Session",
+			"--exclude=*/Last Tabs",
+			CHROME_PROFILE_DIR + "/",
+			SCRAPING_DIR + "/",
+		],
+		{ stdio: "pipe", encoding: "utf8" },
 	);
+	if (result.status !== 0) {
+		console.error(result.stderr || result.stdout || "rsync failed");
+		process.exit(result.status ?? 1);
+	}
 }
 
-// Start Chrome with flags to force new instance
 spawn(
-	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+	CHROME_BIN,
 	[
 		"--remote-debugging-port=9222",
-		`--user-data-dir=${SCRAPING_DIR}`,
+		"--user-data-dir=" + SCRAPING_DIR,
 		"--no-first-run",
 		"--no-default-browser-check",
 	],
@@ -73,7 +98,8 @@ for (let i = 0; i < 30; i++) {
 		await browser.disconnect();
 		connected = true;
 		break;
-	} catch {
+	} catch (err) {
+		void err;
 		await new Promise((r) => setTimeout(r, 500));
 	}
 }

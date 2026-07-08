@@ -1,8 +1,7 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { exec as execCb } from "child_process";
-import { existsSync, readFileSync, realpathSync } from "fs";
+import { existsSync, readFileSync, realpathSync, type Dirent } from "fs";
 import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
-import type { Dirent } from "fs";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
 import { promisify } from "util";
@@ -503,7 +502,11 @@ export default function rewindExtension(pi: ExtensionAPI) {
   }
 
   async function commitExists(commitSha: string): Promise<boolean> {
-    const result = await pi.exec("git", ["cat-file", "-e", `${commitSha}^{commit}`]);
+    if (!/^[0-9a-fA-F]{4,64}$/.test(commitSha)) {
+      return false;
+    }
+    const objectName = `${commitSha}^{commit}`;
+    const result = await pi.exec("git", ["cat-file", "-e", objectName]);
     return result.code === 0;
   }
 

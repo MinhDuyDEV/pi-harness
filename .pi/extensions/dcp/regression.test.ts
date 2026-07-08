@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { scanNewReReads, shouldLogRegression } from "./regression";
-import type { AssistantMessage, Message } from "@mariozechner/pi-ai";
+import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 
 function assistantRead(id: string, path: string): Message {
   return {

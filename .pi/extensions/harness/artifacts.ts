@@ -12,8 +12,6 @@ import { extractText, getLastAssistantText, type Sprint, type SprintResult } fro
 import type { RunTraceQualitySummary } from "./traceQuality.js";
 import type { HarnessWorkspace } from "./gitSafety.js";
 
-// ─── Progress Artifacts ───────────────────────────────────────────────────────
-
 /** Write or append to harness-run-local progress artifacts. */
 export function writeProgress(runDir: string, sprintNum: number, title: string, passed: boolean, detail: string) {
 	const progressPath = join(runDir, "PROGRESS.md");
@@ -41,8 +39,6 @@ export function writeProgress(runDir: string, sprintNum: number, title: string, 
 	};
 	writeFileSync(sprintStatePath, JSON.stringify(stateJson, null, 2), "utf-8");
 }
-
-// ─── Workflow Script Generation ───────────────────────────────────────────────
 
 /** Generate a reusable workflow script at .pi/workflows/{slug}.mjs and a run card. */
 export function generateWorkflowScript(
@@ -79,7 +75,6 @@ if (import.meta.url === \`file://\${process.argv[1]}\`) {
 `;
 		writeFileSync(join(workflowsDir, `${slug}.mjs`), script, "utf-8");
 
-		// Write harness run card from template
 		const templatePath = join(cwd, ".pi", "templates", "harness-card.md");
 		const allPassed = results.every((r) => r.passed);
 		let card: string;
@@ -103,12 +98,14 @@ if (import.meta.url === \`file://\${process.argv[1]}\`) {
 
 		writeFileSync(join(runsDir, `${slug}.md`), card, "utf-8");
 		return slug;
-	} catch {
+	} catch (err) {
+		// Best-effort card write — never fail the harness on IO.
+		console.warn(
+			`Failed to write harness run card: ${err instanceof Error ? err.message : String(err)}`,
+		);
 		return null;
 	}
 }
-
-// ─── Run Tracker ───────────────────────────────────────────────────────────────
 
 interface UsageSummary {
 	inputTokens: number;
@@ -274,16 +271,16 @@ export class HarnessTracker {
 		this.runDir = join(cwd, ".pi", "harness-runs", this.runId);
 		try {
 			mkdirSync(this.runDir, { recursive: true });
-		} catch {
-			// fail silently — tracking is best-effort
+		} catch (err) {
+			void err;
 		}
 	}
 
 	private write(name: string, content: string) {
 		try {
 			writeFileSync(join(this.runDir, name), content, "utf-8");
-		} catch {
-			// best-effort
+		} catch (err) {
+			void err;
 		}
 	}
 
@@ -294,8 +291,8 @@ export class HarnessTracker {
 	private appendNdjson(path: string, data: UnknownRecord) {
 		try {
 			appendFileSync(path, `${JSON.stringify({ time: new Date().toISOString(), ...data })}\n`, "utf-8");
-		} catch {
-			// best-effort
+		} catch (err) {
+			void err;
 		}
 	}
 
@@ -332,8 +329,8 @@ export class HarnessTracker {
 			mkdirSync(dir, { recursive: true });
 			const fileName = name.endsWith(".txt") ? name : `${name}.txt`;
 			writeFileSync(join(dir, fileName), content, "utf-8");
-		} catch {
-			// best-effort
+		} catch (err) {
+			void err;
 		}
 	}
 
@@ -342,8 +339,8 @@ export class HarnessTracker {
 		try {
 			mkdirSync(dir, { recursive: true });
 			writeFileSync(join(dir, "SYSTEM-PROMPT.txt"), systemPrompt, "utf-8");
-		} catch {
-			// best-effort
+		} catch (err) {
+			void err;
 		}
 	}
 
@@ -405,8 +402,8 @@ export class HarnessTracker {
 		try {
 			if (!existsSync(statePath)) writeFileSync(statePath, `# Harness Run State\n\n${entry}`, "utf-8");
 			else appendFileSync(statePath, `\n${entry}`, "utf-8");
-		} catch {
-			// best-effort
+		} catch (err) {
+			void err;
 		}
 	}
 
