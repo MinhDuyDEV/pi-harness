@@ -1,21 +1,5 @@
-/**
- * Safety Rules — Prompt Injection Scanning
- *
- * Detects prompt injection attempts in context files that get injected
- * into the system prompt (AGENTS.md, .cursorrules, SOUL.md, .pi/ configs,
- * memory files). Inspired by Hermes Agent's prompt_builder.py scanner.
- *
- * Two attack surfaces:
- *   1. Write/edit to context files — blocked before content reaches disk
- *   2. Content already in memory observations — scanned at injection time
- *      (handled by the memory extension calling scanForInjection directly)
- */
 
 import { block, confirm, rule, type RuleSet, type Severity } from "../types.js";
-
-// ---------------------------------------------------------------------------
-// Threat patterns — ordered by severity
-// ---------------------------------------------------------------------------
 
 const THREAT_PATTERNS: Array<{
 	id: string;
@@ -88,10 +72,6 @@ const THREAT_PATTERNS: Array<{
 	},
 ];
 
-// ---------------------------------------------------------------------------
-// Invisible unicode characters (zero-width / bidi overrides)
-// ---------------------------------------------------------------------------
-
 const INVISIBLE_CHARS = new Set([
 	"\u200B", // zero-width space
 	"\u200C", // zero-width non-joiner
@@ -104,10 +84,6 @@ const INVISIBLE_CHARS = new Set([
 	"\u202D", // left-to-right override
 	"\u202E", // right-to-left override
 ]);
-
-// ---------------------------------------------------------------------------
-// Context file detection
-// ---------------------------------------------------------------------------
 
 /** Paths that get injected into the system prompt or agent context. */
 const CONTEXT_FILE_PATTERNS: RegExp[] = [
@@ -127,10 +103,6 @@ const CONTEXT_FILE_PATTERNS: RegExp[] = [
 export function isContextFile(path: string): boolean {
 	return CONTEXT_FILE_PATTERNS.some((p) => p.test(path));
 }
-
-// ---------------------------------------------------------------------------
-// Scanner — reusable by memory extension and safety rules
-// ---------------------------------------------------------------------------
 
 export interface InjectionScanResult {
 	/** True if any threat was detected */
@@ -159,7 +131,6 @@ export function scanForInjection(
 		low: 0,
 	};
 
-	// Check threat patterns
 	for (const { id, pattern, severity, description } of THREAT_PATTERNS) {
 		if (pattern.test(content)) {
 			findings.push(`${id}: ${description}`);
@@ -169,7 +140,6 @@ export function scanForInjection(
 		}
 	}
 
-	// Check invisible unicode
 	const invisibleFound: string[] = [];
 	for (const char of INVISIBLE_CHARS) {
 		if (content.includes(char)) {
@@ -189,10 +159,6 @@ export function scanForInjection(
 		severity: findings.length > 0 ? maxSeverity : "low",
 	};
 }
-
-// ---------------------------------------------------------------------------
-// Safety rules — block/confirm on write/edit to context files
-// ---------------------------------------------------------------------------
 
 export const injectionRules: RuleSet = [
 	rule({

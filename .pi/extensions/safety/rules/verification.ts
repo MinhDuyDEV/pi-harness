@@ -194,7 +194,6 @@ export class VerificationTracker {
 		}
 		this.results.set(sessionId, results);
 
-		// Clean up old sessions
 		if (this.results.size > this.maxSessions) {
 			const oldest = this.results.keys().next().value;
 			if (oldest !== undefined) this.results.delete(oldest);

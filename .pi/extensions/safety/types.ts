@@ -5,10 +5,6 @@
  * from the security domain, not the implementation.
  */
 
-// ---------------------------------------------------------------------------
-// Verdict — what the safety system decided
-// ---------------------------------------------------------------------------
-
 export type VerdictKind = "block" | "confirm" | "allow";
 
 export type Severity = "critical" | "high" | "medium" | "low";
@@ -54,10 +50,6 @@ export function confirm(
 	return { kind: "confirm", ruleId, severity, threat, message };
 }
 
-// ---------------------------------------------------------------------------
-// ToolCallContext — normalized input for rule evaluation
-// ---------------------------------------------------------------------------
-
 export interface ToolCallContext {
 	/** Tool being invoked */
 	readonly tool: string;
@@ -76,10 +68,6 @@ export interface ToolCallContext {
 	/** Session identifier */
 	readonly sessionId: string;
 }
-
-// ---------------------------------------------------------------------------
-// Rule — a pure function with metadata
-// ---------------------------------------------------------------------------
 
 /** A rule is a pure function: context in, verdict out, null = no opinion */
 export type RuleFn = (ctx: ToolCallContext) => Verdict | null;
@@ -106,9 +94,5 @@ export function rule(opts: {
 }): Rule {
 	return Object.freeze(opts);
 }
-
-// ---------------------------------------------------------------------------
-// RuleSet — composable collection
-// ---------------------------------------------------------------------------
 
 export type RuleSet = ReadonlyArray<Rule>;

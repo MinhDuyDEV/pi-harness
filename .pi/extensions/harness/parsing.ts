@@ -8,8 +8,6 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
 import type { TextContent } from "@earendil-works/pi-ai";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export type HarnessRiskLane = "tiny" | "normal" | "high-risk";
 
 /**
@@ -72,8 +70,6 @@ export interface EvalCriterionResult {
 	confidence?: EvalConfidence;
 }
 
-// ─── Format Instructions ─────────────────────────────────────────────────────
-
 export const HARNESS_FORMAT_INSTRUCTIONS = `
 
 ---
@@ -120,8 +116,6 @@ Confidence rules:
 
 A PASS requires every sprint criterion to appear in criteria with passes=true and non-empty evidence.`;
 
-// ─── Text Helpers ─────────────────────────────────────────────────────────────
-
 export function extractText(content: string | readonly { type: string; text?: string }[]): string {
 	if (typeof content === "string") return content;
 	return content
@@ -140,8 +134,6 @@ export function getLastAssistantText(session: AgentSession): string {
 	}
 	return "";
 }
-
-// ─── Sprint Manifest Parsing ──────────────────────────────────────────────────
 
 export function parseCriteriaItems(criteria: string): string[] {
 	return criteria
@@ -214,8 +206,6 @@ export function parseSprints(text: string): Sprint[] {
 }
 
 export { parseMarkdownFrontmatter } from "../lib/util.js";
-
-// ─── Eval Output Parsing ──────────────────────────────────────────────────────
 
 /**
  * Extract top-level JSON objects from a text that may contain markdown or prose.

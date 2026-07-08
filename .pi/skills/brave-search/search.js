@@ -18,7 +18,6 @@ if (nIndex !== -1 && args[nIndex + 1]) {
 	args.splice(nIndex, 2);
 }
 
-// Parse country option
 let country = "US";
 const countryIndex = args.indexOf("--country");
 if (countryIndex !== -1 && args[countryIndex + 1]) {
@@ -26,7 +25,6 @@ if (countryIndex !== -1 && args[countryIndex + 1]) {
 	args.splice(countryIndex, 2);
 }
 
-// Parse freshness option
 let freshness = null;
 const freshnessIndex = args.indexOf("--freshness");
 if (freshnessIndex !== -1 && args[freshnessIndex + 1]) {
@@ -90,7 +88,6 @@ async function fetchBraveResults(query, numResults, country, freshness) {
 
 	const results = [];
 
-	// Extract web results
 	if (data.web && data.web.results) {
 		for (const result of data.web.results) {
 			if (results.length >= numResults) break;

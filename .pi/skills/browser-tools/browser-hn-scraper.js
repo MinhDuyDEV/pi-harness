@@ -34,7 +34,6 @@ async function scrapeHackerNews(limit = 30) {
       const $element = $(element);
       const id = $element.attr('id');
 
-      // Get title and URL from titleline
       const $titleLine = $element.find('.titleline > a').first();
       const title = $titleLine.text().trim();
       const url = $titleLine.attr('href');
@@ -43,18 +42,14 @@ async function scrapeHackerNews(limit = 30) {
       const $metadataRow = $element.next();
       const $subtext = $metadataRow.find('.subtext');
 
-      // Get points
       const $score = $subtext.find(`#score_${id}`);
       const pointsText = $score.text();
       const points = pointsText ? parseInt(pointsText.match(/\d+/)?.[0] || '0') : 0;
 
-      // Get author
       const author = $subtext.find('.hnuser').text().trim();
 
-      // Get time
       const time = $subtext.find('.age').attr('title') || $subtext.find('.age').text().trim();
 
-      // Get comments count
       const $commentsLink = $subtext.find('a').last();
       const commentsText = $commentsLink.text();
       let commentsCount = 0;
@@ -88,7 +83,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   let limit = 30;
 
-  // Parse --limit argument
   const limitIndex = args.indexOf('--limit');
   if (limitIndex !== -1 && args[limitIndex + 1]) {
     limit = parseInt(args[limitIndex + 1]);

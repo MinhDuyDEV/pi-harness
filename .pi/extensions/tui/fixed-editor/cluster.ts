@@ -91,7 +91,6 @@ export function extractCursor(lines: string[]): FixedClusterOutput {
     if (!cursor) {
       cursor = { row, col: visibleWidth(line.slice(0, idx)) };
     }
-    // Remove the marker
     return line.slice(0, idx) + line.slice(idx + CURSOR_MARKER.length);
   });
   return { lines: cleaned, cursor };

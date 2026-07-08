@@ -14,8 +14,6 @@
  * DeepSeek-compatible.
  */
 
-// ─── Schema Analysis ────────────────────────────────────────
-
 export interface SchemaAnalysis {
   shouldFlatten: boolean;
   leafCount: number;
@@ -73,8 +71,6 @@ export function analyzeSchema(schema: JsonSchema | undefined): SchemaAnalysis {
     enumTooLarge,
   };
 }
-
-// ─── Schema Repair ──────────────────────────────────────────
 
 /**
  * Deep-clean a tool schema for DeepSeek compat:
@@ -141,8 +137,6 @@ export function repairSchema(schema: JsonSchema): JsonSchema {
 
   return out;
 }
-
-// ─── Tool Spec Scavenging ───────────────────────────────────
 
 export interface ToolSpec {
   type?: string;

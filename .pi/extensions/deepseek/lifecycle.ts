@@ -8,8 +8,6 @@
  * Unlike OpenCode which uses Effect TS, this is plain async/await.
  */
 
-// ─── Types ──────────────────────────────────────────────────
-
 export interface ReasoningStart {
   type: "reasoning_start";
   id: string;
@@ -72,8 +70,6 @@ export type LifecycleEvent =
   | StepStart
   | Finish;
 
-// ─── State ──────────────────────────────────────────────────
-
 export interface LifecycleState {
   readonly reasoning: ReadonlySet<string>;
   readonly content: ReadonlySet<string>;
@@ -83,8 +79,6 @@ export interface LifecycleState {
 export function initialLifecycleState(): LifecycleState {
   return { reasoning: new Set(), content: new Set(), stepStarted: false };
 }
-
-// ─── Lifecycle Helpers ──────────────────────────────────────
 
 function ensureStepStarted(
   state: LifecycleState,

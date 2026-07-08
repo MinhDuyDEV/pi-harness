@@ -6,8 +6,7 @@
      *      $ text here            $ = editor mode, $$ = shell mode (! prefix)
      *     ──────────────────────
      */
-    import { CustomEditor } from "@earendil-works/pi-coding-agent";
-    import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
+import { CustomEditor, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
     import {
       CURSOR_MARKER,
       truncateToWidth,

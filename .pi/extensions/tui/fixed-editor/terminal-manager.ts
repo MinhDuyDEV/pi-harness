@@ -1,16 +1,3 @@
-/**
- * terminal-manager.ts — Terminal patch lifecycle management.
- *
- * Manages snapshot/restore of 5 monkey-patched entry points:
- *   1. terminal.write
- *   2. terminal.rows (getter)
- *   3. tui.render
- *   4. tui.doRender
- *   5. tui input listener
- *
- * The compositor provides callbacks for each patched function;
- * TerminalManager handles the mechanical install/dispose lifecycle.
- */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

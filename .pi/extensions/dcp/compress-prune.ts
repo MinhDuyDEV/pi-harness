@@ -135,7 +135,6 @@ export function pruneToolResults(
 		// Only compact non-empty results
 		if (totalLen === 0) continue;
 
-		// Build short arg preview from the corresponding tool call
 		const args = callArgsMap.get(tr.toolCallId);
 		const argPreview = args ? shortArgPreview(tr.toolName, args) : tr.toolName;
 

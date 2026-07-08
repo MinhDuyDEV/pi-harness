@@ -12,7 +12,7 @@ import {
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
 import { watch as fsWatch, type FSWatcher } from "node:fs";
 import { basename as pathBasename, dirname as pathDirname } from "node:path";
-import { createQueueTracker } from "./sidebar.js";
+import { createQueueTracker, createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.js";
 import {
   hasOpenTodos,
   findCanonicalTodo,
@@ -35,7 +35,6 @@ import {
   pickRandomWorkingQuote,
   workingStatusSpacerLines,
 } from "./working-indicator.js";
-import { createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.js";
 import {
   addUsageTokenMetrics,
   displayedTurnUsage,

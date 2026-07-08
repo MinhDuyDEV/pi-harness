@@ -14,8 +14,6 @@
  * For production accuracy, consider loading the DeepSeek tokenizer JSON.
  */
 
-// ─── Token Estimation ───────────────────────────────────────
-
 /**
  * Estimate token count for a string.
  * DeepSeek's tokenizer averages ~0.75 tokens/char for English,
@@ -37,8 +35,6 @@ export function estimateTokens(text: string): number {
   // CJK: ~1 token per char, ASCII: ~0.75 tokens per char, other: ~1.5 tokens per char
   return Math.ceil(cjk + ascii * 0.75 + other * 1.5);
 }
-
-// ─── Shrink Tool Results ────────────────────────────────────
 
 export interface ShrinkResult {
   messages: Array<Record<string, unknown>>;
@@ -236,8 +232,6 @@ export function shrinkOversizedToolCallArgsByTokens(
     entriesDropped,
   };
 }
-
-// ─── Utilities ──────────────────────────────────────────────
 
 function totalContentChars(messages: Array<Record<string, unknown>>): number {
   let total = 0;

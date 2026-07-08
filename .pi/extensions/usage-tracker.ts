@@ -20,10 +20,6 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 
-// ---------------------------------------------------------------------------
-// Database
-// ---------------------------------------------------------------------------
-
 let _db: DatabaseSync | null = null;
 
 function getDataDir(): string {
@@ -91,10 +87,6 @@ function closeDB(): void {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Recording
-// ---------------------------------------------------------------------------
-
 function recordUsage(
 	sessionId: string,
 	model: string,
@@ -133,10 +125,6 @@ function recordUsage(
 			updated_at = excluded.updated_at`,
 	).run(sessionId, model, provider, inputTokens, outputTokens, cacheRead + cacheWrite, thinkingTokens, costUsd, now, now);
 }
-
-// ---------------------------------------------------------------------------
-// Queries
-// ---------------------------------------------------------------------------
 
 interface ModelBreakdown {
 	model: string;
@@ -216,10 +204,6 @@ function getTodayUsage(): { input: number; output: number; cost: number; turns: 
 	`).get(todayStart.getTime()) as { input: number; output: number; cost: number; turns: number };
 	return row;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function formatTokens(n: number): string {
 	if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -313,15 +297,7 @@ function fallbackUsageFromMessage(message: any, lastInputEstimate: number): Norm
 	};
 }
 
-// ---------------------------------------------------------------------------
-// Extension
-// ---------------------------------------------------------------------------
-
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
 
 export default function usageTrackerExtension(pi: ExtensionAPI): void {
 	try {
@@ -460,7 +436,6 @@ export default function usageTrackerExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// Cleanup
 	pi.on("session_shutdown", () => {
 		closeDB();
 	});

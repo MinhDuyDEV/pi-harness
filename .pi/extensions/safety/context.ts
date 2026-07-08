@@ -7,10 +7,6 @@
 
 import type { ToolCallContext } from "./types.js";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function getEventUrls(
 	input: Record<string, unknown>,
 ): { url?: string; urls?: string[] } {
@@ -89,10 +85,6 @@ function buildTaskUpdateContext(
 		sessionId,
 	};
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Build a ToolCallContext from a raw pi tool_call event.

@@ -6,7 +6,7 @@
  */
 
 import { isIP } from "node:net";
-import { block, confirm, rule, type RuleSet } from "../types.js";
+import { block, rule, type RuleSet } from "../types.js";
 
 const NETWORK_PATTERNS: RegExp[] = [
 	/\bcurl\b/,

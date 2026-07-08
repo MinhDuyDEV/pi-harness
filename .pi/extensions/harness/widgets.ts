@@ -8,11 +8,8 @@
  *   expanded (≥80 columns), normal (≥60 columns), compact (<60 columns).
  */
 
-import type { ExtensionContext, ThemeColor } from "@earendil-works/pi-coding-agent";
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { ExtensionContext, ThemeColor, AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 /**
  * Braille spinner frames — industry standard for TUI (pi built-in, unicode-animations npm).
@@ -22,8 +19,6 @@ import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
  */
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const SPINNER_INTERVAL_MS = 80;
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export type HarnessPhase = "initializing" | "planning" | "generating" | "evaluating" | "fixing" | "complete" | "failed" | "";
 export type AgentRole = "planner" | "generator" | "evaluator";
@@ -74,8 +69,6 @@ export interface WidgetState {
 
 /** Minimal theme type matching pi-tui's Theme (types not exported directly). */
 export type WidgetTheme = { fg: (color: ThemeColor, text: string) => string; bold?: (text: string) => string };
-
-// ─── Display Helpers ──────────────────────────────────────────────────────────
 
 function fitCell(text: string, width: number): string {
 	const clipped = visibleWidth(text) > width ? truncateToWidth(text, width, "…") : text;
@@ -209,13 +202,6 @@ export function sessionUsage(session: AgentSession): Pick<WidgetState, "turnCoun
 	return { turnCount, inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens, totalCost };
 }
 
-// ─── HarnessWidget ───────────────────────────────────────────────────────────
-
-/**
- * Manages a live TUI widget showing harness progress.
- * The widget exposes only state the harness actually knows: workflow phase,
- * active agent metadata, sprint/review progress, active tools, and elapsed time.
- */
 export class HarnessWidget {
 	private ctx: ExtensionContext;
 	private state: WidgetState;

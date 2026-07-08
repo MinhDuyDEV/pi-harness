@@ -17,8 +17,6 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export type HarnessWorkspaceMode = "current" | "worktree" | "auto";
 
 export interface HarnessWorkspace {
@@ -28,8 +26,6 @@ export interface HarnessWorkspace {
 	worktreePath?: string;
 	warning?: string;
 }
-
-// ─── Project Root ─────────────────────────────────────────────────────────────
 
 /**
  * Resolve the git project root from cwd.
@@ -43,8 +39,6 @@ export function resolveProjectRoot(cwd: string): string {
 		return cwd;
 	}
 }
-
-// ─── Workspace Isolation ──────────────────────────────────────────────────────
 
 /**
  * Select the workspace a harness run should mutate.

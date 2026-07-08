@@ -17,31 +17,8 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-// ─── Constants ──────────────────────────────────────────────
-
 const MIMO_BASE_URL = "https://api.xiaomimimo.com/v1";
 const MIMO_API_KEY_ENV = "XIAOMI_MIMO_API_KEY";
-
-// ─── Model Definitions ──────────────────────────────────────
-// Pricing effective May 27, 2026 (v2.5 permanent price cut, up to 99% off)
-// Length-based tiers REMOVED — simplified flat pricing.
-// Source: Xiaomi MiMo official announcement email (May 2026)
-//         https://platform.xiaomimimo.com/docs/en-US/news/v2.5-price-update
-//
-// MiMo-V2.5 (Per 1M tokens):
-//   Input (cache miss): $0.14/1M tokens
-//   Input (cache hit):  $0.0028/1M tokens
-//   Output:             $0.28/1M tokens
-//
-// MiMo-V2.5-Pro (Per 1M tokens):
-//   Input (cache miss): $0.435/1M tokens
-//   Input (cache hit):  $0.0036/1M tokens
-//   Output:             $0.87/1M tokens
-//
-// MiMo-V2.5-TTS: Free (limited time)
-// V2 models: pricing unchanged, will be deprecated soon
-
-// ─── Thinking level map ─────────────────────────────────────
 
 // MiMo only supports: "low", "medium", "high" reasoning effort.
 // No "max" level. xhigh is not supported (null = no effort sent).
@@ -53,10 +30,7 @@ const THINKING_LEVEL_MAP = {
   xhigh: null,
 } as const;
 
-// ─── Models ─────────────────────────────────────────────────
-
 const MIMO_MODELS = [
-  // --- V2.5 series (latest, best pricing, released Apr 23 2026) ---
   {
     id: "xiaomi/mimo-v2.5",
     name: "MiMo V2.5",
@@ -101,7 +75,6 @@ const MIMO_MODELS = [
     contextWindow: 262_144,  // effective (1M advertised; reliable within 256K via Hybrid SWA)
     maxTokens: 131_072,
   },
-  // --- V2 series (previous gen) ---
   {
     id: "xiaomi/mimo-v2-flash",
     name: "MiMo V2 Flash",
@@ -169,8 +142,6 @@ const MIMO_MODELS = [
     maxTokens: 131_072,
   },
 ];
-
-// ─── Extension Entry ────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
   pi.registerProvider("xiaomi-mimo", {

@@ -18,8 +18,6 @@
 
 import { stripHallucinatedToolMarkup } from "./thinking.js";
 
-// ─── Types ──────────────────────────────────────────────────
-
 export interface DeepSeekStreamDelta {
   content?: string;
   reasoning_content?: string;
@@ -84,8 +82,6 @@ export type StreamEvent =
   | { type: "error"; error: string }
   | { type: "finalized_tool" };
 
-// ─── Parser ─────────────────────────────────────────────────
-
 /**
  * Parse an SSE text line and emit events.
  */
@@ -109,7 +105,6 @@ export function parseSSELine(
     return;
   }
 
-  // Parse JSON
   let chunk: DeepSeekStreamChunk;
   try {
     chunk = JSON.parse(data) as DeepSeekStreamChunk;
@@ -124,7 +119,6 @@ export function parseSSELine(
     emit({ type: "usage", usage: chunk.usage });
   }
 
-  // Process choices
   const choices = chunk.choices;
   if (!choices || choices.length === 0) return;
 
@@ -189,8 +183,6 @@ export function parseSSELine(
   }
 }
 
-// ─── Stream Reader ──────────────────────────────────────────
-
 /**
  * Read an entire SSE stream from a Response body and accumulate results.
  *
@@ -226,7 +218,6 @@ export async function readDeepSeekStream(
 
       buffer += decoder.decode(value, { stream: true });
 
-      // Process complete lines
       const lines = buffer.split("\n");
       // Keep the last partial line in the buffer
       buffer = lines.pop() ?? "";
@@ -236,7 +227,6 @@ export async function readDeepSeekStream(
       }
     }
 
-    // Process any remaining data
     if (buffer.trim()) {
       parseSSELine(buffer, acc, emit);
     }
@@ -250,8 +240,6 @@ export async function readDeepSeekStream(
 
   return acc;
 }
-
-// ─── Tool Call Finalization ─────────────────────────────────
 
 /**
  * Finalize tool calls from the accumulator into a clean array.

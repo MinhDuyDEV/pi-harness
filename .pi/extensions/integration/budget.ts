@@ -1,18 +1,3 @@
-/**
- * Budget Coordinator
- *
- * Ranked, token-budgeted injection for context reconstruction on pi restart.
- *
- * When pi restarts, multiple sources compete for injection into the system prompt:
- *   1. Session checkpoint (discoveries, files, progress)
- *   2. Active tasks (TODO.md / PROGRESS.md checkboxes)
- *   3. Memory observations (relevant to session context)
- *   4. Persona / learned patterns
- *   5. Scene context
- *
- * This module allocates the token budget from highest-priority sources down,
- * ensuring critical context is never crowded out by low-priority noise.
- */
 
 // Default budget allocation (out of 100 priority points)
 export const DEFAULT_PRIORITIES: Record<string, number> = {

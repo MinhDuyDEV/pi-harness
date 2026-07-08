@@ -17,8 +17,6 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { parseMarkdownFrontmatter } from "./parsing.js";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface AgentFrontmatter {
 	description?: string;
 	model?: string;
@@ -42,8 +40,6 @@ export function validateThinkingLevel(value: string | undefined): ThinkingLevel 
 	const valid: ThinkingLevel[] = ["minimal", "low", "medium", "high", "xhigh"];
 	return valid.includes(value as ThinkingLevel) ? (value as ThinkingLevel) : undefined;
 }
-
-// ─── Context Files ────────────────────────────────────────────────────────────
 
 /**
  * Load context files (AGENTS.md, APPEND_SYSTEM.md) from project or global locations.
@@ -81,8 +77,6 @@ export function wrapWithContext(
 	if (context.append) parts.push("\n" + context.append.trim());
 	return parts.join("\n");
 }
-
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 export const BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
 export const DEFAULT_PLANNER_TOOLS = ["read", "grep", "find", "ls"];
@@ -147,8 +141,6 @@ Issues:
 - [file.ts:42] Description of the issue
 Recommendations:
 - Suggested fix`;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseToolList(value: string | undefined): string[] {
 	if (!value) return [];

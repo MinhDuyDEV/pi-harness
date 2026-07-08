@@ -18,9 +18,6 @@ import {
   resolveContextPressure,
   type ContextPressureSource,
 } from "./pressure.js";
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 export interface NudgeState {
   pendingNudge: string | null;
@@ -39,10 +36,6 @@ export interface NudgeState {
   lastPressurePercent: number | null;
   lastPressureSource: ContextPressureSource | null;
 }
-
-// ---------------------------------------------------------------------------
-// Nudge Manager
-// ---------------------------------------------------------------------------
 
 export class NudgeManager {
   private config: DCPConfig;

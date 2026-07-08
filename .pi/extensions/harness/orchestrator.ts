@@ -47,8 +47,6 @@ import { formatVerificationSummary, runVerificationCommands } from "./verificati
 import { findFailedDependencies } from "./sprint-guards.js";
 import { assessRunTrace, assessSprintTrace, formatTraceQualitySummary, type RunTraceQualitySummary } from "./traceQuality.js";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 interface AgentDef {
 	systemPrompt: string;
 	tools: string[];
@@ -88,8 +86,6 @@ export interface HarnessResult {
 	isError?: boolean;
 }
 
-// ─── Agent Definition Loading ────────────────────────────────────────────────
-
 /**
  * Load an agent definition from file or fall back to defaults.
  * Duplicate pattern removed from index.ts by centralizing here.
@@ -125,8 +121,6 @@ function loadAgentDef(
 	};
 }
 
-// ─── Error Handling ──────────────────────────────────────────────────────────
-
 class HarnessAbortError extends Error {
 	constructor() {
 		super("Harness run aborted");
@@ -137,8 +131,6 @@ class HarnessAbortError extends Error {
 function throwIfAborted(signal?: AbortSignal): void {
 	if (signal?.aborted) throw new HarnessAbortError();
 }
-
-// ─── Model Resolution ────────────────────────────────────────────────────────
 
 function resolveAllModels(
 	params: HarnessRunParams,
@@ -156,8 +148,6 @@ function resolveAllModels(
 	};
 }
 
-// ─── Phase Notifications ─────────────────────────────────────────────────────
-
 function notify(
 	onUpdate: HarnessContext["onUpdate"],
 	text: string,
@@ -168,8 +158,6 @@ function notify(
 		details,
 	});
 }
-
-// ─── Interactive Pane Mode ───────────────────────────────────────────────────
 
 function shouldUseInteractivePanes(params: HarnessRunParams): boolean {
 	return params.tmuxMode === "watch" && isInsideTmux();
@@ -183,8 +171,6 @@ function runStatePromptSection(tracker: HarnessTracker): string[] {
 	const state = tracker.readState();
 	return state ? ["", "Current harness run state:", state] : [];
 }
-
-// ─── Phase 1: Planning ───────────────────────────────────────────────────────
 
 async function runPlanningPhase(
 	prompt: string,
@@ -259,8 +245,6 @@ async function runPlanningPhase(
 	tracker.appendState("planning", `Planner produced ${sprints.length} strict sprint(s).`, sprints.map((sprint) => `Sprint ${sprint.number}: ${sprint.title} · lane ${sprint.riskLane} · proof ${sprint.proofRequired.length}`));
 	return { specText, sprints };
 }
-
-// ─── Phase 2: Build + Evaluate (per sprint) ──────────────────────────────────
 
 async function runBuildEvaluatePhase(
 	sprints: Sprint[],
@@ -642,8 +626,6 @@ async function runBuildEvaluatePhase(
 	return { results, passedSprintCount, failedSprintCount };
 }
 
-// ─── Report Helpers ──────────────────────────────────────────────────────────
-
 function verdictDisplay(verdict: string, confidence?: string): string {
 	switch (verdict) {
 		case "PASS": return `[✓] PASS${confidence === "low" ? " (low conf)" : confidence === "medium" ? " (med conf)" : ""}`;
@@ -652,8 +634,6 @@ function verdictDisplay(verdict: string, confidence?: string): string {
 		default: return "[x] FAIL";
 	}
 }
-
-// ─── Phase 3: Report ─────────────────────────────────────────────────────────
 
 function buildFinalReport(
 	params: HarnessRunParams,
@@ -714,8 +694,6 @@ function buildFinalReport(
 	].join("\n");
 }
 
-// ─── Main Orchestrator ───────────────────────────────────────────────────────
-
 /**
  * Run the full harness orchestration.
  *
@@ -753,13 +731,11 @@ export async function orchestrateHarnessRun(
 		notify(onUpdate, `[warn] ${workspace.warning}`, { phase: "workspace", warning: workspace.warning });
 	}
 
-	// Load context files once
 	const contextFiles = params.inheritContext ? loadContextFiles(projectRoot) : { agents: "", append: "" };
 
 	const warnings: string[] = [];
 	const availableToolNames = context.availableToolNames ?? new Set<string>();
 
-	// --- Load agent definitions ---
 	const plannerDef = loadAgentDef(
 		params.plannerAgent,
 		"planner",
@@ -845,7 +821,6 @@ export async function orchestrateHarnessRun(
 
 	signal?.addEventListener("abort", () => widget.clear(), { once: true });
 
-	// --- Phase 1: Plan ---
 	const { specText, sprints } = await runPlanningPhase(
 		params.prompt,
 		params.plannerAgent,
@@ -890,7 +865,6 @@ export async function orchestrateHarnessRun(
 		spec: specText,
 	});
 
-	// --- Phase 2: Build + Evaluate (per sprint) ---
 	const { results, passedSprintCount, failedSprintCount } = await runBuildEvaluatePhase(
 		sprints,
 		params,
@@ -925,7 +899,6 @@ export async function orchestrateHarnessRun(
 	// Generate reusable workflow script
 	const workflowSlug = generateWorkflowScript(projectRoot, params.prompt, specText, sprints, params.pattern, results);
 
-	// Save tracking artifacts
 	tracker.saveTiming();
 	const traceSummary = assessRunTrace(sprints, results);
 	tracker.saveTraceQuality(traceSummary);

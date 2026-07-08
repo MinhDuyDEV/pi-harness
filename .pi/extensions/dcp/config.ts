@@ -4,10 +4,6 @@
  * Pure data: types + defaults. No runtime dependencies.
  */
 
-// ---------------------------------------------------------------------------
-// Config types
-// ---------------------------------------------------------------------------
-
 export type CompressMode = "range" | "message";
 export type NudgeForce = "strong" | "soft";
 export type Permission = "ask" | "allow" | "deny";
@@ -148,10 +144,6 @@ export interface DCPConfig {
   recall: RecallConfig;
   debug: boolean;
 }
-
-// ---------------------------------------------------------------------------
-// Default config
-// ---------------------------------------------------------------------------
 
 const DEFAULT_PROTECTED_TOOLS: readonly string[] = [
   "write",

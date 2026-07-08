@@ -12,7 +12,7 @@
      *   4. (removed) - was Memory Observations via FTS5; MEMORY.md is now managed by the user and read on-demand via the memory skill
      */
 
-    import { readdirSync, readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
     import { join } from "node:path";
 
     interface ParsedBlock {

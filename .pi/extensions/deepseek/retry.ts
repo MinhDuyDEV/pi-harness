@@ -11,11 +11,7 @@
  * - Never retries on abort
  */
 
-// ─── Imports ──────────────────────────────────────────────
-
 import { isAbortError } from "../lib/util.js";
-
-// ─── Types ──────────────────────────────────────────────────
 
 export interface RetryOptions {
   /** Maximum total attempts (including the first). Default 4. */
@@ -39,8 +35,6 @@ export interface RetryInfo {
 }
 
 const DEFAULT_RETRYABLE_STATUSES = [408, 429, 500, 502, 503, 504] as const;
-
-// ─── Main ───────────────────────────────────────────────────
 
 /**
  * Fetch with exponential backoff, jitter, Retry-After support, and body draining.
@@ -99,8 +93,6 @@ export async function fetchWithRetry(
   throw lastError ?? new Error("fetchWithRetry: loop exited unexpectedly");
 }
 
-// ─── Backoff Computation ────────────────────────────────────
-
 /**
  * Compute backoff with:
  * - Retry-After header support (server's explicit instruction)
@@ -126,8 +118,6 @@ function computeWait(
   const jitter = exp * (0.75 + Math.random() * 0.5);
   return Math.min(Math.max(jitter, 0), cap);
 }
-
-// ─── Utilities ──────────────────────────────────────────────
 
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   if (ms <= 0) return Promise.resolve();

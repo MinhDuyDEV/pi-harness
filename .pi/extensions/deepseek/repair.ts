@@ -13,8 +13,6 @@
 
 import { isThinkingModeModel } from "./thinking.js";
 
-// ─── Tool Call ID Stamping ──────────────────────────────────
-
 let _stampSeq = 0;
 
 /**
@@ -27,8 +25,6 @@ export function stampMissingIds(
     c.id ? (c as { id: string; [key: string]: unknown }) : { ...c, id: `z-ds-${Date.now().toString(36)}-${_stampSeq++}` },
   );
 }
-
-// ─── Tool Call Pairing Fix ──────────────────────────────────
 
 /**
  * Drops both unpaired assistant.tool_calls and stray tool messages.
@@ -101,8 +97,6 @@ export function fixToolCallPairing(
   return { messages: out, droppedAssistantCalls, droppedStrayTools };
 }
 
-// ─── reasoning_content Stamping ─────────────────────────────
-
 /**
  * Back-fills reasoning_content on bare assistant turns for thinking models.
  * DeepSeek V4/reasoner models require reasoning_content on every assistant
@@ -129,8 +123,6 @@ export function stampMissingReasoningForThinkingMode(
 
   return { messages: out, stampedCount };
 }
-
-// ─── Truncated JSON Repair ──────────────────────────────────
 
 export interface TruncationRepairResult {
   repaired: string;
@@ -273,8 +265,6 @@ export function repairAllToolCallArgs(
 
   return { repaired, fallbacks };
 }
-
-// ─── Combined Healing ───────────────────────────────────────
 
 /**
  * Apply all repair passes to a message array before sending to DeepSeek.

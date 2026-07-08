@@ -74,13 +74,11 @@ export function applyCompressStrip(
 		const callOp = ops.find((o) => o.type === "call" && o.toolCallId === op.toolCallId);
 		if (!callOp) continue;
 
-		// Extract summary from result
 		const fullText = textOf(messages[op.messageIndex] as ToolResultMessage);
 		const marker = "The following is the authoritative summary of the compressed range:";
 		const idx = fullText.indexOf(marker);
 		const summary = idx >= 0 ? fullText.substring(idx + marker.length).trim() : fullText;
 
-		// Extract topic from call
 		const callMsg = messages[callOp.messageIndex] as AssistantMessage;
 		const tc = callMsg.content[callOp.contentIndex] as ToolCall;
 		const topic = ((tc.arguments as Record<string, unknown>)?.topic ?? "compressed") as string;
@@ -138,13 +136,11 @@ export function applyCompressStrip(
 			}
 		}
 
-		// Remove compress call + result
 		indicesToRemove.add(cr.callIndex);
 		strippedTokens += estimateTokens(messages[cr.callIndex]);
 		indicesToRemove.add(cr.resultIndex);
 		strippedTokens += estimateTokens(messages[cr.resultIndex]);
 
-		// Build final summary with nesting and protected content
 		let finalSummary = cr.summary;
 		if (nestedSummaries.length > 0) {
 			finalSummary = nestedSummaries.map((s) => `[Previously compressed]\n${s}`).join("\n\n")

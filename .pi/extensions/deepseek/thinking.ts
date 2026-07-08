@@ -11,8 +11,6 @@
  * - request extra_body.thinking.type differs by model
  */
 
-// ─── Model Detection ────────────────────────────────────────
-
 /**
  * True when the model emits reasoning_content and requires it round-tripped
  * on follow-up requests. DeepSeek rejects follow-up messages from thinking
@@ -41,8 +39,6 @@ export function thinkingModeForModel(model: string): "enabled" | "disabled" | un
   if (m === "deepseek-v4-flash" || m === "deepseek-v4-pro") return "enabled";
   return undefined;
 }
-
-// ─── DSML Stripping ─────────────────────────────────────────
 
 /**
  * Strip hallucinated tool-call markup that DeepSeek models sometimes emit

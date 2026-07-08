@@ -13,8 +13,6 @@
 
 import type { JsonSchema } from "./scavenge.js";
 
-// ─── Analysis ───────────────────────────────────────────────
-
 export interface FlattenDecision {
   shouldFlatten: boolean;
   leafCount: number;
@@ -45,8 +43,6 @@ export function analyzeSchema(schema: JsonSchema | undefined): FlattenDecision {
   };
 }
 
-// ─── Flatten ────────────────────────────────────────────────
-
 /**
  * Flatten a nested object schema to dot-path flat schema.
  *
@@ -70,8 +66,6 @@ export function flattenSchema(schema: JsonSchema): JsonSchema {
   };
 }
 
-// ─── Re-nest ────────────────────────────────────────────────
-
 /**
  * Convert flat dot-path arguments back to nested structure after receiving tool call args.
  *
@@ -87,8 +81,6 @@ export function nestArguments(flatArgs: Record<string, unknown>): Record<string,
 
   return out;
 }
-
-// ─── Internal ───────────────────────────────────────────────
 
 function walkSchema(
   schema: JsonSchema,

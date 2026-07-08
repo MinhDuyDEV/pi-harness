@@ -17,11 +17,10 @@
  * has stronger native tools and models for those jobs.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { truncateHead, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { truncateHead } from "@earendil-works/pi-coding-agent";
 import { buildSubprocessEnv } from "./safety/env-policy.js";
-import { execFilePromise, isAbortError } from "./lib/util.js";
+import { execFilePromise } from "./lib/util.js";
 
 type OutputFormat = "llm" | "markdown" | "text" | "json" | "html";
 

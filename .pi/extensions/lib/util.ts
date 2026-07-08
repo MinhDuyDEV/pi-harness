@@ -6,12 +6,7 @@
  *   - runChildProcess / abortOnSignal (shared child-process helpers)
  */
 
-import { execFile } from "node:child_process";
-import type { ChildProcess } from "node:child_process";
-
-// ---------------------------------------------------------------------------
-// Markdown Frontmatter
-// ---------------------------------------------------------------------------
+import { execFile, type ChildProcess } from "node:child_process";
 
 /** Parse simple YAML frontmatter from agent markdown files. */
 export function parseMarkdownFrontmatter(
@@ -34,10 +29,6 @@ export function parseMarkdownFrontmatter(
 	return { frontmatter, body };
 }
 
-// ---------------------------------------------------------------------------
-// Error Detection
-// ---------------------------------------------------------------------------
-
 /**
  * Detect abort errors across different runtime shapes.
  * Covers DOMException (AbortError), Node error codes (ABORT_ERR),
@@ -52,10 +43,6 @@ export function isAbortError(err: unknown): boolean {
 		candidate?.name === "TimeoutError"
 	);
 }
-
-// ---------------------------------------------------------------------------
-// Child Process Helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Attach abort-signal handling to a child process.

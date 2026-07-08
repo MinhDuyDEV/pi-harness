@@ -1,12 +1,10 @@
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
-import { createAgentSession, SessionManager } from "@earendil-works/pi-coding-agent";
+import { createAgentSession, SessionManager, type AgentSession } from "@earendil-works/pi-coding-agent";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { createHarnessResourceLoader, modelLabel, validateThinkingLevel } from "./agents.js";
 import type { HarnessTracker } from "./artifacts.js";
 import { runInteractivePaneAgent } from "./interactivePane.js";
 import { getLastAssistantText } from "./parsing.js";
-import type { HarnessWidget, AgentRole } from "./widgets.js";
-import { sessionUsage } from "./widgets.js";
+import { sessionUsage, type HarnessWidget, type AgentRole } from "./widgets.js";
 
 export type AgentRunnerMode = "sdk" | "interactive-pane";
 

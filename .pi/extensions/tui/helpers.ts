@@ -10,11 +10,6 @@
 
 // ── Nerd Font detection ────────────────────────────────────────────────────
 
-/**
- * Detects whether the terminal supports Nerd Font icons.
- * Set POWERLINE_NERD_FONTS=0 to disable, POWERLINE_NERD_FONTS=1 to enable.
- * Default is false — avoids silent garbled icons on non-Nerd-Font terminals.
- */
 export function hasNerdFonts(): boolean {
   if (process.env.POWERLINE_NERD_FONTS === "1") return true;
   if (process.env.POWERLINE_NERD_FONTS === "0") return false;

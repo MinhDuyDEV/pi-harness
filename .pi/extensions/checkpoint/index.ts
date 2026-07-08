@@ -225,6 +225,5 @@ export default function (pi: any): void {
     await writeCheckpoint(config, piDir, ctx, sessionId);
   });
 
-  // Cleanup on shutdown
   pi.on("session_shutdown", () => {});
 }

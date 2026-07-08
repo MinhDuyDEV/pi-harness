@@ -43,10 +43,6 @@ export interface DcpStateEntryPayload {
   createdAt: number;
 }
 
-// ---------------------------------------------------------------------------
-// Custom message types (internal to DCP extension)
-// ---------------------------------------------------------------------------
-
 /** Custom message type for DCP compressed summaries */
 interface DCPCompressedSummaryMessage {
   role: "custom";
@@ -75,10 +71,6 @@ interface BranchSummaryMessage {
   summary: string;
 }
 
-// ---------------------------------------------------------------------------
-// Structured summary types (P0: Factory-style structured fields)
-// ---------------------------------------------------------------------------
-
 /** Structured fields for a compression event */
 export interface StructuredSummaryFields {
   files_read: string[];
@@ -106,10 +98,6 @@ export interface PersistentSessionSummary {
   merged_block_ids: number[];
   topic: string;
 }
-
-// ---------------------------------------------------------------------------
-// Artifact tracking types (P1: file-path harvesting from tool calls)
-// ---------------------------------------------------------------------------
 
 export interface ArtifactTrackerEntry {
   lastSeen: number;
@@ -158,14 +146,6 @@ export const READ_TOOLS = new Set([
 
 /** Tools whose path arguments should be tracked as "modify" operations */
 const MODIFY_TOOLS = new Set(["write", "edit"]);
-
-// ---------------------------------------------------------------------------
-// Quality metrics types (P1: regression detection)
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Probe evaluation types (P1 enhancement: probe-based quality evaluation)
-// ---------------------------------------------------------------------------
 
 export interface ProbeResult {
   name: string;
@@ -435,10 +415,6 @@ export function cleanupSession(sessionId: string): void {
   sessions.delete(sessionId);
 }
 
-// ---------------------------------------------------------------------------
-// Block operations
-// ---------------------------------------------------------------------------
-
 export function addBlock(
   sessionId: string,
   topic: string,
@@ -475,10 +451,6 @@ export function getStats(sessionId: string) {
     qualityMetrics: s.qualityMetrics,
   };
 }
-
-// ---------------------------------------------------------------------------
-// P0: Persistent summary merging (anchored iterative summarization)
-// ---------------------------------------------------------------------------
 
 /**
  * Parse comma-separated string into trimmed, non-empty array.
@@ -529,7 +501,6 @@ export function mergeIntoPersistentSummary(
     ps.next_steps = ps.next_steps.slice(-20);
   }
 
-  // Update topic to most recent
   ps.topic = topic;
   ps.merged_block_ids.push(blockId);
   ps.last_updated = Date.now();
@@ -537,10 +508,6 @@ export function mergeIntoPersistentSummary(
 
   return ps;
 }
-
-// ---------------------------------------------------------------------------
-// P1: Probe-based compression quality evaluation
-// ---------------------------------------------------------------------------
 
 /**
  * Run quality probes on a compression event.
@@ -660,7 +627,6 @@ export function recordProbeResults(
   if (!result.allPassed) {
     state.qualityMetrics.failedProbes++;
   }
-  // Running average
   const n = state.qualityMetrics.totalCompressions;
   if (n > 0) {
     const prevAvg = state.qualityMetrics.avgProbeScore;
@@ -742,10 +708,6 @@ export function buildCompressedSummaryMessage(
   return parts.join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// P0/P1: Extract structured fields from compress tool call arguments
-// ---------------------------------------------------------------------------
-
 /**
  * Extract structured fields from compress tool params.
  * Handles both the new structured fields and the old freeform summary fallback.
@@ -792,10 +754,6 @@ function extractStructuredFields(
 
   return { fields, narrative };
 }
-
-// ---------------------------------------------------------------------------
-// P1: Artifact tracking
-// ---------------------------------------------------------------------------
 
 /**
  * Extract file path(s) from tool call arguments.
@@ -879,10 +837,6 @@ export function getArtifactTracker(sessionId: string): {
     files_modified: [...ps.files_modified],
   };
 }
-
-// ---------------------------------------------------------------------------
-// P1: Quality metrics / regression detection
-// ---------------------------------------------------------------------------
 
 /**
  * Record a compress event for quality tracking.
@@ -1013,16 +967,6 @@ export function getQualityStatus(sessionId: string): string {
 
   return status;
 }
-
-// ---------------------------------------------------------------------------
-// Context message stripping
-//
-// Invoked on every `context` event (before every LLM request).
-// Three strategies applied in order:
-//   1. compress-strip — replace ranges covered by compress blocks with summaries
-//   2. dedup — strip duplicate tool call arguments, keep latest result
-//   3. purge-errors — strip large inputs from old errored tool calls
-// ---------------------------------------------------------------------------
 
 /**
  * Estimate token count for a message using chars/4 heuristic.
@@ -1211,16 +1155,8 @@ export function computeRunPruneStats(
   return { tokens: prunedTokens, count: prunedCount };
 }
 
-
-
-
-
 // ── Step 4: Tool-Result Pruning ────────────────────────────────────────
 // Moved to ./compress-prune.ts.
-
-// ---------------------------------------------------------------------------
-// Post-compaction token estimate (Pi 0.79.8 RPC parity)
-// ---------------------------------------------------------------------------
 
 /** Heuristic post-compact context size (Pi 0.79.8 `estimatedTokensAfter` parity). */
 export function estimateTokensAfterCompress(
@@ -1264,10 +1200,6 @@ export function enrichCompactionResult<
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// Compress tool registration
-// ---------------------------------------------------------------------------
 
 const COMPRESS_TOOL_DESCRIPTION = [
   "Collapse a range in the conversation into a detailed summary with structured fields.",
@@ -1459,7 +1391,6 @@ export function registerCompressTool(
         recordProbeResults(sessionId, probeResult);
       }
 
-      // Build response with persistent summary preview
       const allBlocks = getBlocks(sessionId);
       const stats = getStats(sessionId);
       const contextUsage =

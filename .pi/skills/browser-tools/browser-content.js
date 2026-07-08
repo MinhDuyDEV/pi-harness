@@ -55,7 +55,6 @@ await client.detach();
 
 const finalUrl = p.url();
 
-// Extract with Readability
 const doc = new JSDOM(outerHTML, { url: finalUrl });
 const reader = new Readability(doc.window.document);
 const article = reader.parse();

@@ -114,7 +114,6 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 			threat: "sensitive-modification",
 			targets: ["write", "edit", "bash"],
 			check: (ctx) => {
-				// Check write/edit tool path
 				if (ctx.path) {
 					const resolved = canonicalPath(ctx.path, ctx.cwd);
 					if (/\/\.git(\/|$)/.test(resolved)) {
@@ -122,7 +121,6 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 							"Writing to .git/ directory is forbidden. This could inject malicious hooks.");
 					}
 				}
-				// Check bash write targets
 				if (ctx.command) {
 					const targets = extractWriteTargets(ctx.command);
 					for (const t of targets) {
@@ -161,10 +159,6 @@ export function workspaceRules(config?: { additionalProtectedPaths?: string[] })
 		}),
 	];
 }
-
-// ---------------------------------------------------------------------------
-// Bash write-target extraction (ported from sandbox.ts)
-// ---------------------------------------------------------------------------
 
 function extractWriteTargets(command: string): string[] {
 	const targets: string[] = [];

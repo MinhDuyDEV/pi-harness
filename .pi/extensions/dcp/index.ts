@@ -29,7 +29,6 @@ import {
   getBlocks,
   getDcpSessionId,
   getPersistentSummary,
-  getQualityMetrics,
   getQualityStatus,
   getStats,
   processContextMessages,
@@ -244,7 +243,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         contextWindow,
       );
 
-
       const nudgeStateBefore = nudge.getState();
       nudge.checkContext(ctx, meter);
       const nudgeStateAfter = nudge.getState();
@@ -253,9 +251,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         const threshold = resolveAutoCompactThreshold(
           config.autoCompact,
           contextWindow,
-        );
-        console.log(
-          `[dcp] turn_end: branch=${meter.branchTokens} outbound=${meter.outboundTokens} delta=${meter.deltaTokens ?? 0} pressure=${Math.round(nudgeStateAfter.lastPressurePercent ?? meter.branchPercent ?? 0)}% source=${formatPressureSourceLabel(nudgeStateAfter.lastPressureSource ?? config.autoCompact.pressureSource ?? "max")} threshold=${Math.round(threshold.percent)}% (${threshold.tokens} tokens) stripped=${meter.strippedByDcp}`,
         );
       }
 

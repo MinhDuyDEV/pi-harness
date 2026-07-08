@@ -24,8 +24,6 @@ import { Type } from "@sinclair/typebox";
 import { resolveProjectRoot } from "./gitSafety.js";
 import { orchestrateHarnessRun } from "./orchestrator.js";
 
-// ─── Extension Entry ──────────────────────────────────────────────────────────
-
 export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "harness",
