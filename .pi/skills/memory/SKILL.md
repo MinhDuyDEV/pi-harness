@@ -1,16 +1,17 @@
 ---
 name: memory
-description: ALWAYS check at the start of any task to recall prior context, established patterns, and historical decisions. The user's memory file is loaded on-demand via `read`.
+description: ALWAYS read durable project context from `.pi/MEMORY.md`; append learnings to it. File-based, on-demand, observable.
 ---
 
 # Memory
 
-Persistent context that survives across sessions. The user maintains a memory file; you read it when relevant and edit it when new durable learnings come up.
+Durable project knowledge lives in `<cwd>/.pi/MEMORY.md`. Read it on demand when relevant, append to it when new learnings surface.
 
 ## When to load
 
 **ALWAYS** at the start of any task that:
-- involves a decision, design choice, or architectural call (a prior decision may exist)
+
+- involves a decision, design choice, or architectural call
 - references prior work, past sessions, or "what we did before"
 - is in a project the user has memory for (`<cwd>/.pi/MEMORY.md` exists)
 - the user mentions "memory", "before", "last time", "we used to", or similar
@@ -19,26 +20,28 @@ For trivial edits, single-line fixes, or pure code questions with no project con
 
 ## Where memory lives
 
-- `~/.pi/MEMORY.md` — global personal memory (cross-project, cross-session)
 - `<cwd>/.pi/MEMORY.md` — project-specific memory (per working directory)
+- `~/.pi/MEMORY.md` — global personal memory (cross-project, cross-session)
 
 The user creates and owns these files. They are not part of this skill.
+
+Sections in MEMORY.md: architecture, decisions, patterns, gotchas. Grep-friendly keywords.
 
 ## Usage
 
 **Recall prior context:**
 
 ```bash
-# Read the whole file (when small)
-read ~/.pi/MEMORY.md
+# Search memory
+rg -n "<topic>" <cwd>/.pi/MEMORY.md
 
-# Or search for a specific topic
-grep -i "topic" ~/.pi/MEMORY.md
+# Or read the whole file (when small)
+read <cwd>/.pi/MEMORY.md
 ```
 
 **Save a new learning this session:**
 
-1. Read the current memory file to check for duplicates.
+1. Check for duplicates: `rg -n "<topic>" <cwd>/.pi/MEMORY.md`
 2. If the learning is durable, append a bullet via `edit`. Keep entries short.
 
 **Compact when the file grows:**
@@ -49,15 +52,10 @@ grep -i "topic" ~/.pi/MEMORY.md
 ## Conventions for entries
 
 - One bullet per learning, with type tag in brackets: `[decision]`, `[bugfix]`, `[pattern]`, `[feature]`, `[discovery]`, `[learning]`, `[warning]`.
-- Optional metadata: `helpful=N` / `harmful=N` if the user has rated entries.
 - Prefer concise titles; narrative only when essential.
 
-## When NOT to use this skill
+## When NOT to use
 
-- For session-internal scratch work — use the conversation context, not MEMORY.md.
-- For ephemeral task tracking — use a TODO.md file, not MEMORY.md.
-- For project rules — those go in AGENTS.md, not MEMORY.md.
-
-## Recovery (advanced)
-
-If the user maintains an archive of dropped entries, recover via `grep` on the archive path. Most users do not need an archive — compact, don't accumulate.
+- For session-internal scratch work — use the conversation, not MEMORY.md.
+- For ephemeral task tracking — use `TODO.md`, not MEMORY.md.
+- For project rules — those go in `AGENTS.md`, not MEMORY.md.
