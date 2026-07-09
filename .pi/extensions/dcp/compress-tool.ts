@@ -1,147 +1,214 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+/**
+ * DCP Extension — Compress Tool
+ *
+ * Agent-callable tool that writes a durable summary block.
+ *
+ * CRITICAL: pi.registerTool only accepts a ToolDefinition object
+ * (`{ name, parameters, execute, ... }`). The multi-arg form
+ * `registerTool("name", description, fn)` treats the string as the tool
+ * definition, so `tool.name` is undefined. JSON then omits `name` and
+ * providers return 422 "missing field `name`" (or tools[N].name missing)
+ * on every request after session_start — including resume.
+ */
+
+import { Type } from "@sinclair/typebox";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type { DCPConfig } from "./config.js";
 import {
   addBlock,
+  getBlocks,
+  getDcpSessionId,
+  getQualityMetrics,
   getStats,
-  getState,
   makeDcpStateEntryPayload,
 } from "./compress-state.js";
 import {
   evaluateCompressionProbes,
+  extractStructuredFields,
   mergeIntoPersistentSummary,
   recordProbeResults,
-  extractStructuredFields,
-  buildCompressedSummaryMessage,
 } from "./compress-summary.js";
-import { recordCompressFiles, getQualityStatus } from "./compress-metrics.js";
+import {
+  getQualityStatus,
+  recordCompressEvent,
+} from "./compress-metrics.js";
+import { renderCompressResult } from "./compress-render.js";
+import { DCP_STATE_ENTRY_TYPE } from "./compress-types.js";
 
-const COMPRESS_TOOL_DESCRIPTION =
-  `Compress a conversation range into a dense summary (replaces range with anchor reference).
-   Always returns blockId + summary + structured fields for context continuation.
-   Use instead of manual summarization — ensures proper DCP state tracking.
+export const COMPRESS_TOOL_DESCRIPTION = `Save a durable summary of completed work to DCP (Durable Compression Protocol).
 
-   Args:
-     summary: The compressed summary text
-     topic: Short label for this block (3–5 words)
-     files_read: Comma-separated file paths read in this range
-     files_modified: Comma-separated file paths modified in this range
-     decisions: Comma-separated key decisions made in this range
-     next_steps: Comma-separated remaining tasks
-     start_message_id: Starting message identifier (optional)
-     end_message_id: Ending message identifier (optional)`;
+Call this when:
+1. You finished a multi-step task and context is getting long
+2. A /dcp-nudge or [DCP Nudge] message asked you to compress
+3. You are about to switch topics and want to preserve state
 
-let compressToolRegistered = false;
+Write a DETAILED summary covering: what was done, key decisions, current state of all modified files, and remaining work. This summary is the only record after context is compacted — be thorough.`;
+
+const compressParams = Type.Object({
+  summary: Type.String({
+    description:
+      "Detailed summary of work done, decisions made, file states, and remaining tasks. Be thorough — this replaces the raw history.",
+  }),
+  files_read: Type.Optional(
+    Type.String({
+      description: "Comma-separated paths of files that were read/examined",
+    }),
+  ),
+  files_modified: Type.Optional(
+    Type.String({
+      description: "Comma-separated paths of files that were created/edited",
+    }),
+  ),
+  decisions: Type.Optional(
+    Type.String({
+      description: "Comma-separated key decisions made during this work",
+    }),
+  ),
+  next_steps: Type.Optional(
+    Type.String({
+      description: "Comma-separated remaining tasks / next steps",
+    }),
+  ),
+});
 
 export function registerCompressTool(
   pi: ExtensionAPI,
   config: DCPConfig,
-  nudge: (msg: string) => void,
+  nudge?: (msg: string) => void,
 ): void {
-  if (compressToolRegistered) return;
-
-  pi.registerTool("compress", COMPRESS_TOOL_DESCRIPTION, async (params) => {
-    const sessionId = pi.sessionManager.getSessionFile() ?? pi.cwd;
-    const { fields, narrative } = extractStructuredFields(params, config);
-    const topic = (params.topic as string) ?? "session-context";
-
-    const startLabel = (params.start_message_id as string) ?? "auto";
-    const endLabel = (params.end_message_id as string) ?? "auto";
-
-    const block = addBlock(
-      sessionId,
-      topic,
-      narrative,
-      startLabel,
-      endLabel,
-      {
-        files_read: fields.files_read,
-        files_modified: fields.files_modified,
-        decisions: fields.decisions,
-        next_steps: fields.next_steps,
+  pi.registerTool({
+    name: "compress",
+    label: "compress",
+    description: COMPRESS_TOOL_DESCRIPTION,
+    parameters: compressParams,
+    async execute(
+      _toolCallId: string,
+      params: {
+        summary: string;
+        files_read?: string;
+        files_modified?: string;
+        decisions?: string;
+        next_steps?: string;
       },
-    );
+      _signal: AbortSignal | undefined,
+      _onUpdate: unknown,
+      ctx: ExtensionContext,
+    ) {
+      if (config.compress.permission === "deny") {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "DCP compress denied by config (compress.permission=deny).",
+            },
+          ],
+          details: { denied: true },
+        };
+      }
 
-    mergeIntoPersistentSummary(sessionId, fields, topic, block.blockId);
+      const sessionId = getDcpSessionId(ctx);
+      const { fields, narrative } = extractStructuredFields(
+        params as Record<string, unknown>,
+        config,
+      );
+      const mode = "manual";
 
-    if (config.structuredSummary.qualityProbes?.enabled) {
-      const probeResults = evaluateCompressionProbes(
-        fields,
+      const block = addBlock(
+        sessionId,
+        "manual",
         narrative,
-        block.summaryTokens,
-        config.structuredSummary.qualityProbes ?? {
-          enabled: true,
-          minFileCoverage: 50,
-          minDecisionCoverage: 50,
-          minNarrativeDepth: 50,
-          minStructureCompleteness: 50,
-          minProbePassRate: 60,
+        "manual",
+        "manual",
+        {
+          files_read: fields.files_read,
+          files_modified: fields.files_modified,
+          decisions: fields.decisions,
+          next_steps: fields.next_steps,
+          source: mode,
         },
       );
-      recordProbeResults(sessionId, probeResults);
 
-      if (!probeResults.allPassed && nudge) {
-        const failedProbes = probeResults.probes
-          .filter((p) => !p.pass)
-          .map((p) => `${p.name}: ${p.detail}`)
-          .join("; ");
-        nudge(`Compression quality warning — ${failedProbes}`);
+      mergeIntoPersistentSummary(sessionId, fields, "manual", block.blockId);
+      recordCompressEvent(sessionId, block.blockId, fields);
+
+      if (config.probeEvaluation.enabled) {
+        const probeResult = evaluateCompressionProbes(
+          fields,
+          narrative,
+          block.summaryTokens,
+          config.probeEvaluation,
+        );
+        recordProbeResults(sessionId, probeResult);
       }
-    }
 
-    recordCompressFiles(
-      sessionId,
-      [...fields.files_read, ...fields.files_modified],
-    );
-
-    const state = getState(sessionId);
-    const quality = state.qualityMetrics;
-    quality.totalCompressions++;
-    if (config.structuredSummary.qualityProbes?.enabled) {
-      const probe = evaluateCompressionProbes(
-        fields,
-        narrative,
-        block.summaryTokens,
-        config.structuredSummary.qualityProbes,
+      pi.appendEntry(
+        DCP_STATE_ENTRY_TYPE,
+        makeDcpStateEntryPayload(sessionId, "manual-compress"),
       );
-      if (probe.allPassed) {
-        quality.cleanCompressions++;
+
+      const stats = getStats(sessionId);
+      const qualityStatus = getQualityStatus(sessionId);
+      const qm = getQualityMetrics(sessionId);
+      const first = getBlocks(sessionId).length <= 1;
+
+      if (nudge) {
+        nudge(
+          `Manual compress recorded (b${block.blockId}). ${qualityStatus}`,
+        );
       }
-    } else {
-      quality.cleanCompressions++;
-    }
 
-    state.currentTurn = quality.totalCompressions;
+      const lines = [
+        `DCP compress saved as block b${block.blockId}.`,
+        `Summary tokens: ~${block.summaryTokens}. Store: ${stats.blockCount} blocks, ~${stats.summaryTokens} summary tokens.`,
+        first ? "" : qualityStatus,
+      ].filter(Boolean);
 
-    const summaryMessage = buildCompressedSummaryMessage(
-      state.persistentSummary,
-    );
-
-    const stats = getStats(sessionId);
-    const isFirst = state.blocks.length <= 1;
-
-    return {
-      blockId: block.blockId,
-      blockCount: stats.blockCount,
-      summary: summaryMessage,
-      probeResults: quality.lastProbeResults,
-      qualityStatus: isFirst ? undefined : getQualityStatus(sessionId),
-    };
-  });
-
-  pi.on("afterToolCall", (event) => {
-    if (!event?.result?.details?.dcpStateEvent) return;
-    const sessionId = pi.sessionManager.getSessionFile() ?? pi.cwd;
-    const payload = makeDcpStateEntryPayload(sessionId, "tool-call auto-save");
-    try {
-      const details = event.result as Record<string, unknown>;
-      if (!details.dcp) {
-        details.dcp = {};
+      if (config.probeEvaluation.enabled && qm.lastProbeResults) {
+        const probeLines: string[] = [
+          "",
+          "--- Compression quality probes ---",
+        ];
+        for (const p of qm.lastProbeResults.probes) {
+          const icon = p.pass ? "PASS" : "FAIL";
+          probeLines.push(
+            `  [${icon}] ${p.name}: ${p.score}/100 — ${p.detail}`,
+          );
+        }
+        const overallIcon = qm.lastProbeResults.allPassed ? "PASS" : "FAIL";
+        probeLines.push(
+          `  [${overallIcon}] Overall: ${qm.lastProbeResults.overallScore}/100`,
+        );
+        lines.push(...probeLines);
       }
-      (details.dcp as Record<string, unknown>).snapshot = payload.snapshot;
-    } catch {
-      // Best-effort: can't modify frozen results
-    }
-  });
 
-  compressToolRegistered = true;
+      return {
+        content: [{ type: "text" as const, text: lines.join("\n") }],
+        details: {
+          blockId: block.blockId,
+          topic: block.topic,
+          mode,
+          summaryTokens: block.summaryTokens,
+          summaryBufferTokens: stats.summaryTokens,
+          files: fields,
+          quality: qm,
+        },
+      };
+    },
+    renderResult(
+      result: {
+        content: Array<{ type: string; text?: string }>;
+        details?: unknown;
+      },
+      options: { expanded: boolean; isPartial: boolean },
+      theme: {
+        fg: (color: string, text: string) => string;
+        bold: (text: string) => string;
+      },
+    ) {
+      return renderCompressResult(result as never, options, theme as never);
+    },
+  });
 }
