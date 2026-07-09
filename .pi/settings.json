@@ -1,8 +1,8 @@
 {
-  "defaultProvider": "opencode-go",
-  "defaultModel": "minimax-m3",
+  "defaultProvider": "agent-router",
+  "defaultModel": "glm-5.2",
   "defaultThinkingLevel": "high",
-  "editorPaddingX": 1,
+  "editorPaddingX": 0,
   "images": {
     "blockImages": false
   },

@@ -10,7 +10,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import safetyExtension from "../safety.js";
-import { buildSubprocessEnv } from "./env-policy.js";
 import { evaluate } from "./evaluate.js";
 import { defaultRules } from "./rules/presets.js";
 import { VerificationTracker, verificationRules } from "./rules/verification.js";
@@ -127,21 +126,13 @@ function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 	})?.kind, "confirm", t);
 }
 
-{
-	const t = "env-policy rejects override keys outside the selected policy";
-	assert.throws(
-		() => buildSubprocessEnv("webclaw", { AWS_SECRET_ACCESS_KEY: "leak" }),
-		/override is not allowed/i,
-		t,
-	);
-}
 
 {
 	const t = "dangerous network targets block encoded localhost and link-local addresses";
 	const { rules } = defaultRules();
 	for (const url of ["http://2130706433", "http://0x7f000001", "http://[::ffff:127.0.0.1]", "http://[fe80::1]"]) {
 		const verdict = verdictFor(rules, {
-			tool: "webclaw_scrape",
+			tool: "web_fetch",
 			url,
 			cwd: "/repo",
 			sessionId: "s1",

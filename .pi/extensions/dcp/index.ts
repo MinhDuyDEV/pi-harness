@@ -37,9 +37,6 @@ import {
   buildContextMeterSnapshot,
   estimateOutboundContextTokens,
 } from "./context-meter.js";
-import {
-  resolveAutoCompactThreshold,
-} from "./pressure.js";
 import { registerRecallTool } from "./recall.js";
 import {
   getCompactionMetadata,
@@ -58,7 +55,6 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   if (!config.enabled) return;
 
   const nudge = new NudgeManager(config);
-  let autoCompactInvokePending = false;
   let initialized = false;
 
   function appendDcpStateEntry(ctx: ExtensionContext, reason: string): void {
@@ -134,30 +130,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         contextWindow,
       );
 
-      const nudgeStateBefore = nudge.getState();
       nudge.checkContext(ctx, meter);
-      const nudgeStateAfter = nudge.getState();
-
-      if (config.debug) {
-        resolveAutoCompactThreshold(config.autoCompact, contextWindow);
-      }
-
-      const crossedThreshold =
-        config.autoCompact.invokeNativeCompact &&
-        config.autoCompact.enabled &&
-        !nudgeStateBefore.autoCompactTriggered &&
-        nudgeStateAfter.autoCompactTriggered;
-
-      if (crossedThreshold && !autoCompactInvokePending) {
-        autoCompactInvokePending = true;
-        try {
-          await ctx.compact({ reason: "threshold" });
-        } catch {
-          // Pi may reject compact (in-flight turn, etc.)
-        } finally {
-          autoCompactInvokePending = false;
-        }
-      }
     } catch {
       // best-effort
     }

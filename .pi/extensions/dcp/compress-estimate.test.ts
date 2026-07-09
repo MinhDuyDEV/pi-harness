@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Message } from "@earendil-works/pi-ai";
-import { enrichCompactionResult, estimateTokensAfterCompress } from "./compress.js";
+import { enrichCompactionResult, estimateTokensAfterCompress, estimateTokens } from "./compress.js";
 
 describe("estimateTokensAfterCompress", () => {
   test("returns undefined without context baseline", () => {
@@ -30,9 +30,13 @@ describe("enrichCompactionResult", () => {
       preparation,
     );
     expect(enriched.estimatedTokensAfter).toBeDefined();
-    // removed ~100 tokens (400 chars), summary ~200+ tokens after growth
-    expect(enriched.estimatedTokensAfter!).toBe(
-      estimateTokensAfterCompress(10_000, 100, Math.ceil(enriched.summary.length / 4)),
-    );
+        // Verify the estimator derives removedEstimate via estimateTokens(userMsg).
+        expect(enriched.estimatedTokensAfter!).toBe(
+          estimateTokensAfterCompress(
+            10_000,
+            estimateTokens(userMsg),
+            Math.ceil(enriched.summary.length / 4),
+          ),
+        );
   });
 });

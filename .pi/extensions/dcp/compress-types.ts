@@ -67,9 +67,8 @@ const COMPACTABLE_TOOLS = new Set([
   "glob",
   "webfetch",
   "websearch",
-  "codesearch",
-  "grepsearch",
-  "multi_grep",
+      "codesearch",
+      "multi_grep",
 ]);
 
 export function isCompactableTool(toolName: string): boolean {
@@ -81,13 +80,10 @@ export const READ_TOOLS = new Set([
   "grep",
   "find",
   "ls",
-  "multi_grep",
-  "grepsearch",
-  "web_fetch",
-  "webclaw_scrape",
-  "webclaw_batch",
-  "context7",
-]);
+      "multi_grep",
+      "web_fetch",
+      "context7",
+    ]);
 
 export const MODIFY_TOOLS = new Set(["write", "edit"]);
 

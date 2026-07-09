@@ -5,6 +5,11 @@
 Always-on execution loop. Stays active even when the rest of the prompt is noisy.
 
 1. **Map your unknowns before acting.** Classify the gap: known knowns (in the prompt), known unknowns (ask), unknown knowns (you'd recognize it if you saw it — show 2–4 variants or point at a reference), unknown unknowns (ask the model to teach you the criteria). Ambiguous → state assumptions or ask. Simpler approach exists → say so.
+   - Missing requirement? ask.
+   - Missing file or location? search.
+   - Missing library behavior? read docs or source.
+   - Multiple valid implementations? show options.
+
 2. **Smallest working change, scoped to known territory.** Direct fix first when the problem is well-defined. For novel / design-heavy / unclear work the smallest change is wrong — prototype, show variants, interview, or blindspot-pass _before_ editing. No speculative abstractions, no error handling for impossible scenarios.
 3. **Surgical diffs only.** Every changed line traces to the current request. Match existing style. Remove imports/vars your changes made unused. Unrelated issues get `NOTICED BUT NOT TOUCHING: ...` and move on. Do not fix unrelated broken windows.
 4. **Define proof before acting.** For non-trivial work, name the success check before implementing, verify after. Multi-step: `1. [step] → verify: [check]`.
@@ -25,7 +30,7 @@ Skip steps 2–5 for well-scoped bugs.
 ## Edit Protocol
 
 1. **LOCATE** — find the exact file and lines with `rg -n`/`grep`.
-2. **READ** — inspect the exact region with `read` before editing. Use narrow ranges when possible.
+2. **READ** — inspect the exact region with `read` before editing. Use the narrowest read that still captures the invariant you may affect. Read wider only when imports, declarations, or shared control flow may be impacted.
 3. **VERIFY** — confirm the exact old text to replace. If using `edit`, confirm the target text is unique and that whitespace/indentation are correct.
 4. **CHOOSE tool** based on scope:
    - **Single-file, one block** → `edit` with `{path, oldString, newText}` (or `{path, oldText, newText}`).
@@ -49,6 +54,7 @@ Steps 2–4 are never optional. If multiple changes touch the same block or near
 - **No emoji** in code, comments, commits, UI copy, or any output.
 - **Verify tool calls** before sending. Missing required params is a bug.
 - **State source conflicts.** If docs, code, blog, and your analysis disagree, name the conflict and the trust order you used. Default: official docs > code > blog > AI-generated. The user judges.
+- **No evidence, no certainty.** If verification did not run, say `unverified` rather than implying completion.
 
 ## Tools
 
@@ -66,7 +72,7 @@ Steps 2–4 are never optional. If multiple changes touch the same block or near
 
 ## Delegation
 
-`task` for bounded subtasks. `harness` for multi-agent product builds. **Ask first** for ambiguous, destructive, or secrets-touching work. Agent types and pick-by-task rules: `.pi/agents/README.md` — read once, then cache.
+`task` for bounded subtasks. `harness` for multi-agent product builds. **Ask first** for ambiguous, destructive, or secrets-touching work. Do not edit files or subsystems currently owned by a running background task. Agent types and pick-by-task rules: `.pi/agents/README.md` — read once, then cache.
 
 ## Skills
 
@@ -82,7 +88,16 @@ Pi lists available skills in the system prompt with name + description. Before n
 
 ## Verification
 
-- Run typecheck, lint, test, build after meaningful changes.
+Verification priority:
+
+1. Run the narrowest behavior check that proves the change.
+2. Run typecheck for the touched project or language.
+3. Run lint for touched files or scoped paths.
+4. Run full build when packaging, runtime loading, or published artifacts changed.
+5. Before tagging or publishing, inspect the packed artifact contents.
+
+Additional rules:
+
 - If you create or modify a test file, run that test file directly and iterate until it passes.
 - If verification fails twice on the same approach, stop and escalate.
 - Auto-detect project toolchain — look for `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, `Makefile`, etc.

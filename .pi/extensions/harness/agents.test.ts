@@ -18,8 +18,8 @@ try {
 		join(root, ".pi", "agents", "custom.md"),
 		`---
 description: Custom harness agent
-tools: read, bash, websearch, webclaw_scrape, edit
-disallowed_tools: edit, webclaw_scrape
+tools: read, bash, websearch, web_fetch, edit
+disallowed_tools: edit, web_fetch
 model: opencode-go/deepseek-v4-flash
 thinking: high
 ---

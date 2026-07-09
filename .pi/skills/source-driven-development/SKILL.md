@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [research, implementation, verification]
 dependencies: []
 agent_types: [scout, planner, worker]
-tools: [context7, websearch, web_fetch, webclaw_scrape, grepsearch, codesearch]
+    tools: [context7, websearch, web_fetch, codesearch]
 ---
 
 # Source-Driven Development
@@ -89,7 +89,7 @@ Higher-ranked sources win on conflicts.
 
 ## Consolidated Research Workflow
 
-This is the canonical active source-grounding skill. It absorbs deep-research and source-code-research for normal work. Use opensrc, webclaw, context7, grepsearch, or gemini-large-context as tool-specific companions only when the source demands them.
+This is the canonical active source-grounding skill. It absorbs deep-research and source-code-research for normal work. Use opensrc, context7, or gemini-large-context as tool-specific companions only when the source demands them.
 
 Evidence hierarchy:
 1. local code and tests;

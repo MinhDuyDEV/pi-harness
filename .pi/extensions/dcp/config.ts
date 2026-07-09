@@ -50,8 +50,8 @@ export interface AutoCompactConfig {
   /** Optional 0-1 ratio; when set, threshold = contextWindow * ratio. */
   thresholdRatio?: number;
   /**
-   * When true, call ctx.compact() once when threshold is crossed (Pi native compaction;
-   * DCP still hooks session_before_compact when deterministicCompaction is enabled).
+   * When true, rely on Pi's native overflow compaction instead of the legacy critical nudge.
+   * DCP still hooks session_before_compact when deterministicCompaction is enabled.
    * When false, only inject the critical nudge (legacy behavior).
    */
   invokeNativeCompact: boolean;
@@ -214,9 +214,8 @@ export const DEFAULT_CONFIG: DCPConfig = {
       "glob",
       "webfetch",
       "websearch",
-      "codesearch",
-      "grepsearch",
-      "multi_grep",
+        "codesearch",
+        "multi_grep",
     ],
   },
   qualityMetrics: {
