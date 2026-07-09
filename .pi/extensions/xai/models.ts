@@ -9,6 +9,9 @@ import {
   XAI_RESPONSES_URL,
 } from "./constants";
 
+// Pi's provider model schema only exposes text/image capability metadata.
+// xAI Responses can also accept PDFs via input_file; payload.ts normalizes
+// those request parts without widening pi's model input enum.
 export const MODELS = [
   {
     id: "grok-4.5",

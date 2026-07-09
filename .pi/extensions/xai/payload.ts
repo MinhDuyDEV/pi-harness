@@ -1,10 +1,62 @@
 import type { Api, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { normalizeXaiPdfInput } from "./files";
 import { normalizeXaiImageInput } from "./images";
 import { grokSupportsReasoningEffort, isGrokCliProxyModel, normalizedXaiModelId } from "./models";
 import { textFromResponsesContent } from "./text";
 
-function normalizeResponsesImageParts(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(normalizeResponsesImageParts);
+function extractNormalizedPdfPart(obj: Record<string, any>): Record<string, any> | undefined {
+  const source = obj.type === "file" && obj.file && typeof obj.file === "object" ? { ...(obj.file as Record<string, any>) } : obj;
+  const filename =
+    typeof source.filename === "string"
+      ? source.filename
+      : typeof source.name === "string"
+        ? source.name
+        : typeof obj.filename === "string"
+          ? obj.filename
+          : undefined;
+  const mimeType =
+    typeof source.mimeType === "string"
+      ? source.mimeType
+      : typeof source.mediaType === "string"
+        ? source.mediaType
+        : typeof obj.mimeType === "string"
+          ? obj.mimeType
+          : typeof obj.mediaType === "string"
+            ? obj.mediaType
+            : undefined;
+
+  if (typeof source.file_id === "string" && source.file_id) {
+    return {
+      type: "input_file",
+      file_id: source.file_id,
+      ...(typeof filename === "string" && filename ? { filename } : {}),
+    };
+  }
+
+  const fileUrl = typeof source.file_url === "object" && source.file_url ? source.file_url.url : source.file_url;
+  const fileData = typeof source.file_data === "object" && source.file_data ? source.file_data.data : source.file_data;
+  const candidate =
+    typeof fileUrl === "string"
+      ? fileUrl
+      : typeof fileData === "string"
+        ? fileData
+        : typeof source.url === "string"
+          ? source.url
+          : typeof source.data === "string"
+            ? source.data
+            : undefined;
+
+  const normalized = normalizeXaiPdfInput(candidate, { mimeType, filename });
+  if (!normalized) return undefined;
+
+  return {
+    type: "input_file",
+    ...normalized,
+  };
+}
+
+function normalizeResponsesMediaParts(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(normalizeResponsesMediaParts);
   if (!value || typeof value !== "object") return value;
 
   const obj: Record<string, any> = { ...(value as Record<string, any>) };
@@ -15,6 +67,10 @@ function normalizeResponsesImageParts(value: unknown): unknown {
       detail: typeof obj.detail === "string" && obj.detail ? obj.detail : "auto",
     };
   }
+
+  const normalizedPdfPart = extractNormalizedPdfPart(obj);
+  if (normalizedPdfPart) return normalizedPdfPart;
+
   if (obj.type === "image_url") {
     const imageUrl = typeof obj.image_url === "object" && obj.image_url ? obj.image_url.url : obj.image_url;
     const detail = typeof obj.image_url === "object" && obj.image_url ? obj.image_url.detail : obj.detail;
@@ -30,8 +86,8 @@ function normalizeResponsesImageParts(value: unknown): unknown {
     if (typeof detail === "string" && detail) obj.detail = detail;
     if (typeof obj.detail !== "string" || !obj.detail) obj.detail = "auto";
   }
-  if (Array.isArray(obj.content)) obj.content = normalizeResponsesImageParts(obj.content);
-  if (Array.isArray(obj.output)) obj.output = normalizeResponsesImageParts(obj.output);
+  if (Array.isArray(obj.content)) obj.content = normalizeResponsesMediaParts(obj.content);
+  if (Array.isArray(obj.output)) obj.output = normalizeResponsesMediaParts(obj.output);
   return obj;
 }
 
@@ -58,7 +114,7 @@ function textForFunctionCallOutput(output: unknown): string {
 }
 
 function normalizeXaiResponsesInput(input: unknown[], model: Model<Api>): unknown[] {
-  const normalizedInput = input.map(normalizeResponsesImageParts) as Record<string, any>[];
+  const normalizedInput = input.map(normalizeResponsesMediaParts) as Record<string, any>[];
   const rewritten: unknown[] = [];
   const modelExtras = model as Model<Api> & { input?: unknown };
   const modelInputs = Array.isArray(modelExtras.input) ? (modelExtras.input as unknown[]) : [];
@@ -174,7 +230,11 @@ export function rewriteXaiResponsesPayload(payload: unknown, model: Model<Api>, 
   // xAI doesn't implement OpenAI's prompt_cache_retention knob. Keep the
   // cache key (xAI documents it as a body field), but remove retention.
   delete body.prompt_cache_retention;
-  if (options?.sessionId && !body.prompt_cache_key) body.prompt_cache_key = options.sessionId;
+  if (body.prompt_cache_key === false) {
+    delete body.prompt_cache_key;
+  } else if (options?.sessionId && !body.prompt_cache_key) {
+    body.prompt_cache_key = options.sessionId;
+  }
 
   return body;
 }
