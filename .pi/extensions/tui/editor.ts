@@ -172,7 +172,6 @@ export class AmpBoxEditor extends CustomEditor {
         // Render autocomplete list directly (avoids double-render via super.render)
         const ac = this as any;
         const hasAutocomplete = ac.autocompleteState && ac.autocompleteList;
-        lines.push(""); // breathing room before footer or autocomplete
         if (hasAutocomplete) {
           const autocompleteIndent = " ".repeat(padX);
           const autocompleteWidth = Math.max(
