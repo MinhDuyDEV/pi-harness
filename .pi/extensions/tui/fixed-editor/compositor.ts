@@ -68,6 +68,11 @@ import {
   createScrollState,
   scrollOffsetForRow,
 } from "./scroll-state.js";
+import {
+  createHeightStabilizeState,
+  suppressClusterDrivenHeightChange,
+  type HeightStabilizeState,
+} from "./height-stabilize.js";
 type MutableScrollState = { -readonly [K in keyof ScrollState]: ScrollState[K] };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -278,6 +283,10 @@ export class FixedEditorCompositor {
   private renderPassActive = false;
   private renderingCluster = false;
   private checkingOverlay = false;
+  /** Tracks physical terminal rows so cluster height churn does not full-clear. */
+  private heightStabilize: HeightStabilizeState = createHeightStabilizeState();
+  /** Last measured scrollable rows; used during re-entrant terminal.rows reads. */
+  private lastScrollableRows: number | null = null;
 
   // Diagnostics
   private interceptedWrites = 0;
@@ -325,7 +334,26 @@ export class FixedEditorCompositor {
         this.renderPassActive = true;
         this.renderPassCluster = null;
         try {
+          // Slash autocomplete / selectors grow the bottom cluster → onRows shrinks.
+          // pi-tui treats that as a physical resize and full-clears (2J/3J) = black flash.
+          // Measure after clearing pass cache so autocomplete height is current.
+          // Rewind previousHeight for cluster-only changes; still full-clear on real resize.
+          suppressClusterDrivenHeightChange(
+            this.heightStabilize,
+            this.tui,
+            this.getRawRows(),
+            this.getScrollableRows(),
+          );
           this.originalTuiDoRender?.();
+          // Editor.render re-enters terminal.rows mid-pass; re-sync if drifted.
+          const post = this.getScrollableRows();
+          const tuiAny = this.tui as { previousHeight?: number };
+          if (
+            tuiAny.previousHeight !== undefined &&
+            tuiAny.previousHeight !== post
+          ) {
+            tuiAny.previousHeight = post;
+          }
           this.repaintFixedCluster();
         } finally {
           this.renderPassActive = false;
@@ -342,6 +370,11 @@ export class FixedEditorCompositor {
       if (!this.disposed) this.restoreTerminalState();
     };
     process.once("exit", this.emergencyCleanup);
+
+    // clearOnShrink full-clears when previous frame had blank lines and content
+    // shrinks — common when slash autocomplete closes. With fixed editor the
+    // scroll region already isolates the chat pane; disable the flicker path.
+    (this.tui as { clearOnShrink?: boolean }).clearOnShrink = false;
 
     this.installed = true;
   }
@@ -529,10 +562,20 @@ export class FixedEditorCompositor {
 
   private getScrollableRows(): number {
     const raw = this.getRawRows();
-    if (this.disposed || this.painting || this.renderingCluster || this.hasVisibleOverlay()) return raw;
+    // Overlays / paint own the full screen.
+    if (this.disposed || this.painting || this.hasVisibleOverlay()) return raw;
+    // Re-entrancy: editor.render() reads tui.terminal.rows while we measure
+    // the cluster. Returning `raw` here sized autocomplete against the full
+    // terminal, then the outer measurement saw a different height → pi-tui
+    // previousHeight drift → full clear (black flash) on `/` slash autocomplete.
+    if (this.renderingCluster) {
+      return this.lastScrollableRows ?? raw;
+    }
     const w = Math.max(1, this.terminal.columns || 80);
     const cluster = this.getCachedCluster(w, raw);
-    return Math.max(1, raw - cluster.lines.length);
+    const rows = Math.max(1, raw - cluster.lines.length);
+    this.lastScrollableRows = rows;
+    return rows;
   }
 
   private hasVisibleOverlay(): boolean {

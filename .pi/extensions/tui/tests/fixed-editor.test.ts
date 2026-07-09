@@ -657,28 +657,45 @@ test("keyboard navigation jumps scrollable chat to top and bottom", () => {
   fixture.compositor.dispose();
 });
 
-test("pi-tui settings read persisted fixed-editor scroll shortcuts", () => {
-  const dir = mkdtempSync(join(tmpdir(), "pi-tui-settings-"));
-  try {
-    mkdirSync(join(dir, ".pi"));
-    writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify({
-      piTui: {
-        fixedEditor: {
-          scrollChatUp: "ctrl+shift+u",
-          scrollChatDown: "ctrl+shift+d",
-          scrollChatTop: "ctrl+shift+home",
-          scrollChatBottom: "ctrl+shift+end",
-        },
-      },
-    }));
+    test("pi-tui settings read persisted fixed-editor settings", () => {
+      const dir = mkdtempSync(join(tmpdir(), "pi-tui-settings-"));
+      try {
+        mkdirSync(join(dir, ".pi"));
+        writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify({
+          piTui: {
+            fixedEditor: {
+              enabled: true,
+              scrollChatUp: "ctrl+shift+u",
+              scrollChatDown: "ctrl+shift+d",
+              scrollChatTop: "ctrl+shift+home",
+              scrollChatBottom: "ctrl+shift+end",
+            },
+          },
+        }));
 
-    assert.deepEqual(readPiTuiSettings(dir).keyboardScrollShortcuts, {
-      up: "ctrl+shift+u",
-      down: "ctrl+shift+d",
-      top: "ctrl+shift+home",
-      bottom: "ctrl+shift+end",
+        assert.equal(readPiTuiSettings(dir).fixedEditorEnabled, true);
+        assert.deepEqual(readPiTuiSettings(dir).keyboardScrollShortcuts, {
+          up: "ctrl+shift+u",
+          down: "ctrl+shift+d",
+          top: "ctrl+shift+home",
+          bottom: "ctrl+shift+end",
+        });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
     });
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
+
+    test("pi-tui settings default fixed editor to false", () => {
+      const dir = mkdtempSync(join(tmpdir(), "pi-tui-settings-default-"));
+      try {
+        mkdirSync(join(dir, ".pi"));
+        writeFileSync(join(dir, ".pi", "settings.json"), JSON.stringify({
+          piTui: {},
+        }));
+
+        assert.equal(readPiTuiSettings(dir).fixedEditorEnabled, false);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+

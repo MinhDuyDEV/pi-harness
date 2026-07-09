@@ -22,6 +22,7 @@ export interface PiTuiSettings {
    * explicitly opted out. Only `true` means "user wants the tab-bar progress".
    */
   showTerminalProgress?: boolean;
+  fixedEditorEnabled?: boolean;
   keyboardScrollShortcuts?: {
     up: string;
     down: string;
@@ -124,7 +125,15 @@ export function readPiTuiSettings(cwd: string): PiTuiSettings {
 
   const block = readPiTuiBlock(projectParsed);
   const workingPaddingTop = readWorkingPaddingTop(block?.workingPaddingTop);
-  const fixedEditor = block?.fixedEditor as Record<string, unknown> | undefined;
+
+  // Resolve fixed-editor enable from several historical *project* shapes.
+  // Live project settings used `powerline.fixedEditor: true` which was
+  // silently ignored (reader only accepted piTui.fixedEditor.enabled === true),
+  // so compositor + height-stabilize never installed → slash black flash.
+  // Project-only: do not inherit global fixedEditor (avoids surprise enable).
+  const resolved = resolveFixedEditorConfig(projectParsed, block);
+  const fixedEditorEnabled = resolved.enabled;
+  const fixedEditor = resolved.block;
   const up = nonEmptyString(fixedEditor?.scrollChatUp);
   const down = nonEmptyString(fixedEditor?.scrollChatDown);
   const shortcuts =
@@ -142,7 +151,46 @@ export function readPiTuiSettings(cwd: string): PiTuiSettings {
           },
         }
       : {};
-  return { workingPaddingTop, showTerminalProgress, editorPaddingX, ...shortcuts };
+  return { workingPaddingTop, showTerminalProgress, editorPaddingX, fixedEditorEnabled, ...shortcuts };
+}
+
+/**
+ * Accept (project settings only):
+ * - piTui.fixedEditor: true
+ * - piTui.fixedEditor: { enabled: true, scrollChatUp, ... }
+ * - powerline.fixedEditor: true  (legacy misplaced key still in project settings)
+ * - top-level fixedEditor: true | { enabled }
+ */
+function resolveFixedEditorConfig(
+  projectParsed: Record<string, unknown>,
+  piTuiBlock: Record<string, unknown> | undefined,
+): { enabled: boolean; block: Record<string, unknown> | null } {
+  const candidates: unknown[] = [
+    piTuiBlock?.fixedEditor,
+    projectParsed.fixedEditor,
+    (projectParsed.powerline as Record<string, unknown> | undefined)?.fixedEditor,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === true) return { enabled: true, block: null };
+    if (candidate === false) return { enabled: false, block: null };
+    if (candidate && typeof candidate === "object") {
+      const obj = candidate as Record<string, unknown>;
+      if ("enabled" in obj) {
+        return { enabled: obj.enabled === true, block: obj };
+      }
+      // Object with shortcuts but no `enabled` → treat as enabled (legacy).
+      if (
+        "scrollChatUp" in obj ||
+        "scrollChatDown" in obj ||
+        "scrollChatTop" in obj ||
+        "scrollChatBottom" in obj
+      ) {
+        return { enabled: true, block: obj };
+      }
+    }
+  }
+  return { enabled: false, block: null };
 }
 
 /** @deprecated Use readPiTuiSettings */
