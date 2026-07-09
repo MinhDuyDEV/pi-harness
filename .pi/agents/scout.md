@@ -6,7 +6,7 @@ model: opencode-go/deepseek-v4-flash
 thinking: high
 readonly: true
 proactive: true
-skills: memory, source-driven-development, brave-search, webclaw, opensrc
+skills: memory, source-driven-development, brave-search, opensrc
 prompt_mode: append
 ---
 
@@ -49,7 +49,6 @@ Pi scout = external **docs/web** and cited sources — not OpenCode-style manage
 - `deepwiki`: public GitHub repo docs/Q&A.
 - `websearch` / `codesearch`: discover current docs, examples, discussions.
 - `web_fetch`: read selected search results.
-- `webclaw_scrape` / `webclaw_batch`: direct static/protected pages.
 - Browser tools only when JavaScript rendering is required.
 
 ## Parallel Research

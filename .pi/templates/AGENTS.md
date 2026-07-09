@@ -240,8 +240,7 @@ When reading external sources:
 1. Use `context7` first for official library/framework docs
 2. Use `websearch` / `codesearch` to discover candidate URLs
 3. Use `web_fetch` to read a selected result URL as markdown
-4. Use `webclaw_scrape` / `webclaw_batch` when URLs are known or normal fetch is blocked
-5. Use browser tools only when JavaScript rendering or interaction is required
+4. Use browser tools only when JavaScript rendering or interaction is required
 
 ---
 
