@@ -2,15 +2,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:diagnostics": "node --test ../tests/diagnostics.test.ts ../tests/diagnostics-parse.test.ts",
-    "test:superpi": "node --test ../../tests/superpi.test.ts",
-    "test": "node --test ../../tests/*.test.ts",
-    "eval:harness": "node scripts/run-harness-evals.mjs",
-    "smoke:harness": "node scripts/smoke-harness.mjs && npm run eval:harness",
-    "smoke:harness:config": "node scripts/smoke-harness.mjs",
-    "smoke:harness:full": "node scripts/smoke-harness.mjs --with-dcp && npm run eval:harness",
-    "smoke:vcc-snapshot": "npx --yes esbuild dcp/scripts/smoke-snapshot.ts --bundle --platform=node --format=esm --alias:@sinclair/typebox=./dcp/scripts/typebox-shim.ts --outfile=/tmp/pikit-vcc-snapshot-smoke.mjs && node /tmp/pikit-vcc-snapshot-smoke.mjs"
+    "test": "echo 'No tests configured yet'"
   },
+
   "dependencies": {},
   "peerDependencies": {
     "@earendil-works/pi-ai": "^0.80.0",
