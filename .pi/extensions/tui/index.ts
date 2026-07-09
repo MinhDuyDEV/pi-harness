@@ -20,7 +20,8 @@ import {
   renderTodosWidget,
   type TodosState,
 } from "./todos-panel.js";
-import { createDefaultFooterState, createFooterRenderer } from "./footer.js";
+import { createDefaultFooterState } from "./footer.js";
+import { streamingPromptFramesForThinkingLevel } from "./editor-prompt.js";
 import {
   refreshGitInfo,
   invalidateGitStatus,
@@ -31,7 +32,6 @@ import { AmpBoxEditor } from "./editor.js";
 import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.js";
 import { readPiTuiSettings, type PiTuiSettings } from "./settings.js";
 import {
-  formatWorkingMessageWithPaddingTop,
   pickRandomWorkingQuote,
   workingStatusSpacerLines,
 } from "./working-indicator.js";
@@ -47,7 +47,7 @@ import {
 } from "./usage.js";
 
 /** Lightweight wave animation for the editor streaming prompt. ~200ms for smooth feel. */
-const STREAMING_PROMPT_FRAMES = ["≈", "≋", "⋍", "≋"];
+const DEFAULT_STREAMING_PROMPT_FRAMES = ["≈", "≋", "⋍", "≋"];
 const STREAMING_PROMPT_INTERVAL_MS = 200;
 
 const PROVIDER_DISPLAY: Record<string, string> = {
@@ -193,22 +193,16 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
   function applyWorkingRowPadding(ctx: ExtensionContext): void {
     if (!ctx.hasUI) return;
-    const top = piTuiSettings.workingPaddingTop ?? 1;
-    // Fixed-editor cluster adds blank rows in getStatusLines; avoid doubling with message newlines.
-    if (fixedEditorEnabled && compositor) {
-      ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
-      return;
-    }
-    const message = formatWorkingMessageWithPaddingTop(top);
-    if (message !== undefined) {
-      ctx.ui.setWorkingMessage(message);
-    } else {
-      ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
-    }
+    // Native Pi working rows render spinner + message inline. Prefixing the
+    // message with newlines splits them into separate rows (`⠧` then
+    // `Connecting neurons...`). Keep the native loader single-line.
+    // Fixed-editor spacing is handled separately via workingStatusSpacerLines().
+    ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
   }
 
   function startFooterAnim(ctx: ExtensionContext) {
-    if (editorStreamingPrompt === STREAMING_PROMPT_FRAMES[0]) return;
+    const frames = streamingPromptFramesForThinkingLevel(footer.thinkingLevel);
+    if (editorStreamingPrompt === frames[0]) return;
 
     // Restore Pi's native animated working indicator (spinner).
     if (ctx.hasUI) {
@@ -221,13 +215,16 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
     // Start lightweight wave animation for editor prompt character.
     streamPromptAnimFrame = 0;
-    setEditorStreamingPrompt(STREAMING_PROMPT_FRAMES[0]);
+    setEditorStreamingPrompt(frames[0]);
+    currentEditor?.setThinkingLevel(footer.thinkingLevel);
 
     if (!streamPromptAnimTimer) {
       streamPromptAnimTimer = setInterval(() => {
         if (!footer.isStreaming) return;
-        streamPromptAnimFrame = (streamPromptAnimFrame + 1) % STREAMING_PROMPT_FRAMES.length;
-        setEditorStreamingPrompt(STREAMING_PROMPT_FRAMES[streamPromptAnimFrame]);
+        const nextFrames = streamingPromptFramesForThinkingLevel(footer.thinkingLevel)
+          ?? DEFAULT_STREAMING_PROMPT_FRAMES;
+        streamPromptAnimFrame = (streamPromptAnimFrame + 1) % nextFrames.length;
+        setEditorStreamingPrompt(nextFrames[streamPromptAnimFrame]);
       }, STREAMING_PROMPT_INTERVAL_MS);
       streamPromptAnimTimer.unref?.();
     }
@@ -250,10 +247,8 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   }
 
   // ── Refresh UI ───────────────────────────────────────────────────────────
-  function ensureFooter(ctx: ExtensionContext) {
-    if (ctx.mode !== "tui" || footerInstalled) return;
-    ctx.ui.setFooter(createFooterRenderer(footer));
-    footerInstalled = true;
+  function ensureFooter(_ctx: ExtensionContext) {
+    // Custom footer disabled. Let Pi render its default footer.
   }
 
   function refreshUI(ctx: ExtensionContext) {
@@ -342,28 +337,29 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   let fixedQueueContainer: any = null;
   let fixedWidgetContainerBelow: any = null;
   let fixedFooterContainer: any = null;
-  let fixedEditorEnabled = true;
+  // Default OFF; session_start applies project settings.
+  let fixedEditorEnabled = false;
 
   // ── Session lifecycle ────────────────────────────────────────────────────
-      pi.on("session_start", async (_event, ctx) => {
-        // Do NOT call setWorkingVisible(false) here. The SDK auto-creates the
-        // working loader (spinner + working message) inside the status
-        // container in its message_start path, but only when `workingVisible`
-        // is still true. Flipping it to false here would prevent the spinner
-        // from ever being created, leaving the status row of the fixed
-        // cluster empty even while the agent is streaming.
-        if (ctx.hasUI) {
-          ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
-        }
-        footer.isStreaming = false;
-            footer.tokenCount = 0;
-            footer.contextWindow = 0;
-            setEditorStreamingPrompt(null);
-        footer.cwd = ctx.cwd;
-        footer.git = null;
-        footer.thinkingLevel = "";
-        footer.turnElapsed = 0;
-        footer.turnTokens = 0;
+  pi.on("session_start", async (_event, ctx) => {
+    // Do NOT call setWorkingVisible(false) here. The SDK auto-creates the
+    // working loader (spinner + working message) inside the status
+    // container in its message_start path, but only when `workingVisible`
+    // is still true. Flipping it to false here would prevent the spinner
+    // from ever being created, leaving the status row of the fixed
+    // cluster empty even while the agent is streaming.
+    if (ctx.hasUI) {
+      ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
+    }
+    footer.isStreaming = false;
+    footer.tokenCount = 0;
+    footer.contextWindow = 0;
+    setEditorStreamingPrompt(null);
+    footer.cwd = ctx.cwd;
+    footer.git = null;
+    footer.thinkingLevel = "";
+    footer.turnElapsed = 0;
+    footer.turnTokens = 0;
     footer.turnInputTokens = 0;
     footer.turnOutputTokens = 0;
     footer.turnCacheReadTokens = 0;
@@ -389,6 +385,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     // that doesn't match the path check below) still refresh the panel.
     watchTodosFile(ctx.cwd, ctx);
     piTuiSettings = readPiTuiSettings(ctx.cwd);
+    fixedEditorEnabled = piTuiSettings.fixedEditorEnabled === true;
     applyWorkingRowPadding(ctx);
     updateGit(ctx);
 
@@ -396,8 +393,17 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (ctx.mode === "tui") {
       ctx.ui.setEditorComponent((tui, theme, kb) => {
         tuiRef = tui;
-        currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme, piTuiSettings.editorPaddingX);
+        currentEditor = new AmpBoxEditor(
+          tui,
+          theme,
+          kb,
+          ctx.ui.theme,
+          piTuiSettings.editorPaddingX,
+          footer.thinkingLevel,
+        );
+
         currentEditor.setStreamingPrompt(editorStreamingPrompt);
+
 
         // After editor is created, initialize the compositor if fixed-editor is enabled
         tryInitCompositor(tui, ctx);
@@ -447,7 +453,6 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     }
     try {
       ctx.ui.setEditorComponent(undefined);
-      ctx.ui.setFooter(undefined);
     } catch {
       /* best effort */
     }
@@ -606,6 +611,13 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
   pi.on("thinking_level_select", async (event, _ctx) => {
     footer.thinkingLevel = event.level;
+    currentEditor?.setThinkingLevel(event.level);
+    if (streamPromptAnimTimer) {
+      streamPromptAnimFrame = 0;
+      const frames = streamingPromptFramesForThinkingLevel(event.level)
+        ?? DEFAULT_STREAMING_PROMPT_FRAMES;
+      setEditorStreamingPrompt(frames[0]);
+    }
     if (footer.tui) footer.tui.requestRender();
   });
 
@@ -678,8 +690,16 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     ctx.ui.setEditorComponent((tui, theme, kb) => {
       tuiRef = tui;
       currentEditor?.dispose();
-      currentEditor = new AmpBoxEditor(tui, theme, kb, ctx.ui.theme, piTuiSettings.editorPaddingX);
+      currentEditor = new AmpBoxEditor(
+        tui,
+        theme,
+        kb,
+        ctx.ui.theme,
+        piTuiSettings.editorPaddingX,
+        footer.thinkingLevel,
+      );
       currentEditor.setStreamingPrompt(editorStreamingPrompt);
+
       tryInitCompositor(tui, ctx);
       return currentEditor;
     });

@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDefaultFooterState, createFooterRenderer } from "../footer.js";
-import { editorPromptForState } from "../editor-prompt.js";
+import {
+  editorBorderColorForThinkingLevel,
+  editorPromptForState,
+  streamingPromptFramesForThinkingLevel,
+} from "../editor-prompt.js";
 import { displayedTurnUsage, restoreUsageSnapshotFromBranch } from "../usage.js";
 
 const plainTheme = {
@@ -24,21 +28,42 @@ test("footer renders visible icon turn stats by default", () => {
   assert.doesNotMatch(line, / 0\.0s|\bin 0\b|\bout 0\b|\bcache 0\/0\b|\bturn 0\.0s\b/);
 });
 
-test("footer does not render the streaming wave before the model", () => {
+test("footer does not render a duplicate custom streaming indicator", () => {
   const state = createDefaultFooterState();
   state.modelLabel = "model";
   state.isStreaming = true;
 
   const line = renderFooter(state, 120);
 
-  assert.doesNotMatch(line, /≈ model/);
+  assert.doesNotMatch(line, /⠼ Crunching tokens\.\.\./);
   assert.match(line, /model/);
 });
 
-test("editor prompt switches from chevron to streaming wave", () => {
-  assert.equal(editorPromptForState({ isShell: false, streamingPrompt: null }), " ");
-  assert.equal(editorPromptForState({ isShell: false, streamingPrompt: "≈" }), "≈ ");
-  assert.equal(editorPromptForState({ isShell: true, streamingPrompt: "≈" }), "$ ");
+
+test("editor prompt keeps glyph stable and only changes by state/color", () => {
+  assert.equal(
+    editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "medium" }),
+    " ",
+  );
+  assert.equal(
+    editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "high" }),
+    " ",
+  );
+  assert.equal(
+    editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "off" }),
+    " ",
+  );
+  assert.equal(
+    editorPromptForState({ isShell: false, streamingPrompt: "≈", thinkingLevel: "high" }),
+    "≈ ",
+  );
+  assert.equal(
+    editorPromptForState({ isShell: true, streamingPrompt: "≈", thinkingLevel: "high" }),
+    "$ ",
+  );
+  assert.equal(editorBorderColorForThinkingLevel("off"), "thinkingOff");
+  assert.equal(editorBorderColorForThinkingLevel("xhigh"), "thinkingXhigh");
+  assert.deepEqual(streamingPromptFramesForThinkingLevel("low"), ["-", "~", "-"]);
 });
 
 test("turn usage display keeps previous turn until current turn usage arrives", () => {

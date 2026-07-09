@@ -17,7 +17,12 @@ import { CustomEditor, type KeybindingsManager, type Theme } from "@earendil-wor
       EditorTheme,
       TUI,
     } from "@earendil-works/pi-tui";
-    import { editorPromptForState } from "./editor-prompt.js";
+    import {
+  editorBorderColorForThinkingLevel,
+  editorPromptColorForThinkingLevel,
+  editorPromptForState,
+  normalizeThinkingLevel,
+} from "./editor-prompt.js";
 
     function padRight(content: string, width: number): string {
       const vw = visibleWidth(content);
@@ -30,27 +35,33 @@ import { CustomEditor, type KeybindingsManager, type Theme } from "@earendil-wor
       return next.done ? "" : next.value;
     }
 
-    export class AmpBoxEditor extends CustomEditor {
-      private cursorVisible = true;
-      private blinkTimer: ReturnType<typeof setInterval> | null = null;
-      private streamingPrompt: string | null = null;
+export class AmpBoxEditor extends CustomEditor {
+  private cursorVisible = true;
+  private blinkTimer: ReturnType<typeof setInterval> | null = null;
+  private streamingPrompt: string | null = null;
+  private thinkingLevel = "medium";
 
-      constructor(
-        tui: TUI,
-        theme: EditorTheme,
-        kb: KeybindingsManager,
-        private fullTheme: Theme,
-        editorPaddingX: number = 0,
-      ) {
+
+  constructor(
+    tui: TUI,
+    theme: EditorTheme,
+    kb: KeybindingsManager,
+    private fullTheme: Theme,
+    editorPaddingX: number = 0,
+    thinkingLevel: string = "medium",
+  ) {
+
         super(tui, theme, kb);
         // Clamp to pi's documented 0-3 range. Mirrors the top-level
         // `editorPaddingX` UI setting. Non-finite values default to 0.
-        const clamped = Number.isFinite(editorPaddingX)
-          ? Math.max(0, Math.min(3, Math.trunc(editorPaddingX)))
-          : 0;
-        this.setPaddingX(clamped);
-        this.startCursorBlink();
-      }
+    const clamped = Number.isFinite(editorPaddingX)
+      ? Math.max(0, Math.min(3, Math.trunc(editorPaddingX)))
+      : 0;
+    this.setPaddingX(clamped);
+    this.thinkingLevel = normalizeThinkingLevel(thinkingLevel);
+    this.startCursorBlink();
+  }
+
 
       private startCursorBlink() {
         this.blinkTimer = setInterval(() => {
@@ -66,11 +77,19 @@ import { CustomEditor, type KeybindingsManager, type Theme } from "@earendil-wor
         }, 1000);
       }
 
-      setStreamingPrompt(prompt: string | null): void {
-        if (this.streamingPrompt === prompt) return;
-        this.streamingPrompt = prompt;
-        this.tui.requestRender();
-      }
+  setStreamingPrompt(prompt: string | null): void {
+    if (this.streamingPrompt === prompt) return;
+    this.streamingPrompt = prompt;
+    this.tui.requestRender();
+  }
+
+  setThinkingLevel(level: string): void {
+    const normalized = normalizeThinkingLevel(level);
+    if (this.thinkingLevel === normalized) return;
+    this.thinkingLevel = normalized;
+    this.tui.requestRender();
+  }
+
 
       /** Clean up blink timer when editor is replaced. */
       dispose() {
@@ -92,15 +111,19 @@ import { CustomEditor, type KeybindingsManager, type Theme } from "@earendil-wor
         const text = this.getText();
         const isShell = text.startsWith("!");
 
-        // Prompt:  for normal mode, ≈/≋ wave while streaming, $ for shell mode.
-        const prompt = editorPromptForState({ isShell, streamingPrompt: this.streamingPrompt });
-        const promptW = visibleWidth(prompt);
-        // Shell mode highlights both border and prompt with `warning`; default uses `accent`.
-        const borderColorName = isShell ? "warning" : "accent";
-        const promptThemed = this.color(borderColorName, prompt);
+    // Prompt + border respond to the active thinking budget.
+    const prompt = editorPromptForState({
+      isShell,
+      streamingPrompt: this.streamingPrompt,
+      thinkingLevel: this.thinkingLevel,
+    });
+    const promptW = visibleWidth(prompt);
+    const borderColorName = editorBorderColorForThinkingLevel(this.thinkingLevel);
+    const promptColorName = editorPromptColorForThinkingLevel(this.thinkingLevel);
+    const promptThemed = this.color(promptColorName, prompt);
 
-        // Top/bottom border line, themed with `accent` (or `warning` in shell mode).
-        const border = this.color(borderColorName, "─".repeat(width));
+    const border = this.color(borderColorName, "─".repeat(width));
+
 
         const padX = this.getPaddingX();
         const bodyWidth = Math.max(1, width - padX * 2);
