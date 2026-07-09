@@ -71,6 +71,7 @@ pnpm-debug.log*
 
 # Pi skill source manifests are committed; runtime lock/caches are local.
 .pi/skills-lock.json
+.pi/MEMORY.md
 
 # SQLite databases (local state, not source code)
 *.db

@@ -5,7 +5,7 @@ version: 1.0.0
 tags: [research, implementation, verification]
 dependencies: []
 agent_types: [scout, planner, worker]
-    tools: [context7, websearch, web_fetch, codesearch]
+tools: [context7, websearch, web_fetch, codesearch]
 ---
 
 # Source-Driven Development
