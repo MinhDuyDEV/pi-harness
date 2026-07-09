@@ -35,7 +35,6 @@ Extensions auto-loaded from `.pi/extensions/`:
 | `webclaw`             | Web scraping via `webclaw` CLI binary                                                                                                                                    |
 | `tps`                 | Tokens-per-second tracking during streaming                                                                                                                              |
 | `dcp`                 | Dynamic context pruning — compress conversation to stay under token limits                                                                                               |
-| `harness`             | Multi-agent build harness (planner → generator ↔ evaluator)                                                                                                              |
 | `tui`                 | Fixed-editor compositor with scrollable chat, sticky editor/footer, right sidebar, selection-to-clipboard, animated streaming prompt — overrides Pi's default TUI layout |
 
 ### Agents (7)

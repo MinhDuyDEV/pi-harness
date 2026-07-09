@@ -1,6 +1,6 @@
 # Agent Run Report
 
-Use after meaningful agent, subagent, `/ship`, or harness-maintenance runs.
+Use after meaningful agent, subagent, `/ship`, or orchestration-maintenance runs.
 
 ## Summary
 
@@ -32,7 +32,7 @@ Use after meaningful agent, subagent, `/ship`, or harness-maintenance runs.
 
 | Command/check | Result | Evidence |
 | --- | --- | --- |
-| `cd .pi/extensions && npm run smoke:harness` |  |  |
+| `npm test` / targeted verification used by the run |  |  |
 
 ## Subagents
 

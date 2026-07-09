@@ -1,8 +1,8 @@
 # Agent roster
 
-Specialist agents for the `task` tool and harness. Each file is a **standalone system prompt** — no `AGENTS.md` / `APPEND_SYSTEM.md` inheritance unless the parent passes rules in the task `prompt`.
+Specialist agents for the `task` tool. Each file is a **standalone system prompt** — no `AGENTS.md` / `APPEND_SYSTEM.md` inheritance unless the parent passes rules in the task `prompt`.
 
-The **session agent** is always the parent. Task agents match **OpenCode-style** builtins where applicable: `explore`, `scout`, `general`, plus `reviewer`. Harness uses `harness-*` via the `harness` tool.
+The **session agent** is always the parent. Task agents match **OpenCode-style** builtins where applicable: `explore`, `scout`, `general`, plus `reviewer`.
 
 Routing: `~/.pi/agent/APPEND_SYSTEM.md` (Delegation). Rules: `AGENTS.md` / project `.pi/AGENTS.md`.
 
@@ -38,16 +38,6 @@ tools:
 | `general` | Multi-step tasks, implementation, parallel tracks | Trivial 1–2 file parent work |
 | `reviewer` | Post-change audit, path:line evidence | Before code exists |
 
-## Harness agents (`harness` tool)
-
-| Agent | Role |
-|-------|------|
-| `harness-planner` | Sprint manifest |
-| `harness-worker` | Implement sprint |
-| `harness-reviewer` | QA sprint |
-
-Prefer `hidden: true` on harness-only agents under `agents/`.
-
 ## Pick by task
 
 | Task shape | Agent |
@@ -56,7 +46,7 @@ Prefer `hidden: true` on harness-only agents under `agents/`.
 | Best practice / docs for Y? | `scout` |
 | Implement or multi-step delegated work | `general` |
 | Review diff / changes | `reviewer` |
-| Product from short prompt | `harness` |
+| Product from short prompt | Workflow-style orchestration with `task` |
 
 ## Prompt template (parent → `task`)
 

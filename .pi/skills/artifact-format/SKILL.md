@@ -71,7 +71,7 @@ Anchors are slugified lowercase with hyphens. Em dashes and spaces become single
 
 Artifacts are owned by the parent agent. Subagents (`task`) return proposed blocks to the parent; the parent writes to the canonical file.
 
-`harness` is an exception: it writes its own output to `.pi/artifacts/task-<id>/{CONTEXT.md, RESULT.md, sessions/}` (harness convention, parent ignores the directory). The parent translates harness output into the canonical files as needed.
+`task` sessions may write their own transcripts under `.pi/artifacts/tasks/`; treat those as implementation detail logs. The parent should still translate durable outcomes into the canonical artifact files as needed.
 
 ## Work Sessions
 
