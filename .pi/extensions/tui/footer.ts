@@ -191,7 +191,7 @@ export function createFooterRenderer(state: FooterState) {
   return (_tui: TUI, theme: Theme, footerData?: unknown) => ({
     invalidate() {},
     render(width: number): string[] {
-      state.tui = _tui;
+      if (_tui) state.tui = _tui;
       const sepStr = theme.fg("borderMuted", " " + sep() + " ");
 
       // ── Left: [spinner] [model] [thinking] [path] [queue] ─────────────

@@ -27,31 +27,11 @@ import { contextFromEvent } from "./context.js";
 import { evaluate } from "./evaluate.js";
 import type { RuleSet, Verdict } from "./types.js";
 import { defaultRules } from "./rules/presets.js";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 type BlockResult = { block: true; reason: string };
 
 type TextPart = { type: string; text?: unknown };
-
-type ExtensionContext = {
-	ui?: {
-		confirm?: (title: string, message: string) => boolean | Promise<boolean>;
-		notify?: (message: string, level: "info") => void;
-	};
-};
-
-type SafetyCommandContext = {
-	ui?: {
-		notify?: (message: string, level: "info") => void;
-	};
-};
-
-type ExtensionAPI = {
-	on(event: "tool_call" | "tool_result", handler: (event: unknown, ctx?: ExtensionContext) => unknown): void;
-	registerCommand(name: string, options: {
-		description: string;
-		handler: (args: unknown, ctx: SafetyCommandContext) => Promise<string>;
-	}): void;
-};
 
 function readTextContent(value: unknown): string {
 	if (!Array.isArray(value)) return "";
@@ -168,7 +148,7 @@ export default function safetyExtension(pi: ExtensionAPI): void {
 	// 5. Unified /safety command
 	pi.registerCommand("safety", {
 		description: "Show active safety rules, audit log, and posture",
-		async handler(_args: unknown, ctx: SafetyCommandContext) {
+		async handler(_args: unknown, ctx: ExtensionCommandContext) {
 			const allRules = describe(rules);
 			const stats = audit.stats();
 			const recentBlocks = audit.query({ kind: "block" }).slice(-5);

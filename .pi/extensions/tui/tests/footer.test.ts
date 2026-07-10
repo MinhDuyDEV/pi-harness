@@ -139,3 +139,14 @@ test("restoreUsageSnapshotFromBranch reconstructs last turn usage and total sess
   assert.equal(snapshot.elapsedMs, 12_000);
   assert.equal(snapshot.totalCostUsd, 0.063);
 });
+
+test("footer preserves a valid TUI attachment when a later render lacks one", () => {
+  const state = createDefaultFooterState();
+  const attachedTui = { requestRender() {} };
+  const renderer = createFooterRenderer(state);
+
+  renderer(attachedTui as any, plainTheme as any).render(80);
+  renderer(undefined as any, plainTheme as any).render(80);
+
+  assert.equal(state.tui, attachedTui);
+});
