@@ -8,6 +8,18 @@ type RegisteredTool = {
   description?: string;
   parameters?: unknown;
   execute?: unknown;
+  renderCall?: (
+    args: unknown,
+    theme: {
+      fg: (color: string, text: string) => string;
+      bold: (text: string) => string;
+    },
+  ) => { render: (width: number) => string[] };
+};
+
+const plainTheme = {
+  fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
 };
 
 function mockApi() {
@@ -30,6 +42,9 @@ describe("DCP registerTool shape", () => {
     registerCompressTool(api, DEFAULT_CONFIG);
     expect(tools).toHaveLength(1);
     expect(tools[0]?.name).toBe("compress");
+    expect(tools[0]?.renderCall?.({}, plainTheme)?.render(80)?.map((line) => line.trimEnd())).toEqual([
+      "⚙ compress",
+    ]);
     expect(tools[0]?.parameters).toBeDefined();
     expect(typeof tools[0]?.execute).toBe("function");
     // Simulate OpenAI Responses serialization: undefined name is omitted
@@ -51,6 +66,9 @@ describe("DCP registerTool shape", () => {
     registerRecallTool(api);
     expect(tools).toHaveLength(1);
     expect(tools[0]?.name).toBe("dcp_recall");
+    expect(tools[0]?.renderCall?.({}, plainTheme)?.render(80)?.map((line) => line.trimEnd())).toEqual([
+      "⚙ dcp_recall",
+    ]);
     expect(tools[0]?.parameters).toBeDefined();
     expect(typeof tools[0]?.execute).toBe("function");
     const payload = JSON.parse(

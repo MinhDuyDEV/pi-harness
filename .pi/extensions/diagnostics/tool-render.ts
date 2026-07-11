@@ -21,7 +21,7 @@ export function renderDiagnosticsCall(
   args: Record<string, unknown> | undefined,
   theme: Theme,
 ): Text {
-  const parts = [theme.fg("toolTitle", theme.bold("Diagnostics"))];
+  const parts = [theme.fg("toolTitle", theme.bold("⚙ diagnostics"))];
   const scope = args?.scope;
   if (scope === "changed" || scope === "full") {
     parts.push(theme.fg("muted", ` scope=${scope}`));

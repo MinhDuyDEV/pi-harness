@@ -16,6 +16,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import type { DCPConfig } from "./config.js";
 import {
   addBlock,
@@ -84,6 +85,8 @@ export function registerCompressTool(
     label: "compress",
     description: COMPRESS_TOOL_DESCRIPTION,
     parameters: compressParams,
+    renderCall: (_args, theme) =>
+      new Text(theme.fg("toolTitle", theme.bold("⚙ compress")), 0, 0),
     async execute(
       _toolCallId: string,
       params: {

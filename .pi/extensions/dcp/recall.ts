@@ -7,6 +7,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
+import { Text } from "@earendil-works/pi-tui";
 import { getDcpSessionId } from "./compress-state.js";
 import {
   listDurableSessionStates,
@@ -84,6 +85,8 @@ export function registerRecallTool(pi: ExtensionAPI): void {
         }),
       ),
     }),
+    renderCall: (_args, theme) =>
+      new Text(theme.fg("toolTitle", theme.bold("⚙ dcp_recall")), 0, 0),
     async execute(
       _toolCallId: string,
       params: {

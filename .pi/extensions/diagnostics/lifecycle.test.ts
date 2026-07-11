@@ -2,6 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import diagnosticsExtension from "./extension.ts";
+import { renderDiagnosticsCall } from "./tool-render.ts";
+
+const plainTheme = {
+	fg: (_color: string, text: string) => text,
+	bold: (text: string) => text,
+};
 
 describe("Diagnostics extension lifecycle contract", () => {
 	it("default export is a function accepting ExtensionAPI", () => {
@@ -27,6 +33,14 @@ describe("Diagnostics extension lifecycle contract", () => {
 		// Verify tool registration
 		const diagTool = registeredTools.find((t) => t.name === "diagnostics");
 		assert.ok(diagTool, "Expected 'diagnostics' tool to be registered");
+	});
+
+	it("renders the prefixed diagnostics tool-call title", () => {
+		const lines = renderDiagnosticsCall(undefined, plainTheme as never)
+			.render(80)
+			.map((line) => line.trimEnd());
+
+		assert.deepStrictEqual(lines, ["⚙ diagnostics"]);
 	});
 
 	it("registers expected event handlers for activation", () => {
