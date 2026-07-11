@@ -7,7 +7,7 @@ model: opencode-go/deepseek-v4-flash
 thinking: off
 readonly: true
 proactive: true
-tools: read, grep, find, ls, multi_grep, bash
+tools: read, grep, find, bash
 prompt_mode: append
 ---
 

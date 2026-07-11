@@ -4,7 +4,7 @@ description: >
   Use for parallel units of work (parent may launch multiple task calls). May edit when needed.
   NOT for in-repo-only mapping (explore) or docs-only external research (scout).
 model: opencode-go/deepseek-v4-flash
-thinking: off
+thinking: xhigh
 proactive: true
 prompt_mode: append
 ---
