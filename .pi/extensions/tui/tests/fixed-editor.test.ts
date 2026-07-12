@@ -699,3 +699,30 @@ test("keyboard navigation jumps scrollable chat to top and bottom", () => {
       }
     });
 
+    test("compositor.install rolls back and restores terminal on failure", () => {
+      const terminal = new FakeTerminal();
+      const tui = {
+        render(_w: number) {},
+        doRender() {},
+        addInputListener(_fn: (data: string) => unknown) {
+          throw new Error("input listener setup failed");
+        },
+        terminal: { mode: "raw" },
+      };
+      const compositor = new FixedEditorCompositor(tui, terminal, {
+        getEditorLines: () => [],
+        getRenderStateKey: () => "",
+        getSidebarWidth: () => 0,
+        getSidebarLines: () => [],
+        isStreaming: () => false,
+      });
+
+      assert.throws(() => compositor.install(), /input listener setup failed/);
+
+      // After failure, terminal should have received reset sequences during rollback
+      const combinedWrite = terminal.writes.join("");
+      assert.ok(
+        combinedWrite.includes("\x1b["),
+        "terminal received escape sequences during rollback: " + combinedWrite,
+      );
+    });

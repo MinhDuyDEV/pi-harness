@@ -313,70 +313,75 @@ export class FixedEditorCompositor {
 
   /** Install the compositor. */
   install(): void {
-    if (this.installed) return;
-    if (typeof this.terminal.write !== "function") {
-      throw new Error("[pi-tui] FixedEditorCompositor: terminal.write is required");
-    }
+    try {
+      if (this.installed) return;
+      if (typeof this.terminal.write !== "function") {
+        throw new Error("[pi-tui] FixedEditorCompositor: terminal.write is required");
+      }
 
-    // Delegate all patching to TerminalManager with compositor callbacks.
-    // The TerminalManager snapshots originals and patches:
-    //   terminal.write → this.write
-    //   terminal.rows → this.getScrollableRows
-    //   tui.render → this.renderScrollableRoot
-    //   tui.doRender → repaintFixedCluster after render pass
-    //   input listener → this.handleInput
-    this.terminalManager.install({
-      onWrite: (data) => this.write(data),
-      onRows: () => this.getScrollableRows(),
-      onInput: (data) => this.handleInput(data),
-      onRender: (width) => this.renderScrollableRoot(width),
-      onDoRender: () => {
-        this.renderPassActive = true;
-        this.renderPassCluster = null;
-        try {
-          // Slash autocomplete / selectors grow the bottom cluster → onRows shrinks.
-          // pi-tui treats that as a physical resize and full-clears (2J/3J) = black flash.
-          // Measure after clearing pass cache so autocomplete height is current.
-          // Rewind previousHeight for cluster-only changes; still full-clear on real resize.
-          suppressClusterDrivenHeightChange(
-            this.heightStabilize,
-            this.tui,
-            this.getRawRows(),
-            this.getScrollableRows(),
-          );
-          this.originalTuiDoRender?.();
-          // Editor.render re-enters terminal.rows mid-pass; re-sync if drifted.
-          const post = this.getScrollableRows();
-          const tuiAny = this.tui as { previousHeight?: number };
-          if (
-            tuiAny.previousHeight !== undefined &&
-            tuiAny.previousHeight !== post
-          ) {
-            tuiAny.previousHeight = post;
-          }
-          this.repaintFixedCluster();
-        } finally {
-          this.renderPassActive = false;
+      // Delegate all patching to TerminalManager with compositor callbacks.
+      // The TerminalManager snapshots originals and patches:
+      //   terminal.write → this.write
+      //   terminal.rows → this.getScrollableRows
+      //   tui.render → this.renderScrollableRoot
+      //   tui.doRender → repaintFixedCluster after render pass
+      //   input listener → this.handleInput
+      this.terminalManager.install({
+        onWrite: (data) => this.write(data),
+        onRows: () => this.getScrollableRows(),
+        onInput: (data) => this.handleInput(data),
+        onRender: (width) => this.renderScrollableRoot(width),
+        onDoRender: () => {
+          this.renderPassActive = true;
           this.renderPassCluster = null;
-        }
-      },
-    });
+          try {
+            // Slash autocomplete / selectors grow the bottom cluster → onRows shrinks.
+            // pi-tui treats that as a physical resize and full-clears (2J/3J) = black flash.
+            // Measure after clearing pass cache so autocomplete height is current.
+            // Rewind previousHeight for cluster-only changes; still full-clear on real resize.
+            suppressClusterDrivenHeightChange(
+              this.heightStabilize,
+              this.tui,
+              this.getRawRows(),
+              this.getScrollableRows(),
+            );
+            this.originalTuiDoRender?.();
+            // Editor.render re-enters terminal.rows mid-pass; re-sync if drifted.
+            const post = this.getScrollableRows();
+            const tuiAny = this.tui as { previousHeight?: number };
+            if (
+              tuiAny.previousHeight !== undefined &&
+              tuiAny.previousHeight !== post
+            ) {
+              tuiAny.previousHeight = post;
+            }
+            this.repaintFixedCluster();
+          } finally {
+            this.renderPassActive = false;
+            this.renderPassCluster = null;
+          }
+        },
+      });
 
-    // Enable SGR mouse wheel reporting for fixed-zone scrolling
-    this.originalWrite(enableMouseReporting());
+      // Enable SGR mouse wheel reporting for fixed-zone scrolling
+      this.originalWrite(enableMouseReporting());
 
-    // Emergency cleanup on exit
-    this.emergencyCleanup = () => {
-      if (!this.disposed) this.restoreTerminalState();
-    };
-    process.once("exit", this.emergencyCleanup);
+      // Emergency cleanup on exit
+      this.emergencyCleanup = () => {
+        if (!this.disposed) this.restoreTerminalState();
+      };
+      process.once("exit", this.emergencyCleanup);
 
-    // clearOnShrink full-clears when previous frame had blank lines and content
-    // shrinks — common when slash autocomplete closes. With fixed editor the
-    // scroll region already isolates the chat pane; disable the flicker path.
-    (this.tui as { clearOnShrink?: boolean }).clearOnShrink = false;
+      // clearOnShrink full-clears when previous frame had blank lines and content
+      // shrinks — common when slash autocomplete closes. With fixed editor the
+      // scroll region already isolates the chat pane; disable the flicker path.
+      (this.tui as { clearOnShrink?: boolean }).clearOnShrink = false;
 
-    this.installed = true;
+      this.installed = true;
+    } catch (e) {
+      this.dispose();
+      throw e;
+    }
   }
 
   /** Hide a renderable component via PatchManager. */

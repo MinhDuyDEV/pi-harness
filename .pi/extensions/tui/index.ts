@@ -32,6 +32,10 @@ import { AmpBoxEditor } from "./editor.js";
 import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.js";
 import { readPiTuiSettings, type PiTuiSettings } from "./settings.js";
 import {
+  findRenderableContainerWithChild,
+  isRenderable,
+} from "./render-tree.js";
+import {
   pickRandomWorkingQuote,
   workingStatusSpacerLines,
 } from "./working-indicator.js";
@@ -247,13 +251,8 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   }
 
   // ── Refresh UI ───────────────────────────────────────────────────────────
-  function ensureFooter(_ctx: ExtensionContext) {
-    // Custom footer disabled. Let Pi render its default footer.
-  }
-
   function refreshUI(ctx: ExtensionContext) {
     if (ctx.mode !== "tui") return;
-    ensureFooter(ctx);
 
     if (ctx.model) {
       footer.modelLabel = modelLabel(ctx.model);
@@ -705,27 +704,6 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     });
   }
 
-  function isRenderable(
-    value: unknown,
-  ): value is { render(width: number): string[] } {
-    return (
-      !!value && typeof (value as { render?: unknown }).render === "function"
-    );
-  }
-
-  function findContainerWithChild(
-    tui: any,
-    child: any,
-  ): { container: any; index: number } | null {
-    const children = Array.isArray(tui?.children) ? tui.children : [];
-    const index = children.findIndex(
-      (candidate: any) =>
-        Array.isArray(candidate?.children) &&
-        candidate.children.includes(child),
-    );
-    if (index === -1) return null;
-    return { container: children[index], index };
-  }
 
   function renderHiddenLines(
     renderable: any,
@@ -740,10 +718,21 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   function syncFixedRenderables(repaint = true): void {
     if (!fixedEditorEnabled || !compositor || !tuiRef || !currentEditor) return;
 
-    const editorContainerMatch = findContainerWithChild(tuiRef, currentEditor);
-    if (!editorContainerMatch) return;
+    const editorContainerMatch = findRenderableContainerWithChild(
+      tuiRef,
+      currentEditor,
+    );
+    if (!editorContainerMatch) {
+      console.error(
+        "[pikit-tui] Fixed editor mode disabled: render tree does not contain the expected editor container. This typically means the Pi runtime render-tree structure has changed. Disabling fixed mode to prevent broken layout.",
+      );
+      fixedEditorEnabled = false;
+      compositor.dispose();
+      return;
+    }
 
     const children = Array.isArray(tuiRef.children) ? tuiRef.children : [];
+
     const nextEditorContainer = editorContainerMatch.container;
     const nextStatusContainer = isRenderable(
       children[editorContainerMatch.index - 2],
@@ -899,6 +888,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       getSidebarWidth: (terminalWidth: number) => sidebarTotalWidth(sidebar, terminalWidth),
       getSidebarLines: (width: number, height: number) => renderSidebar(sidebar, width, height, {
         subtext: (text) => ctx.ui.theme.fg("dim", text),
+        label: (text) => ctx.ui.theme.fg("accent", text),
         success: (text) => ctx.ui.theme.fg("success", text),
         error: (text) => ctx.ui.theme.fg("error", text),
         warning: (text) => ctx.ui.theme.fg("warning", text),
@@ -921,8 +911,18 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       },
     });
 
-    compositor.install();
-    syncFixedRenderables();
+        try {
+          compositor.install();
+        } catch (error) {
+          compositor = null;
+          fixedEditorEnabled = false;
+          ctx.ui.notify(
+            `[pi-tui] Failed to install compositor: ${String(error)}`,
+            "error",
+          );
+          return;
+        }
+        syncFixedRenderables();
   }
 
   // ── Tool results ─────────────────────────────────────────────────────────

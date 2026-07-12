@@ -20,6 +20,7 @@
 		"test": "npm run test:extensions",
 		"test:extensions": "node scripts/run-extension-tests.mjs",
 		"test:safety": "npx tsx .pi/extensions/safety/safety.test.ts",
+		"test:tui": "npx tsx --test .pi/extensions/tui/tests/fixed-editor.test.ts && npx tsx --test .pi/extensions/tui/tests/footer.test.ts && npx tsx --test .pi/extensions/tui/tests/render-tree.test.ts && npx tsx --test .pi/extensions/tui/tests/sidebar.test.ts",
 		"typecheck": "tsc --noEmit",
 		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3",
 		"install:hooks": "node scripts/install-git-hooks.mjs",

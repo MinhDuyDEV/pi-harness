@@ -163,3 +163,25 @@ test("sidebar renders compact session todos queue and bottom identity rows", () 
   assert.match(plain(lines.at(-2) ?? ""), /~\/dev\/projects\/pikit\/\.pi:main\s*$/);
   assert.match(plain(lines.at(-1) ?? ""), /Pi 1\.2\.3\s*$/);
 });
+
+test("sidebar uses label callback from style when provided", () => {
+  const state = createDefaultSidebarState();
+  state.enabled = true;
+  state.modelLabel = "test-model";
+  state.cwd = "/tmp";
+  state.piVersion = "0.0.0";
+  const invoked: string[] = [];
+  const lines = renderSidebar(state, 34, 22, {
+    label: (text) => {
+      invoked.push(text);
+      return `[label:${text}]`;
+    },
+    subtext: (text) => text,
+    success: (text) => text,
+    error: (text) => text,
+    warning: (text) => text,
+  });
+  assert.ok(invoked.length > 0, "Expected label callback to be invoked");
+  assert.ok(lines.some(l => l.includes("[label:Session")), `Expected rendered output to contain "[label:Session", got ${JSON.stringify(lines)}`);
+  assert.ok(lines.some(l => l.includes("[label:")), "Expected some line to contain [label:…] output");
+});
