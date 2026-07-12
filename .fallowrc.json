@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": [
+    ".pi/extensions/*.ts",
+    ".pi/extensions/*/index.ts",
+    ".pi/extensions/**/*.test.ts",
+    ".pi/cli/*.mjs"
+  ],
+  "ignoreDependencies": [
+    "@earendil-works/pi-ai",
+    "@earendil-works/pi-coding-agent",
+    "@earendil-works/pi-tui",
+    "@sinclair/typebox"
+  ],
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/.git/**"
+  ]
+}

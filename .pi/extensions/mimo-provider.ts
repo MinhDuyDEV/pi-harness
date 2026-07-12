@@ -18,7 +18,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const MIMO_BASE_URL = "https://api.xiaomimimo.com/v1";
-const MIMO_API_KEY_ENV = "XIAOMI_MIMO_API_KEY";
 
 // MiMo only supports: "low", "medium", "high" reasoning effort.
 // No "max" level. xhigh is not supported (null = no effort sent).
