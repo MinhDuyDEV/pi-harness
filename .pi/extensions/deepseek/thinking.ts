@@ -71,22 +71,3 @@ export function stripHallucinatedToolMarkup(
 
   return options.trim === false ? out : out.trim();
 }
-
-/**
- * Strip DSML from all assistant messages in an array (in-place return).
- */
-export function stripAllDSML(
-  messages: Array<{ role: string; content?: string | null }>,
-): { stripped: number } {
-  let stripped = 0;
-  for (const msg of messages) {
-    if (msg.role === "assistant" && msg.content) {
-      const cleaned = stripHallucinatedToolMarkup(msg.content);
-      if (cleaned !== msg.content) {
-        msg.content = cleaned;
-        stripped++;
-      }
-    }
-  }
-  return { stripped };
-}

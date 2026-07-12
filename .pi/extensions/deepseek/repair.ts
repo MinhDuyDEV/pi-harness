@@ -32,7 +32,7 @@ export function stampMissingIds(
  *
  * Returns the fixed messages array and counts of dropped items for telemetry.
  */
-export function fixToolCallPairing(
+function fixToolCallPairing(
   messages: Array<Record<string, unknown>>,
 ): {
   messages: Array<Record<string, unknown>>;
@@ -105,7 +105,7 @@ export function fixToolCallPairing(
  *
  * Skipped on non-thinking models to avoid unnecessary prefix-cache churn.
  */
-export function stampMissingReasoningForThinkingMode(
+function stampMissingReasoningForThinkingMode(
   messages: Array<Record<string, unknown>>,
   model: string,
 ): { messages: Array<Record<string, unknown>>; stampedCount: number } {
@@ -242,29 +242,7 @@ export function repairTruncatedJson(input: string): TruncationRepairResult {
   }
 }
 
-/**
- * Apply repairTruncatedJson to all tool_calls in an assistant message.
- */
-export function repairAllToolCallArgs(
-  msg: { tool_calls?: Array<{ function: { arguments?: string } }> },
-): { repaired: number; fallbacks: number } {
-  if (!msg.tool_calls) return { repaired: 0, fallbacks: 0 };
-  let repaired = 0;
-  let fallbacks = 0;
 
-  for (const call of msg.tool_calls) {
-    const args = call.function?.arguments;
-    if (!args) continue;
-    const result = repairTruncatedJson(args);
-    if (result.changed) {
-      call.function.arguments = result.repaired;
-      repaired++;
-      if (result.fallback) fallbacks++;
-    }
-  }
-
-  return { repaired, fallbacks };
-}
 
 /**
  * Apply all repair passes to a message array before sending to DeepSeek.

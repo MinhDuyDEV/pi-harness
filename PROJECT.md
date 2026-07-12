@@ -54,7 +54,6 @@ A lean index of where things live in this repo. Maintained by the agent.
 - `.pi/extensions/srcwalk/` — code analysis (read, search, callers, callees)
 - `.pi/extensions/safety/` — safety hooks
 - `.pi/extensions/checkpoint/` — checkpoint manager
-- `.pi/extensions/integration/budget.ts` — token budget tracker
 - `.pi/extensions/task/` — long-running subagent orchestration via the `task` tool
 
 ## Notes

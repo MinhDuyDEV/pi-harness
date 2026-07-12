@@ -19,7 +19,7 @@
  * DeepSeek's tokenizer averages ~0.75 tokens/char for English,
  * ~0.4 tokens/char for CJK. We use a conservative overestimate.
  */
-export function estimateTokens(text: string): number {
+function estimateTokens(text: string): number {
   if (!text) return 0;
   let cjk = 0;
   let ascii = 0;
@@ -43,68 +43,6 @@ export interface ShrinkResult {
   charsSaved: number;
   tokensSaved: number;
   entriesDropped: number;
-}
-
-/**
- * Shrink oversized tool result content by truncating the deepest/largest
- * tool message in the array. Applies progressively until under maxChars
- * or only one tool result remains.
- */
-export function shrinkOversizedToolResults(
-  messages: Array<Record<string, unknown>>,
-  maxChars: number,
-): ShrinkResult {
-  let totalChars = totalContentChars(messages);
-  let healedCount = 0;
-  let entriesDropped = 0;
-
-  while (totalChars > maxChars) {
-    // Find the largest tool result content
-    let largestIdx = -1;
-    let largestLen = 0;
-
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i]!;
-      if (msg.role === "tool" && typeof msg.content === "string") {
-        const len = (msg.content as string).length;
-        if (len > largestLen) {
-          largestLen = len;
-          largestIdx = i;
-        }
-      }
-    }
-
-    if (largestIdx < 0) break; // No more tool results to shrink
-
-    // Shrink the largest by ~30% (or replace with summary)
-    const msg = messages[largestIdx]!;
-    const content = msg.content as string;
-
-    if (largestLen > 2000) {
-      // Truncate to half
-      const half = Math.floor(largestLen / 2);
-      msg.content = content.slice(0, half) + `\n…[truncated: ${largestLen - half} chars]`;
-      healedCount++;
-    } else {
-      // Replace with metadata-only
-      msg.content = `[tool result: ${largestLen} chars (truncated for context budget)]`;
-      entriesDropped++;
-      healedCount++;
-    }
-
-    const newTotal = totalContentChars(messages);
-    if (newTotal >= totalChars) break; // Sanity check — prevent infinite loop
-    totalChars = newTotal;
-  }
-
-  return {
-    messages,
-    healedCount,
-    healedFrom: 0,
-    charsSaved: 0, // Computed below
-    tokensSaved: 0,
-    entriesDropped,
-  };
 }
 
 /**

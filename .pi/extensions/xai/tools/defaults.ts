@@ -29,7 +29,7 @@ const XAI_ALL_TOOL_NAMES = [
   ...XAI_DEFAULT_DISABLED_TOOLS,
 ] as const;
 
-export type XaiToolName = (typeof XAI_ALL_TOOL_NAMES)[number];
+type XaiToolName = (typeof XAI_ALL_TOOL_NAMES)[number];
 
 /** Read PI_XAI_ENABLE_TOOLS and PI_XAI_DISABLE_TOOLS, return the set of tools to register. */
 export function resolveXaiToolConfig(): Set<string> {

@@ -1,11 +1,11 @@
 {
   "entry": [
+    "extensions/deepseek-provider.ts",
+    "extensions/mimo-provider.ts",
     "extensions/xai-oauth.ts"
   ],
-  "ignore": [
+  "ignorePatterns": [
     "**/node_modules/**",
-    "**/.git/**",
-    "**/dist/**",
-    "git/**"
+    "**/.git/**"
   ]
 }

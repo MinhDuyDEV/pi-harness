@@ -13,7 +13,7 @@
 
 import { isAbortError } from "../lib/util.js";
 
-export interface RetryOptions {
+interface RetryOptions {
   /** Maximum total attempts (including the first). Default 4. */
   maxAttempts?: number;
   /** Initial backoff in ms. Doubles each retry, with jitter. Default 500. */
@@ -28,7 +28,7 @@ export interface RetryOptions {
   onRetry?: (info: RetryInfo) => void;
 }
 
-export interface RetryInfo {
+interface RetryInfo {
   attempt: number;
   reason: string;
   waitMs: number;

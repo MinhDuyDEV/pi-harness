@@ -36,7 +36,7 @@ export interface JsonSchema {
 /**
  * Analyze a JSON schema for DeepSeek compatibility issues.
  */
-export function analyzeSchema(schema: JsonSchema | undefined): SchemaAnalysis {
+function analyzeSchema(schema: JsonSchema | undefined): SchemaAnalysis {
   if (!schema) {
     return {
       shouldFlatten: false,
@@ -80,7 +80,7 @@ export function analyzeSchema(schema: JsonSchema | undefined): SchemaAnalysis {
  * - Replaces deeply nested `$ref` with string type
  * - Strips `title`, `readOnly`, `writeOnly`
  */
-export function repairSchema(schema: JsonSchema): JsonSchema {
+function repairSchema(schema: JsonSchema): JsonSchema {
   if (!schema || typeof schema !== "object") return schema ?? { type: "string" };
 
   const out: JsonSchema = {};

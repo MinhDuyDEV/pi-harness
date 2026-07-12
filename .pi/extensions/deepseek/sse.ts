@@ -240,26 +240,3 @@ export async function readDeepSeekStream(
 
   return acc;
 }
-
-/**
- * Finalize tool calls from the accumulator into a clean array.
- * Validates that each tool call has at minimum a name.
- * Sorted by index for deterministic ordering.
- */
-export function finalizeToolCalls(
-  acc: StreamAccumulator,
-): Array<{ id?: string; type: string; function: { name: string; arguments: string } }> {
-  const entries = [...acc.toolCalls.entries()]
-    .filter(([, tc]) => !!tc.name)
-    .sort(([a], [b]) => a - b)
-    .map(([, tc]) => ({
-      id: tc.id,
-      type: "function" as const,
-      function: {
-        name: tc.name,
-        arguments: tc.arguments || "{}",
-      },
-    }));
-
-  return entries;
-}
