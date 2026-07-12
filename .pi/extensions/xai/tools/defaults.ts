@@ -10,9 +10,9 @@
 // Special value: "*" enables or disables everything (clear of all
 // defaults for the matching direction).
 
-export const XAI_DEFAULT_ENABLED_TOOLS = [] as const;
+const XAI_DEFAULT_ENABLED_TOOLS = [] as const;
 
-export const XAI_DEFAULT_DISABLED_TOOLS = [
+const XAI_DEFAULT_DISABLED_TOOLS = [
   "xai_web_search",
   "xai_x_search",
   "xai_analyze_image",
@@ -24,7 +24,7 @@ export const XAI_DEFAULT_DISABLED_TOOLS = [
   "xai_deep_research",
 ] as const;
 
-export const XAI_ALL_TOOL_NAMES = [
+const XAI_ALL_TOOL_NAMES = [
   ...XAI_DEFAULT_ENABLED_TOOLS,
   ...XAI_DEFAULT_DISABLED_TOOLS,
 ] as const;
