@@ -1,7 +1,7 @@
 ---
 name: grill-me
 description: Use when you have a rough idea, ADR, PRD, or spec that needs to survive scrutiny before code is written.
-version: 1.0.0
+version: 1.1.0
 tags: [planning, review, decision]
 dependencies: [brainstorming, spec-driven-development]
 agent_types: [planner, worker, reviewer]
@@ -34,6 +34,23 @@ Ask:
 - "What are we not talking about?"
 
 One question at a time. Let the person answer fully before asking another.
+
+Before asking, require all three:
+- **Material** — the answer could change architecture, scope, UX, data, security, cost, or acceptance criteria.
+- **Grounded** — inspect available source, tests, docs, or prior decisions first; cite the concrete uncertainty.
+- **Answerable** — offer real options, an approvable default, or a specific reference request.
+
+Ask a blocking question in this shape:
+
+```md
+Blocking question: <one material decision>
+Why it matters: <what changes between the live options>
+Evidence: <source, test, doc, or stated constraint>
+Recommended answer: <default and rationale>
+If you don't care: I'll proceed with <default>.
+```
+
+Do not ask about low-risk choices a competent implementer can reverse cheaply. Record those as labeled assumptions and explain how they will be verified.
 
 ## What a Good Grilling Looks Like
 

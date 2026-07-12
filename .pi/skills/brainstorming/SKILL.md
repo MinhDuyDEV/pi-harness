@@ -1,7 +1,7 @@
 ---
 name: brainstorming
 description: Use when creating or developing, before writing code or implementation plans - refines rough ideas into fully-formed designs through collaborative questioning, alternative exploration, and incremental validation. Don't use during clear 'mechanical' processes
-version: 1.0.0
+version: 1.1.0
 tags: [planning, workflow]
 dependencies: []
 agent_types: [planner, worker, reviewer]
@@ -38,7 +38,21 @@ Map the gap before proposing. A simpler approach often exists — say so.
 
 ## Workflow
 
-1. **Map unknowns** — classify the gap using the four categories above. State assumptions out loud for ambiguous cases. If the request is well-defined, do not brainstorm — just fix.
+1. **Map unknowns** — classify the gap using the four categories above. State assumptions out loud for ambiguous cases. If the request is well-defined, do not brainstorm — just fix. For unfamiliar domains or high-stakes decisions, include:
+
+   ```md
+   ### Highest-risk blindspots
+   1. <unknown>
+      - Why it matters:
+      - Evidence:
+      - Cheap resolution:
+      - Decision owner: user | agent | docs | prototype
+
+   ### Safe assumptions
+   - <assumption> — why safe; how to verify later
+   ```
+
+   Rank blindspots by implementation risk. Do not manufacture evidence; mark inaccessible evidence as unverified.
 2. **Variants** — for novel / design-heavy / unclear work, show 2–4 cheap variants *before* recommending one. Each variant names the trade-off it accepts.
 3. **Interview** — one question at a time on architecture / data-model / UX. Multiple-choice when 2–4 options are genuinely live. Reference-pointing beats 200 words of explanation.
 4. **Validate** — incremental check-in: "does this match what you wanted?" before going deeper.
