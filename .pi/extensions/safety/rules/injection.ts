@@ -104,7 +104,7 @@ export function isContextFile(path: string): boolean {
 	return CONTEXT_FILE_PATTERNS.some((p) => p.test(path));
 }
 
-export interface InjectionScanResult {
+interface InjectionScanResult {
 	/** True if any threat was detected */
 	detected: boolean;
 	/** Individual findings */

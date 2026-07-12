@@ -5,7 +5,7 @@
  * Think array combinators for security rules.
  */
 
-import type { Rule, RuleSet, Severity } from "./types.js";
+import type { RuleSet, Severity } from "./types.js";
 
 const SEVERITY_ORDER: Record<Severity, number> = {
 	critical: 3,
@@ -30,30 +30,9 @@ export function exclude(set: RuleSet, ...ids: string[]): RuleSet {
 	return set.filter((r) => !idSet.has(r.id));
 }
 
-/** Keep only rules matching predicate. */
-export function filter(set: RuleSet, predicate: (r: Rule) => boolean): RuleSet {
-	return set.filter(predicate);
-}
-
-/** Replace a rule by ID. If not found, appends. Pass null to remove. */
-export function override(set: RuleSet, id: string, replacement: Rule | null): RuleSet {
-	if (replacement === null) return exclude(set, id);
-	const idx = set.findIndex((r) => r.id === id);
-	if (idx === -1) return [...set, replacement];
-	const copy = [...set];
-	copy[idx] = replacement;
-	return copy;
-}
-
 /** Only rules targeting a specific tool (or "*"). */
 export function forTool(set: RuleSet, tool: string): RuleSet {
 	return set.filter((r) => r.targets.includes("*") || r.targets.includes(tool));
-}
-
-/** Only rules at or above a severity threshold. */
-export function atSeverity(set: RuleSet, minSeverity: Severity): RuleSet {
-	const min = SEVERITY_ORDER[minSeverity];
-	return set.filter((r) => SEVERITY_ORDER[r.severity] >= min);
 }
 
 /** Sort rules by severity descending (critical first). Stable sort. */
