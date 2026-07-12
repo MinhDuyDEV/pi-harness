@@ -1,6 +1,6 @@
 import { getAgentDir, type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { exec as execCb } from "child_process";
-import { existsSync, readFileSync, realpathSync, type Dirent } from "fs";
+import { existsSync, readFileSync, realpathSync, type Dirent } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "os";
 import { dirname, isAbsolute, join, relative, resolve } from "path";
@@ -120,20 +120,6 @@ interface ParsedSessionLedger {
       timestamp: string;
       targetId?: string;
       label?: string | null;
-    }
-
-    interface SessionLikeHeaderEntry {
-      type: "session";
-      id?: string;
-      cwd?: string;
-      parentSession?: string | null;
-    }
-
-    interface SessionLikeGenericEntry {
-      type: string;
-      id: string;
-      parentId: string | null;
-      timestamp: string;
     }
 
 interface SessionLikeCustomEntry {
