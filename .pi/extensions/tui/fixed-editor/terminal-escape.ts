@@ -49,10 +49,10 @@ export function disableAutoWrap(): string {
 export function enableAutoWrap(): string {
   return "\x1b[?7h";
 }
-export function enableAlternateScrollMode(): string {
+function enableAlternateScrollMode(): string {
   return "\x1b[?1007h";
 }
-export function resetExtendedKeyboardModes(): string {
+function resetExtendedKeyboardModes(): string {
   return "\x1b[<999u\x1b[>4;0m";
 }
 

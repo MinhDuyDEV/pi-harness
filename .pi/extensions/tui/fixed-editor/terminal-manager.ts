@@ -23,27 +23,7 @@ interface TerminalSnapshot {
 
 // ── Helpers re-exported from terminal-escape ──────────────────────────────────
 
-import {
-  beginSynchronizedOutput,
-  clearLine,
-  disableAutoWrap,
-  disableMouseReporting,
-  emergencyTerminalModeReset,
-  enableAutoWrap,
-  enableMouseReporting,
-  endSynchronizedOutput,
-  hideCursor,
-  moveCursor,
-  overrideColumns,
-  padLineToWidth,
-  resetScrollRegion,
-  restoreCursor,
-  sanitizeLine,
-  saveCursor,
-  setScrollRegion,
-  showCursor,
-  sliceColumns,
-} from "./terminal-escape.js";
+import { emergencyTerminalModeReset } from "./terminal-escape.js";
 
 // ── TerminalManager ───────────────────────────────────────────────────────────
 
@@ -206,26 +186,3 @@ export class TerminalManager {
     return undefined;
   }
 }
-
-// Re-export escape helpers for convenience
-export {
-  beginSynchronizedOutput,
-  clearLine,
-  disableAutoWrap,
-  disableMouseReporting,
-  emergencyTerminalModeReset,
-  enableAutoWrap,
-  enableMouseReporting,
-  endSynchronizedOutput,
-  hideCursor,
-  moveCursor,
-  overrideColumns,
-  padLineToWidth,
-  resetScrollRegion,
-  restoreCursor,
-  sanitizeLine,
-  saveCursor,
-  setScrollRegion,
-  showCursor,
-  sliceColumns,
-};

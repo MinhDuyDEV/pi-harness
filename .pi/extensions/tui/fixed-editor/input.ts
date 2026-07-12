@@ -20,7 +20,7 @@ export type ScrollAction =
   | { kind: "center" }
   | { kind: "bottom" };
 
-export const DEFAULT_KEYBOARD_SCROLL_SHORTCUTS: Required<KeyboardScrollShortcuts> = {
+const DEFAULT_KEYBOARD_SCROLL_SHORTCUTS: Required<KeyboardScrollShortcuts> = {
   up: "super+up",
   down: "super+down",
   top: "super+home",

@@ -16,8 +16,6 @@ export function hasNerdFonts(): boolean {
   return false;
 }
 
-export const NF = hasNerdFonts();
-
 // ── Formatting ─────────────────────────────────────────────────────────────
 
 export function formatCost(usd: number): string {

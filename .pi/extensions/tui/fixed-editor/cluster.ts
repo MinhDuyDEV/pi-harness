@@ -17,7 +17,7 @@
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { stripAnsi } from "../helpers.js";
 
-export const CURSOR_MARKER = "\x1b_pi:c\x07";
+const CURSOR_MARKER = "\x1b_pi:c\x07";
 
 /** Max rows the cluster can consume (reserved from the bottom). */
 const MAX_CLUSTER_ROWS = 20;
@@ -83,7 +83,7 @@ function pinEditorLines(lines: string[], max: number): string[] {
 }
 
 /** Extract the CURSOR_MARKER from rendered lines, returning cleaned lines + cursor position. */
-export function extractCursor(lines: string[]): FixedClusterOutput {
+function extractCursor(lines: string[]): FixedClusterOutput {
   let cursor: FixedCursorPos | null = null;
   const cleaned = lines.map((line, row) => {
     const idx = line.indexOf(CURSOR_MARKER);

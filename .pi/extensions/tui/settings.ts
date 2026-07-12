@@ -31,8 +31,6 @@ export interface PiTuiSettings {
   };
 }
 
-/** @deprecated Use PiTuiSettings */
-export type AmpTuiSettings = PiTuiSettings;
 
 function nonEmptyString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
@@ -192,6 +190,3 @@ function resolveFixedEditorConfig(
   }
   return { enabled: false, block: null };
 }
-
-/** @deprecated Use readPiTuiSettings */
-export const readAmpTuiSettings = readPiTuiSettings;
