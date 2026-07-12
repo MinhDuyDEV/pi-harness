@@ -33,7 +33,7 @@ export interface DeterministicSummaryResult {
 const DEFAULT_MAX_TRANSCRIPT_LINES = 140;
 const DEFAULT_MAX_SECTION_ITEMS = 24;
 
-export function estimateTextTokens(text: string): number {
+function estimateTextTokens(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
 }
 

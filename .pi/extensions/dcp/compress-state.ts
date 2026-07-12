@@ -184,7 +184,7 @@ export function makeDcpStateEntryPayload(
   };
 }
 
-export function restoreDcpStateSnapshot(
+function restoreDcpStateSnapshot(
   sessionId: string,
   snapshot: DurableSessionState,
 ): void {

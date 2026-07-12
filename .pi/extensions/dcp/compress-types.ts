@@ -71,10 +71,6 @@ const COMPACTABLE_TOOLS = new Set([
       "multi_grep",
 ]);
 
-export function isCompactableTool(toolName: string): boolean {
-  return COMPACTABLE_TOOLS.has(toolName);
-}
-
 export const READ_TOOLS = new Set([
   "read",
   "grep",
@@ -84,8 +80,6 @@ export const READ_TOOLS = new Set([
       "web_fetch",
       "context7",
     ]);
-
-export const MODIFY_TOOLS = new Set(["write", "edit"]);
 
 export interface ProbeResult {
   name: string;

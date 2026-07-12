@@ -5,9 +5,9 @@
 import type { AssistantMessage, Message, ToolCall } from "@earendil-works/pi-ai";
 
 /** Tools that count toward re-read metrics (excludes broad search tools). */
-export const REGRESSION_READ_TOOLS = new Set(["read", "hashline_read"]);
+const REGRESSION_READ_TOOLS = new Set(["read", "hashline_read"]);
 
-export function isRegressionReadTool(name: string): boolean {
+function isRegressionReadTool(name: string): boolean {
   return REGRESSION_READ_TOOLS.has(name);
 }
 

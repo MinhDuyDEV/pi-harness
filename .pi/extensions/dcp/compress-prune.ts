@@ -14,7 +14,7 @@ import type {
 	ToolCall,
 	ToolResultMessage,
 } from "@earendil-works/pi-ai";
-import { estimateTokens } from "./compress.js";
+import { estimateTokens } from "./compress-token-utils.js";
 
 interface DCPConfigShape {
 	toolResultPruning: {

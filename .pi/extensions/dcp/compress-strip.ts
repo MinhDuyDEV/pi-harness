@@ -17,7 +17,9 @@ import type {
 	ToolResultMessage,
 	UserMessage,
 } from "@earendil-works/pi-ai";
-import { buildCompressedSummaryMessage, estimateTokens, extractToolOps, getState } from "./compress.js";
+import { buildCompressedSummaryMessage } from "./compress-summary.js";
+import { estimateTokens, extractToolOps } from "./compress-token-utils.js";
+import { getState } from "./compress-state.js";
 
 interface DCPConfigShape {
 	compress: {

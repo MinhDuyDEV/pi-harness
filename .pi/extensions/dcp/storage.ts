@@ -56,7 +56,7 @@ export interface DurableSessionInfo {
   updatedAt: number;
 }
 
-export const DCP_STATE_DIR = join(homedir(), ".pi", "agent", "dcp-state");
+const DCP_STATE_DIR = join(homedir(), ".pi", "agent", "dcp-state");
 
 function ensureStateDir(): void {
   mkdirSync(DCP_STATE_DIR, { recursive: true });
@@ -69,7 +69,7 @@ export function getSessionKey(sessionId: string): string {
     .slice(0, 24);
 }
 
-export function getSessionStatePath(sessionId: string): string {
+function getSessionStatePath(sessionId: string): string {
   return join(DCP_STATE_DIR, `${getSessionKey(sessionId)}.json`);
 }
 

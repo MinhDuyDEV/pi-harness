@@ -14,7 +14,7 @@ export interface DcpCompactionMetadata {
   customInstructions?: string;
 }
 
-export function asRecord(
+function asRecord(
   value: unknown,
 ): Record<string, unknown> | undefined {
   return value && typeof value === "object"
@@ -22,7 +22,7 @@ export function asRecord(
     : undefined;
 }
 
-export function asMutableRecord(
+function asMutableRecord(
   value: unknown,
 ): Record<string, unknown> | undefined {
   return value && typeof value === "object"
@@ -30,7 +30,7 @@ export function asMutableRecord(
     : undefined;
 }
 
-export function parseCompactionReason(value: unknown): CompactionReason {
+function parseCompactionReason(value: unknown): CompactionReason {
   return value === "manual" || value === "threshold" || value === "overflow"
     ? value
     : "unknown";

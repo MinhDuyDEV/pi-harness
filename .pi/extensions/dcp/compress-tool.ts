@@ -39,7 +39,7 @@ import {
 import { renderCompressResult } from "./compress-render.js";
 import { DCP_STATE_ENTRY_TYPE } from "./compress-types.js";
 
-export const COMPRESS_TOOL_DESCRIPTION = `Save a durable summary of completed work to DCP (Durable Compression Protocol).
+const COMPRESS_TOOL_DESCRIPTION = `Save a durable summary of completed work to DCP (Durable Compression Protocol).
 
 Call this when:
 1. You finished a multi-step task and context is getting long

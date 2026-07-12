@@ -8,9 +8,7 @@
 // Types & Constants
 export {
   DCP_STATE_ENTRY_TYPE,
-  isCompactableTool,
   READ_TOOLS,
-  MODIFY_TOOLS,
 } from "./compress-types.js";
 export type {
   DcpStateEntryPayload,
@@ -37,7 +35,6 @@ export {
   getPersistentSummary,
   getQualityMetrics,
   makeDcpStateEntryPayload,
-  restoreDcpStateSnapshot,
   restoreDcpStateFromSessionEntries,
   cleanupSession,
   incrementTurn,
@@ -59,20 +56,14 @@ export {
 export {
   trackToolCall,
   getArtifactTracker,
-  extractPathFromArgs,
-  detectReadRegression,
   checkCompressionRegression,
   recordCompressEvent,
-  recordCompressFiles,
-  markArtifactsCompressed,
   getQualityStatus,
-  evaluateQuality,
 } from "./compress-metrics.js";
 
 // Token Estimation / Context Processing / Pruning
 export {
   estimateTokens,
-  partitionCompressibleMessages,
   estimateOutboundContextTokens,
   estimateTokensAfterCompress,
   enrichCompactionResult,

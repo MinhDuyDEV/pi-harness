@@ -13,7 +13,6 @@ function extractPathFromArgs(
   return undefined;
 }
 
-export { extractPathFromArgs };
 
 export function trackToolCall(
   sessionId: string,
@@ -99,37 +98,6 @@ export function checkCompressionRegression(
   return false;
 }
 
-export function detectReadRegression(
-  sessionId: string,
-  toolName: string,
-  args: Record<string, unknown>,
-  config: DCPConfig,
-): boolean {
-  const state = getState(sessionId);
-  if (!state.recentCompressFiles) return false;
-  const file = extractPathFromArgs(toolName, args);
-  if (!file) return false;
-  const isReRead = state.recentCompressFiles.files.includes(file);
-  if (isReRead) {
-    state.qualityMetrics.reReadsAfterCompress++;
-    const blockId =
-      state.blocks.length > 0
-        ? state.blocks[state.blocks.length - 1].blockId
-        : 0;
-    state.qualityMetrics.regressionLog.push({
-      blockId,
-      file,
-      turnGap: state.currentTurn - state.recentCompressFiles.turn,
-      timestamp: Date.now(),
-    });
-    if (state.qualityMetrics.regressionLog.length > 100) {
-      state.qualityMetrics.regressionLog =
-        state.qualityMetrics.regressionLog.slice(-50);
-    }
-  }
-  return isReRead;
-}
-
 export function recordCompressEvent(
   sessionId: string,
   blockId: number,
@@ -153,25 +121,6 @@ export function recordCompressEvent(
   }
 }
 
-export function recordCompressFiles(
-  sessionId: string,
-  files: readonly string[],
-): void {
-  const state = getState(sessionId);
-  state.recentCompressFiles = { files: [...files], turn: state.currentTurn };
-}
-
-export function markArtifactsCompressed(
-  sessionId: string,
-  files: readonly string[],
-): void {
-  const tracker = getState(sessionId).artifactTracker;
-  for (const f of files) {
-    const entry = tracker.get(f);
-    if (entry) entry.wasCompressed = true;
-  }
-}
-
 export function getQualityStatus(sessionId: string): string {
   const qm = getState(sessionId).qualityMetrics;
   const lastResults = qm.lastProbeResults;
@@ -187,49 +136,4 @@ export function getQualityStatus(sessionId: string): string {
     `Latest probes: ${probeSummary}`,
     `Avg probe score: ${qm.avgProbeScore.toFixed(1)}`,
   ].join(" | ");
-}
-
-export function evaluateQuality(
-  qualityMetrics: QualityMetricsData,
-): { status: string; numericalScore: number; details: string[] } {
-  const details: string[] = [];
-  let score = 100;
-
-  const rereadPenalty = Math.min(
-    qualityMetrics.reReadsAfterCompress * 10,
-    50,
-  );
-  if (rereadPenalty > 0) {
-    details.push(
-      `-${rereadPenalty} points: ${qualityMetrics.reReadsAfterCompress} re-read after compress`,
-    );
-    score -= rereadPenalty;
-  }
-
-  const probePenalty = qualityMetrics.failedProbes * 15;
-  if (probePenalty > 0) {
-    details.push(
-      `-${probePenalty} points: ${qualityMetrics.failedProbes} probe failures`,
-    );
-    score -= probePenalty;
-  }
-
-  if (
-    qualityMetrics.lastProbeResults &&
-    qualityMetrics.totalCompressions > 0
-  ) {
-    const probeScore = qualityMetrics.lastProbeResults.overallScore;
-    if (probeScore < 70) {
-      const penalty = Math.round((70 - probeScore) / 2);
-      details.push(`-${penalty} points: low probe score (${probeScore})`);
-      score -= penalty;
-    }
-  }
-
-  const status = score >= 80 ? "good" : score >= 50 ? "fair" : "poor";
-  return {
-    status,
-    numericalScore: Math.max(0, score),
-    details,
-  };
 }

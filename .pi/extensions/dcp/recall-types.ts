@@ -32,5 +32,4 @@ export interface RecallResult {
   total: number;
 }
 
-export const PAGE_SIZE = 5;
 export const RAW_SESSION_DIR = join(homedir(), ".pi", "agent", "sessions");

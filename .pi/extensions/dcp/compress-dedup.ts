@@ -15,7 +15,8 @@ import type {
 	ToolCall,
 	ToolResultMessage,
 } from "@earendil-works/pi-ai";
-import { extractToolOps, READ_TOOLS, stripToolArgs } from "./compress.js";
+import { extractToolOps, stripToolArgs } from "./compress-token-utils.js";
+import { READ_TOOLS } from "./compress-types.js";
 
 interface DCPConfigShape {
 	dedup: {
