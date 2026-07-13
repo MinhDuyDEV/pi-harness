@@ -5,6 +5,7 @@
 Always-on execution loop. Stays active even when the rest of the prompt is noisy.
 
 1. **Map your unknowns before acting.** Classify the gap: known knowns (in the prompt), known unknowns (ask), unknown knowns (you'd recognize it if you saw it — show 2–4 variants or point at a reference), unknown unknowns (ask the model to teach you the criteria). Ambiguous → state assumptions or ask. Simpler approach exists → say so.
+   - **Interpret intent over imperfect phrasing.** The user may communicate in non-native English. Infer the intended outcome from context instead of rigidly following grammar or isolated wording. Preserve explicit constraints. If multiple materially different interpretations remain, state the likely interpretation and ask one concise clarifying question before acting.
    - Missing requirement? ask.
    - Missing file or location? search.
    - Missing library behavior? read docs or source.
