@@ -1,8 +1,8 @@
 {
-  "defaultProvider": "agent-router",
-  "defaultModel": "glm-5.2",
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.6-terra",
   "defaultThinkingLevel": "high",
-  "editorPaddingX": 0,
+  "editorPaddingX": 1,
   "images": {
     "blockImages": false
   },
@@ -29,8 +29,8 @@
       "maxRetryDelayMs": 60000
     }
   },
-  "steeringMode": "one-at-a-time",
-  "followUpMode": "one-at-a-time",
+  "steeringMode": "all",
+  "followUpMode": "all",
   "enableSkillCommands": true,
   "skills": [
     ".pi/skills/"
@@ -41,24 +41,26 @@
   "extensions": [
     ".pi/extensions/"
   ],
-  "lastChangelogVersion": "0.80.3",
+  "lastChangelogVersion": "0.80.6",
   "treeFilterMode": "default",
   "transport": "auto",
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "terminal": {
     "showTerminalProgress": true,
     "clearOnShrink": true,
     "showImages": false,
     "autoResize": true
   },
-  "collapseChangelog": true,
+  "collapseChangelog": false,
   "enableInstallTelemetry": false,
   "powerline": {
-    "preset": "default",
-    "fixedEditor": true
+    "preset": "default"
   },
   "piTui": {
-    "workingPaddingTop": 1
+    "workingPaddingTop": 1,
+    "fixedEditor": {
+      "enabled": false
+    }
   },
   "theme": "catppuccin",
   "showHardwareCursor": false,
@@ -66,5 +68,6 @@
   "quietStartup": false,
   "doubleEscapeAction": "tree",
   "defaultProjectTrust": "always",
-  "outputPad": 1
+  "outputPad": 1,
+  "showCacheMissNotices": true
 }
