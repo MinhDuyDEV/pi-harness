@@ -59,11 +59,11 @@ describe("buildContextMeterSnapshot — null-tokens diagnostics suppression", ()
 });
 
 // ── Versioned custom-entry persistence ───────────────────────────────
-describe("makeDcpStateEntryPayload — V2 with sessionId", () => {
-  it("creates a version 2 payload with sessionId", () => {
+describe("makeDcpStateEntryPayload — V3 with provenance", () => {
+  it("creates a version 3 payload with sessionId", () => {
     const payload = makeDcpStateEntryPayload("session-branch-1", "manual");
     expect(payload).toBeDefined();
-    expect(payload.version).toBe(2);
+    expect(payload.version).toBe(3);
     expect(payload.sessionId).toBe("session-branch-1");
     expect(payload.reason).toBe("manual");
     expect(typeof payload.createdAt).toBe("number");
@@ -73,7 +73,7 @@ describe("makeDcpStateEntryPayload — V2 with sessionId", () => {
 
   it("uses the correct snapshot structure", () => {
     const payload = makeDcpStateEntryPayload("session-branch-2", "threshold");
-    expect(payload.snapshot.version).toBe(1);
+    expect(payload.snapshot.version).toBe(2);
     expect(Array.isArray(payload.snapshot.blocks)).toBe(true);
     expect(typeof payload.snapshot.sessionId).toBe("string");
   });
@@ -166,6 +166,14 @@ describe("restoreDcpStateFromSessionEntries — branch-safe filtering", () => {
     const entries = [v1Entry];
     const result = restoreDcpStateFromSessionEntries("session-fallback", entries);
     expect(result).toBe(true);
+  });
+
+  it("returns false rather than restoring another session's V2 entry", () => {
+    const entries = [
+      makeEntry({ timestamp: 2000, sessionId: "session-other" }),
+    ];
+    const result = restoreDcpStateFromSessionEntries("session-mine", entries);
+    expect(result).toBe(false);
   });
 
   it("returns false when no valid entries exist", () => {
@@ -323,9 +331,9 @@ describe("DcpStateEntryPayload — version compatibility", () => {
     expect(result).toBe(true);
   });
 
-  it("V2 payload includes sessionId for branch-safe filtering", () => {
+  it("V3 payload includes sessionId for branch-safe filtering", () => {
     const payload = makeDcpStateEntryPayload("branch-test-1", "manual");
-    expect(payload.version).toBe(2);
+    expect(payload.version).toBe(3);
     expect(payload.sessionId).toBe("branch-test-1");
   });
 });

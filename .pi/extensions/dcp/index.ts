@@ -25,6 +25,7 @@ import {
   cleanupSession,
   getBlocks,
   getDcpSessionId,
+  getProvenanceCounts,
   getQualityStatus,
   processContextMessages,
   registerCompressTool,
@@ -32,6 +33,7 @@ import {
   incrementTurn,
   makeDcpStateEntryPayload,
   restoreDcpStateFromSessionEntries,
+  validateBlocksProvenance,
 } from "./compress.js";
 import { getSessionBranchMessages } from "./branch-messages.js";
 import { getArtifactTracker } from "./compress-metrics.js";
@@ -84,8 +86,19 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
   function ensureInitialized(ctx: ExtensionContext): void {
     if (!initialized) {
-      const entries = ctx.sessionManager.getBranch() as readonly unknown[];
+      const entries = ctx.sessionManager.getBranch();
       restoreDcpStateFromSessionEntries(getDcpSessionId(ctx), entries);
+      // Validate provenance for all restored blocks against current branch
+      const quarantinedCount = validateBlocksProvenance(
+        getDcpSessionId(ctx),
+        ctx.sessionManager,
+      );
+      if (quarantinedCount > 0) {
+        const counts = getProvenanceCounts(getDcpSessionId(ctx));
+        console.warn(
+          `[dcp] Quarantined ${quarantinedCount} block(s) due to provenance mismatch. Active: ${counts.validated} validated, ${counts.legacyUnverified} legacy_unverified. Quarantined total: ${counts.quarantined}`,
+        );
+      }
     }
     if (initialized) return;
 

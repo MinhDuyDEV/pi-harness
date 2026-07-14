@@ -11,6 +11,7 @@ import {
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createHash } from "node:crypto";
+import type { DcpProvenanceV2, LegacyAttestationMetadata, QuarantinedBlock } from "./compress-types.ts";
 
 export interface DurableCompressionBlock {
   id: string;
@@ -25,7 +26,11 @@ export interface DurableCompressionBlock {
   endMessageId?: string;
   beadId?: string;
   source?: string;
-}
+      /** V2: provenance metadata captured at block creation time */
+      provenance?: DcpProvenanceV2;
+      /** Attestation metadata when a legacy block has been attested */
+      attestation?: LegacyAttestationMetadata;
+    }
 
 export interface DurableArtifact {
   path: string;
@@ -36,7 +41,7 @@ export interface DurableArtifact {
 }
 
 export interface DurableSessionState {
-  version: 1;
+  version: 1 | 2;
   sessionId: string;
   sessionKey: string;
   blocks: DurableCompressionBlock[];
@@ -47,6 +52,8 @@ export interface DurableSessionState {
   compressEventCount: number;
   lastCompressTurn: number;
   updatedAt: number;
+  /** V2: Quarantined blocks that failed provenance validation */
+  quarantinedBlocks?: QuarantinedBlock[];
 }
 
 export interface DurableSessionInfo {
@@ -82,7 +89,7 @@ export function loadDurableSessionState(
     const parsed = JSON.parse(
       readFileSync(path, "utf8"),
     ) as DurableSessionState;
-    if (parsed.version !== 1 || !Array.isArray(parsed.blocks)) return undefined;
+    if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.blocks)) return undefined;
     return parsed;
   } catch {
     return undefined;
@@ -135,7 +142,7 @@ export function loadDurableSessionStateFromPath(
     const parsed = JSON.parse(
       readFileSync(path, "utf8"),
     ) as DurableSessionState;
-    if (parsed.version !== 1 || !Array.isArray(parsed.blocks)) return undefined;
+    if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.blocks)) return undefined;
     return parsed;
   } catch {
     return undefined;

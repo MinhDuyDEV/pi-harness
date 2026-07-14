@@ -17,6 +17,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import { extractToolOps, stripToolArgs } from "./compress-token-utils.js";
 import { READ_TOOLS } from "./compress-types.js";
+import type { ProtectionPolicy } from "./protection.js";
 
 interface DCPConfigShape {
 	dedup: {
@@ -41,6 +42,7 @@ interface DCPConfigShape {
 export function applyDedup(
 	messages: Message[],
 	config: DCPConfigShape,
+	protection?: ProtectionPolicy,
 ): { prunedTokens: number; prunedCount: number } {
 	if (!config.dedup.enabled) return { prunedTokens: 0, prunedCount: 0 };
 
@@ -70,6 +72,8 @@ export function applyDedup(
 		if (calls.length <= 1) continue;
 		for (let i = 0; i < calls.length - 1; i++) {
 			const oldCall = calls[i];
+			// Protected messages survive dedup
+			if (protection?.isProtected(messages[oldCall.messageIndex])) continue;
 			// Strip call arguments
 			const asst = messages[oldCall.messageIndex] as AssistantMessage;
 			const tc = asst.content[oldCall.contentIndex] as ToolCall;
@@ -77,6 +81,8 @@ export function applyDedup(
 			// Strip corresponding result
 			for (const op of ops) {
 				if (op.type === "result" && op.toolCallId === oldCall.toolCallId) {
+					// Skip if the result message itself is protected
+					if (protection?.isProtected(messages[op.messageIndex])) continue;
 					const rm = messages[op.messageIndex] as ToolResultMessage;
 					const textPart = rm.content.find((c) => c.type === "text") as TextContent | undefined;
 					const snippet = textPart?.text?.slice(0, 100).replace(/\n/g, " ").trim() ?? "";
@@ -98,6 +104,7 @@ export function applyDedup(
 export function applyPurgeErrors(
 	messages: Message[],
 	config: DCPConfigShape,
+	protection?: ProtectionPolicy,
 ): { prunedTokens: number; prunedCount: number } {
 	if (!config.purgeErrors.enabled) return { prunedTokens: 0, prunedCount: 0 };
 
@@ -114,6 +121,9 @@ export function applyPurgeErrors(
 	for (const op of ops) {
 		if (op.type !== "call" || !erroredIds.has(op.toolCallId)) continue;
 		if (protectedSet.has(op.toolName)) continue;
+
+		// Protected content survives error purging
+		if (protection?.isProtected(messages[op.messageIndex])) continue;
 
 		// Estimate age: use distance from end of messages as proxy
 		const relativeAge = messages.length - op.messageIndex;

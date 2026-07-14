@@ -23,24 +23,35 @@ export type {
   ProbeEvaluationResult,
   RegressionEvent,
   QualityMetricsData,
-  CompressionBlock,
-  ToolOp,
-  SessionState,
-} from "./compress-types.js";
+      CompressionBlock,
+      LegacyAttestationMetadata,
+      ToolOp,
+      SessionState,
+    } from "./compress-types.js";
 
-// State Management
-export {
-  getDcpSessionId,
-  getState,
-  getPersistentSummary,
-  getQualityMetrics,
-  makeDcpStateEntryPayload,
-  restoreDcpStateFromSessionEntries,
-  cleanupSession,
-  incrementTurn,
-  addBlock,
-  getBlocks,
-  getStats,
+    // State Management
+    export {
+      addBlock,
+      attestBlock,
+      captureProvenance,
+      cleanupSession,
+      getBlocks,
+      getDcpSessionId,
+      getLegacyStatus,
+      getProvenanceCounts,
+      getQualityMetrics,
+      getPersistentSummary,
+      getQuarantinedBlocks,
+      getState,
+      getStats,
+      incrementTurn,
+      isLegacyBlock,
+      makeDcpStateEntryPayload,
+      persistState,
+      quarantineLegacyBlocks,
+      restoreDcpStateFromSessionEntries,
+      validateBlocksProvenance,
+      validateBlockProvenance,
 } from "./compress-state.js";
 
 // Summary / Probes

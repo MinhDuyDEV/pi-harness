@@ -8,6 +8,8 @@ import {
   estimateTokens,
   extractToolOps,
 } from "./compress-token-utils.js";
+    import { computeProtectionPolicy } from "./protection.js";
+    import type { ProtectionProvenance } from "./compress-types.js";
 
 export {
   estimateTokens,
@@ -19,14 +21,15 @@ function isCompressibleMessage(msg: Message): boolean {
   return msg.role !== "assistant" && msg.role !== "user";
 }
 
-export function processContextMessages(
-  messages: Message[],
-  sessionId: string,
-  config: DCPConfig,
-): Message[] {
-  checkCompressionRegression(messages, sessionId, config);
-  return runContextStrategies(messages, sessionId, config).messages;
-}
+    export function processContextMessages(
+      messages: Message[],
+      sessionId: string,
+      config: DCPConfig,
+    ): Message[] {
+      checkCompressionRegression(messages, sessionId, config);
+      const result = runContextStrategies(messages, sessionId, config);
+      return result.messages;
+    }
 
 export function runContextStrategies(
   messages: Message[],
@@ -36,31 +39,39 @@ export function runContextStrategies(
   messages: Message[];
   prunedTokens: number;
   prunedCount: number;
+  provenance: ProtectionProvenance;
 } {
   const working = messages.map((msg) => structuredClone(msg));
+
+  // Compute the shared protection policy once per strategy run
+  const protection = computeProtectionPolicy(working, config);
 
   const {
     messages: afterStrip,
     prunedTokens: stripTokens,
     prunedCount: stripCount,
-  } = applyCompressStrip(working, sessionId, config);
+  } = applyCompressStrip(working, sessionId, config, protection);
   const { prunedTokens: dedupTokens, prunedCount: dedupCount } = applyDedup(
     afterStrip,
     config,
+    protection,
   );
   const { prunedTokens: purgeTokens, prunedCount: purgeCount } = applyPurgeErrors(
     afterStrip,
     config,
+    protection,
   );
   const { prunedTokens: pruneTokens, prunedCount: pruneCount } = pruneToolResults(
     afterStrip,
     config,
+    protection,
   );
 
   return {
     messages: afterStrip,
     prunedTokens: stripTokens + dedupTokens + purgeTokens + pruneTokens,
     prunedCount: stripCount + dedupCount + purgeCount + pruneCount,
+    provenance: protection.provenance,
   };
 }
 

@@ -95,15 +95,17 @@ export interface QualityMetricsConfig {
   trackReReads: boolean;
 }
 
-export interface ToolResultPruningConfig {
-  enabled: boolean;
-  /** Total estimated token threshold to trigger pruning (default: 40_000) */
-  thresholdTokens: number;
-  /** Number of most recent turns to protect from pruning */
-  protectedRecentTurns: number;
-  /** Override list of compactable tool names (defaults to built-in list) */
-  compactableTools: string[];
-}
+    export interface ToolResultPruningConfig {
+      enabled: boolean;
+      /** Total estimated token threshold to trigger pruning (default: 40_000) */
+      thresholdTokens: number;
+      /** Number of most recent turns to protect from pruning */
+      protectedRecentTurns: number;
+      /** Override list of compactable tool names (defaults to built-in list) */
+      compactableTools: string[];
+      /** Tool names protected from pruning by all strategies */
+      protectedTools: string[];
+    }
 
 export interface DeterministicCompactionConfig {
   enabled: boolean;
@@ -120,6 +122,13 @@ export interface SemanticEnrichmentConfig {
   enabled: boolean;
   /** Provider/model name; empty means use Pi's default provider when a provider hook is available. */
   provider: string;
+}
+
+export interface ProtectionConfig {
+  /** Glob patterns for file paths whose tool call+result are protected from compression strategies */
+  protectedFilePatterns: string[];
+  /** Number of most recent tool-call turns to protect from compression strategies */
+  recentTurns: number;
 }
 
 export interface RecallConfig {
@@ -141,6 +150,7 @@ export interface DCPConfig {
   qualityMetrics: QualityMetricsConfig;
   deterministicCompaction: DeterministicCompactionConfig;
   semanticEnrichment: SemanticEnrichmentConfig;
+  protection: ProtectionConfig;
   recall: RecallConfig;
   debug: boolean;
 }
@@ -201,11 +211,12 @@ export const DEFAULT_CONFIG: DCPConfig = {
     showInResponse: true,
     nudgeOnFailure: true,
   },
-  toolResultPruning: {
-    enabled: true,
-    thresholdTokens: 40_000,
-    protectedRecentTurns: 2,
-    compactableTools: [
+      toolResultPruning: {
+        enabled: true,
+        thresholdTokens: 40_000,
+        protectedRecentTurns: 2,
+        protectedTools: [],
+        compactableTools: [
       "read",
       "bash",
       "grep",
@@ -232,6 +243,10 @@ export const DEFAULT_CONFIG: DCPConfig = {
   semanticEnrichment: {
     enabled: false,
     provider: "",
+  },
+  protection: {
+    protectedFilePatterns: [],
+    recentTurns: 3,
   },
   recall: {
     enabled: true,

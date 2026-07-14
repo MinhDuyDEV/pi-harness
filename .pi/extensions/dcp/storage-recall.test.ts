@@ -550,13 +550,12 @@ test("recall display normalizes DCP-specific OCR typos without mutating search s
   }
 });
 
-test("DCP state snapshots restore from branch-native custom entries", () => {
-  const sourceSession = `dcp-source-${Date.now()}-${Math.random()}`;
-  const targetSession = `dcp-target-${Date.now()}-${Math.random()}`;
-  try {
+    test("DCP state snapshots restore from branch-native custom entries", () => {
+      const sessionId = `dcp-branch-${Date.now()}-${Math.random()}`;
+      try {
     addBlock(
-      sourceSession,
-      "branch-state",
+          sessionId,
+          "branch-state",
       "Carry DCP state across tree navigation.",
       "start",
       "end",
@@ -566,9 +565,10 @@ test("DCP state snapshots restore from branch-native custom entries", () => {
         ],
       },
     );
-    const payload = makeDcpStateEntryPayload(sourceSession, "manual");
+        const payload = makeDcpStateEntryPayload(sessionId, "manual");
+        cleanupSession(sessionId);
 
-    const restored = restoreDcpStateFromSessionEntries(targetSession, [
+        const restored = restoreDcpStateFromSessionEntries(sessionId, [
       {
         type: "custom",
         id: "entry-1",
@@ -579,13 +579,11 @@ test("DCP state snapshots restore from branch-native custom entries", () => {
     ]);
 
     expect(restored).toBe(true);
-    expect(getBlocks(targetSession).map((block) => block.topic)).toContain(
-      "branch-state",
-    );
-  } finally {
-    cleanupSession(sourceSession);
-    cleanupSession(targetSession);
-    deleteDurableSessionState(sourceSession);
-    deleteDurableSessionState(targetSession);
+        expect(getBlocks(sessionId).map((block) => block.topic)).toContain(
+          "branch-state",
+        );
+      } finally {
+        cleanupSession(sessionId);
+        deleteDurableSessionState(sessionId);
   }
 });

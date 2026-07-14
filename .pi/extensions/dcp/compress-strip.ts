@@ -20,6 +20,7 @@ import type {
 import { buildCompressedSummaryMessage } from "./compress-summary.js";
 import { estimateTokens, extractToolOps } from "./compress-token-utils.js";
 import { getState } from "./compress-state.js";
+import type { ProtectionPolicy } from "./protection.js";
 
 interface DCPConfigShape {
 	compress: {
@@ -61,6 +62,7 @@ export function applyCompressStrip(
 	messages: Message[],
 	sessionId: string,
 	config: DCPConfigShape,
+	protection?: ProtectionPolicy,
 ): { messages: Message[]; prunedTokens: number; prunedCount: number } {
 	const ops = extractToolOps(messages);
 	const compressResults: Array<{
@@ -114,6 +116,10 @@ export function applyCompressStrip(
 
 		for (let j = rangeStart; j < rangeEnd; j++) {
 			if (indicesToRemove.has(j)) continue;
+
+			// Protected content stays in the array — do not mark for removal
+			if (protection?.isProtected(messages[j])) continue;
+
 			strippedTokens += estimateTokens(messages[j]);
 			indicesToRemove.add(j);
 

@@ -15,6 +15,7 @@ import type {
 	ToolResultMessage,
 } from "@earendil-works/pi-ai";
 import { estimateTokens } from "./compress-token-utils.js";
+import type { ProtectionPolicy } from "./protection.js";
 
 interface DCPConfigShape {
 	toolResultPruning: {
@@ -56,6 +57,7 @@ function shortArgPreview(toolName: string, args: Record<string, unknown>): strin
 export function pruneToolResults(
 	messages: Message[],
 	config: DCPConfigShape,
+	protection?: ProtectionPolicy,
 ): { prunedTokens: number; prunedCount: number } {
 	if (!config.toolResultPruning.enabled) {
 		return { prunedTokens: 0, prunedCount: 0 };
@@ -114,8 +116,13 @@ export function pruneToolResults(
 	let prunedTokens = 0;
 	let prunedCount = 0;
 
-	for (const msg of messages) {
+	for (let i = 0; i < messages.length; i++) {
+		const msg = messages[i];
 		if (msg.role !== "toolResult") continue;
+
+		// Protected content is not pruned
+		if (protection?.isProtected(messages[i])) continue;
+
 		const tr = msg as ToolResultMessage;
 
 		// Skip if this result belongs to a protected (recent) turn

@@ -4,21 +4,24 @@
  * /dcp and /dcp-recall command handlers.
  */
 
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type { Message } from "@earendil-works/pi-ai";
 import type { DCPConfig } from "./config.js";
 import {
   getBlocks,
   getDcpSessionId,
   getPersistentSummary,
+  getProvenanceCounts,
+  getQuarantinedBlocks,
   getStats,
   getArtifactTracker,
 } from "./compress.js";
 import { getSessionBranchMessages } from "./branch-messages.js";
 import { searchDcpRecall } from "./recall.js";
-import {
-  formatPressureSourceLabel,
-} from "./pressure.js";
+import { formatPressureSourceLabel } from "./pressure.js";
 
 export function registerDcpCommand(
   pi: ExtensionAPI,
@@ -29,7 +32,11 @@ export function registerDcpCommand(
     getState: () => import("./nudge.js").NudgeState;
   },
   helpers: {
-    estimateOutboundContextTokens: (messages: Message[], sessionId: string, config: DCPConfig) => number;
+    estimateOutboundContextTokens: (
+      messages: Message[],
+      sessionId: string,
+      config: DCPConfig,
+    ) => number;
     buildContextMeterSnapshot: (
       usedTokens: number | undefined,
       outboundTokens: number,
@@ -43,6 +50,35 @@ export function registerDcpCommand(
       "DCP status — compression blocks, artifact tracking, quality metrics, and nudges",
     async handler(_args: string, ctx: ExtensionContext) {
       ensureInitialized(ctx);
+
+      // Legacy subcommand routing
+      if (_args.trim().startsWith("legacy")) {
+        const { handleLegacyCommand } = await import("./legacy-attestation.js");
+        const { makeDcpStateEntryPayload, DCP_STATE_ENTRY_TYPE } =
+          await import("./compress.js");
+        const legacyArgs = _args.trim().slice("legacy".length).trim();
+        await handleLegacyCommand(
+          legacyArgs,
+          {
+            notify: (msg: string) => ctx.ui.notify(msg),
+            confirm: (title: string, message: string) =>
+              ctx.ui.confirm(title, message),
+          },
+          {
+            stateKey: getDcpSessionId(ctx),
+            session: ctx.sessionManager,
+            appendState: (reason: string) => {
+              const stateKey = getDcpSessionId(ctx);
+              pi.appendEntry(
+                DCP_STATE_ENTRY_TYPE,
+                makeDcpStateEntryPayload(stateKey, reason),
+              );
+            },
+          },
+        );
+        return;
+      }
+
       const sessionId = getDcpSessionId(ctx);
       const usage = ctx.getContextUsage();
       const contextWindow = ctx.model?.contextWindow ?? 200_000;
@@ -59,6 +95,8 @@ export function registerDcpCommand(
       nudge.refreshContextMeter(ctx, meter);
 
       const blocks = getBlocks(sessionId);
+      const provenance = getProvenanceCounts(sessionId);
+      const quarantined = getQuarantinedBlocks(sessionId);
       const stats = getStats(sessionId);
       const nudgeState = nudge.getState();
 
@@ -91,7 +129,9 @@ export function registerDcpCommand(
               )
               .join("\n"),
         "",
-        `Total summary buffer: ~${stats.summaryTokens} tokens`,
+        "### Provenance",
+        `  Validated: ${provenance.validated}${provenance.attested != null ? ` | Attested: ${provenance.attested}` : ""} | Legacy unverified: ${provenance.legacyUnverified} | Quarantined: ${quarantined.length}`,
+        "",
         (() => {
           const branchMsgs = getSessionBranchMessages(ctx);
           const tokenCount = branchMsgs.reduce((sum: number, m: Message) => {
@@ -168,7 +208,9 @@ export function registerDcpCommand(
               lines.push(`    \u2022 ${f}`);
             }
             if (artifacts.files_read.length > 10) {
-              lines.push(`    \u2026 and ${artifacts.files_read.length - 10} more`);
+              lines.push(
+                `    \u2026 and ${artifacts.files_read.length - 10} more`,
+              );
             }
           }
           if (artifacts.files_modified.length > 0) {
@@ -207,8 +249,7 @@ export function registerDcpCommand(
 
       lines.push(
         nudgeState.pendingNudge
-              ? `\uF071 Pending nudge: "${nudgeState.pendingNudge}"`
-
+          ? `\uF071 Pending nudge: "${nudgeState.pendingNudge}"`
           : "No pending nudge",
       );
 

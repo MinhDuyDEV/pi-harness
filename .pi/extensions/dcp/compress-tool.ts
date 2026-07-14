@@ -16,16 +16,19 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
-import type { DCPConfig } from "./config.js";
-import {
-  addBlock,
-  getBlocks,
-  getDcpSessionId,
-  getQualityMetrics,
-  getStats,
-  makeDcpStateEntryPayload,
-} from "./compress-state.js";
+    import { Text } from "@earendil-works/pi-tui";
+    import type { DCPConfig } from "./config.js";
+    import {
+      addBlock,
+      captureProvenance,
+      getBlocks,
+      getDcpSessionId,
+      getQualityMetrics,
+      getStats,
+      makeDcpStateEntryPayload,
+    } from "./compress-state.js";
+    import { computeProtectionPolicy } from "./protection.js";
+    import { getSessionBranchMessages } from "./branch-messages.js";
 import {
   evaluateCompressionProbes,
   extractStructuredFields,
@@ -112,27 +115,44 @@ export function registerCompressTool(
         };
       }
 
-      const sessionId = getDcpSessionId(ctx);
-      const { fields, narrative } = extractStructuredFields(
-        params as Record<string, unknown>,
-        config,
-      );
-      const mode = "manual";
+          const sessionId = getDcpSessionId(ctx);
+          const { fields, narrative } = extractStructuredFields(
+            params as Record<string, unknown>,
+            config,
+          );
+          const mode = "manual";
 
-      const block = addBlock(
-        sessionId,
-        "manual",
-        narrative,
-        "manual",
-        "manual",
-        {
-          files_read: fields.files_read,
-          files_modified: fields.files_modified,
-          decisions: fields.decisions,
-          next_steps: fields.next_steps,
-          source: mode,
-        },
-      );
+          // Compute protection provenance over the current session messages
+          const sessionMessages = getSessionBranchMessages(ctx);
+          const protectionProvenance = sessionMessages.length > 0
+            ? computeProtectionPolicy(sessionMessages, config).provenance
+            : undefined;
+
+          const provenance = ctx.sessionManager
+            ? captureProvenance(
+                ctx.sessionManager,
+                Date.now(),
+                protectionProvenance,
+                "manual",
+              )
+            : undefined;
+
+          const block = addBlock(
+            sessionId,
+            "manual",
+            narrative,
+            "manual",
+            "manual",
+            {
+              files_read: fields.files_read,
+              files_modified: fields.files_modified,
+              decisions: fields.decisions,
+              next_steps: fields.next_steps,
+              source: mode,
+              ...(protectionProvenance ? { protectionProvenance } : {}),
+            },
+            provenance,
+          );
 
       mergeIntoPersistentSummary(sessionId, fields, "manual", block.blockId);
       recordCompressEvent(sessionId, block.blockId, fields);
