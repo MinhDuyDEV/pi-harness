@@ -97,7 +97,7 @@ export class NudgeManager {
     this.state.lastMeter = meter;
     const pressure = resolveContextPressure(
       meter,
-      this.config.autoCompact.pressureSource ?? "max",
+      "branch",
     );
     this.state.lastPressurePercent = pressure.percent;
     this.state.lastPressureSource = pressure.source;
@@ -144,7 +144,7 @@ export class NudgeManager {
 
     const pressure = resolveContextPressure(
       meterSnap,
-      autoCfg.pressureSource ?? "max",
+      "branch",
     );
     const autoThreshold = resolveAutoCompactThreshold(autoCfg, contextWindow);
     const contextPercent = pressure.percent;
@@ -167,12 +167,8 @@ export class NudgeManager {
       !this.state.autoCompactTriggered
     ) {
       this.state.autoCompactTriggered = true;
-      if (!autoCfg.invokeNativeCompact) {
-        this.state.pendingNudge = this.buildCriticalNudge(
-          contextTokens,
-          contextPercent,
-          meterSnap,
-        );
+      if (!autoCfg.invokeNativeCompact || pressure.source !== "branch") {
+        this.state.pendingNudge = this.buildCriticalNudge(meterSnap);
         return this.state.pendingNudge;
       }
       return null;
@@ -180,11 +176,7 @@ export class NudgeManager {
 
     if (contextPercent >= config.maxContextLimit) {
       if (this.state.autoCompactTriggered) return null;
-      this.state.pendingNudge = this.buildCriticalNudge(
-        contextTokens,
-        contextPercent,
-        meterSnap,
-      );
+      this.state.pendingNudge = this.buildCriticalNudge(meterSnap);
       this.state.lastNudgeTurn = this.currentTurn;
       return this.state.pendingNudge;
     }
@@ -194,8 +186,8 @@ export class NudgeManager {
 
     this.state.pendingNudge =
       config.nudgeForce === "strong"
-        ? this.buildStrongNudge(contextTokens, contextPercent)
-        : this.buildGentleNudge(contextTokens, contextPercent);
+        ? this.buildStrongNudge(meterSnap)
+        : this.buildGentleNudge(meterSnap);
     this.state.lastNudgeTurn = this.currentTurn;
 
     return this.state.pendingNudge;
@@ -250,9 +242,23 @@ export class NudgeManager {
     return `Use \`compress\` on the oldest block (b1) adding structured fields.`;
   }
 
-  private buildGentleNudge(tokens: number, percent: number): string {
+  private formatContextMetrics(meter: ContextMeterSnapshot): string {
+    const formatMetric = (label: string, tokens: number, percent: number) =>
+      `${label} ${Math.round(tokens / 1000)}k / ${Math.round(meter.contextWindow / 1000)}k (${Math.round(percent)}%)`;
+    const metrics = [
+      formatMetric("branch", meter.branchTokens, meter.branchPercent),
+    ];
+    if (meter.outboundPercent !== null) {
+      metrics.push(
+        formatMetric("processed-history estimate", meter.outboundTokens, meter.outboundPercent),
+      );
+    }
+    return metrics.join("; ");
+  }
+
+  private buildGentleNudge(meter: ContextMeterSnapshot): string {
     const parts = [
-      `[DCP] Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%).`,
+      `[DCP] Context: ${this.formatContextMetrics(meter)}.`,
       this.buildActionSuggestion(),
     ];
     if (this.state.qualityStatus) {
@@ -261,9 +267,9 @@ export class NudgeManager {
     return parts.join(" ");
   }
 
-  private buildStrongNudge(tokens: number, percent: number): string {
+  private buildStrongNudge(meter: ContextMeterSnapshot): string {
     const parts = [
-      `[DCP] Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%).`,
+      `[DCP] Context: ${this.formatContextMetrics(meter)}.`,
       this.buildActionSuggestion(),
     ];
     if (this.state.qualityStatus) {
@@ -272,13 +278,9 @@ export class NudgeManager {
     return parts.join(" ");
   }
 
-  private buildCriticalNudge(
-    tokens: number,
-    percent: number,
-    meter?: ContextMeterSnapshot,
-  ): string {
+  private buildCriticalNudge(meter: ContextMeterSnapshot): string {
     const parts = [
-      `[DCP] CRITICAL: Context at ${Math.round(tokens / 1000)}k tokens (${Math.round(percent)}%) — approaching limit.`,
+      `[DCP] CRITICAL: Context: ${this.formatContextMetrics(meter)} — approaching limit.`,
       this.buildActionSuggestion(),
     ];
     if (meter?.strippedByDcp && meter.deltaTokens != null && meter.deltaTokens > 0) {
@@ -300,7 +302,7 @@ export class NudgeManager {
     const nudge = s.pendingNudge ? " \uF071 pending" : "";
     const qual = s.qualityStatus ? ` | ${s.qualityStatus}` : "";
     const meter = s.lastMeter
-      ? ` | outbound ${Math.round(s.lastMeter.outboundTokens / 1000)}k${s.lastMeter.strippedByDcp ? ` (Δ${Math.round((s.lastMeter.deltaTokens ?? 0) / 1000)}k)` : ""}`
+      ? ` | estimate ${Math.round(s.lastMeter.outboundTokens / 1000)}k${s.lastMeter.strippedByDcp ? ` (Δ${Math.round((s.lastMeter.deltaTokens ?? 0) / 1000)}k)` : ""}`
       : "";
     return `DCP: ${Math.round(s.lastContextTokens / 1000)}k branch${pct}${meter}${nudge}${qual}`;
   }

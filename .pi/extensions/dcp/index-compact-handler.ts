@@ -135,7 +135,12 @@ export async function handleSessionBeforeCompact(
 
   if (!result) return;
   result.summary = `${prependCompactionContext(result.summary, compactionMetadata)}\n\n## DCP Persistent Summary\n\n${buildCompressedSummaryMessage(ps)}`;
-  addDcpCompactionDetails(result, sessionId, compactionMetadata);
+  addDcpCompactionDetails(
+    result,
+    sessionId,
+    compactionMetadata,
+        makeDcpStateEntryPayload,
+  );
   return {
     compaction: enrichCompactionResult(
       result,
@@ -146,7 +151,7 @@ export async function handleSessionBeforeCompact(
   };
 }
 
-export function handleSessionBeforeTree(
+export async function handleSessionBeforeTree(
   event: unknown,
   ctx: ExtensionContext,
   config: DCPConfig,

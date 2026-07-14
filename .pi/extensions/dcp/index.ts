@@ -12,8 +12,10 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
   type InputEvent,
+  type SessionCompactEvent,
   type SessionBeforeCompactEvent,
   type SessionBeforeTreeEvent,
+  type SessionTreeEvent,
   type ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 
@@ -32,6 +34,7 @@ import {
   restoreDcpStateFromSessionEntries,
 } from "./compress.js";
 import { getSessionBranchMessages } from "./branch-messages.js";
+import { getArtifactTracker } from "./compress-metrics.js";
 import { NudgeManager } from "./nudge.js";
 import {
   buildContextMeterSnapshot,
@@ -40,6 +43,7 @@ import {
 import { registerRecallTool } from "./recall.js";
 import {
   getCompactionMetadata,
+  extractCompactionOutcome,
 } from "./index-helpers.js";
 import {
   handleSessionBeforeCompact,
@@ -49,6 +53,13 @@ import {
   registerDcpCommand,
   registerDcpRecallCommand,
 } from "./index-commands.js";
+import {
+  buildCompactionCompletedEvent,
+  buildNudgeEvaluatedEvent,
+  buildLifecycleForkEvent,
+  buildNullTokensEvent,
+  type DCPTelemetryEvent,
+} from "./telemetry.js";
 
 export default function dcpExtension(pi: ExtensionAPI): void {
   const config: DCPConfig = { ...DEFAULT_CONFIG };
@@ -56,6 +67,13 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
   const nudge = new NudgeManager(config);
   let initialized = false;
+  let lastTelemetryEvent: DCPTelemetryEvent | null = null;
+
+  /** Emit JSON-safe telemetry for extension and RPC consumers. */
+  function emitTelemetry(evt: DCPTelemetryEvent): void {
+    lastTelemetryEvent = evt;
+    pi.events.emit("dcp:telemetry", evt);
+  }
 
   function appendDcpStateEntry(ctx: ExtensionContext, reason: string): void {
     pi.appendEntry(
@@ -75,10 +93,17 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     if (config.recall.enabled) registerRecallTool(pi);
 
     // Register commands
-    registerDcpCommand(pi, ctx, config, nudge, {
-      estimateOutboundContextTokens,
-      buildContextMeterSnapshot,
-    }, ensureInitialized);
+    registerDcpCommand(
+      pi,
+      ctx,
+      config,
+      nudge,
+      {
+        estimateOutboundContextTokens,
+        buildContextMeterSnapshot,
+      },
+      ensureInitialized,
+    );
     registerDcpRecallCommand(pi, ctx, config, ensureInitialized);
 
     initialized = true;
@@ -104,7 +129,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
           getDcpSessionId(ctx),
           event.toolName,
           event.input,
-          config.artifactTracking.maxFiles,
+          config,
         );
       }
     } catch {
@@ -112,6 +137,13 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     }
   });
 
+  /**
+   * turn_end handler.
+   *
+   * When Pi reports `usage?.tokens === null` after compaction,
+   * percentage-based diagnostics are suppressed: the meter returns null for
+   * `branchPercent` and `deltaTokens`, and the nudge is skipped entirely.
+   */
   pi.on("turn_end", async (_event: unknown, ctx: ExtensionContext) => {
     try {
       ensureInitialized(ctx);
@@ -124,13 +156,27 @@ export default function dcpExtension(pi: ExtensionAPI): void {
         sessionId,
         config,
       );
+
+      // Explicit null-tokens guard: suppress all percentage diagnostics
+      if (!usage?.tokens) {
+        emitTelemetry(buildNullTokensEvent(outboundTokens));
+        return;
+      }
+
       const meter = buildContextMeterSnapshot(
-        usage?.tokens,
+        usage.tokens,
         outboundTokens,
         contextWindow,
       );
+      const nudgeEmitted = nudge.checkContext(ctx, meter) !== null;
 
-      nudge.checkContext(ctx, meter);
+      emitTelemetry(
+        buildNudgeEvaluatedEvent(
+          meter.branchTokens,
+          meter.branchPercent,
+          nudgeEmitted,
+        ),
+      );
     } catch {
       // best-effort
     }
@@ -197,11 +243,31 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     },
   );
 
-  pi.on("session_compact", (event, ctx: ExtensionContext) => {
+  /**
+   * session_compact handler.
+   *
+   * Records the authoritative completed-compaction outcome from the event,
+   * not speculative estimates from `session_before_compact`. The event
+   * carries the actual `compactionEntry`, `reason`, and `willRetry`.
+   */
+  pi.on("session_compact", (event: SessionCompactEvent, ctx: ExtensionContext) => {
     ensureInitialized(ctx);
+    const sessionId = getDcpSessionId(ctx);
     const metadata = getCompactionMetadata(event);
+    const blocks = getBlocks(sessionId);
+    const artifacts = getArtifactTracker(sessionId);
+    const artifactCount =
+      artifacts.files_read.length + artifacts.files_modified.length;
+    const outcome = extractCompactionOutcome(
+      metadata,
+      blocks.length,
+      artifactCount,
+      false,
+    );
+
     nudge.recordCompress();
-    appendDcpStateEntry(ctx, `compaction:${metadata.reason}`);
+    appendDcpStateEntry(ctx, `compaction:${outcome.reason}`);
+    emitTelemetry(buildCompactionCompletedEvent(outcome));
   });
 
   const onTreeEvent = pi.on as (
@@ -216,12 +282,20 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     },
   );
 
-  pi.on("session_tree", (_event, ctx: ExtensionContext) => {
-    ensureInitialized(ctx);
-    appendDcpStateEntry(ctx, "tree");
+  /**
+   * Rebuild DCP state after navigation within the current session tree.
+   * Leaf IDs identify entries, while the session ID remains unchanged.
+   */
+  pi.on("session_tree", (_event: SessionTreeEvent, ctx: ExtensionContext) => {
+    // Leaf IDs are entries within the current session, not session IDs.
+    cleanupSession(getDcpSessionId(ctx));
+    initialized = false;
+    emitTelemetry(buildLifecycleForkEvent(true, true));
   });
 
   pi.on("session_shutdown", (_event, ctx: ExtensionContext) => {
     cleanupSession(getDcpSessionId(ctx));
   });
+
+
 }

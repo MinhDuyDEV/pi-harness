@@ -6,6 +6,8 @@ import {
 } from "./storage.js";
 import type {
   CompressionBlock,
+  DcpStateEntryPayload,
+  DcpStateEntryPayloadV2,
   PersistentSessionSummary,
   SessionState,
 } from "./compress-types.js";
@@ -175,9 +177,10 @@ export function getArtifactTracker(sessionId: string) {
 export function makeDcpStateEntryPayload(
   sessionId: string,
   reason: string,
-): import("./compress-types.js").DcpStateEntryPayload {
+): DcpStateEntryPayloadV2 {
   return {
-    version: 1 as const,
+    version: 2 as const,
+    sessionId,
     reason,
     snapshot: durableFromSessionState(sessionId, getState(sessionId)),
     createdAt: Date.now(),
@@ -197,13 +200,42 @@ function restoreDcpStateSnapshot(
   saveDurableSessionState(normalized);
 }
 
+/**
+ * Result of scanning session entries for a restorable DCP state.
+ */
+interface RestoreCandidate {
+  timestamp: number;
+  snapshot: DurableSessionState;
+  version: number;
+}
+
+/**
+ * Validate a candidate snapshot object.
+ */
+function isValidSnapshot(snapshot: unknown): snapshot is DurableSessionState {
+  return (
+    typeof snapshot === "object" &&
+    snapshot !== null &&
+    typeof (snapshot as DurableSessionState).version === "number" &&
+    Array.isArray((snapshot as DurableSessionState).blocks)
+  );
+}
+
+/**
+ * Find the best restorable DCP state entry for the given session.
+ *
+ * Branch-safe strategy:
+ * 1. Prefer V2+ entries whose `sessionId` matches the current session.
+ * 2. Fall back to the latest V1 entry (pre-branch-safe migration path).
+ * 3. Accept V2+ entries with a non-matching sessionId only if no match exists.
+ */
 export function restoreDcpStateFromSessionEntries(
   sessionId: string,
   entries: readonly unknown[],
 ): boolean {
-  let latest:
-    | { timestamp: number; snapshot: DurableSessionState }
-    | undefined;
+  let exactMatch: RestoreCandidate | undefined;
+  let anyMatch: RestoreCandidate | undefined;
+
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
     const obj = entry as Record<string, unknown>;
@@ -221,16 +253,35 @@ export function restoreDcpStateFromSessionEntries(
         : undefined;
     const payload = obj.customType === "dcp_state" ? data : undefined;
     const snapshot = (payload?.snapshot ?? dcpDetails?.snapshot) as
-      | DurableSessionState
+      | unknown
       | undefined;
-    if (!snapshot || snapshot.version !== 1 || !Array.isArray(snapshot.blocks))
-      continue;
+    if (!snapshot || !isValidSnapshot(snapshot)) continue;
+
     const timestamp = typeof obj.timestamp === "number" ? obj.timestamp : 0;
-    if (!latest || timestamp >= latest.timestamp)
-      latest = { timestamp, snapshot };
+    const payloadVersion =
+      typeof payload?.version === "number" ? payload.version : 1;
+
+    // Branch-safe: prefer entries with matching sessionId
+    if (payloadVersion >= 2 && typeof payload?.sessionId === "string") {
+      if (payload.sessionId === sessionId) {
+        if (!exactMatch || timestamp >= exactMatch.timestamp)
+          exactMatch = { timestamp, snapshot, version: payloadVersion };
+      } else {
+        if (!anyMatch || timestamp >= anyMatch.timestamp)
+          anyMatch = { timestamp, snapshot, version: payloadVersion };
+      }
+    } else {
+      // V1 entries: no sessionId, use as fallback
+      if (!anyMatch || timestamp >= anyMatch.timestamp)
+        anyMatch = { timestamp, snapshot, version: 1 };
+    }
   }
-  if (!latest) return false;
-  restoreDcpStateSnapshot(sessionId, latest.snapshot);
+
+  // Prefer exact match, then any match
+  const best = exactMatch ?? anyMatch;
+  if (!best) return false;
+
+  restoreDcpStateSnapshot(sessionId, best.snapshot);
   return true;
 }
 

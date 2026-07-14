@@ -1,6 +1,6 @@
 import type { Message } from "@earendil-works/pi-ai";
 import { getState } from "./compress-state.js";
-import type { QualityMetricsData } from "./compress-types.js";
+
 import type { DCPConfig } from "./config.js";
 
 function extractPathFromArgs(
@@ -18,7 +18,8 @@ export function trackToolCall(
   sessionId: string,
   toolName: string,
   args: Record<string, unknown>,
-  config: DCPConfig,
+  _config: DCPConfig,
+
 ): void {
   const state = getState(sessionId);
   const file = extractPathFromArgs(toolName, args);
@@ -57,10 +58,9 @@ function shouldLogRegression(
 ): boolean {
   if (msg.role === "toolResult" && Array.isArray(msg.content)) {
     for (const c of msg.content) {
-      if (c && typeof c === "object") {
-        const block = c as Record<string, unknown>;
-        const file = block.file as string | undefined;
-        if (file && recentFiles.some((rf) => file?.includes(rf))) {
+      if (c && typeof c === "object" && "file" in c) {
+        const file = typeof c.file === "string" ? c.file : undefined;
+        if (file && recentFiles.some((rf) => file.includes(rf))) {
           return true;
         }
       }
@@ -124,8 +124,11 @@ export function recordCompressEvent(
 export function getQualityStatus(sessionId: string): string {
   const qm = getState(sessionId).qualityMetrics;
   const lastResults = qm.lastProbeResults;
+  const failedProbes = lastResults
+    ? lastResults.probes.filter((p) => !p.pass).length
+    : 0;
   const probeSummary = lastResults
-    ? `${lastResults.allPassed ? "all passed" : `${lastResults.failedProbes} failed`} (score: ${lastResults.overallScore})`
+    ? `${lastResults.allPassed ? "all passed" : `${failedProbes} failed`} (score: ${lastResults.overallScore})`
     : "no probes yet";
   const regressions = qm.regressionLog.length;
   return [

@@ -55,7 +55,7 @@ export interface AutoCompactConfig {
    * When false, only inject the critical nudge (legacy behavior).
    */
   invokeNativeCompact: boolean;
-  /** Which meter drives nudge zones and autoCompact (default max). */
+  /** Deprecated compatibility setting. Pi branch usage exclusively drives nudges and auto-compaction. */
   pressureSource: "branch" | "outbound" | "max";
 }
 
@@ -182,7 +182,7 @@ export const DEFAULT_CONFIG: DCPConfig = {
     thresholdPercent: 80,
     thresholdRatio: 0.8,
     invokeNativeCompact: true,
-    pressureSource: "max",
+    pressureSource: "branch",
   },
   structuredSummary: {
     enabled: true,

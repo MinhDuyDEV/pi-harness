@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { Type } from "@sinclair/typebox";
+import { Type, Optional } from "@sinclair/typebox";
 import type {
   ExtensionAPI,
   ExtensionContext,
@@ -59,27 +59,27 @@ export function registerRecallTool(pi: ExtensionAPI): void {
       "Use scope:'all' only when current-lineage results are insufficient.",
     ],
     parameters: Type.Object({
-      query: Type.Optional(
+      query: Optional(
         Type.String({
           description:
             "Search query. Regex is supported; multi-word queries are OR-ranked.",
         }),
       ),
-      expand: Type.Optional(
+      expand: Optional(
         Type.Array(Type.Number(), {
           description: "Recall indices to expand with full content.",
         }),
       ),
-      page: Type.Optional(
+      page: Optional(
         Type.Number({ description: "1-based page number for search results." }),
       ),
-      scope: Type.Optional(
-        StringEnum(["active", "all"], {
+      scope: Optional(
+        Type.Union([Type.Literal("active"), Type.Literal("all")], {
           description:
             "active searches current DCP state first; all searches all durable/session logs.",
         }),
       ),
-      limit: Type.Optional(
+      limit: Optional(
         Type.Number({
           description: "Maximum entries to return before pagination.",
         }),

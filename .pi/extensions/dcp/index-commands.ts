@@ -26,7 +26,7 @@ export function registerDcpCommand(
   config: DCPConfig,
   nudge: {
     refreshContextMeter: (ctx: ExtensionContext, meter: unknown) => void;
-    getState: () => Record<string, unknown>;
+    getState: () => import("./nudge.js").NudgeState;
   },
   helpers: {
     estimateOutboundContextTokens: (messages: Message[], sessionId: string, config: DCPConfig) => number;
@@ -34,7 +34,7 @@ export function registerDcpCommand(
       usedTokens: number | undefined,
       outboundTokens: number,
       contextWindow: number,
-    ) => Record<string, unknown>;
+    ) => unknown;
   },
   ensureInitialized: (ctx: ExtensionContext) => void,
 ): void {
@@ -65,20 +65,20 @@ export function registerDcpCommand(
       const lines: string[] = [
         "## DCP Status",
         "",
-        `Context: ${nudgeState.lastContextTokens !== null ? `${Math.round((nudgeState.lastContextTokens as number) / 1000)}k branch` : "no data"}` +
+        `Context: ${nudgeState.lastContextTokens !== null ? `${Math.round(nudgeState.lastContextTokens / 1000)}k branch` : "no data"}` +
           (nudgeState.lastContextPercent !== null
-            ? ` (${Math.round(nudgeState.lastContextPercent as number)}%)`
+            ? ` (${Math.round(nudgeState.lastContextPercent)}%)`
             : "") +
           (nudgeState.lastMeter
-            ? (nudgeState.lastMeter as Record<string, unknown>).outboundTokens as number > 0
-              ? ` | outbound ${Math.round(((nudgeState.lastMeter as Record<string, unknown>).outboundTokens as number) / 1000)}k` +
-                ((nudgeState.lastMeter as Record<string, unknown>).strippedByDcp
-                  ? ` (\u0394${Math.round(((nudgeState.lastMeter as Record<string, unknown>).deltaTokens as number ?? 0) / 1000)}k)`
+            ? nudgeState.lastMeter.outboundTokens > 0
+              ? ` | estimate ${Math.round(nudgeState.lastMeter.outboundTokens / 1000)}k` +
+                (nudgeState.lastMeter.strippedByDcp
+                  ? ` (\u0394${Math.round((nudgeState.lastMeter.deltaTokens ?? 0) / 1000)}k)`
                   : "")
-              : " | outbound n/a (run after an agent turn for pruned estimate)"
+              : " | estimate n/a (run after an agent turn)"
             : "") +
           (nudgeState.lastPressurePercent != null
-            ? ` | pressure ${Math.round(nudgeState.lastPressurePercent as number)}% (${formatPressureSourceLabel(nudgeState.lastPressureSource as string ?? "max")})`
+            ? ` | pressure ${Math.round(nudgeState.lastPressurePercent)}% (${formatPressureSourceLabel(nudgeState.lastPressureSource ?? "branch")})`
             : ""),
         "",
         "### Compression Blocks",
@@ -207,7 +207,8 @@ export function registerDcpCommand(
 
       lines.push(
         nudgeState.pendingNudge
-          ? `\uF071 Pending nudge: "${nudgeState.pendingNudge as string}"`
+              ? `\uF071 Pending nudge: "${nudgeState.pendingNudge}"`
+
           : "No pending nudge",
       );
 

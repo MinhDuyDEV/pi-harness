@@ -3,10 +3,10 @@ import { NudgeManager } from "./nudge";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { DCPConfig } from "./config";
 
-type Usage = { tokens: number; contextWindow?: number };
+type Usage = { tokens: number | null; contextWindow?: number };
 type Model = { contextWindow?: number };
 
-function makeCtx(opts: { tokens: number; contextWindow?: number } = { tokens: 0 }): ExtensionContext {
+function makeCtx(opts: Usage = { tokens: 0 }): ExtensionContext {
   const usage: Usage = { tokens: opts.tokens };
   if (opts.contextWindow !== undefined) usage.contextWindow = opts.contextWindow;
   const model: Model = {};
@@ -54,8 +54,8 @@ describe("NudgeManager.autoCompactTriggered", () => {
       strippedByDcp: true,
     };
     m.incTurn();
-    expect(m.checkContext(highCtx, meter)).toBeNull();
-    expect(m.getState().autoCompactTriggered).toBe(false);
+    expect(m.checkContext(highCtx, meter)).toContain("CRITICAL");
+    expect(m.getState().autoCompactTriggered).toBe(true);
   });
 
   it("Zone 4 arms without nudge when invokeNativeCompact is true", () => {
@@ -152,5 +152,56 @@ describe("NudgeManager.autoCompactTriggered", () => {
     m.incTurn();
     const second = m.checkContext(midCtx);
     expect(second).not.toBeNull();
+  });
+
+
+  it("does not pair branch tokens with outbound pressure", () => {
+    const config = defaultConfig();
+    config.compress.nudgeFrequency = 0;
+    const manager = new NudgeManager(config);
+    const ctx = makeCtx({ tokens: 39_000, contextWindow: 372_000 });
+
+    const nudge = manager.checkContext(ctx, {
+      branchTokens: 39_000,
+      outboundTokens: 241_800,
+      branchPercent: 10.48,
+      outboundPercent: 65,
+      contextWindow: 372_000,
+      deltaTokens: -202_800,
+      strippedByDcp: false,
+    });
+
+    expect(nudge).toBeNull();
+  });
+
+  it("does not nudge when Pi reports unavailable context usage", () => {
+    const config = defaultConfig();
+    config.compress.nudgeFrequency = 0;
+    const manager = new NudgeManager(config);
+    const ctx = makeCtx({ tokens: null, contextWindow: 372_000 });
+
+    const nudge = manager.checkContext(ctx, {
+      branchTokens: 0,
+      outboundTokens: 275_000,
+      branchPercent: 0,
+      outboundPercent: 74,
+      contextWindow: 372_000,
+      deltaTokens: -275_000,
+      strippedByDcp: false,
+    });
+
+    expect(nudge).toBeNull();
+  });
+
+  it("does not nudge from a processed-history estimate above the context window", () => {
+    const config = defaultConfig();
+    config.autoCompact.thresholdPercent = 90;
+    config.autoCompact.pressureSource = "outbound";
+    const manager = new NudgeManager(config);
+    const nudge = manager.checkContext(makeCtx({ tokens: 66_000, contextWindow: 372_000 }), {
+      branchTokens: 66_000, outboundTokens: 473_000, branchPercent: 17.7, outboundPercent: 127.2,
+      contextWindow: 372_000, deltaTokens: -407_000, strippedByDcp: false,
+    });
+    expect(nudge).toBeNull();
   });
 });

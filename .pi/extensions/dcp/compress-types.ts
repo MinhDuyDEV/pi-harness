@@ -2,12 +2,33 @@ import type { DurableSessionState } from "./storage.js";
 
 export const DCP_STATE_ENTRY_TYPE = "dcp_state";
 
-export interface DcpStateEntryPayload {
+/**
+ * Current version of the DCP state entry payload format.
+ * Increment when the payload shape changes (migration handled in restore).
+ */
+export const DCP_STATE_CURRENT_VERSION = 2 as const;
+
+/** V1: Original format (before branch-safe filtering). */
+export interface DcpStateEntryPayloadV1 {
   version: 1;
   reason: string;
   snapshot: DurableSessionState;
   createdAt: number;
 }
+
+/**
+ * V2: Added `sessionId` for active-branch-safe restoration.
+ * Identifies which Pi session branch this state belongs to.
+ */
+export interface DcpStateEntryPayloadV2 {
+  version: 2;
+  sessionId: string;
+  reason: string;
+  snapshot: DurableSessionState;
+  createdAt: number;
+}
+
+export type DcpStateEntryPayload = DcpStateEntryPayloadV1 | DcpStateEntryPayloadV2;
 
 export interface DCPCompressedSummaryMessage {
   role: "custom";

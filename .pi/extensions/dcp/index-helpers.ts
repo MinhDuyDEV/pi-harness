@@ -5,8 +5,9 @@
  * No closure over `pi`/`ctx`/`config`.
  */
 
-import type { DcpStateEntryPayload, DurableSessionState } from "./compress.js";
+import type { DcpStateEntryPayload } from "./compress.js";
 import type { CompactionReason } from "./deterministic.js";
+import type { CompactionOutcome } from "./telemetry.js";
 
 export interface DcpCompactionMetadata {
   reason: CompactionReason;
@@ -123,4 +124,25 @@ export function addDcpCompactionDetails(
   dcp.snapshot = makeDcpStateEntryPayloadFn(sessionId, "compaction").snapshot;
   details.dcp = dcp;
   result.details = details;
+}
+
+/**
+ * Extract the authoritative compaction outcome from a `session_compact` event.
+ *
+ * Uses the `reason` and `willRetry` fields from the event directly,
+ * not speculative estimates from `session_before_compact`.
+ */
+export function extractCompactionOutcome(
+  event: { reason?: string; willRetry?: boolean },
+  blockCount: number,
+  artifactCount: number,
+  deterministic: boolean,
+): CompactionOutcome {
+  return {
+    blockCount,
+    artifactCount,
+    deterministic,
+    reason: (event.reason as CompactionOutcome["reason"]) ?? "unknown",
+    willRetry: event.willRetry ?? false,
+  };
 }
