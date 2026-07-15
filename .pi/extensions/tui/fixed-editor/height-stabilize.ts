@@ -19,6 +19,8 @@ export type PiTuiHeightFields = {
   previousHeight?: number;
   previousLines?: string[];
   previousViewportTop?: number;
+  cursorRow?: number;
+  hardwareCursorRow?: number | null;
 };
 
 export function createHeightStabilizeState(): HeightStabilizeState {
@@ -52,8 +54,17 @@ export function suppressClusterDrivenHeightChange(
 
   // Avoid differential path fullRender(true) when extraLines > height on large shrinks.
   if (Array.isArray(tui.previousLines) && tui.previousLines.length > scrollableRows) {
+    const removedLineCount = tui.previousLines.length - scrollableRows;
     // Keep the bottom of the previous window (matches offset=0 pin-to-bottom).
     tui.previousLines = tui.previousLines.slice(-scrollableRows);
+    // pi-tui stores cursor rows in the same coordinate space as previousLines.
+    // Rebase them with the trimmed buffer or subsequent diffs repaint stale rows.
+    if (typeof tui.cursorRow === "number") {
+      tui.cursorRow = Math.max(0, tui.cursorRow - removedLineCount);
+    }
+    if (typeof tui.hardwareCursorRow === "number") {
+      tui.hardwareCursorRow = Math.max(0, tui.hardwareCursorRow - removedLineCount);
+    }
   }
 
   return true;

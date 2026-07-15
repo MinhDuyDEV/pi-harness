@@ -7,15 +7,18 @@ import { join } from "node:path";
 
 let renderFixedCluster: any;
 let FixedEditorCompositor: any;
+let suppressClusterDrivenHeightChange: any;
 let emergencyTerminalModeReset: any;
 let readPiTuiSettings: any;
 
 before(async () => {
   const clusterModule: any = await import("../fixed-editor/cluster.js");
   const compositorModule: any = await import("../fixed-editor/compositor.js");
+  const heightStabilizeModule: any = await import("../fixed-editor/height-stabilize.js");
   const settingsModule: any = await import("../settings.js");
   ({ renderFixedCluster } = clusterModule.default ?? clusterModule);
   ({ FixedEditorCompositor, emergencyTerminalModeReset } = compositorModule.default ?? compositorModule);
+  ({ suppressClusterDrivenHeightChange } = heightStabilizeModule.default ?? heightStabilizeModule);
   ({ readPiTuiSettings } = settingsModule.default ?? settingsModule);
 });
 
@@ -98,6 +101,24 @@ function makeCompositor(options: {
     },
   };
 }
+
+test("cluster-driven root shrink rebases differential-render cursor rows", () => {
+  const heightState = { lastTrackedRawRows: 24 };
+  const tui = {
+    previousHeight: 8,
+    previousLines: ["0", "1", "2", "3", "4", "5", "6", "7"],
+    previousViewportTop: 2,
+    cursorRow: 7,
+    hardwareCursorRow: 7,
+  };
+
+  suppressClusterDrivenHeightChange(heightState, tui, 24, 5);
+
+  assert.deepEqual(tui.previousLines, ["3", "4", "5", "6", "7"]);
+  assert.equal(tui.previousViewportTop, 0);
+  assert.equal(tui.cursorRow, 4);
+  assert.equal(tui.hardwareCursorRow, 4);
+});
 
 test("fixed cluster gives editor first claim before footer and optional rows", () => {
   const rendered = renderFixedCluster({
