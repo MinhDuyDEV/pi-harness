@@ -22,13 +22,14 @@ import {
 import { getSessionBranchMessages } from "./branch-messages.js";
 import { searchDcpRecall } from "./recall.js";
 import { formatPressureSourceLabel } from "./pressure.js";
+import type { ContextMeterSnapshot } from "./context-meter.js";
 
 export function registerDcpCommand(
   pi: ExtensionAPI,
   _ctx: ExtensionContext,
   config: DCPConfig,
   nudge: {
-    refreshContextMeter: (ctx: ExtensionContext, meter: unknown) => void;
+    refreshContextMeter: (ctx: ExtensionContext, meter: ContextMeterSnapshot) => void;
     getState: () => import("./nudge.js").NudgeState;
   },
   helpers: {
@@ -38,10 +39,10 @@ export function registerDcpCommand(
       config: DCPConfig,
     ) => number;
     buildContextMeterSnapshot: (
-      usedTokens: number | undefined,
+      usedTokens: number | null | undefined,
       outboundTokens: number,
       contextWindow: number,
-    ) => unknown;
+    ) => ContextMeterSnapshot;
   },
   ensureInitialized: (ctx: ExtensionContext) => void,
 ): void {

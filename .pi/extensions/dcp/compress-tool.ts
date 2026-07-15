@@ -41,6 +41,19 @@ import {
 } from "./compress-metrics.js";
 import { renderCompressResult } from "./compress-render.js";
 import { DCP_STATE_ENTRY_TYPE } from "./compress-types.js";
+import type { QualityMetricsData, StructuredSummaryFields } from "./compress-types.js";
+
+type CompressToolDetails =
+  | { denied: true }
+  | {
+      blockId: number;
+      topic: string;
+      mode: string;
+      summaryTokens: number;
+      summaryBufferTokens: number;
+      files: StructuredSummaryFields;
+      quality: QualityMetricsData;
+    };
 
 const COMPRESS_TOOL_DESCRIPTION = `Save a durable summary of completed work to DCP (Durable Compression Protocol).
 
@@ -83,7 +96,7 @@ export function registerCompressTool(
   config: DCPConfig,
   nudge?: (msg: string) => void,
 ): void {
-  pi.registerTool({
+  pi.registerTool<typeof compressParams, CompressToolDetails>({
     name: "compress",
     label: "compress",
     description: COMPRESS_TOOL_DESCRIPTION,
@@ -220,18 +233,8 @@ export function registerCompressTool(
         },
       };
     },
-    renderResult(
-      result: {
-        content: Array<{ type: string; text?: string }>;
-        details?: unknown;
-      },
-      options: { expanded: boolean; isPartial: boolean },
-      theme: {
-        fg: (color: string, text: string) => string;
-        bold: (text: string) => string;
-      },
-    ) {
-      return renderCompressResult(result as never, options, theme as never);
+    renderResult(result, options, theme) {
+      return renderCompressResult(result, options, theme);
     },
   });
 }

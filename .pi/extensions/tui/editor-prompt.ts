@@ -1,3 +1,4 @@
+import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 import { hasNerdFonts } from "./helpers.js";
 
 const NF_ICON_PROMPT = hasNerdFonts() ? "\ueab6 " : "> ";
@@ -8,7 +9,8 @@ export type EditorThinkingLevel =
   | "low"
   | "medium"
   | "high"
-  | "xhigh";
+  | "xhigh"
+  | "max";
 
 export interface EditorPromptState {
   isShell: boolean;
@@ -24,6 +26,7 @@ export function normalizeThinkingLevel(level?: string | null): EditorThinkingLev
     case "medium":
     case "high":
     case "xhigh":
+    case "max":
       return level;
     default:
       return "medium";
@@ -43,7 +46,7 @@ export function editorPromptForState(state: EditorPromptState): string {
     : idlePromptForThinkingLevel(state.thinkingLevel);
 }
 
-export function editorBorderColorForThinkingLevel(thinkingLevel: string): string {
+export function editorBorderColorForThinkingLevel(thinkingLevel: string): ThemeColor {
   switch (normalizeThinkingLevel(thinkingLevel)) {
     case "off":
     case "minimal":
@@ -56,10 +59,12 @@ export function editorBorderColorForThinkingLevel(thinkingLevel: string): string
       return "thinkingHigh";
     case "xhigh":
       return "thinkingXhigh";
+    case "max":
+      return "thinkingMax";
   }
 }
 
-export function editorPromptColorForThinkingLevel(thinkingLevel: string): string {
+export function editorPromptColorForThinkingLevel(thinkingLevel: string): ThemeColor {
   return editorBorderColorForThinkingLevel(thinkingLevel);
 }
 
@@ -77,6 +82,7 @@ export function streamingPromptFramesForThinkingLevel(
     case "high":
       return ["≈", "≋", "≈"];
     case "xhigh":
+    case "max":
       return ["∿", "≋", "∿"];
   }
 }

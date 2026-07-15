@@ -1171,7 +1171,7 @@ export default function rewindExtension(pi: ExtensionAPI) {
     const ctx = activeContext;
     if (!ctx) return;
 
-    checkpointEntry(ctx, data.entryId).catch((error) => {
+    return checkpointEntry(ctx, data.entryId).catch((error) => {
       notify(ctx, `Rewind: failed to checkpoint ${data.entryId} (${error instanceof Error ? error.message : String(error)})`, "warning");
     });
   });

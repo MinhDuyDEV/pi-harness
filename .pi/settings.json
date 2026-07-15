@@ -9,7 +9,7 @@
   "packages": [
     "npm:@heyhuynhgiabuu/pi-pretty",
     "npm:@heyhuynhgiabuu/pi-diff",
-    "npm:@heyhuynhgiabuu/pi-search",
+    "npm:@heyhuynhgiabuu/pi-search@0.2.7",
     "npm:@heyhuynhgiabuu/pi-task",
     "git:https://github.com/badlogic/pi-diff-review"
   ],

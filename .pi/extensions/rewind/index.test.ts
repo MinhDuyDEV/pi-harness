@@ -507,8 +507,7 @@ test("rewind:checkpoint-entry binds the current tree to a custom message", async
     ]);
 
     await harness.invoke("session_start", {});
-    harness.eventHandlers.get("rewind:checkpoint-entry")?.({ source: "pi-custom-compaction", entryId: "marker-1" });
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await harness.eventHandlers.get("rewind:checkpoint-entry")?.({ source: "pi-custom-compaction", entryId: "marker-1" });
     await harness.writeRepoFile("notes.txt", "current state\n");
 
     harness.enqueueSelection("Restore files to that point");

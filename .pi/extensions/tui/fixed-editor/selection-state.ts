@@ -181,7 +181,7 @@ export function getSelectionText(
   state: SelectionState,
   getLineContent: (area: SelectionArea, lineIndex: number) => string | null,
   stripAnsiFn: (s: string) => string,
-  sliceColumnsFn: (s: string, start: number, end?: number) => string,
+  sliceColumnsFn: (s: string, start: number, end: number) => string,
 ): string {
   if (!state.area || !state.anchor || !state.focus) return "";
   const ordered = orderedEndpoints(state.anchor, state.focus);

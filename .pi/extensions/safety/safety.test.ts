@@ -166,18 +166,25 @@ async function testDisabledRulesPosture(): Promise<void> {
 	const previous = process.env.PI_SAFETY_DISABLED_RULES;
 	process.env.PI_SAFETY_DISABLED_RULES = "no-force-push-main";
 	try {
-		const commands = new Map<string, { handler: (args: unknown, ctx: unknown) => Promise<string> | string }>();
+		const commands = new Map<string, { handler: (args: unknown, ctx: unknown) => Promise<void> | void }>();
 		const fakePi = {
 			on() {},
-			registerCommand(name: string, options: { handler: (args: unknown, ctx: unknown) => Promise<string> | string }) {
+			registerCommand(name: string, options: { handler: (args: unknown, ctx: unknown) => Promise<void> | void }) {
 				commands.set(name, options);
 			},
 		};
 		safetyExtension(fakePi as never);
-		const output = await commands.get("safety")?.handler({}, {});
-		assert.equal(typeof output, "string", t + ": command returns string");
-		assert.match(String(output), /Disabled rules/i, t + ": disabled heading");
-		assert.match(String(output), /no-force-push-main/, t + ": disabled id");
+		let notification = "";
+		const output = await commands.get("safety")?.handler({}, {
+			ui: {
+				notify(message: string) {
+					notification = message;
+				},
+			},
+		});
+		assert.equal(output, undefined, t + ": command returns void");
+		assert.match(notification, /Disabled rules/i, t + ": disabled heading");
+		assert.match(notification, /no-force-push-main/, t + ": disabled id");
 	} finally {
 		if (previous === undefined) delete process.env.PI_SAFETY_DISABLED_RULES;
 		else process.env.PI_SAFETY_DISABLED_RULES = previous;

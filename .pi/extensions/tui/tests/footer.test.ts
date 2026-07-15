@@ -31,9 +31,11 @@ test("editor prompt keeps glyph stable and only changes by state/color", () => {
     editorPromptForState({ isShell: true, streamingPrompt: "≈", thinkingLevel: "high" }),
     "$ ",
   );
-  assert.equal(editorBorderColorForThinkingLevel("off"), "thinkingOff");
-  assert.equal(editorBorderColorForThinkingLevel("xhigh"), "thinkingXhigh");
-  assert.deepEqual(streamingPromptFramesForThinkingLevel("low"), ["-", "~", "-"]);
+    assert.equal(editorBorderColorForThinkingLevel("off"), "thinkingOff");
+    assert.equal(editorBorderColorForThinkingLevel("xhigh"), "thinkingXhigh");
+    assert.equal(editorBorderColorForThinkingLevel("max"), "thinkingMax");
+    assert.deepEqual(streamingPromptFramesForThinkingLevel("low"), ["-", "~", "-"]);
+    assert.deepEqual(streamingPromptFramesForThinkingLevel("max"), ["∿", "≋", "∿"]);
 });
 
 test("turn usage display keeps previous turn until current turn usage arrives", () => {

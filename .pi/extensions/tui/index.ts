@@ -795,39 +795,6 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (changed && repaint) compositor.requestRepaint();
   }
 
-  function fixedRenderStateKey(): string | undefined {
-    syncFixedRenderables(false);
-    // Editor may be detached from the container when a selector (e.g. /resume) replaces it.
-    // Return undefined to signal the compositor not to cache — the selector content
-    // updates asynchronously (session list loads) without changing the editor text.
-    const editorAttached = !!(currentEditor && tuiRef &&
-      Array.isArray(tuiRef.children) &&
-      tuiRef.children.some((c: any) => Array.isArray(c?.children) && c.children.includes(currentEditor)));
-    if (!editorAttached) return undefined;
-    return JSON.stringify({
-      // NOTE: high-churn streaming fields (turnElapsed, turnTokens, tokenCount)
-      // are intentionally excluded so the cluster cache stays stable during streaming.
-      // Footer refreshes its display via its own footer.tui?.requestRender() path.
-      editor: currentEditor?.getText() ?? "",
-      model: footer.modelLabel,
-      thinking: footer.thinkingLevel,
-      streaming: footer.isStreaming,
-          editorPrompt: editorStreamingPrompt,
-          context: footer.contextWindow,
-          cwd: footer.cwd,
-      git: footer.git,
-      turnCacheReadTokens: footer.turnCacheReadTokens,
-      turnCacheWriteTokens: footer.turnCacheWriteTokens,
-      costUsd: footer.totalCostUsd,
-      todos: todosState.items.map((item) => `${item.done ? "x" : " "}:${item.text}`).join("|"),
-      sidebar: {
-        enabled: sidebar.enabled,
-        width: sidebar.width,
-        minTerminalWidth: sidebar.minTerminalWidth,
-      },
-    });
-  }
-
   /** Initialize the compositor if all conditions are met. */
   function tryInitCompositor(tui: any, ctx: ExtensionContext) {
     if (!fixedEditorEnabled) return;
@@ -884,7 +851,6 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       },
       getFooterLines: (width: number) =>
         renderHiddenLines(fixedFooterContainer, width, true),
-      getRenderStateKey: fixedRenderStateKey,
       getSidebarWidth: (terminalWidth: number) => sidebarTotalWidth(sidebar, terminalWidth),
       getSidebarLines: (width: number, height: number) => renderSidebar(sidebar, width, height, {
         subtext: (text) => ctx.ui.theme.fg("dim", text),
@@ -898,8 +864,8 @@ export default function piTuiExtension(pi: ExtensionAPI) {
         tui.getShowHardwareCursor(),
       isStreaming: () => footer.isStreaming,
       keyboardScrollShortcuts: piTuiSettings.keyboardScrollShortcuts,
-      onCopySelection: (text: string) => {
-        void copyToClipboard(text).catch(() => {
+      onCopySelection: async (text: string) => {
+        await copyToClipboard(text).catch(() => {
           ctx.ui.setStatus("tui-copy", "Clipboard copy failed");
           if (clipboardStatusTimer) clearTimeout(clipboardStatusTimer);
           clipboardStatusTimer = setTimeout(() => {

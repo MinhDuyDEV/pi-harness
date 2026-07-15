@@ -1,19 +1,10 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-/**
- * Run all extension tests.
- *
- * Discovers `*.test.ts` files under `.pi/extensions/` recursively
- * (excluding node_modules) and runs them in a single `tsx --test` call.
- * The list is dynamic — adding a new test file is enough, no script
- * edit required. Replaces a previous hand-maintained list of 16 paths
- * and 4 single-file runs (3 of which referenced missing files).
- */
-function run(args) {
-	const result = spawnSync("npx", ["tsx", ...args], { stdio: "inherit" });
+function run(command, args) {
+	const result = spawnSync(command, args, { stdio: "inherit" });
 	if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
@@ -36,11 +27,14 @@ function findTestFiles(dir) {
 }
 
 const testFiles = findTestFiles(join(ROOT, ".pi", "extensions")).sort();
-
 if (testFiles.length === 0) {
 	console.error("No test files found under .pi/extensions/");
 	process.exit(1);
 }
 
-run(["--test", ...testFiles]);
+const bunTests = testFiles.filter((file) => readFileSync(file, "utf8").includes("bun:test"));
+const nodeTests = testFiles.filter((file) => !bunTests.includes(file));
+
+if (nodeTests.length > 0) run("npx", ["tsx", "--test", ...nodeTests]);
+if (bunTests.length > 0) run("bun", ["test", ...bunTests.map((file) => `./${file}`)]);
 

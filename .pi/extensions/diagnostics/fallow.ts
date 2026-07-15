@@ -66,6 +66,7 @@ async function execFallow(
   stderr: string;
   exitCode: number | null;
   elapsedMs: number;
+  enoent?: boolean;
 }> {
   const configured = process.env.FALLOW_BIN;
   const timeoutMs = fallowTimeoutMs();

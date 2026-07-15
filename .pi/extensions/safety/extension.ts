@@ -198,7 +198,6 @@ export default function safetyExtension(pi: ExtensionAPI): void {
 
 			const output = lines.join("\n").trim();
 			ctx.ui?.notify?.(output, "info");
-			return output;
 		},
 	});
 }

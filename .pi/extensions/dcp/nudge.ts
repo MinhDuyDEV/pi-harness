@@ -245,9 +245,10 @@ export class NudgeManager {
   private formatContextMetrics(meter: ContextMeterSnapshot): string {
     const formatMetric = (label: string, tokens: number, percent: number) =>
       `${label} ${Math.round(tokens / 1000)}k / ${Math.round(meter.contextWindow / 1000)}k (${Math.round(percent)}%)`;
-    const metrics = [
-      formatMetric("branch", meter.branchTokens, meter.branchPercent),
-    ];
+    const metrics: string[] = [];
+    if (meter.branchTokens !== null && meter.branchPercent !== null) {
+      metrics.push(formatMetric("branch", meter.branchTokens, meter.branchPercent));
+    }
     if (meter.outboundPercent !== null) {
       metrics.push(
         formatMetric("processed-history estimate", meter.outboundTokens, meter.outboundPercent),

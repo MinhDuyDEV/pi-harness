@@ -1,8 +1,9 @@
-import { Type } from "@earendil-works/pi-ai";
+import { Type, type Static } from "@earendil-works/pi-ai";
 import { DEFAULT_XAI_IMAGE_MODEL, DEFAULT_XAI_MODEL, XAI_IMAGES_GENERATIONS_URL } from "../constants";
 import { normalizeXaiImageInput } from "../images";
 import { createXaiResponse, postXaiJson } from "../responses";
 import { extractResponsesText, messageFromError, statusFromError } from "../text";
+import type { XaiResponsesData } from "../types";
 import { requireXaiAuthToken, xaiToolError } from "./common";
 import { defineXaiTool } from "./define-tool";
 

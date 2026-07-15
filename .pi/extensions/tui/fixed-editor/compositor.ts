@@ -304,7 +304,7 @@ export class FixedEditorCompositor {
     this.originalRowsGetter = this.resolveOriginalRowsGetter(terminal);
     this.originalTuiRender = typeof tui.render === "function" ? tui.render.bind(tui) : null;
     this.originalTuiDoRender = typeof tui.doRender === "function" ? tui.doRender.bind(tui) : null;
-    this.patchManager = new PatchManager(terminal);
+    this.patchManager = new PatchManager();
     this.terminalManager = new TerminalManager(tui, terminal);
     this.scrollState = createScrollState();
   }
@@ -1073,7 +1073,7 @@ export class FixedEditorCompositor {
       this.sel.lastLeftPress = null;
       this.sel.preserveFocusOnRelease = false;
       this.sel.focus = location.point;
-      this.selectionState = extendSelection(this.selectionState, location.point, true);
+      this.selectionState = extendSelection(this.selectionState, location.point);
       this.copySelectionIfChanged();
       this.repaintSelection();
       return true;
@@ -1117,7 +1117,7 @@ export class FixedEditorCompositor {
       this.sel.highlightVisible = true;
       this.sel.preserveFocusOnRelease = true;
       this.selectionState = beginSelection(this.selectionState, this.sel.area, { line, col: 0 }, true);
-      this.selectionState = extendSelection(this.selectionState, this.sel.focus, true);
+      this.selectionState = extendSelection(this.selectionState, this.sel.focus);
       this.sel.lastLeftPress = null;
       this.copySelectionIfChanged();
       this.repaintSelection();
@@ -1229,7 +1229,7 @@ export class FixedEditorCompositor {
     const edgeLine = delta > 0 ? start : start + Math.max(0, this.visibleScrollableRows - 1);
     this.sel.focus = { line: edgeLine, col: Math.max(0, pkt.col - 1) };
     this.sel.highlightVisible = true;
-    this.selectionState = extendSelection(this.selectionState, this.sel.focus, true);
+    this.selectionState = extendSelection(this.selectionState, this.sel.focus);
     this.copySelectionIfChanged();
     this.repaintSelection();
     return true;
