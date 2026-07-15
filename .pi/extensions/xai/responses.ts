@@ -173,7 +173,7 @@ export function streamSimpleXaiResponses(model: Model<Api>, context: Context, op
   const stream = createForwardingAssistantStream();
   void (async () => {
     try {
-      const { streamSimple } = await import("@earendil-works/pi-ai/api/openai-responses");
+      const { streamSimple } = await import("@earendil-works/pi-ai/compat");
       const inner = streamSimple(openAIResponsesModel as Model<"openai-responses">, context, {
         ...options,
         headers,
