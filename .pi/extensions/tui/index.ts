@@ -177,7 +177,9 @@ export default function piTuiExtension(pi: ExtensionAPI) {
         const sidebarVisible = sidebarTotalWidth(sidebar, terminalWidth) > 0;
 
         // Widgets — hide when empty. The sidebar owns queue/TODOs when visible.
-        if (hasOpenTodos(todosState) && !sidebarVisible) {
+        // `piTui.todosWidget: false` disables this widget when another todo widget
+        // (e.g. @minhduydev/pi-todo) owns the below-editor region.
+        if (hasOpenTodos(todosState) && !sidebarVisible && piTuiSettings.todosWidget !== false) {
           ctx.ui.setWidget(
             "amp-todos",
             (_tui: TUI, theme: Theme) =>

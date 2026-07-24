@@ -58,3 +58,23 @@ describe("readPiTuiSettings fixedEditor enablement", () => {
     );
   });
 });
+
+describe("readPiTuiSettings todosWidget", () => {
+  test("defaults to true when absent", () => {
+    withProjectSettings({ piTui: { workingPaddingTop: 1 } }, (cwd) => {
+      expect(readPiTuiSettings(cwd).todosWidget).toBe(true);
+    });
+  });
+
+  test("false when piTui.todosWidget is false", () => {
+    withProjectSettings({ piTui: { todosWidget: false } }, (cwd) => {
+      expect(readPiTuiSettings(cwd).todosWidget).toBe(false);
+    });
+  });
+
+  test("true when piTui.todosWidget is true", () => {
+    withProjectSettings({ piTui: { todosWidget: true } }, (cwd) => {
+      expect(readPiTuiSettings(cwd).todosWidget).toBe(true);
+    });
+  });
+});

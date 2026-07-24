@@ -22,6 +22,10 @@ export interface PiTuiSettings {
    * explicitly opted out. Only `true` means "user wants the tab-bar progress".
    */
   showTerminalProgress?: boolean;
+  /** Whether the built-in `amp-todos` widget renders below the editor. Default true.
+   *  Set false when another todo widget (e.g. `@minhduydev/pi-todo`) owns the
+   *  below-editor region, so two widgets don't stack and crush the editor. */
+  todosWidget?: boolean;
   fixedEditorEnabled?: boolean;
   keyboardScrollShortcuts?: {
     up: string;
@@ -149,7 +153,8 @@ export function readPiTuiSettings(cwd: string): PiTuiSettings {
           },
         }
       : {};
-  return { workingPaddingTop, showTerminalProgress, editorPaddingX, fixedEditorEnabled, ...shortcuts };
+  const todosWidget = block?.todosWidget !== false;
+  return { workingPaddingTop, showTerminalProgress, editorPaddingX, fixedEditorEnabled, todosWidget, ...shortcuts };
 }
 
 /**
