@@ -1,0 +1,393 @@
+import { createHash } from "node:crypto";
+import {
+  getSessionKey,
+  loadDurableSessionState,
+  saveDurableSessionState,
+  type DurableSessionState,
+} from "./storage.js";
+import type {
+  CompressionBlock,
+  DcpProvenanceV2,
+  DcpStateEntryPayloadV3,
+  PersistentSessionSummary,
+  QuarantinedBlock,
+  SessionState,
+} from "./compress-types.js";
+import { validateBlockProvenance } from "./compress-provenance.js";
+import {
+  durableFromSessionState,
+  emptyPersistentSummary,
+  newSessionState,
+  sessionStateFromDurable,
+} from "./compress-state-storage.js";
+
+const sessions = new Map<string, SessionState>();
+
+export function getDcpSessionId(ctx: {
+  cwd: string;
+  sessionManager: { getSessionFile: () => string | undefined };
+}): string {
+  return ctx.sessionManager.getSessionFile() ?? ctx.cwd;
+}
+
+export function persistState(sessionId: string): void {
+      const state = sessions.get(sessionId);
+      if (!state) return;
+      saveDurableSessionState(durableFromSessionState(sessionId, state));
+    }
+
+export function getState(sessionId: string): SessionState {
+  let s = sessions.get(sessionId);
+  if (!s) {
+    const durable = loadDurableSessionState(sessionId);
+    s = durable ? sessionStateFromDurable(durable) : newSessionState();
+    sessions.set(sessionId, s);
+  }
+  return s;
+}
+
+export function getPersistentSummary(
+  sessionId: string,
+): PersistentSessionSummary {
+  return getState(sessionId).persistentSummary;
+}
+
+export function getQualityMetrics(sessionId: string) {
+  return getState(sessionId).qualityMetrics;
+}
+
+export function getArtifactTracker(sessionId: string) {
+  return getState(sessionId).artifactTracker;
+}
+
+export function makeDcpStateEntryPayload(
+  sessionId: string,
+  reason: string,
+): DcpStateEntryPayloadV3 {
+  return {
+    version: 3 as const,
+    sessionId,
+    reason,
+    snapshot: durableFromSessionState(sessionId, getState(sessionId)),
+    createdAt: Date.now(),
+  };
+}
+
+function restoreDcpStateSnapshot(
+  sessionId: string,
+  snapshot: DurableSessionState,
+): void {
+  const normalized: DurableSessionState = {
+    ...snapshot,
+    sessionId,
+    sessionKey: getSessionKey(sessionId),
+  };
+  sessions.set(sessionId, sessionStateFromDurable(normalized));
+  saveDurableSessionState(normalized);
+}
+
+/**
+ * Result of scanning session entries for a restorable DCP state.
+ */
+interface RestoreCandidate {
+  timestamp: number;
+  snapshot: DurableSessionState;
+  version: number;
+}
+
+/**
+ * Validate a candidate snapshot object.
+ */
+function isValidSnapshot(snapshot: unknown): snapshot is DurableSessionState {
+  return (
+    typeof snapshot === "object" &&
+    snapshot !== null &&
+    typeof (snapshot as DurableSessionState).version === "number" &&
+    Array.isArray((snapshot as DurableSessionState).blocks)
+  );
+}
+
+/**
+ * Restore the newest snapshot belonging to this session. Legacy V1 entries
+ * have no session identity and are considered only as a migration fallback.
+ */
+export function restoreDcpStateFromSessionEntries(
+  sessionId: string,
+  entries: readonly unknown[],
+): boolean {
+  let exactMatch: RestoreCandidate | undefined;
+  let legacyMatch: RestoreCandidate | undefined;
+
+  for (const entry of entries) {
+    if (!entry || typeof entry !== "object") continue;
+    const obj = entry as Record<string, unknown>;
+    const details =
+      obj.details && typeof obj.details === "object"
+        ? (obj.details as Record<string, unknown>)
+        : undefined;
+    const dcpDetails =
+      details?.dcp && typeof details.dcp === "object"
+        ? (details.dcp as Record<string, unknown>)
+        : undefined;
+    const data =
+      obj.data && typeof obj.data === "object"
+        ? (obj.data as Record<string, unknown>)
+        : undefined;
+    const payload = obj.customType === "dcp_state" ? data : undefined;
+    const snapshot = payload?.snapshot ?? dcpDetails?.snapshot;
+    if (!snapshot || !isValidSnapshot(snapshot)) continue;
+
+    const timestamp =
+      typeof obj.timestamp === "number"
+        ? obj.timestamp
+        : typeof obj.timestamp === "string"
+          ? Date.parse(obj.timestamp) || 0
+          : 0;
+    const payloadVersion =
+      typeof payload?.version === "number" ? payload.version : 1;
+
+    if (payloadVersion >= 2) {
+      if (payload?.sessionId !== sessionId) continue;
+      if (!exactMatch || timestamp >= exactMatch.timestamp) {
+        exactMatch = { timestamp, snapshot, version: payloadVersion };
+      }
+      continue;
+    }
+
+    if (!legacyMatch || timestamp >= legacyMatch.timestamp) {
+      legacyMatch = { timestamp, snapshot, version: 1 };
+    }
+  }
+
+  const best = exactMatch ?? legacyMatch;
+  if (!best) return false;
+  restoreDcpStateSnapshot(sessionId, best.snapshot);
+  return true;
+}
+
+export function cleanupSession(sessionId: string): void {
+  sessions.delete(sessionId);
+}
+
+export function incrementTurn(sessionId: string): void {
+  getState(sessionId).currentTurn++;
+}
+
+export function addBlock(
+  sessionId: string,
+  topic: string,
+  summary: string,
+  startLabel: string,
+  endLabel: string,
+  metadata?: Record<string, unknown>,
+  provenance?: DcpProvenanceV2,
+): CompressionBlock {
+  const state = getState(sessionId);
+  const block: CompressionBlock = {
+    blockId: state.nextBlockId++,
+    topic,
+    summary,
+    startLabel,
+    endLabel,
+    summaryTokens: Math.ceil(summary.length / 4),
+    createdAt: Date.now(),
+    metadata,
+    provenance,
+  };
+  state.blocks.push(block);
+  rebuildPersistentSummary(state);
+  persistState(sessionId);
+  return block;
+}
+
+export function getBlocks(sessionId: string): readonly CompressionBlock[] {
+  return getState(sessionId).blocks;
+}
+
+export function getStats(sessionId: string) {
+  const s = getState(sessionId);
+  return {
+    blockCount: s.blocks.length,
+    summaryTokens: s.blocks.reduce((sum, b) => sum + b.summaryTokens, 0),
+    qualityMetrics: s.qualityMetrics,
+  };
+}
+
+/**
+ * Minimum interface for session operations needed by provenance capture and validation.
+ */
+export function rebuildPersistentSummary(state: SessionState): void {
+  // Reset to empty
+  state.persistentSummary = emptyPersistentSummary();
+  const seenDecisions = new Set<string>();
+
+  // Walk blocks in order (oldest first) to match the additive semantics
+  for (const block of state.blocks) {
+    const filesRead = (block.metadata?.files_read as string[]) ?? [];
+    const filesModified = (block.metadata?.files_modified as string[]) ?? [];
+    const decisions = (block.metadata?.decisions as string[]) ?? [];
+    const nextSteps = (block.metadata?.next_steps as string[]) ?? [];
+
+    // Prepend new unique reads/modifies
+    const newReads = filesRead.filter(
+      (f: string) => !state.persistentSummary.files_read.includes(f),
+    );
+    const newModifies = filesModified.filter(
+      (f: string) => !state.persistentSummary.files_modified.includes(f),
+    );
+    if (newReads.length > 0)
+      state.persistentSummary.files_read = [
+        ...newReads,
+        ...state.persistentSummary.files_read,
+      ] as string[];
+    if (newModifies.length > 0)
+      state.persistentSummary.files_modified = [
+        ...newModifies,
+        ...state.persistentSummary.files_modified,
+      ] as string[];
+
+    for (const d of decisions) {
+      if (!seenDecisions.has(d)) {
+        seenDecisions.add(d);
+        state.persistentSummary.decisions.push({
+          text: d,
+          block_id: block.blockId,
+          timestamp: block.createdAt,
+        });
+      }
+    }
+
+    for (const ns of nextSteps) {
+      state.persistentSummary.next_steps.push({
+        text: ns,
+        block_id: block.blockId,
+        timestamp: block.createdAt,
+      });
+    }
+    if (state.persistentSummary.next_steps.length > 20) {
+      state.persistentSummary.next_steps =
+        state.persistentSummary.next_steps.slice(-20);
+    }
+  }
+
+  // Use the latest block's topic
+  if (state.blocks.length > 0) {
+    const last = state.blocks[state.blocks.length - 1];
+    state.persistentSummary.topic = last.topic;
+    state.persistentSummary.merged_block_ids = state.blocks.map(
+      (b) => b.blockId,
+    );
+  }
+
+  state.persistentSummary.last_updated = Date.now();
+}
+
+/**
+ * Validate all blocks in a session state that have provenance metadata.
+ * Blocks that fail validation are moved to the quarantine collection.
+ * The persistent summary is rebuilt from active blocks to prevent leakage.
+ * Returns the count of blocks that were quarantined.
+ */
+export function validateBlocksProvenance(
+  sessionId: string,
+  session: {
+    getSessionId(): string;
+    getBranch(fromId?: string): readonly { id: string }[];
+  },
+): number {
+  const state = getState(sessionId);
+  const remaining: CompressionBlock[] = [];
+  let quarantineCount = 0;
+
+      for (const block of state.blocks) {
+        // Verify attestation summary hash before ancestry check
+        if (block.attestation) {
+          const currentHash = createHash("sha256").update(block.summary).digest("hex");
+          if (block.attestation.summaryHash !== currentHash) {
+                state.quarantinedBlocks.push({
+                  id: `b${block.blockId}`,
+                  summary: block.summary,
+                  reason: "attestation-hash-mismatch",
+                  quarantinedAt: Date.now(),
+                  createdAt: block.createdAt,
+                  actor: "system",
+                  confirmation: "auto",
+                  summaryHash: block.attestation.summaryHash,
+                });
+            quarantineCount++;
+            continue;
+          }
+        }
+        if (block.provenance) {
+          const result = validateBlockProvenance(block.provenance, session);
+          if ("reason" in result) {
+                state.quarantinedBlocks.push({
+                  id: `b${block.blockId}`,
+                  summary: block.summary,
+                  reason: result.reason,
+                  quarantinedAt: Date.now(),
+                  createdAt: block.createdAt,
+                  actor: block.attestation ? "system" : undefined,
+                  confirmation: block.attestation ? "auto" : undefined,
+                  summaryHash: block.attestation?.summaryHash,
+                });
+            quarantineCount++;
+            continue; // Don't keep in active blocks
+          }
+        }
+        // Blocks without provenance (legacy) or passing validation stay active
+        remaining.push(block);
+  }
+
+  if (quarantineCount > 0) {
+    state.blocks = remaining;
+    // Rebuild persistent summary from active blocks only to prevent leakage
+    rebuildPersistentSummary(state);
+    persistState(sessionId);
+  }
+
+  return quarantineCount;
+}
+
+/**
+ * Get quarantined blocks for a session.
+ */
+export function getQuarantinedBlocks(
+  sessionId: string,
+): readonly QuarantinedBlock[] {
+  return getState(sessionId).quarantinedBlocks;
+}
+
+/**
+ * Check if a block in the state is legacy (no provenance data).
+ */
+export function isLegacyBlock(block: CompressionBlock): boolean {
+  return !block.provenance;
+}
+
+/**
+ * Count provenance statuses for display.
+ */
+export function getProvenanceCounts(sessionId: string) {
+          const state = getState(sessionId);
+          let validated = 0;
+          let attested = 0;
+          let legacyUnverified = 0;
+
+          for (const block of state.blocks) {
+            if (block.attestation) {
+              attested++;
+            } else if (block.provenance) {
+              validated++;
+            } else {
+              legacyUnverified++;
+            }
+          }
+
+          return {
+            validated,
+            attested,
+            legacyUnverified,
+            quarantined: state.quarantinedBlocks.length,
+          };
+        }

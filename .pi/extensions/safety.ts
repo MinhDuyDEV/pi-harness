@@ -4,4 +4,4 @@
  * Unified safety module replacing guardrails.ts + guardian.ts + sandbox.ts.
  * See safety/ directory for composable rule system.
  */
-export { default } from "./safety/extension.js";
+export { default } from "./safety/extension.ts";

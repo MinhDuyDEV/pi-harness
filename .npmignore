@@ -1,0 +1,8 @@
+# Exclude test files and dev-only docs from the published payload.
+# `files` in package.json whitelists .pi/extensions (which carries extension tests);
+# these carve-outs stop tests and internal dev docs from shipping to consumers.
+**/*.test.ts
+**/*.test.js
+**/*.test.d.ts
+.pi/extensions/rewind/PORT.md
+.pi/extensions/rewind/TESTING.md

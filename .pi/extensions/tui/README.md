@@ -30,10 +30,10 @@ break the extension. No deprecation notice will be issued for these internal API
 
 | Package | Version |
 |---------|---------|
-| `@earendil-works/pi-coding-agent` | `0.80.6` |
-| `@earendil-works/pi-tui` | `0.80.6` |
+| `@earendil-works/pi-coding-agent` | `0.81.1` |
+| `@earendil-works/pi-tui` | `0.81.1` |
 
-This extension was developed and tested against **Pi v0.80.6**. Newer versions may require adjustments.
+This extension was developed and tested against **Pi v0.81.1**. Internal TUI APIs remain version-sensitive; run the extension typecheck and TUI tests after every Pi upgrade.
 The render-tree sibling indices used by `syncFixedRenderables` assume the TUI layout:
 
 ```
@@ -47,8 +47,8 @@ incompatibility, loudly disable fixed mode, and log the reason to stderr.
 
 ### Prerequisites
 
-- Pi v0.80.6 (or compatible)
-- Node.js >= 20 with `npx tsx`
+- Pi v0.81.1 (or compatible)
+- Node.js >= 22.19.0 with the repository dev dependencies
 
 ### Running tests
 
@@ -57,9 +57,9 @@ incompatibility, loudly disable fixed mode, and log the reason to stderr.
 npm run test:tui
 
 # Individual test files
-npx tsx --test .pi/extensions/tui/tests/sidebar.test.ts
-npx tsx --test .pi/extensions/tui/tests/footer.test.ts
-npx tsx --test .pi/extensions/tui/tests/fixed-editor.test.ts
+node --import tsx --test .pi/extensions/tui/tests/sidebar.test.ts
+node --import tsx --test .pi/extensions/tui/tests/footer.test.ts
+node --import tsx --test .pi/extensions/tui/tests/fixed-editor.test.ts
 ```
 
 > **Note**: Files under `.pi/extensions/tui/tests/` prefixed with `fixed-editor-settings` or

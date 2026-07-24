@@ -18,12 +18,11 @@ let _stampSeq = 0;
 /**
  * DeepSeek 400s on tool_calls missing `id`. Give bare calls a fallback.
  */
-export function stampMissingIds(
-  calls: Array<{ id?: string; [key: string]: unknown }>,
-): Array<{ id: string; [key: string]: unknown }> {
-  return calls.map((c) =>
-    c.id ? (c as { id: string; [key: string]: unknown }) : { ...c, id: `z-ds-${Date.now().toString(36)}-${_stampSeq++}` },
-  );
+export function stampMissingIds<T extends { id?: string }>(calls: T[]): Array<T & { id: string }> {
+  return calls.map((call) => ({
+    ...call,
+    id: call.id ?? `z-ds-${Date.now().toString(36)}-${_stampSeq++}`,
+  }));
 }
 
 /**
@@ -32,14 +31,14 @@ export function stampMissingIds(
  *
  * Returns the fixed messages array and counts of dropped items for telemetry.
  */
-function fixToolCallPairing(
-  messages: Array<Record<string, unknown>>,
+function fixToolCallPairing<T extends Record<string, unknown>>(
+  messages: T[],
 ): {
-  messages: Array<Record<string, unknown>>;
+  messages: T[];
   droppedAssistantCalls: number;
   droppedStrayTools: number;
 } {
-  const out: Array<Record<string, unknown>> = [];
+  const out: T[] = [];
   let droppedAssistantCalls = 0;
   let droppedStrayTools = 0;
 
@@ -59,7 +58,7 @@ function fixToolCallPairing(
       }
 
       // Look ahead for matching tool responses
-      const candidates: Array<Record<string, unknown>> = [];
+      const candidates: T[] = [];
       let j = i + 1;
       while (j < messages.length && needed.size > 0) {
         const nxt = messages[j]!;
@@ -105,10 +104,10 @@ function fixToolCallPairing(
  *
  * Skipped on non-thinking models to avoid unnecessary prefix-cache churn.
  */
-function stampMissingReasoningForThinkingMode(
-  messages: Array<Record<string, unknown>>,
+function stampMissingReasoningForThinkingMode<T extends Record<string, unknown>>(
+  messages: T[],
   model: string,
-): { messages: Array<Record<string, unknown>>; stampedCount: number } {
+): { messages: T[]; stampedCount: number } {
   if (!isThinkingModeModel(model)) {
     return { messages, stampedCount: 0 };
   }
@@ -144,102 +143,85 @@ export interface TruncationRepairResult {
  * 5. Falls back to "{}" only when unrecoverable
  */
 export function repairTruncatedJson(input: string): TruncationRepairResult {
-  const notes: string[] = [];
-
   if (!input || !input.trim()) {
-    return {
-      repaired: "{}",
-      changed: input !== "{}",
-      notes: ["empty input → {}"],
-      fallback: false,
-    };
+    return { repaired: "{}", changed: input !== "{}", notes: ["empty input → {}"], fallback: false };
   }
-
-  // Fast path: already parseable
   try {
     JSON.parse(input);
     return { repaired: input, changed: false, notes: [], fallback: false };
   } catch {
-    // Fall through to repair
+    return repairInvalidJson(input);
   }
+}
 
+function repairInvalidJson(input: string): TruncationRepairResult {
+  const notes: string[] = [];
+  const repaired = closeJsonStructure(input, analyzeJsonStructure(input), notes);
+  try {
+    JSON.parse(repaired);
+    return { repaired, changed: repaired !== input, notes, fallback: false };
+  } catch (error) {
+    const preview = input.length <= 500 ? input : `${input.slice(0, 500)} …[+${input.length - 500} chars]`;
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      repaired: "{}",
+      changed: true,
+      notes: [...notes, `fallback to {}: ${message}`, `unrecoverable truncation — original args preview: ${preview}`],
+      fallback: true,
+    };
+  }
+}
+
+function analyzeJsonStructure(input: string): { stack: string[]; inString: boolean; lastSignificant: number } {
   const stack: string[] = [];
   let escaped = false;
   let inString = false;
   let lastSignificant = -1;
-
-  for (let i = 0; i < input.length; i++) {
-    const c = input[i]!;
-    if (!/\s/.test(c)) lastSignificant = i;
-
+  for (let index = 0; index < input.length; index += 1) {
+    const character = input[index]!;
+    if (!/\s/.test(character)) lastSignificant = index;
     if (escaped) {
       escaped = false;
-      continue;
+    } else if (inString && character === "\\") {
+      escaped = true;
+    } else if (character === '"') {
+      inString = !inString;
+      if (inString) stack.push('"');
+      else stack.pop();
+    } else if (!inString && (character === "{" || character === "[")) {
+      stack.push(character);
+    } else if (!inString && (character === "}" || character === "]")) {
+      stack.pop();
     }
-
-    if (inString) {
-      if (c === "\\") {
-        escaped = true;
-        continue;
-      }
-      if (c === '"') {
-        inString = false;
-        stack.pop();
-      }
-      continue;
-    }
-
-    if (c === '"') {
-      inString = true;
-      stack.push('"');
-      continue;
-    }
-
-    if (c === "{" || c === "[") stack.push(c);
-    else if (c === "}" || c === "]") stack.pop();
   }
+  return { stack, inString, lastSignificant };
+}
 
-  let s = input.slice(0, lastSignificant + 1);
-
-  // Trim a trailing comma which would block re-parse
-  if (/,$/.test(s)) {
-    s = s.replace(/,$/, "");
+function closeJsonStructure(
+  input: string,
+  state: { stack: string[]; inString: boolean; lastSignificant: number },
+  notes: string[],
+): string {
+  let repaired = input.slice(0, state.lastSignificant + 1);
+  if (repaired.endsWith(",")) {
+    repaired = repaired.slice(0, -1);
     notes.push("trimmed trailing comma");
   }
-
-  // If we ended on a key without a value: "foo": → "foo": null
-  if (/":\s*$/.test(s)) {
-    s += " null";
+  if (/":\s*$/.test(repaired)) {
+    repaired += " null";
     notes.push("filled dangling key with null");
   }
-
-  // If we ended inside a string, close it
-  if (inString) {
-    s += '"';
-    stack.pop();
+  if (state.inString) {
+    repaired += '"';
+    state.stack.pop();
     notes.push("closed unterminated string");
   }
-
-  // Pop remaining open structures in reverse order
-  while (stack.length > 0) {
-    const top = stack.pop();
-    if (top === "{") s += "}";
-    else if (top === "[") s += "]";
+  while (state.stack.length > 0) {
+    const opener = state.stack.pop();
+    if (opener === "{") repaired += "}";
+    else if (opener === "[") repaired += "]";
   }
-
-  // Attempt to parse the repaired string
-  try {
-    JSON.parse(s);
-    return { repaired: s, changed: s !== input, notes, fallback: false };
-  } catch (err) {
-    const preview =
-      input.length <= 500
-        ? input
-        : `${input.slice(0, 500)} …[+${input.length - 500} chars]`;
-    notes.push(`fallback to {}: ${(err as Error).message}`);
-    notes.push(`unrecoverable truncation — original args preview: ${preview}`);
-    return { repaired: "{}", changed: true, notes, fallback: true };
-  }
+  return repaired;
 }
 
 
@@ -248,12 +230,11 @@ export function repairTruncatedJson(input: string): TruncationRepairResult {
  * Apply all repair passes to a message array before sending to DeepSeek.
  * This is the main entry point for pre-flight message healing.
  */
-export function healMessages(
-  messages: Array<Record<string, unknown>>,
+export function healMessages<T extends Record<string, unknown>>(
+  messages: T[],
   model: string,
-  maxChars = 500_000,
 ): {
-  messages: Array<Record<string, unknown>>;
+  messages: T[];
   healedCount: number;
 } {
   let healedCount = 0;

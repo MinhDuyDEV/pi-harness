@@ -1,132 +1,125 @@
-/**
- * DCP Extension — JSONL Recall Helpers
- *
- * JSONL reading and transformation utilities for recall.
- * No dependencies on recall ranking or rendering.
- */
-
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, type Stats } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
-import type { RecallEntry } from "./recall-types.js";
-import { RAW_SESSION_DIR } from "./recall-types.js";
 
-/**
- * Transform a JSONL payload into display text.
- */
-export function jsonlPayload(entry: Record<string, unknown>): string {
-  const data = entry.data && typeof entry.data === "object"
-    ? (entry.data as Record<string, unknown>)
-    : undefined;
-  return entry.summary as string ?? data?.summary as string ?? entry.content as string ?? JSON.stringify(entry).slice(0, 200);
+export const RAW_SESSION_DIR = join(homedir(), ".pi", "agent", "sessions");
+
+export function safeStat(path: string): Stats | undefined {
+  try {
+    return statSync(path);
+  } catch {
+    return undefined;
+  }
 }
 
-/**
- * Get the role (type) of a JSONL entry.
- */
-export function jsonlRole(entry: Record<string, unknown>): string {
-  const customType = entry.customType as string | undefined;
-  if (customType && customType !== "dcp_state") return customType;
-  return entry.type as string ?? entry.role as string ?? "entry";
+export function rawSessionKey(path: string): string {
+  return path.split(/[\\/]/).pop()?.replace(/\.jsonl?$/, "") ?? path;
 }
 
-/**
- * Get timestamp from a JSONL entry.
- */
-export function jsonlTimestamp(entry: Record<string, unknown>): number | undefined {
-  if (typeof entry.timestamp === "number") return entry.timestamp;
-  if (typeof entry.t === "number") return entry.t;
-  return undefined;
+export function listRawSessionFiles(scope: "active" | "all", sessionFile?: string): string[] {
+  if (scope === "active" && sessionFile && existsSync(sessionFile)) return [sessionFile];
+  if (!existsSync(RAW_SESSION_DIR)) return [];
+
+  const files: string[] = [];
+  const visit = (directory: string): void => {
+    for (const name of readdirSync(directory)) {
+      const path = join(directory, name);
+      const stat = safeStat(path);
+      if (!stat) continue;
+      if (stat.isDirectory()) visit(path);
+      else if (stat.isFile() && /\.jsonl?$/.test(name)) files.push(path);
+    }
+  };
+
+  visit(RAW_SESSION_DIR);
+  files.sort((left, right) => Number(safeStat(right)?.mtimeMs ?? 0) - Number(safeStat(left)?.mtimeMs ?? 0));
+  return files.slice(0, scope === "all" ? 200 : 20);
 }
 
-/**
- * Should this JSONL entry be included in recall results?
- */
-export function shouldIncludeJsonlEntry(
-  entry: Record<string, unknown>,
-): boolean {
-  if (entry.customType === "dcp_state") return false;
-  const role = jsonlRole(entry);
-  if (role === "system" || role === "compactionSummary" || role === "branchSummary") return false;
+export function readJsonlLines(path: string): unknown[] {
+  try {
+    return readFileSync(path, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return line;
+        }
+      });
+  } catch {
+    return [];
+  }
+}
+
+export function shouldIncludeJsonlEntry(value: unknown): boolean {
+  if (typeof value === "string") return true;
+  if (!value || typeof value !== "object") return false;
+  const object = value as Record<string, unknown>;
+  if (object.type === "custom") return false;
+  if (typeof object.customType === "string" && object.customType) return false;
   return true;
 }
 
-export function normalizeRecallDisplayText(text: string): string {
-  if (!text || text.length > 1000) return text?.slice(0, 1000) ?? "";
-  return text;
+function payload(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const object = value as Record<string, unknown>;
+  if (object.type === "message" && object.message && typeof object.message === "object") return object.message;
+  if (object.type === "custom" && object.customType === "dcp_state") return object.data;
+  return value;
 }
 
 export function contentToText(content: unknown): string {
-  if (!content) return "";
   if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((c: unknown) => {
-        if (typeof c === "string") return c;
-        if (c && typeof c === "object") {
-          const obj = c as Record<string, unknown>;
-          return obj.text as string ?? "";
-        }
-        return "";
-      })
-      .filter(Boolean)
-      .join(" ");
-  }
-  return JSON.stringify(content).slice(0, 200);
+  if (content == null) return "";
+  if (Array.isArray(content)) return content.map(contentToText).filter(Boolean).join("\n");
+  if (typeof content !== "object") return String(content);
+
+  const object = content as Record<string, unknown>;
+  if (object.type === "thinking" || typeof object.thinking === "string") return "";
+  if (object.type === "toolCall") return `tool call: ${String(object.name ?? object.toolName ?? "unknown")}`;
+  if (typeof object.text === "string") return object.text;
+  if (typeof object.content === "string" || Array.isArray(object.content)) return contentToText(object.content);
+  if (object.message) return contentToText(object.message);
+  if (object.output) return contentToText(object.output);
+  if (object.result) return contentToText(object.result);
+  if (object.data) return contentToText(object.data);
+  return "";
 }
 
-/**
- * Read JSONL files from the sessions directory.
- */
-export function* iterateJsonlEntries(
-  sessionKey: string,
-): Generator<{ index: number; entry: Record<string, unknown>; text: string }> {
-  const sessionDir = join(RAW_SESSION_DIR, sessionKey);
-  if (!existsSync(sessionDir)) return;
+export function jsonlText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return String(value ?? "");
+  const object = payload(value);
+  if (!object || typeof object !== "object") return contentToText(object);
 
-  const files = existsSync(sessionDir) ? [] : [];
-  const entries: { file: string; data: Record<string, unknown>; mtime: number }[] = [];
-
-  try {
-    const dirFiles = readdirSync(sessionDir).filter((f) => f.endsWith(".jsonl"));
-    for (const file of dirFiles) {
-      try {
-        const path = join(sessionDir, file);
-        const raw = readFileSync(path, "utf-8");
-        const lines = raw.split("\n").filter(Boolean);
-        for (const line of lines) {
-          try {
-            const entry = JSON.parse(line) as Record<string, unknown>;
-            const mtime = statSync(path).mtimeMs;
-            entries.push({ file, data: entry, mtime });
-          } catch {
-            // skip malformed lines
-          }
-        }
-      } catch {
-        // skip unreadable files
-      }
-    }
-  } catch {
-    return;
+  const record = object as Record<string, unknown>;
+  if (record.snapshot && typeof record.snapshot === "object") {
+    const blocks = Array.isArray((record.snapshot as Record<string, unknown>).blocks)
+      ? ((record.snapshot as Record<string, unknown>).blocks as unknown[]).length
+      : 0;
+    return `DCP state snapshot (${blocks} block${blocks === 1 ? "" : "s"})`;
   }
+  return contentToText(record.content ?? record.message ?? record.text ?? record.output ?? record.result ?? object);
+}
 
-  const typeOrder: Record<string, number> = {
-    user: 0,
-    assistant: 1,
-    toolResult: 2,
-    bashExecution: 3,
-  };
-
-  entries.sort((a, b) => {
-    const typeDiff = (typeOrder[jsonlRole(a.data)] ?? 99) - (typeOrder[jsonlRole(b.data)] ?? 99);
-    if (typeDiff !== 0) return typeDiff;
-    return (jsonlTimestamp(a.data) ?? a.mtime) - (jsonlTimestamp(b.data) ?? b.mtime);
-  });
-
-  let index = 0;
-  for (const { data: entry } of entries) {
-    if (!shouldIncludeJsonlEntry(entry)) continue;
-    const text = jsonlPayload(entry);
-    yield { index: index++, entry, text };
+export function jsonlRole(value: unknown): string {
+  if (!value || typeof value !== "object") return "";
+  const object = payload(value);
+  if (object && typeof object === "object" && typeof (object as Record<string, unknown>).role === "string") {
+    return (object as Record<string, unknown>).role as string;
   }
+  const original = value as Record<string, unknown>;
+  return String(original.customType ?? original.type ?? "");
+}
+
+export function jsonlTimestamp(value: unknown): number | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = (value as Record<string, unknown>).timestamp ?? (value as Record<string, unknown>).createdAt ?? (value as Record<string, unknown>).created_at;
+  if (typeof raw === "number") return raw;
+  if (typeof raw !== "string") return undefined;
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? undefined : parsed;
 }

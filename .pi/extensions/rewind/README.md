@@ -1,74 +1,71 @@
-# pi-rewind (ported to pi SDK 0.79+)
+# pi-rewind (Pi SDK 0.81.1)
 
-Operation-level undo/redo for the pi coding agent. Forked from
-[nicobailon/pi-rewind-hook](https://github.com/nicobailon/pi-rewind-hook) and
-ported to the current `@earendil-works/pi-coding-agent` SDK. See `PORT.md`
-for the list of API-surface changes.
+Operation-level working-tree snapshots for Pi's conversation fork/tree flows. The extension records exact git trees, maps session entries to snapshot commits, and lets users decide whether navigation should also restore files.
 
-## How to use
+## Requirements
 
-This extension has **no slash commands**. It is wired entirely through pi
-events. The user-facing flow is:
+- Pi Coding Agent `0.81.1` (the tested target)
+- A git working tree
+- Node.js `>=22.19.0`
 
-1. Use pi's built-in **`/tree`** command to open the session-tree picker.
-2. Pick a user message (or any earlier entry) to navigate to.
-3. The extension intercepts the navigation in its `session_before_tree`
-   handler and shows a picker:
-   - **Restore files to that point** — rolls the working tree back to
-     the state before the picked turn.
-   - **Don't restore files** — only navigates the conversation tree
-     (files stay as they are).
-   - **Cancel** — aborts the navigation entirely.
-4. If you picked a turn that the extension cannot restore, it cancels
-   the navigation rather than rolling forward or back inconsistently.
+Non-git sessions remain usable; rewind status and snapshot behavior are simply disabled.
 
-The "redo" is just navigating forward in the tree again. There is no
-explicit `/redo`; the picker is symmetric in both directions.
+## User flow
 
-## Events the extension hooks
+The extension has no slash commands. During `/tree` navigation it offers:
 
-| Event                       | What it does |
-| --------------------------- | ------------ |
-| `before_agent_start`        | Injects context about the rewind store when a turn starts |
-| `session_start`             | Rehydrates the rewind store from the JSONL ledger |
-| `session_tree`              | After a tree navigation, files are restored or marked dirty |
-| `session_compact`           | Records the rewind store size before compaction |
-| `session_shutdown`          | Persists the rewind store to JSONL |
-| `turn_start` / `turn_end`   | Captures a per-turn git snapshot of the working tree |
-| `agent_end`                 | Finalises the per-turn rewind record |
-| `session_before_fork`       | Captures a snapshot before a fork so the new session has context |
-| `session_before_tree`       | Asks the user whether to restore files when navigating |
+- **Keep current files**
+- **Restore files to that point** when the selected entry has a live snapshot
+- **Undo last file rewind** when an undo snapshot exists
+- **Cancel navigation**
 
-## Storage
+During a fork it offers the equivalent conversation-only, restore-all, code-only, undo, and cancel choices. Headless forks keep current files. Restore failures cancel the navigation rather than leaving the conversation and working tree out of sync.
 
-- **Per-session ledger** — `CustomEntry` records written into the
-  session JSONL at `.pi/agent/sessions/--<cwd>--/<timestamp>_<uuid>.jsonl`
-- **File snapshots** — git tree objects stored under the user's git
-  ref `refs/pi-rewind/store` with a keepalive chain so `git gc` does
-  not reap them.
-- **Untracked files** — recorded at snapshot time, restored on demand
-  via the `preexistingUntrackedFiles` whitelist. Files the user
-  created by hand after the snapshot are preserved.
-- **Large files** — files above the configured size cap are skipped
-  from snapshots; tracked separately in `skippedLargeFiles`.
+## Event contract
 
-## Out of scope (intentional)
+| Event | Responsibility |
+| --- | --- |
+| `before_agent_start` | Remember the active user prompt for turn binding |
+| `turn_start` / `turn_end` | Capture the pre-turn and assistant-result snapshots |
+| `agent_end` | Persist the completed turn ledger and trigger threshold retention |
+| `session_start` | Reconstruct state and import pending fork metadata |
+| `session_before_fork` / `session_before_tree` | Ask how file state should follow navigation |
+| `session_tree` / `session_compact` | Bind resulting summary/compaction entries to snapshots |
+| `session_shutdown` | Run the configured retention sweep |
+| `rewind:checkpoint-entry` | Bind an allowlisted integration entry to the current tree |
+| `rewind:fork-preference` | Apply an allowlisted one-shot conversation-only preference |
 
-- No `/undo` or `/redo` slash commands. The upstream author chose the
-  `/tree`-picker design. If you want a fast `Cmd+Z`-style shortcut,
-  see `PORT.md` § "Out of scope / future work".
-- No support for non-git worktrees. Pi's resource loader already
-  requires a git repo for project extensions, and rewind depends on
-  git tree objects.
+## Storage and retention
 
-## File
+- Snapshot commits are kept alive through `refs/pi-rewind/store`.
+- Session JSONL stores `rewind-turn`, `rewind-op`, and `rewind-fork-pending` custom entries.
+- Snapshot capture uses a temporary git index and `git add -A`; the real index is not mutated.
+- Restore deletes only repo-relative paths that disappeared between snapshots, then uses `git restore` from the target commit.
+- Optional retention settings support maximum snapshot count, age, labeled-entry pinning, repository-session scanning, and a startup time budget.
 
-```
+## Modules
+
+```text
 .pi/extensions/rewind/
-├── index.ts          (1,461 lines — ported from upstream)
-├── index.test.ts     (752 lines — pre-existing upstream test suite)
-├── package.json      (pi-rewind v2.0.0, pinned to @earendil-works/pi-coding-agent ^0.79.0)
+├── index.ts          # Pi registration and runtime lifecycle
+├── events.ts         # fork/tree/turn event handlers
+├── core.ts           # shared types, settings, and pure helpers
+├── store.ts          # git snapshot store and exact restore operations
+├── ledger.ts         # JSONL ledger parsing and lineage reconstruction
+├── retention.ts      # live-set selection and store pruning
+├── index.test.ts     # integration behavior
+├── ledger.test.ts    # focused parser behavior
+├── package.json
 ├── tsconfig.json
-├── PORT.md           (port notes)
-└── README.md         (this file)
+├── PORT.md
+└── README.md
 ```
+
+## Verify
+
+```bash
+node --import tsx --test .pi/extensions/rewind/index.test.ts .pi/extensions/rewind/ledger.test.ts
+npm run typecheck:extensions
+```
+
+See `PORT.md` for SDK migration history.

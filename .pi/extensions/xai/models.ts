@@ -1,4 +1,5 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import {
   DEFAULT_XAI_MODEL,
   XAI_API_BASE_URL,
@@ -12,7 +13,7 @@ import {
 // Pi's provider model schema only exposes text/image capability metadata.
 // xAI Responses can also accept PDFs via input_file; payload.ts normalizes
 // those request parts without widening pi's model input enum.
-export const MODELS = [
+export const MODELS: ProviderModelConfig[] = [
   {
     id: "grok-4.5",
     name: "Grok 4.5",

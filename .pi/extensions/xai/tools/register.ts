@@ -1,4 +1,8 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ToolDefinition,
+} from "@earendil-works/pi-coding-agent";
+import type { XaiToolDef } from "./define-tool.js";
 import {
   xaiCodeExecutionTool,
   xaiCritiqueTool,
@@ -6,9 +10,9 @@ import {
   xaiMultiAgentTool,
   xaiWebSearchTool,
   xaiXSearchTool,
-} from "./custom-tools";
-import { xaiAnalyzeImageTool, xaiGenerateImageTool } from "./image-tools";
-import { xaiDeepResearchTool } from "./research-tools";
+} from "./custom-tools.js";
+import { xaiAnalyzeImageTool, xaiGenerateImageTool } from "./image-tools.js";
+import { xaiDeepResearchTool } from "./research-tools.js";
 
 const xaiToolRegistry = {
   xai_generate_text: xaiGenerateTextTool,
@@ -22,12 +26,20 @@ const xaiToolRegistry = {
   xai_deep_research: xaiDeepResearchTool,
 } as const;
 
-/** Register the OAuth-backed custom xAI tools whose names are in `enabled`. */
+export function adaptXaiTool(tool: XaiToolDef): ToolDefinition {
+  return {
+    name: tool.name,
+    label: tool.label,
+    description: tool.description,
+    parameters: tool.parameters,
+    execute(toolCallId, params, signal, onUpdate, ctx) {
+      return tool.execute({ toolCallId, params, signal, onUpdate, ctx });
+    },
+  };
+}
+
 export function registerCustomXaiTools(pi: ExtensionAPI, enabled: Set<string>): void {
   for (const [name, tool] of Object.entries(xaiToolRegistry)) {
-    if (enabled.has(name)) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pi.registerTool(tool as any);
-    }
+    if (enabled.has(name)) pi.registerTool(adaptXaiTool(tool));
   }
 }

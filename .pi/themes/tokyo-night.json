@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/badlogic/pi-mono/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
+  "$schema": "https://raw.githubusercontent.com/earendil-works/pi/main/packages/coding-agent/src/modes/interactive/theme/theme-schema.json",
   "name": "tokyo-night",
   "vars": {
     "bg": "#1a1b26",
@@ -32,13 +32,13 @@
     "warning": "yellow",
     "muted": "comment",
     "dim": "dimGray",
-    "text": "",
+    "text": "#c0caf5",
     "thinkingText": "dimGray",
     "selectedBg": "#242430",
     "userMessageBg": "#18181e",
-    "userMessageText": "",
+    "userMessageText": "#7dcfff",
     "customMessageBg": "#1e1e26",
-    "customMessageText": "",
+    "customMessageText": "#bb9af7",
     "customMessageLabel": "purple",
     "toolPendingBg": "#1e1e28",
     "toolSuccessBg": "#1e1e28",

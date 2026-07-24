@@ -1,11 +1,14 @@
 ---
 name: planning-and-task-breakdown
 description: Use when a feature/change has a spec or clear goal and needs an executable implementation plan.
-version: 1.0.0
-tags: [workflow, planning, agent-coordination]
-dependencies: [spec-driven-development]
-agent_types: [planner]
-tools: [TaskCreate, TaskUpdate, memory, grep, find, read]
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  - planning
+  - agent-coordination
+  dependencies:
+  - spec-driven-development
 ---
 
 # Planning & Task Breakdown
@@ -71,6 +74,14 @@ tools: [TaskCreate, TaskUpdate, memory, grep, find, read]
 - Mechanical refactor (rename, reformat) appears in slice 1 — moves the goalposts.
 - Risks only listed at the end, not per slice.
 - Open questions outnumber slices — spec is incomplete, go back to brainstorming.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I know what to do, skip the plan" | Knowing ≠ ordered, sized, stop-conditioned slices; the plan makes "done" verifiable per-slice. |
+| "I'll figure out open questions during coding" | Open questions during coding become guesses in code; the plan forces them out first. |
+| "Slices are just a checklist" | A checklist is unordered; slices are ordered + stop-conditioned so you know when to stop. |
 
 ## Skill Result Contract
 

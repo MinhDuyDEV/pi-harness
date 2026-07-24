@@ -1,11 +1,18 @@
 ---
 name: browser-testing-with-devtools
-description: "Use when verifying or debugging browser behavior with live runtime evidence: DOM state, console errors, network requests, screenshots, performance traces, or end-to-end user flows. Routes between Chrome DevTools and Playwright."
-version: 1.0.0
-tags: [browser, testing, debugging, verification]
-dependencies: [chrome-devtools, playwright]
-agent_types: [planner, worker, reviewer]
-tools: []
+description: 'Use when verifying or debugging browser behavior with live runtime evidence: DOM state, console errors, network
+  requests, screenshots, performance traces, or end-to-end user flows. Routes between Chrome DevTools and Playwright.'
+metadata:
+  version: 1.0.0
+  tags:
+  - browser
+  - testing
+  - debugging
+  - verification
+  dependencies:
+  - chrome-devtools
+  - playwright
+disable-model-invocation: true
 ---
 
 # Browser Testing with DevTools

@@ -1,11 +1,15 @@
 ---
 name: code-cleanup
-description: Use after behavior is working but the diff is noisy, repetitive, over-complicated, or obviously AI-shaped - lock behavior first, then simplify the changed code and re-verify without expanding scope
-version: 1.0.0
-tags: [refactor, code-quality, workflow]
-dependencies: [verification-before-completion]
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use after behavior is working but the diff is noisy, repetitive, over-complicated, or obviously AI-shaped - lock
+  behavior first, then simplify the changed code and re-verify without expanding scope
+metadata:
+  version: 1.0.0
+  tags:
+  - refactor
+  - code-quality
+  - workflow
+  dependencies:
+  - verification-before-completion
 ---
 
 # Code Cleanup
@@ -50,6 +54,14 @@ Cleanup before behavior is locked (can't prove nothing broke); expanding scope (
 ## Red Flags
 
 Cleanup before tests pass; "I just want to refactor this"; expanding into unrelated files; "while I'm here" fixes; tests deleted (not the cleanup target); reformatting the whole file; rename of public API; no baseline saved; re-verify skipped; "I'll write tests for the new structure later".
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I'll simplify and fix the bug together" | Coupling them is scope creep; lock behavior first, simplify second — or you can't tell which broke. |
+| "The diff is already noisy, a bit more won't matter" | Noise is the signal to stop + ship what's locked, not to add more. |
+| "It's obviously simpler" | Obvious-to-you isn't verified; re-run the behavior test after simplifying. |
 
 ## Self-Quiz
 

@@ -82,7 +82,7 @@ export function padLineToWidth(line: string, width: number): string {
 }
 
 export function overrideColumns(target: { columns?: number } | undefined, columns: number): () => void {
-  if (!target) return () => {};
+  if (!target) return () => undefined;
   const descriptor = Object.getOwnPropertyDescriptor(target, "columns");
   const previous = target.columns;
   try {
@@ -108,7 +108,7 @@ export function overrideColumns(target: { columns?: number } | undefined, column
         }
       };
     } catch {
-      return () => {};
+      return () => undefined;
     }
   }
 }

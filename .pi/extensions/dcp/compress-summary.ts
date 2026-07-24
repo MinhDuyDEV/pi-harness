@@ -247,13 +247,13 @@ export function extractStructuredFields(
   if (config.structuredSummary.autoExtractPaths) {
     if (fields.files_read.length === 0 && fields.files_modified.length === 0) {
       const filePattern =
-        /(?:\b(?:src|lib|app|test|config|public)\/[^\s,)]+(?:\.[a-z]+)?\b)|(?:\b[a-zA-Z0-9_-]+\/[a-zA-Z0-9._\/-]+\.[a-z]+\b)/g;
+        /(?:\b(?:src|lib|app|test|config|public)\/[^\s,)]+(?:\.[a-z]+)?\b)|(?:\b[a-zA-Z0-9_-]+\/[a-zA-Z0-9._/-]+\.[a-z]+\b)/g;
       const matches = narrative.match(filePattern);
       if (matches) {
         const readContext = /read|open|look|check|examine|review/i;
         const modContext =
           /modify|edit|write|change|update|fix|add|create|delete|refactor/i;
-        for (const m of [...new Set(matches)]) {
+        for (const m of new Set(matches)) {
           const idx = narrative.indexOf(m);
           const start = Math.max(0, idx - 60);
           const lineContext = narrative.substring(start, idx + m.length + 60);

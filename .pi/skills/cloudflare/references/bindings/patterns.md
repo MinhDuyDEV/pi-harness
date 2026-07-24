@@ -3,7 +3,7 @@
 ### ❌ Hardcoding Credentials
 ```typescript
 // DON'T
-const apiKey = 'sk_live_abc123';
+const apiKey = '<api-key>';
 ```
 **✅ Use secrets:**
 ```bash

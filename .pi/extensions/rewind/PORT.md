@@ -1,69 +1,40 @@
 # Port notes: pi-rewind-hook → pi-rewind 2.0
 
-Forked from https://github.com/nicobailon/pi-rewind-hook (last upstream commit: 2025-04-24).
+Forked from <https://github.com/nicobailon/pi-rewind-hook> (upstream snapshot: 2025-04-24) and maintained for the `@earendil-works/pi-coding-agent` SDK.
 
-## What was wrong with the upstream code
+## Compatibility changes
 
-- Imported from `@mariozechner/pi-coding-agent` (the old package scope; the
-  package was renamed to `@earendil-works/pi-coding-agent`).
-- Used local `SessionLikeEntry` types that were slightly too loose, so they
-  were silently accepting any object as a session entry and bypassing the
-  SDK's stricter nullability checks.
-- Used a generic catch-all `{ type: string; [k: string]: unknown }` in
-  the entry union, which broke narrowing on `entry.type === "message"` and
-  similar discriminants — the test suite masked this because all tests
-  built entry objects inline.
-- Used `Awaited<ReturnType<typeof readdir>>` for the variable type, which
-  includes `string[]` and `Buffer[]` overloads in addition to `Dirent[]`.
-  The new `@types/node` is strict about this and refuses to let you call
-  `entry.name` on a `Buffer`.
-- `appendEntry(customType, data)` calls still work, but tests were using
-  `Pick<ExtensionAPI, "exec" | "appendEntry" | "on" | "events">` which
-  stopped satisfying the new `EventBus` type once `events.on` started
-  returning `() => void` for unsubscribe.
-
-## What this fork changes
-
-| Change | Why |
+| Change | Reason |
 | --- | --- |
-| Bumped import to `@earendil-works/pi-coding-agent` | The old scope is dead |
-| Pinned to `^0.79.0` (latest as of port) | Forward-compat for SDK 0.8x |
-| Added `Dirent<string>` explicit type on `readdir` | `@types/node` 20 strictness |
-| Added `as unknown as ExtensionAPI` to the test mock | Test mocks no longer satisfy the strict `Pick<>` for unrelated fields |
-| `events.on` mock now returns the unsubscribe function | Match new `EventBus` contract |
-| `events.on` mock now registers into the test's `eventHandlers` map | Same |
-| `parentSession` typed as `string \| null \| undefined` everywhere | Header is JSONL-sourced and can be `null` for sessions without a parent |
-| Local `SessionLikeMessageEntry.message` is optional | Defends against partial entries written by older SDK versions |
-| `toTimestamp(undefined)` and `toTimestamp(string)` only | `Record<string, unknown>` access gives `unknown`, not `string` |
-| `findLatestUserMessageEntry` returns `as SessionLikeMessageEntry` | Generic catch-all in the union widens the return type |
-| `await parseSessionLedgerFile` returns `ParsedSessionLedger \| null` | The function may legitimately fail to read the file |
+| Import from `@earendil-works/pi-coding-agent` | The original package scope is obsolete |
+| Pin development against Pi `0.81.1` | Match this repository's tested runtime while leaving the host as a peer dependency |
+| Return an unsubscribe function from the custom event-bus test mock | Match the current `EventBus` contract |
+| Treat `parentSession` as `string \| null \| undefined` | Session JSONL headers may omit it or store `null` |
+| Validate rewind custom-entry payloads before use | Older or malformed session lines must not corrupt reconstruction |
+| Use an explicit `SessionLikeEntry` compatibility boundary | Pi does not expose a stable public session-entry union for this extension yet |
 
-## What is intentionally unchanged
+## 2026 modularization
 
-- All 1,400+ lines of rewind logic, retention policy, picker UI, file
-  watcher, and rebase flow are byte-for-byte from upstream.
-- The 752-line test suite is kept as-is. One pre-existing flaky test
-  (`"silently restores files on session_before_tree"`) was failing
-  before the port and is still failing after — it's an upstream test
-  bug (the test calls `rewind:checkpoint-entry` with no payload, the
-  source's handler validates and bails, so no checkpoint is created).
-  Fixing it is out of scope for the port.
+The original single implementation file grew beyond 1,400 lines. It is now split without changing the user-facing event contract:
+
+- `index.ts` — lifecycle wiring
+- `events.ts` — turn/fork/tree handlers
+- `core.ts` — shared types, validation, settings, and path helpers
+- `store.ts` — git snapshot operations
+- `ledger.ts` — session JSONL parsing and lineage lookup
+- `retention.ts` — snapshot live-set policy
+
+Focused ledger tests supplement the original integration suite. Restore failures are covered and cancel the affected navigation operation.
 
 ## Verification
 
+```bash
+node --import tsx --test index.test.ts ledger.test.ts
+npm run typecheck:extensions
 ```
-tsc --noEmit -p tsconfig.json    → clean
-tsx --test index.test.ts          → 11/12 pass (1 pre-existing upstream bug)
-```
 
-## Out of scope / future work
+The repository-wide `npm run check` also exercises Pi resource loading, static quality gates, and all extension tests.
 
-The upstream code is feature-complete. Real follow-ups would be:
+## Remaining boundary
 
-1. Replace the local `SessionLikeEntry` mirror with an import from
-   `@earendil-works/pi-coding-agent` once the SDK exports a stable
-   `SessionEntry` union type publicly.
-2. Add integration tests that load the extension via `createAgentSession`
-   and drive `session_start` + `turn_end` against a real `pi` runtime.
-3. Add `session_before_compact` and `session_before_fork` pre-snapshot
-   hooks (the new SDK supports them and the upstream code does not).
+Replace the local session-entry compatibility types with SDK exports only after Pi publishes a stable session entry union. Until then, the validation layer in `core.ts`/`ledger.ts` is deliberate.

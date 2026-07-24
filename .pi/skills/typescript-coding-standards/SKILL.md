@@ -1,11 +1,15 @@
 ---
 name: typescript-coding-standards
-description: Use when writing, refactoring, or reviewing TypeScript code that needs strong domain modeling, typed errors, schema parsing, safe adapters, test seams, or maintainable module boundaries.
-version: 1.0.0
-tags: [typescript, code-quality, architecture, testing]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when writing, refactoring, or reviewing TypeScript code that needs strong domain modeling, typed errors,
+  schema parsing, safe adapters, test seams, or maintainable module boundaries.
+metadata:
+  version: 1.0.0
+  tags:
+  - typescript
+  - code-quality
+  - architecture
+  - testing
+  dependencies: []
 ---
 
 # TypeScript Coding Standards

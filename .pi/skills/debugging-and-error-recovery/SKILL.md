@@ -1,11 +1,15 @@
 ---
 name: debugging-and-error-recovery
 description: Use when tests fail, builds break, behavior is unexpected, or multiple fix attempts have not worked.
-version: 1.0.0
-tags: [debugging, workflow, verification]
-dependencies: [test-driven-development, verification-before-completion]
-agent_types: [worker, reviewer]
-tools: [bash, grep, find, read]
+metadata:
+  version: 1.0.0
+  tags:
+  - debugging
+  - workflow
+  - verification
+  dependencies:
+  - test-driven-development
+  - verification-before-completion
 ---
 
 # Debugging & Error Recovery

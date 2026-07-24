@@ -36,8 +36,8 @@ function estimateTokens(text: string): number {
   return Math.ceil(cjk + ascii * 0.75 + other * 1.5);
 }
 
-export interface ShrinkResult {
-  messages: Array<Record<string, unknown>>;
+export interface ShrinkResult<T extends Record<string, unknown> & { content?: unknown } = Record<string, unknown> & { content?: unknown }> {
+  messages: T[];
   healedCount: number;
   healedFrom: number;
   charsSaved: number;
@@ -49,10 +49,10 @@ export interface ShrinkResult {
  * Token-aware variant — uses estimated token count instead of char count.
  * Important for CJK content where char count ≠ token count.
  */
-export function shrinkOversizedToolResultsByTokens(
-  messages: Array<Record<string, unknown>>,
+export function shrinkOversizedToolResultsByTokens<T extends Record<string, unknown> & { content?: unknown }>(
+  messages: T[],
   maxTokens: number,
-): ShrinkResult {
+): ShrinkResult<T> {
   let totalTokens = estimateTotalTokens(messages);
   let healedCount = 0;
   let tokensSaved = 0;
@@ -117,11 +117,11 @@ export function shrinkOversizedToolResultsByTokens(
  * Shrink oversized tool call arguments by removing verbose fields
  * (like full file content in edit/fs calls).
  */
-export function shrinkOversizedToolCallArgsByTokens(
-  messages: Array<Record<string, unknown>>,
+export function shrinkOversizedToolCallArgsByTokens<T extends Record<string, unknown> & { content?: unknown }>(
+  messages: T[],
   maxTokens: number,
   maxArgTokens = 8000,
-): ShrinkResult {
+): ShrinkResult<T> {
   let healedCount = 0;
   let tokensSaved = 0;
   let charsSaved = 0;
@@ -169,16 +169,6 @@ export function shrinkOversizedToolCallArgsByTokens(
     tokensSaved,
     entriesDropped,
   };
-}
-
-function totalContentChars(messages: Array<Record<string, unknown>>): number {
-  let total = 0;
-  for (const msg of messages) {
-    if (typeof msg.content === "string") {
-      total += (msg.content as string).length;
-    }
-  }
-  return total;
 }
 
 function estimateTotalTokens(messages: Array<Record<string, unknown>>): number {

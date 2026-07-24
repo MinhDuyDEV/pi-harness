@@ -22,6 +22,11 @@ import { estimateTokens, extractToolOps } from "./compress-token-utils.js";
 import { getState } from "./compress-state.js";
 import type { ProtectionPolicy } from "./protection.js";
 
+function toMessage(value: unknown): Message {
+	if (!value || typeof value !== "object" || !("role" in value)) throw new TypeError("invalid compressed summary message");
+	return value as Message;
+}
+
 interface DCPConfigShape {
 	compress: {
 		protectedTools: string[];
@@ -124,9 +129,9 @@ export function applyCompressStrip(
 			indicesToRemove.add(j);
 
 			const m = messages[j];
-			// Nest previously compressed summaries
-			if ((m as unknown as Record<string, unknown>)?.role === "custom" && (m as unknown as Record<string, unknown>)?.customType === "dcp-compressed-summary") {
-				const content = (m as unknown as Record<string, unknown>)?.content;
+			const record = Object.fromEntries(Object.entries(m));
+			if (record.role === "custom" && record.customType === "dcp-compressed-summary") {
+				const content = record.content;
 				if (typeof content === "string" && content.trim()) nestedSummaries.push(content);
 			}
 			// Preserve protected tool outputs
@@ -179,13 +184,13 @@ export function applyCompressStrip(
 		if (injects) {
 			for (const inj of injects) {
 				const content = useStructured ? buildCompressedSummaryMessage(summary) : inj.summary;
-				newMessages.push({
+				newMessages.push(toMessage({
 					role: "custom",
 					customType: "dcp-compressed-summary",
 					content,
 					display: false,
 					timestamp: Date.now(),
-				} as unknown as Message);
+				}));
 			}
 		}
 		if (indicesToRemove.has(i)) continue;

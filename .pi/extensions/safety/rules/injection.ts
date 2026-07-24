@@ -117,10 +117,7 @@ interface InjectionScanResult {
  * Scan content for prompt injection patterns and invisible unicode.
  * Reusable by both safety rules (file writes) and memory injection.
  */
-export function scanForInjection(
-	content: string,
-	filename: string,
-): InjectionScanResult {
+export function scanForInjection(content: string): InjectionScanResult {
 	const findings: string[] = [];
 	let maxSeverity: Severity = "low";
 
@@ -174,7 +171,7 @@ export const injectionRules: RuleSet = [
 			const content = ctx.content;
 			if (!content) return null;
 
-			const result = scanForInjection(content, path);
+			const result = scanForInjection(content);
 			if (!result.detected) return null;
 
 			// Critical/high findings → block

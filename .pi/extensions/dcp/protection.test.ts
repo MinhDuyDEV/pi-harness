@@ -19,6 +19,7 @@ import { applyCompressStrip } from "./compress-strip.js";
 import { pruneToolResults } from "./compress-prune.js";
 import { DEFAULT_CONFIG } from "./config.js";
 import type { DCPConfig } from "./config.js";
+import { assistantMessage } from "./tests/message-fixtures.js";
 
 // ---------------------------------------------------------------------------
 // Helpers — construct correctly typed Pi Message fixtures
@@ -30,7 +31,7 @@ import type { DCPConfig } from "./config.js";
 function toolCallMsg(
   toolName: string,
   args: Record<string, unknown> = {},
-  id: string,
+  id = "call_1",
 ): AssistantMessage {
   const tc: ToolCall = {
     type: "toolCall",
@@ -38,11 +39,7 @@ function toolCallMsg(
     name: toolName,
     arguments: args,
   };
-  return {
-    role: "assistant",
-    content: [tc],
-    api: "openai-responses",
-  };
+  return assistantMessage([tc]);
 }
 
 function toolResultMsg(
@@ -92,7 +89,11 @@ function compressResultMsg(
  * Build a config with all strategy protectedTools cleared by default.
  * Individual tests opt in by setting the fields they want.
  */
-function makeConfig(overrides: Partial<DCPConfig> = {}): DCPConfig {
+type ConfigOverrides = Omit<Partial<DCPConfig>, "compress"> & {
+  compress?: Partial<DCPConfig["compress"]>;
+};
+
+function makeConfig(overrides: ConfigOverrides = {}): DCPConfig {
   // Start from defaults but clear all strategy protectedTools so tests are explicit
   const base = DEFAULT_CONFIG;
   return {
@@ -751,11 +752,7 @@ describe("protection edge cases", () => {
       name: "readtool",
       arguments: { path: "file.txt" },
     };
-    const msg: AssistantMessage = {
-      role: "assistant",
-      content: [textPart, tc],
-      api: "openai-responses",
-    };
+    const msg = assistantMessage([textPart, tc]);
     const result: ToolResultMessage = {
       role: "toolResult",
       toolCallId: "call_mixed",

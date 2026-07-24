@@ -1,10 +1,17 @@
 ---
 name: artifact-format
-description: "ALWAYS load this skill at the start of any non-trivial task (>= 2 tool calls, >= 2 files modified, audits, plans, reviews, behavior or policy changes, multi-step investigations, or any work the user may want to review later). Defines the format and lifecycle for `.pi/artifacts/TODO.md`, `PLAN.md`, `PROGRESS.md`, `DECISIONS.md`. The first action of a non-trivial task is to append a `### YYYY-MM-DD - <title>` block with `status: active | updated: <date>` to `.pi/artifacts/TODO.md` (or PLAN/PROGRESS/DECISIONS.md if escalated). Skip only for single-line edits, trivial config values, or direct Q&A with no durable output."
-version: 1.0.0
-tags: [workflow, artifacts, planning]
-agent_types: [planner, worker, reviewer]
-tools: [read, write, edit, grep, bash]
+description: 'ALWAYS load this skill at the start of any non-trivial task (>= 2 tool calls, >= 2 files modified, audits, plans,
+  reviews, behavior or policy changes, multi-step investigations, or any work the user may want to review later). Defines
+  the format and lifecycle for `.pi/artifacts/TODO.md`, `PLAN.md`, `PROGRESS.md`, `DECISIONS.md`. The first action of a non-trivial
+  task is to append a `### YYYY-MM-DD - <title>` block with `status: active | updated: <date>` to `.pi/artifacts/TODO.md`
+  (or PLAN/PROGRESS/DECISIONS.md if escalated). Skip only for single-line edits, trivial config values, or direct Q&A with
+  no durable output.'
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  - artifacts
+  - planning
 ---
 
 # Artifact Format
@@ -78,6 +85,14 @@ Artifacts are owned by the parent agent. Subagents (`task`) return proposed bloc
 A work session is a multi-phase task that goes through `/create`, `/plan`, `/ship`, `/verify` (and optionally `/research`). Each slash command updates the same `### YYYY-MM-DD - <title>` block across the relevant canonical files. Sub-content within a block uses H4 (`#### Spec`, `#### Plan`, `#### Run Report`, etc.).
 
 See `skills/development-lifecycle/SKILL.md` for the work session lifecycle and the slash command → file mapping.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "It's a quick task, skip the TODO block" | "Quick" is the task that grows; the block costs one append + saves the untracked drift. |
+| "I'll add it when it gets complex" | By the time it's complex, the early steps are unrecorded; append at the start. |
+| "It's just bookkeeping" | Bookkeeping is the value — the block makes multi-step work observable + resumable; skip it + the work is invisible. |
 
 ## Lifecycle
 

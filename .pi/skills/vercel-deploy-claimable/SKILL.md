@@ -1,11 +1,15 @@
 ---
 name: vercel-deploy-claimable
-description: Use this skill when the user requests Vercel deployment actions such as "Deploy my app", "Deploy this to production", "Create a preview deployment", "Deploy and give me the link", or "Push this live". No authentication required - returns preview URL and claimable deployment link.
-version: "1.0.0"
-tags: [devops, integration]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use this skill when the user requests Vercel deployment actions such as "Deploy my app", "Deploy this to production",
+  "Create a preview deployment", "Deploy and give me the link", or "Push this live". No authentication required - returns
+  preview URL and claimable deployment link.
+metadata:
+  version: 1.0.0
+  tags:
+  - devops
+  - integration
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Vercel Deploy
@@ -29,7 +33,7 @@ tools: []
 ## Usage
 
 ```bash
-bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh [path]
+bash {baseDir}/scripts/deploy.sh [path]
 ```
 
 **Arguments:**
@@ -40,13 +44,13 @@ bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh [path]
 
 ```bash
 # Deploy current directory
-bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh
+bash {baseDir}/scripts/deploy.sh
 
 # Deploy specific project
-bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh /path/to/project
+bash {baseDir}/scripts/deploy.sh /path/to/project
 
 # Deploy existing tarball
-bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh /path/to/project.tgz
+bash {baseDir}/scripts/deploy.sh /path/to/project.tgz
 ```
 
 ## Output

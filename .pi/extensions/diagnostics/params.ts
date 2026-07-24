@@ -1,4 +1,4 @@
-import { Type, type Static } from "@sinclair/typebox";
+import { Type, type Static } from "typebox";
 import { hasTsProject, resolveDiagnosticsProjectRoot } from "./project-root.ts";
 import type { DiagnosticsScope, ResolvedDiagnosticsParams } from "./types.ts";
 

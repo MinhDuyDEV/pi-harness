@@ -1,75 +1,35 @@
 ---
 name: browser-tools
-description: Use when needing to interact with web pages, test frontends, or use a visible browser.
-version: 1.0.0
-tags: [browser, automation, testing]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when the vendored visible-Chrome helper scripts are explicitly requested and native browser tooling is unavailable.
+disable-model-invocation: true
+metadata:
+  category: optional-integration
+  runtime: node-macos
 ---
 
-# Browser Interaction
+# Browser tools (optional, macOS)
 
-## When to Use
+Prefer a configured Playwright or browser extension. These helpers connect to a local Chrome instance over port `9222`, require macOS/Google Chrome for `browser-start.js`, and are disabled from automatic model invocation.
 
-You need to visibly interact with a web page (not headless); click, type, scroll, read rendered content; test a frontend (not just API); take screenshots for review; debug flaky CI by reproducing locally; "show me the page" requests.
+## One-time setup
 
-## When NOT to Use
+Install dependencies into a persistent user directory so they survive `pi update`/`pi remove`; then link them into the skill directory.
 
-Headless is sufficient (use Playwright); the task is API-level (use curl or fetch); no visual interaction needed (use `web_fetch`); static page that doesn't need JS execution.
-
-## Capabilities
-
-| Action | Use |
-|---|---|
-| Navigate to URL | `page.goto(url)` |
-| Get page content | `page.content()` — full HTML |
-| Screenshot | `page.screenshot()` |
-| Click element | `page.click("[data-testid=...]")` |
-| Type into input | `page.fill("[name=email]", "a@b.com")` |
-| Evaluate JS | `page.evaluate(() => document.title)` |
-| Console logs | `page.on("console", ...)` logs to output |
-| Network requests | `page.on("request", ...)` — watch XHR |
-
-## Common Patterns
-
-```python
-# Python (playwright)
-page = browser.new_page()
-page.goto("https://example.com")
-page.fill("input[name=email]", "user@example.com")
-page.click("button[type=submit]")
-page.wait_for_selector(".result")
-content = page.content()
+```bash
+SKILL_DEPS="$HOME/.pi/agent/skill-deps/browser-tools"
+npm ci --prefix "$SKILL_DEPS" --ignore-scripts        # persistent; rerun only if deps change
+ln -sfn "$SKILL_DEPS/node_modules" "{baseDir}/node_modules"  # relink after pi update/remove
 ```
 
-```javascript
-// JavaScript (playwright)
-await page.goto("https://example.com")
-await page.fill("input[name=email]", "user@example.com")
-await page.click("button[type=submit]")
-await page.waitForSelector(".result")
-const content = await page.content()
+`{baseDir}` is this skill's directory. Scripts resolve imports from `{baseDir}/node_modules` (the symlink) into the persistent deps, so they keep working across package updates without reinstalling.
+
+## Typical flow
+
+```bash
+node "{baseDir}/browser-start.js"
+node "{baseDir}/browser-nav.js" "https://example.com"
+node "{baseDir}/browser-content.js" "https://example.com"
+node "{baseDir}/browser-screenshot.js"
 ```
 
-## When to Fall Back
-
-| Case | Fallback |
-|---|---|
-| Page needs login | Use `page.goto` with pre-set cookies |
-| Page blocks simple fetches | Browser tool may be necessary |
-| Page is a heavy SPA (React, Vue) | Browser tool is the right choice |
-| Just need text | `web_fetch` is cheaper |
-| Need to debug CSS | Browser tool — screenshot is best |
-
-## Common Mistakes
-
-`page.goto` without waiting (content not loaded); `screenshot` without visible layout; `click` on invisible element; `fill` before input is focused; not handling popups or new tabs; using browser for what Playwright CLI does faster; taking screenshots for text extraction; not closing the page (memory leaks).
-
-## Red Flags
-
-`page.goto` without `waitForSelector`; screenshot for text; browser for API tasks; not closing pages; ignoring console errors; "I'll just screenshot it" (use text extraction); using browser for static HTML (use web_fetch); too many tabs open at once.
-
-## Anti-Patterns
-
-**`goto` without wait**; **screenshot for text**; **browser for API**; **not closing pages**; **ignoring console errors**; **browser for static**; **too many tabs**.
+Additional helpers inspect cookies, evaluate JavaScript, or interactively pick elements. Do not use them for API-only/static-text tasks, never copy a user's default profile without explicit permission, close browser sessions, and avoid exposing cookies or credentials in logs.

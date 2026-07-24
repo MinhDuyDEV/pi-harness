@@ -1,0 +1,3 @@
+# Optional vendored Node packages have their own package.json/lock and audit gate.
+.pi/skills/brave-search/*.js
+.pi/skills/browser-tools/*.js

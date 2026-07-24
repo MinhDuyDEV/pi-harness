@@ -1,11 +1,15 @@
 ---
 name: figma
-description: Use when implementing UI from Figma designs, extracting design tokens, or downloading assets via Framelink MCP. MUST load when user shares a Figma URL or references Figma files. Requires API token.
-version: 1.0.0
-tags: [design, mcp, integration]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when implementing UI from Figma designs, extracting design tokens, or downloading assets via Framelink MCP.
+  MUST load when user shares a Figma URL or references Figma files. Requires API token.
+metadata:
+  version: 1.0.0
+  tags:
+  - design
+  - mcp
+  - integration
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Figma Design Data (MCP)
@@ -21,7 +25,7 @@ No Figma file key / node ID available; design data not required for the task.
 ## Prerequisites
 
 ```bash
-export FIGMA_API_KEY="your-figma-personal-access-token"
+export FIGMA_API_KEY="<figma-token>"
 ```
 
 Token: Figma → Account Settings → Personal Access Tokens. Scope: `File read` (and `Dev resources` for assets).

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
+import { assistantMessage } from "./tests/message-fixtures.js";
 import { computeRunPruneStats, runContextStrategies } from "./compress.js";
 import { DEFAULT_CONFIG, type DCPConfig } from "./config.js";
 
@@ -62,17 +63,14 @@ describe("computeRunPruneStats", () => {
   test("runContextStrategies does not mutate nested tool-call arguments or tool-result content", () => {
     const cfg = freshConfig();
     cfg.compress.protectedTools = [];
-    const asst: Message = {
-      role: "assistant",
-      content: [
-        {
-          type: "toolCall",
-          id: "t1",
-          name: "bash",
-          arguments: { command: "ls", cwd: "/tmp" },
-        },
-      ],
-    } as AssistantMessage;
+    const asst: Message = assistantMessage([
+      {
+        type: "toolCall",
+        id: "t1",
+        name: "bash",
+        arguments: { command: "ls", cwd: "/tmp" },
+      },
+    ]);
     const result: Message = toolResultMessage("t1", "bash", "x".repeat(1000));
     const asstArgsBefore = JSON.parse(
       JSON.stringify((asst as AssistantMessage).content[0]),

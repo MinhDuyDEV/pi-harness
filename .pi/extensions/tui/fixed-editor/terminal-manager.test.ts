@@ -72,7 +72,7 @@ describe("TerminalManager", () => {
     return {
       onWrite: () => {},
       onRows: () => 24,
-      onInput: () => {},
+      onInput: () => undefined,
       onRender: (w: number) => [`fake at ${w}`],
       onDoRender: () => {},
     };
@@ -127,7 +127,7 @@ describe("TerminalManager", () => {
     tm.install({
       onWrite: (data) => { intercepted.push(data); },
       onRows: () => 24,
-      onInput: () => {},
+      onInput: () => undefined,
       onRender: (w: number) => [`fake at ${w}`],
       onDoRender: () => {},
     });
@@ -142,7 +142,7 @@ describe("TerminalManager", () => {
     tm.install({
       onWrite: () => {},
       onRows: () => 42,
-      onInput: () => {},
+      onInput: () => undefined,
       onRender: (w: number) => [`fake at ${w}`],
       onDoRender: () => {},
     });
@@ -156,7 +156,7 @@ describe("TerminalManager", () => {
     tm.install({
       onWrite: () => {},
       onRows: () => 42,
-      onInput: () => {},
+      onInput: () => undefined,
       onRender: (w: number) => [`fake at ${w}`],
       onDoRender: () => {},
     });
@@ -171,7 +171,7 @@ describe("TerminalManager", () => {
     tm.install({
       onWrite: () => {},
       onRows: () => 24,
-      onInput: () => {},
+      onInput: () => undefined,
       onRender: (w: number) => [`fake at ${w}`],
       onDoRender: () => { called = true; },
     });
@@ -187,7 +187,7 @@ describe("TerminalManager", () => {
     tm.install({
       onWrite: () => {},
       onRows: () => 24,
-      onInput: () => {},
+      onInput: () => undefined,
       onRender: (w: number) => { rendered.push(w); return ["test"]; },
       onDoRender: () => {},
     });
@@ -203,7 +203,7 @@ describe("TerminalManager", () => {
     tm.install({
       onWrite: () => {},
       onRows: () => 24,
-      onInput: (data) => { inputs.push(data); },
+      onInput: (data) => { inputs.push(data); return undefined; },
       onRender: (w: number) => [`fake at ${w}`],
       onDoRender: () => {},
     });

@@ -1,6 +1,6 @@
 ---
 description: Debug/fix bugs or refactor code — two tracks for improving code
-argument-hint: "<description of bug or path> [--refactor] [--scope minimal|moderate|aggressive]"
+argument-hint: <description of bug or path> [--refactor] [--scope minimal|moderate|aggressive]
 ---
 
 # Fix: $ARGUMENTS
@@ -12,13 +12,13 @@ Two tracks for improving code without adding features:
 
 ## Load Skills
 
-```typescript
-skill({ name: "debugging-and-error-recovery" });
-skill({ name: "root-cause-tracing" });
-skill({ name: "verification-before-completion" });
-skill({ name: "code-cleanup" });
-skill({ name: "deep-module-design" });
-```
+Load these available skills using the current session's skill-loading instructions. If no dedicated loader is exposed, read each skill's listed `SKILL.md` file.
+
+- skill: `debugging-and-error-recovery`
+- skill: `root-cause-tracing`
+- skill: `verification-before-completion`
+- skill: `code-cleanup`
+- skill: `deep-module-design`
 
 ## Determine Input Type
 

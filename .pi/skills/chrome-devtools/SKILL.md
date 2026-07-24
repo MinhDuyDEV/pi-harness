@@ -1,11 +1,14 @@
 ---
 name: chrome-devtools
-description: Use when debugging web apps in Chrome — performance profiling, network inspection, DOM debugging, or console automation. MUST load before any Chrome DevTools-based debugging session.
-version: 1.0.0
-tags: [automation, debugging]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when debugging web apps in Chrome — performance profiling, network inspection, DOM debugging, or console
+  automation. MUST load before any Chrome DevTools-based debugging session.
+metadata:
+  version: 1.0.0
+  tags:
+  - automation
+  - debugging
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Chrome DevTools (MCP)

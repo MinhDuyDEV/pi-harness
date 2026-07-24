@@ -1,7 +1,10 @@
 ---
 name: ast-grep
-version: 1.0.0
-description: "Use when searching for code patterns structurally, finding anti-patterns, enforcing conventions, or checking for specific AST patterns across the codebase — ast-grep is an AST-aware structural code search tool (like grep for syntax trees). Supports TS/JS, Rust, Go, Python, Java, and more."
+description: Use when searching for code patterns structurally, finding anti-patterns, enforcing conventions, or checking
+  for specific AST patterns across the codebase — ast-grep is an AST-aware structural code search tool (like grep for syntax
+  trees). Supports TS/JS, Rust, Go, Python, Java, and more.
+metadata:
+  version: 1.0.0
 ---
 
 # AST-Grep (Structural Code Search)

@@ -69,11 +69,9 @@ export default function dcpExtension(pi: ExtensionAPI): void {
 
   const nudge = new NudgeManager(config);
   let initialized = false;
-  let lastTelemetryEvent: DCPTelemetryEvent | null = null;
 
   /** Emit JSON-safe telemetry for extension and RPC consumers. */
   function emitTelemetry(evt: DCPTelemetryEvent): void {
-    lastTelemetryEvent = evt;
     pi.events.emit("dcp:telemetry", evt);
   }
 
@@ -249,7 +247,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     async (event: SessionBeforeCompactEvent, ctx: ExtensionContext) => {
       try {
         ensureInitialized(ctx);
-        return await handleSessionBeforeCompact(pi, event, ctx, config, nudge);
+        return await handleSessionBeforeCompact(pi, event, ctx, config);
       } catch {
         // Fall through to pi's native compaction
       }

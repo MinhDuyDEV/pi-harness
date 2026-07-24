@@ -88,7 +88,6 @@ function scanNewReReads(
 export function checkCompressionRegression(
   messages: readonly Message[],
   sessionId: string,
-  config: DCPConfig,
 ): boolean {
   const count = scanNewReReads(messages, sessionId);
   if (count > 0) {

@@ -1,10 +1,24 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
+import superpiExtension, {
 	stripFrontmatter,
 	messageContainsBootstrap,
 	firstNonCompactionSummaryIndex,
+	getBootstrapSkillPath,
 } from "../.pi/extensions/superpi.ts";
+import { existsSync } from "node:fs";
+
+test("getBootstrapSkillPath resolves to an existing skill file", () => {
+	// Regression: the bootstrap skill path must point at .pi/skills, not a
+	// nonexistent root-level skills/ dir, otherwise the extension becomes a
+	// silent no-op (ENOENT swallowed by getBootstrapContent).
+	const path = getBootstrapSkillPath();
+	assert.ok(
+		path.endsWith([".pi", "skills", "superpi", "SKILL.md"].join("/")),
+		`expected path under .pi/skills, got ${path}`,
+	);
+	assert.equal(existsSync(path), true, `bootstrap skill file not found: ${path}`);
+});
 
 test("stripFrontmatter removes YAML frontmatter", () => {
 	const input = `---
@@ -86,4 +100,51 @@ test("firstNonCompactionSummaryIndex returns full length when all are summaries"
 
 test("firstNonCompactionSummaryIndex returns 0 for empty array", () => {
 	assert.equal(firstNonCompactionSummaryIndex([]), 0);
+});
+
+test("PIKIT_NO_SUPERPI=1 disables bootstrap injection", async () => {
+	const handlers: Record<string, (...args: unknown[]) => unknown> = {};
+	const mockPi = {
+		on: (event: string, handler: (...args: unknown[]) => unknown) => {
+			handlers[event] = handler;
+		},
+	} as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI;
+	superpiExtension(mockPi);
+	const prev = process.env.PIKIT_NO_SUPERPI;
+	try {
+		process.env.PIKIT_NO_SUPERPI = "1";
+		await handlers.session_start?.();
+		const result = await handlers.context({ messages: [{ role: "user", content: "hello" }] });
+		assert.equal(result, undefined, "bootstrap must not inject when PIKIT_NO_SUPERPI=1");
+	} finally {
+		if (prev === undefined) delete process.env.PIKIT_NO_SUPERPI;
+		else process.env.PIKIT_NO_SUPERPI = prev;
+	}
+});
+
+test("PIKIT_NO_SUPERPI unset allows bootstrap injection", async () => {
+	const handlers: Record<string, (...args: unknown[]) => unknown> = {};
+	const mockPi = {
+		on: (event: string, handler: (...args: unknown[]) => unknown) => {
+			handlers[event] = handler;
+		},
+	} as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI;
+	superpiExtension(mockPi);
+	const prev = process.env.PIKIT_NO_SUPERPI;
+	try {
+		delete process.env.PIKIT_NO_SUPERPI;
+		await handlers.session_start?.();
+		const messages = [{ role: "user", content: "hello" }];
+		const result = (await handlers.context({ messages })) as
+			| { messages: unknown[] }
+			| undefined;
+		assert.ok(result, "bootstrap should inject when PIKIT_NO_SUPERPI is unset");
+		assert.ok(
+			result && result.messages.length > messages.length,
+			"injection should add a bootstrap message",
+		);
+	} finally {
+		if (prev === undefined) delete process.env.PIKIT_NO_SUPERPI;
+		else process.env.PIKIT_NO_SUPERPI = prev;
+	}
 });

@@ -75,7 +75,7 @@ id = "preview-namespace-id"
 ```bash
 # .dev.vars (never commit)
 SECRET_KEY="local-secret-key"
-API_TOKEN="dev-token-123"
+API_TOKEN="<dev-token>"
 DATABASE_URL="http://localhost:5432"
 ```
 

@@ -1,11 +1,13 @@
 ---
 name: minimalist-ui
-description: Use INSTEAD OF design-taste-frontend when user requests clean, editorial, or minimalist aesthetics. Warm monochrome palette, typographic contrast, flat bento grids, muted pastels. No gradients, no heavy shadows.
-version: 1.0.0
-tags: [workflow]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use INSTEAD OF design-taste-frontend when user requests clean, editorial, or minimalist aesthetics. Warm monochrome
+  palette, typographic contrast, flat bento grids, muted pastels. No gradients, no heavy shadows.
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Minimalist UI

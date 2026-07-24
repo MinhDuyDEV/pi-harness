@@ -108,7 +108,7 @@ export default {
 ## Secrets Management
 
 ```typescript
-// ❌ BAD: headers: { "Authorization": "Bearer sk_live_abc123..." }
+// ❌ BAD: headers: { "Authorization": "Bearer <api-key>..." }
 // ✅ GOOD: headers: { "Authorization": `Bearer ${env.API_KEY}` }
 ```
 

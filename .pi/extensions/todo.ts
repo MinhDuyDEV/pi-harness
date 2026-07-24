@@ -1,8 +1,3 @@
-// todo.ts — Enforces the TODO Tracking rule from APPEND_SYSTEM.md.
-// When a task crosses the threshold for non-trivial work (>= 2 tool calls),
-// injects a reminder into the tool result if .pi/artifacts/TODO.md is missing
-// or stale. Soft enforcement: one reminder per session.
-
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent"
 import * as fs from "node:fs"
 import * as path from "node:path"

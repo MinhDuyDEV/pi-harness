@@ -103,126 +103,127 @@ export async function ensureFreshXaiCredentials(credentials: OAuthCredentials): 
   return refreshXaiCredentials(credentials);
 }
 
-async function startCallbackServer(expectedState: string): Promise<{
+type CallbackServerHandle = {
   redirectUri: string;
   waitForCallback: (signal?: AbortSignal) => Promise<CallbackResult>;
   resolveCallback: (result: CallbackResult) => void;
   close: () => void;
-}> {
+};
+
+async function startCallbackServer(expectedState: string): Promise<CallbackServerHandle> {
   let resolveCallback!: (result: CallbackResult) => void;
   const callbackPromise = new Promise<CallbackResult>((resolve) => {
     resolveCallback = resolve;
   });
-
-  const makeServer = () =>
-    createServer((req, res) => {
-      const origin = callbackCorsOrigin(req.headers.origin);
-      const writeCors = () => {
-        if (!origin) return;
-        res.setHeader("Access-Control-Allow-Origin", origin);
-        res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        res.setHeader("Access-Control-Allow-Private-Network", "true");
-        res.setHeader("Vary", "Origin");
-      };
-
-      if (req.method === "OPTIONS") {
-        writeCors();
-        res.writeHead(204);
-        res.end();
-        return;
-      }
-
-      const url = new URL(req.url || "/", `http://${XAI_OAUTH_REDIRECT_HOST}`);
-      if (url.pathname !== XAI_OAUTH_REDIRECT_PATH) {
-        res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
-        res.end("Not found");
-        return;
-      }
-
-      const result: CallbackResult = {
-        code: url.searchParams.get("code") || undefined,
-        state: url.searchParams.get("state") || undefined,
-        error: url.searchParams.get("error") || undefined,
-        error_description: url.searchParams.get("error_description") || undefined,
-      };
-      if (result.state !== expectedState) {
-        writeCors();
-        res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
-        res.end("<html><body><h1>xAI authorization state mismatch.</h1>Please return to pi and try again.</body></html>");
-        return;
-      }
-      resolveCallback(result);
-
-      writeCors();
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(
-        result.error
-          ? "<html><body><h1>xAI authorization failed.</h1>You can close this tab.</body></html>"
-          : "<html><body><h1>xAI authorization received.</h1>You can close this tab.</body></html>",
-      );
-    });
-
-  const listen = (port: number): Promise<Server> =>
-    new Promise((resolve, reject) => {
-      const server = makeServer();
-      server.once("error", reject);
-      server.listen(port, XAI_OAUTH_REDIRECT_HOST, () => {
-        // Cast: the typed Server doesn't expose EventEmitter.removeListener,
-        // but the runtime value is an EventEmitter and the method exists.
-        (server as any).removeListener("error", reject);
-        resolve(server);
-      });
-    });
-
-  let server: Server;
-  try {
-    server = await listen(XAI_OAUTH_REDIRECT_PORT);
-  } catch {
-    server = await listen(0);
-  }
-
+  const server = await listenCallbackServer(() => createCallbackHttpServer(expectedState, resolveCallback));
   const address = server.address();
   if (!address || typeof address === "string") {
     server.close();
     throw new Error("Could not determine xAI OAuth callback port");
   }
-
-  const redirectUri = `http://${XAI_OAUTH_REDIRECT_HOST}:${address.port}${XAI_OAUTH_REDIRECT_PATH}`;
-
-  const close = () => {
-    try {
-      server.close();
-    } catch {
-      // ignore
-    }
-  };
-
+  const close = () => closeServer(server);
   return {
-    redirectUri,
+    redirectUri: `http://${XAI_OAUTH_REDIRECT_HOST}:${address.port}${XAI_OAUTH_REDIRECT_PATH}`,
     close,
     resolveCallback,
-    waitForCallback: async (signal?: AbortSignal) => {
-      let timer: NodeJS.Timeout | undefined;
-      let abortHandler: (() => void) | undefined;
-      const timeout = new Promise<CallbackResult>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("Timed out waiting for xAI OAuth callback")), 180_000);
-        abortHandler = () => {
-          if (timer) clearTimeout(timer);
-          reject(new Error("xAI OAuth login was cancelled"));
-        };
-        signal?.addEventListener("abort", abortHandler, { once: true });
-      });
-
-      try {
-        return await Promise.race([callbackPromise, timeout]);
-      } finally {
-        if (timer) clearTimeout(timer);
-        if (abortHandler) signal?.removeEventListener("abort", abortHandler);
-        close();
-      }
-    },
+    waitForCallback: (signal) => waitForCallback(callbackPromise, close, signal),
   };
+}
+
+function createCallbackHttpServer(expectedState: string, resolveCallback: (result: CallbackResult) => void): Server {
+  return createServer((request, response) => {
+    const origin = callbackCorsOrigin(request.headers.origin);
+    if (request.method === "OPTIONS") {
+      writeCorsHeaders(response, origin);
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    const url = new URL(request.url || "/", `http://${XAI_OAUTH_REDIRECT_HOST}`);
+    if (url.pathname !== XAI_OAUTH_REDIRECT_PATH) {
+      response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      response.end("Not found");
+      return;
+    }
+    const result = callbackResultFromUrl(url);
+    if (result.state !== expectedState) {
+      writeCorsHeaders(response, origin);
+      response.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+      response.end("<html><body><h1>xAI authorization state mismatch.</h1>Please return to pi and try again.</body></html>");
+      return;
+    }
+    resolveCallback(result);
+    writeCorsHeaders(response, origin);
+    response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    response.end(result.error
+      ? "<html><body><h1>xAI authorization failed.</h1>You can close this tab.</body></html>"
+      : "<html><body><h1>xAI authorization received.</h1>You can close this tab.</body></html>");
+  });
+}
+
+function callbackResultFromUrl(url: URL): CallbackResult {
+  return {
+    code: url.searchParams.get("code") || undefined,
+    state: url.searchParams.get("state") || undefined,
+    error: url.searchParams.get("error") || undefined,
+    error_description: url.searchParams.get("error_description") || undefined,
+  };
+}
+
+function writeCorsHeaders(response: import("http").ServerResponse, origin: string | undefined): void {
+  if (!origin) return;
+  response.setHeader("Access-Control-Allow-Origin", origin);
+  response.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  response.setHeader("Access-Control-Allow-Private-Network", "true");
+  response.setHeader("Vary", "Origin");
+}
+
+async function listenCallbackServer(makeServer: () => Server): Promise<Server> {
+  try {
+    return await listenOnPort(makeServer(), XAI_OAUTH_REDIRECT_PORT);
+  } catch {
+    return listenOnPort(makeServer(), 0);
+  }
+}
+
+function listenOnPort(server: Server, port: number): Promise<Server> {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, XAI_OAUTH_REDIRECT_HOST, () => {
+      server.removeListener("error", reject);
+      resolve(server);
+    });
+  });
+}
+
+function closeServer(server: Server): void {
+  try {
+    server.close();
+  } catch {
+    return;
+  }
+}
+
+async function waitForCallback(
+  callbackPromise: Promise<CallbackResult>,
+  close: () => void,
+  signal?: AbortSignal,
+): Promise<CallbackResult> {
+  let timer: NodeJS.Timeout | undefined;
+  let abortHandler: (() => void) | undefined;
+  const timeout = new Promise<CallbackResult>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Timed out waiting for xAI OAuth callback")), 180_000);
+    abortHandler = () => reject(new Error("xAI OAuth login was cancelled"));
+    signal?.addEventListener("abort", abortHandler, { once: true });
+  });
+  try {
+    return await Promise.race([callbackPromise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (abortHandler) signal?.removeEventListener("abort", abortHandler);
+    close();
+  }
 }
 
 function buildAuthorizeUrl(discovery: XaiDiscovery, redirectUri: string, challenge: string, state: string, nonce: string): string {
@@ -300,102 +301,89 @@ function credentialsFromTokenPayload(data: XaiTokenPayload, tokenEndpoint: strin
   };
 }
 
-/** Build pi's OAuth provider config for xAI/Grok login and refresh. */
 export function createXaiOAuth({ getExistingCredentials }: XaiOAuthOptions) {
   return {
     usesCallbackServer: true,
     name: "xAI (Grok)",
-
-    async login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials> {
-      const existingCredentials = getExistingCredentials();
-      if (existingCredentials) {
-        const useExisting = await callbacks.onPrompt({
-          message: "Found existing official Grok CLI credentials in ~/.grok/auth.json. Use them instead of opening a new xAI OAuth login? (y/n)",
-        });
-        if (useExisting.toLowerCase().startsWith("y")) {
-          try {
-            return await ensureFreshXaiCredentials(existingCredentials);
-          } catch (error) {
-            callbacks.onProgress?.(
-              `Existing Grok CLI credentials could not be refreshed (${messageFromError(error)}). Starting a fresh xAI OAuth login...`,
-            );
-          }
-        }
-      }
-
-      callbacks.onProgress?.("Starting xAI SuperGrok OAuth login...");
-      const discovery = await xaiDiscovery();
-      const { verifier, challenge } = pkcePair();
-      const state = randomUUID().replace(/-/g, "");
-      const nonce = randomUUID().replace(/-/g, "");
-      const callbackServer = await startCallbackServer(state);
-      const authorizeUrl = buildAuthorizeUrl(discovery, callbackServer.redirectUri, challenge, state, nonce);
-
-      // Trigger automatic browser open via pi's onAuth handler.
-      // pi's login dialog runs `open <url>` on macOS / `xdg-open` on Linux,
-      // AND when usesCallbackServer:true it also shows a built-in manual input
-      // field that resolves via onManualCodeInput. We race both paths below.
-      callbacks.onAuth?.({
-        url: authorizeUrl,
-        instructions:
-          "If the automatic open uses the wrong browser/profile, copy the URL and paste it into the field below (or open it manually in your preferred browser).",
-      });
-
-      callbacks.onProgress?.(`Waiting for xAI OAuth callback on ${callbackServer.redirectUri}...`);
-
-      // Race the local callback server against pi's built-in manual input
-      // (shown automatically when usesCallbackServer: true). If the HTTP
-      // callback fires first (browser reaches localhost), the manual input
-      // is simply a no-op since resolveCallback already ran.
-      const manualCodePromise = callbacks.onManualCodeInput?.();
-      if (manualCodePromise) {
-        manualCodePromise.then((input: string) => {
-          if (input) {
-            const manual = parseCallbackInput(input);
-            if (manual?.trustedManualCode || manual?.state === state || manual?.error) {
-              callbackServer.resolveCallback(manual);
-            } else if (manual) {
-              callbacks.onProgress?.("Ignored pasted xAI callback because the OAuth state did not match. Try the login again if needed.");
-            }
-          }
-        }).catch(() => {
-          // Cancellation is handled by callbacks.signal / the login dialog.
-        });
-      }
-
-      const callback = await callbackServer.waitForCallback(callbacks.signal);
-      if (callback.error) {
-        throw new Error(`xAI authorization failed: ${callback.error_description || callback.error}`);
-      }
-      if (!callback.trustedManualCode && callback.state !== state) {
-        throw new Error("xAI authorization failed: state mismatch");
-      }
-      if (!callback.code) {
-        throw new Error("xAI authorization failed: no authorization code returned");
-      }
-
-      callbacks.onProgress?.("Exchanging xAI authorization code...");
-      const data = await exchangeXaiToken(discovery.token_endpoint, {
-        grant_type: "authorization_code",
-        code: callback.code,
-        redirect_uri: callbackServer.redirectUri,
-        client_id: XAI_OAUTH_CLIENT_ID,
-        code_verifier: verifier,
-      });
-
-      return credentialsFromTokenPayload(data, discovery.token_endpoint);
-    },
-
+    login: (callbacks: OAuthLoginCallbacks) => loginXai(callbacks, getExistingCredentials),
     async refreshToken(credentials: OAuthCredentials): Promise<OAuthCredentials> {
       if (!credentials.refresh && credentials.expires && credentials.expires <= Date.now()) {
         throw new Error("xAI OAuth token is expired and cannot be refreshed. Please run /login xai-auth again.");
       }
-      if (!credentials.refresh) return credentials;
-      return refreshXaiCredentials(credentials);
+      return credentials.refresh ? refreshXaiCredentials(credentials) : credentials;
     },
-
     getApiKey(credentials: OAuthCredentials): string {
       return credentials.access;
     },
   };
+}
+
+async function loginXai(
+  callbacks: OAuthLoginCallbacks,
+  getExistingCredentials: () => OAuthCredentials | null,
+): Promise<OAuthCredentials> {
+  const existing = await promptForExistingCredentials(callbacks, getExistingCredentials());
+  if (existing) return existing;
+  callbacks.onProgress?.("Starting xAI SuperGrok OAuth login...");
+  const discovery = await xaiDiscovery();
+  const { verifier, challenge } = pkcePair();
+  const state = randomUUID().replace(/-/g, "");
+  const nonce = randomUUID().replace(/-/g, "");
+  const callbackServer = await startCallbackServer(state);
+  callbacks.onAuth?.({
+    url: buildAuthorizeUrl(discovery, callbackServer.redirectUri, challenge, state, nonce),
+    instructions: "If the automatic open uses the wrong browser/profile, copy the URL and paste it into the field below (or open it manually in your preferred browser).",
+  });
+  callbacks.onProgress?.(`Waiting for xAI OAuth callback on ${callbackServer.redirectUri}...`);
+  attachManualCodeInput(callbacks, callbackServer, state);
+  const callback = await callbackServer.waitForCallback(callbacks.signal);
+  validateAuthorizationCallback(callback, state);
+  callbacks.onProgress?.("Exchanging xAI authorization code...");
+  const data = await exchangeXaiToken(discovery.token_endpoint, {
+    grant_type: "authorization_code",
+    code: callback.code!,
+    redirect_uri: callbackServer.redirectUri,
+    client_id: XAI_OAUTH_CLIENT_ID,
+    code_verifier: verifier,
+  });
+  return credentialsFromTokenPayload(data, discovery.token_endpoint);
+}
+
+async function promptForExistingCredentials(
+  callbacks: OAuthLoginCallbacks,
+  credentials: OAuthCredentials | null,
+): Promise<OAuthCredentials | null> {
+  if (!credentials) return null;
+  const response = await callbacks.onPrompt({
+    message: "Found existing official Grok CLI credentials in ~/.grok/auth.json. Use them instead of opening a new xAI OAuth login? (y/n)",
+  });
+  if (!response.toLowerCase().startsWith("y")) return null;
+  try {
+    return await ensureFreshXaiCredentials(credentials);
+  } catch (error) {
+    callbacks.onProgress?.(`Existing Grok CLI credentials could not be refreshed (${messageFromError(error)}). Starting a fresh xAI OAuth login...`);
+    return null;
+  }
+}
+
+function attachManualCodeInput(
+  callbacks: OAuthLoginCallbacks,
+  callbackServer: CallbackServerHandle,
+  state: string,
+): void {
+  callbacks.onManualCodeInput?.().then((input: string) => {
+    if (!input) return;
+    const manual = parseCallbackInput(input);
+    if (manual?.trustedManualCode || manual?.state === state || manual?.error) {
+      callbackServer.resolveCallback(manual);
+    } else if (manual) {
+      callbacks.onProgress?.("Ignored pasted xAI callback because the OAuth state did not match. Try the login again if needed.");
+    }
+  }).catch(() => undefined);
+}
+
+function validateAuthorizationCallback(callback: CallbackResult, expectedState: string): asserts callback is CallbackResult & { code: string } {
+  if (callback.error) throw new Error(`xAI authorization failed: ${callback.error_description || callback.error}`);
+  if (!callback.trustedManualCode && callback.state !== expectedState) throw new Error("xAI authorization failed: state mismatch");
+  if (!callback.code) throw new Error("xAI authorization failed: no authorization code returned");
 }

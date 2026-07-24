@@ -4,12 +4,9 @@ import { applyCompressStrip } from "./compress-strip.js";
 import { applyDedup, applyPurgeErrors } from "./compress-dedup.js";
 import { pruneToolResults } from "./compress-prune.js";
 import { checkCompressionRegression } from "./compress-metrics.js";
-import {
-  estimateTokens,
-  extractToolOps,
-} from "./compress-token-utils.js";
-    import { computeProtectionPolicy } from "./protection.js";
-    import type { ProtectionProvenance } from "./compress-types.js";
+import { estimateTokens } from "./compress-token-utils.js";
+import { computeProtectionPolicy } from "./protection.js";
+import type { ProtectionProvenance } from "./compress-types.js";
 
 export {
   estimateTokens,
@@ -17,19 +14,15 @@ export {
   stripToolArgs,
 } from "./compress-token-utils.js";
 
-function isCompressibleMessage(msg: Message): boolean {
-  return msg.role !== "assistant" && msg.role !== "user";
+export function processContextMessages(
+  messages: Message[],
+  sessionId: string,
+  config: DCPConfig,
+): Message[] {
+  checkCompressionRegression(messages, sessionId);
+  const result = runContextStrategies(messages, sessionId, config);
+  return result.messages;
 }
-
-    export function processContextMessages(
-      messages: Message[],
-      sessionId: string,
-      config: DCPConfig,
-    ): Message[] {
-      checkCompressionRegression(messages, sessionId, config);
-      const result = runContextStrategies(messages, sessionId, config);
-      return result.messages;
-    }
 
 export function runContextStrategies(
   messages: Message[],

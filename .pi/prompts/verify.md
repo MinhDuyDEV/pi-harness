@@ -1,7 +1,6 @@
 ---
 description: Verify completeness, correctness, and quality — appends a verification section to the work session block in `.pi/artifacts/PROGRESS.md`
 argument-hint: "<title> [--quick] [--test] [--review] [--ui-review] [--gate-only]"
-agentType: reviewer
 ---
 
 # Verify: $ARGUMENTS
@@ -18,6 +17,7 @@ Check the implementation against the spec, run gates, write tests, and review co
 | `--review` | false | Manual code review by severity |
 | `--ui-review` | false | UI/UX audit with slop-mode scoring |
 | `--gate-only` | false | Run gates and stop; no completeness checks |
+| `--audit` | false | Invoke the `proof-auditor` agent to verify evidence actually proves each claim (fake-green/fake-red/coverage gaps) |
 
 ## 2. Find Work Session
 
@@ -76,6 +76,10 @@ Fix Critical/Important. Minor can ship.
 
 For each UI file, score 0-10 on slop-mode (0-3 clean, 4-6 acceptable, 7-10 critical). Report findings.
 
+### `--audit`: Proof Audit
+
+Delegate to the `proof-auditor` agent with the diff, the spec requirements, and the gate/test output. It returns whether the evidence actually proves each claim — flagging fake-green (tests pass without exercising the requirement), fake-red (failures from environment not code), and coverage gaps (claim broader than evidence). Treat its verdicts as binding for "READY TO SHIP": a claim it grades `not proven` is not done.
+
 ## 5. Update Blocks
 
 ### `.pi/artifacts/PROGRESS.md`
@@ -110,6 +114,7 @@ Report:
 5. UI scores (if `--ui-review`)
 6. Blocking issues (or "none")
 7. Anchor: `PROGRESS.md#YYYY-MM-DD--<slug>`
+8. Audit (if `--audit`): claims proven / gaps found / fake signals
 
 ## Related Commands
 

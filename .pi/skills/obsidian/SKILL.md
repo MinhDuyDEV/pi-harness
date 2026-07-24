@@ -1,11 +1,13 @@
 ---
 name: obsidian
 description: Use when working with Obsidian vault via MCP - read/write notes, search, tag management, and vault operations
-version: 1.0.0
-tags: [integration, documentation]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+metadata:
+  version: 1.0.0
+  tags:
+  - integration
+  - documentation
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Obsidian (MCP)

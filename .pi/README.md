@@ -1,49 +1,33 @@
-# pikit — Pi Agent Extension
+# `.pi/` harness resources
 
-Auto-triggered features that enhance the Pi coding agent with memory consolidation, project indexing, and checkpoint recovery.
+This directory contains project-local Pi resources and the resources published by the `pikit` Pi package.
 
-## Features
+## Published manifest resources
 
-### Auto-Dream (memory consolidation)
-- **Trigger**: `agent_end` event (after each agent turn)
-- **What**: Extracts key terms from recent session messages using TF-IDF, detects bug reports/architecture decisions/feature requests via keyword patterns, and creates durable observations.
-- **Config**: `.pi/extensions/memory/config.ts` — `MEMORY_CONFIG.dream`
+Pi package discovery loads:
 
-### Auto-Distill (tool pattern → skill generation)
-- **Trigger**: `session_before_compact` event
-- **What**: Mines tool call sequences across sessions, detects repeated patterns (e.g., "grep → read → edit"), and generates candidate skill files in `.pi/agent/skills/auto-distilled/`.
-- **Requirements**: At least 2 sessions with 3+ tool calls sharing the same tool sequence.
-- **Throttle**: Runs at most once per 30 days per session.
+- `extensions/`
+- `skills/`
+- `prompts/`
+- `themes/`
 
-### FTS5 Project Index
-- **Trigger**: `session_start` event (background, non-blocking)
-- **What**: Indexes `.md`, `.ts`, `.tsx`, `.js`, `.json`, `.yaml`, `.toml` files from the project root into a SQLite FTS5 virtual table.
-- **Effect**: `memory-search` tool searches both observations and project file contents.
-- **Limit**: Max 200 indexed files.
+The `.pi/APPEND_SYSTEM.md` supplement is the author's local runtime policy for developing this repo. It is **not shipped** and **not injected** into consumers — a consuming repository owns its own `.pi/APPEND_SYSTEM.md`. The package kernel is additive: the `harness-policy` injection extension was removed; delegation uses `@minhduydev/pi-subagents`, an additive runtime that never injects policy into a consumer's system prompt.
 
-### Checkpoint Writer
-- **Trigger**: `turn_end`, `session_before_compact`, `tool_result` (for edit/write/bash tools)
-- **What**: Writes session state snapshots to `.pi/checkpoints/<sessionId>/`. On session rebuild (e.g., after restart), injects checkpoint context into the system prompt.
-- **Retention**: Configurable max per session (FIFO eviction).
-- **Rebuild context**: Injected via `before_agent_start` event as a `<system-reminder>` block (respects configurable character budget).
+## Source-checkout profile
 
-### Tool-Result Pruning (DCP)
-- **Trigger**: During DCP compression (`session_before_compact`)
-- **What**: Filters verbose tool results (grep, find, list) to keep only compactable output.
-- **Config**: `.pi/extensions/dcp/config.ts` — `DCP_CONFIG.pruning`
+These resources are active when this repository is used directly but are not automatically applied by package installation:
 
-## Directory Structure
+- `settings.json` — pinned project packages and extension settings.
+- `agents/` — project agent profiles (`explore`, `general`, `reviewer`, `scout`) for the `@minhduydev/pi-subagents` delegation runtime. The `model:` frontmatter is omitted so agents inherit your `defaultModel`; set `model:` to a specific provider/model only if you want a per-agent override.
+- `APPEND_SYSTEM.md` — project-level runtime supplement; extensions, skills, and prompts layer below it without duplicating it.
+- `../AGENTS.md` — package maintenance instructions loaded by Pi project-context discovery.
 
-```
-.pi/
-  checkpoints/            → Session state snapshots (auto-generated, gitignored)
-  extensions/
-    memory/               → Memory system (dream, distill, project-index)
-    checkpoint/           → Checkpoint writer
-    dcp/                  → DCP compression (tool-result pruning)
-```
+Detailed workflows belong in `skills/`; lifecycle orchestration belongs in `prompts/`; universal runtime rules stay in `APPEND_SYSTEM.md`. `.pi/AGENTS.md` is intentionally absent because it is not a supported project-context location.
 
-## Caveats
+## Local runtime state
 
-- Dream consolidations are keyword-based, not AI-generated.
-- Project index uses `readdirSync` on first run (may cause brief startup lag on large projects).
+- `.pi/artifacts/`
+- `.pi/MEMORY.md`
+- `.pi/npm/`
+
+These paths are local state, ignored by git, and forbidden from the npm payload.

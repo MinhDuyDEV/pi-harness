@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+/**
+ * Release gate: one coherent path combining the full local check, the security
+ * audit, and actual package validation.
+ *
+ * Steps (stop on first failure):
+ *   1. npm run check            — validate:skills, package:check, smoke:resources,
+ *                                  typechecks, quality, full test suite
+ *   2. npm audit                — security audit (all deps, not --omit=dev)
+ *   3. validate:package-payload — deterministic packed-manifest contract
+ *                                  (npm pack --dry-run --json --ignore-scripts)
+ *   4. smoke:packed             — clean-consumer native Pi resource load from the
+ *                                  reconstructed package (npm pack --ignore-scripts)
+ *
+ * No recursion: steps 3-4 use `--ignore-scripts`, and this script never invokes
+ * `npm publish`/`npm pack` without that flag, so `prepack`/`prepublishOnly`
+ * cannot re-enter `check`. The full suite runs exactly once (inside step 1).
+ */
+import { spawnSync } from "node:child_process";
+
+const steps = [
+  { name: "check", cmd: "npm", args: ["run", "check"] },
+  { name: "audit", cmd: "npm", args: ["audit"] },
+  { name: "pack:check", cmd: "npm", args: ["run", "pack:check"] },
+  { name: "smoke:packed", cmd: "npm", args: ["run", "smoke:packed"] },
+];
+
+let failed = null;
+for (const step of steps) {
+  process.stderr.write(`\nrelease:check ► ${step.name}\n`);
+  const result = spawnSync(step.cmd, step.args, { stdio: "inherit", shell: false });
+  if (result.status !== 0) {
+    failed = { name: step.name, status: result.status ?? 1 };
+    break;
+  }
+}
+
+if (failed) {
+  process.stderr.write(`\nrelease:check: FAILED at "${failed.name}" (exit ${failed.status})\n`);
+  process.exit(failed.status);
+}
+
+process.stderr.write(`\nrelease:check: OK — full check, audit, and package validation passed\n`);
+process.exit(0);

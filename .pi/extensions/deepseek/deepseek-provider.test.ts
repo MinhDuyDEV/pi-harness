@@ -2,27 +2,30 @@
  * DeepSeek provider registration smoke test.
  *
  * Verifies the DeepSeek provider registers a valid ProviderConfig contract
- * compatible with installed Pi 0.80.6, without network access or credentials.
+ * compatible with installed Pi 0.81.1, without network access or credentials.
  *
  * TDD approach: test first, see it fail for a missing contract if behavior
  * needs production change.
  */
 
-import { describe, it, expect, mock } from "bun:test";
-import type { ExtensionAPI, ProviderConfig } from "@earendil-works/pi-coding-agent";
+import { describe, it, expect } from "bun:test";
+import type { ProviderConfig } from "@earendil-works/pi-coding-agent";
+import type { DeepseekProviderApi } from "../deepseek-provider.ts";
 
 describe("DeepSeek provider registration", () => {
-  it("registers provider contract matching Pi 0.80.6", async () => {
+  it("registers provider contract matching Pi 0.81.1", async () => {
     // Track what was passed to registerProvider
     let registeredName: string | undefined;
     let registeredConfig: ProviderConfig | undefined;
+    let registerCalls = 0;
 
-    const mockApi = {
-      registerProvider: mock((name: string, config: ProviderConfig) => {
+    const mockApi: DeepseekProviderApi = {
+      registerProvider(name, config) {
+        registerCalls += 1;
         registeredName = name;
         registeredConfig = config;
-      }),
-    } satisfies Partial<ExtensionAPI> as unknown as ExtensionAPI;
+      },
+    };
 
     // Import the provider module default export
     const { default: registerDeepSeek } = await import("../deepseek-provider.ts");
@@ -67,6 +70,6 @@ describe("DeepSeek provider registration", () => {
     expect(typeof registeredConfig!.streamSimple).toBe("function");
 
     // registerProvider must have been called exactly once
-    expect(mockApi.registerProvider).toHaveBeenCalledTimes(1);
+    expect(registerCalls).toBe(1);
   });
 });

@@ -8,39 +8,6 @@
 import { isIP } from "node:net";
 import { block, rule, type RuleSet } from "../types.js";
 
-const NETWORK_PATTERNS: RegExp[] = [
-	/\bcurl\b/,
-	/\bwget\b/,
-	/\bssh\b/,
-	/\bscp\b/,
-	/\bsftp\b/,
-	/\bnc\b/,
-	/\bncat\b/,
-	/\bnetcat\b/,
-	/\btelnet\b/,
-	/\bftp\b/,
-	/\brsync\b.*:/,
-	/\bnpx\s/,
-	/\bnpm\s+install\b/,
-	/\bpip\s+install\b/,
-	/\bcargo\s+install\b/,
-	/\bgo\s+install\b/,
-	/\bgem\s+install\b/,
-];
-
-/** Commands that are always allowed (local-only or safe). */
-const ALLOWLIST: RegExp[] = [
-	/\bnpm\s+install\b(?!\s)/, // bare `npm install` (no package name = local)
-	/\bnpm\s+ci\b/,
-	/\bnpm\s+run\b/,
-	/\bnpm\s+test\b/,
-	/\bnpx\s+tsc\b/,
-	/\bnpx\s+vitest\b/,
-	/\bnpx\s+jest\b/,
-	/\bnpx\s+eslint\b/,
-	/\bnpx\s+prettier\b/,
-];
-
 const URL_PATTERN = /https?:\/\/[^\s'"`<>]+/gi;
 const NUMERIC_PART_PATTERNS: Array<[RegExp, number]> = [
 	[/^0x([0-9a-f]+)$/i, 16],
@@ -67,14 +34,6 @@ const BLOCKED_HOSTS = new Set([
 	"metadata.google.internal",
 	"metadata.google.internal.",
 ]);
-
-function isNetworkCommand(cmd: string): boolean {
-	return NETWORK_PATTERNS.some((p) => p.test(cmd));
-}
-
-function isAllowlisted(cmd: string): boolean {
-	return ALLOWLIST.some((p) => p.test(cmd));
-}
 
 function parseBlockedHostPatterns(): string[] {
 	const raw = process.env.PI_SAFETY_URL_BLOCKLIST ?? "";

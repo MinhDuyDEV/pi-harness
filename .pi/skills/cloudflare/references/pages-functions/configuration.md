@@ -83,7 +83,7 @@
 ```bash
 # .dev.vars (DO NOT COMMIT)
 SECRET_KEY="my-secret-value"
-API_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+API_TOKEN="<api-token>"
 ```
 
 - Add `.dev.vars*` to `.gitignore`

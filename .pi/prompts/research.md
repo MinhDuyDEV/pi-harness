@@ -1,7 +1,6 @@
 ---
 description: Research a topic — explore alternatives and gather evidence; optionally append findings to a work session block in `.pi/artifacts/PROGRESS.md`
 argument-hint: "<topic> [--quick|--thorough] [--alternatives] [--into=<title>]"
-agentType: scout
 ---
 
 # Research: $ARGUMENTS

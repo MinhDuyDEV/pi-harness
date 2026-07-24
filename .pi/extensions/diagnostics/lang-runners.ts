@@ -17,69 +17,37 @@ function nodeBin(root: string, name: string): string {
   return path.join(root, "node_modules", ".bin", name);
 }
 
+function resolveCommand(name: string, args: string[]): { bin: string; args: string[] } | null {
+  const bin = pathWhich(name);
+  return bin ? { bin, args } : null;
+}
+
+function createRunner(
+  name: string,
+  label: string,
+  extensions: string[],
+  detect: (root: string) => boolean,
+  resolve: (root: string) => { bin: string; args: string[] } | null,
+): DiagnosticRunner {
+  return { name, label, extensions, detect, resolve };
+}
+
 export const LANG_DIAGNOSTICS: DiagnosticRunner[] = [
-  {
-    name: "typescript",
-    label: "TypeScript (tsc)",
-    extensions: [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue"],
-    detect(root) {
-      return fs.existsSync(path.join(root, "tsconfig.json"));
-    },
-    resolve(root) {
+  createRunner("typescript", "TypeScript (tsc)", [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts", ".vue"],
+    (root) => fs.existsSync(path.join(root, "tsconfig.json")),
+    (root) => {
       const localTsc = nodeBin(root, process.platform === "win32" ? "tsc.cmd" : "tsc");
-      if (fs.existsSync(localTsc)) {
-        return { bin: localTsc, args: ["--noEmit", "--pretty", "false"] };
-      }
-      return { bin: "npx", args: ["--yes", "tsc", "--noEmit", "--pretty", "false"] };
-    },
-  },
-  {
-    name: "rust",
-    label: "Rust (cargo check)",
-    extensions: [".rs"],
-    detect(root) {
-      return fs.existsSync(path.join(root, "Cargo.toml"));
-    },
-    resolve() {
-      const cargo = pathWhich("cargo");
-      if (!cargo) return null;
-      return { bin: cargo, args: ["check", "--quiet"] };
-    },
-  },
-  {
-    name: "go",
-    label: "Go (go vet)",
-    extensions: [".go"],
-    detect(root) {
-      return fs.existsSync(path.join(root, "go.mod"));
-    },
-    resolve() {
-      const govet = pathWhich("go");
-      if (!govet) return null;
-      return { bin: govet, args: ["vet", "./..."] };
-    },
-  },
-  {
-    name: "python",
-    label: "Python (ruff → mypy)",
-    extensions: [".py", ".pyi"],
-    detect(root) {
-      return (
-        fs.existsSync(path.join(root, "pyproject.toml")) ||
-        fs.existsSync(path.join(root, "setup.py")) ||
-        fs.existsSync(path.join(root, "setup.cfg")) ||
-        fs.existsSync(path.join(root, "requirements.txt")) ||
-        fs.existsSync(path.join(root, "Pipfile"))
-      );
-    },
-    resolve() {
-      const ruff = pathWhich("ruff");
-      if (ruff) return { bin: ruff, args: ["check", "."] };
-      const mypy = pathWhich("mypy");
-      if (mypy) return { bin: mypy, args: ["."] };
-      return null;
-    },
-  },
+      return fs.existsSync(localTsc) ? { bin: localTsc, args: ["--noEmit", "--pretty", "false"] } : resolveCommand("tsc", ["--noEmit", "--pretty", "false"]);
+    }),
+  createRunner("rust", "Rust (cargo check)", [".rs"],
+    (root) => fs.existsSync(path.join(root, "Cargo.toml")),
+    () => resolveCommand("cargo", ["check", "--quiet"])),
+  createRunner("go", "Go (go vet)", [".go"],
+    (root) => fs.existsSync(path.join(root, "go.mod")),
+    () => resolveCommand("go", ["vet", "./..."])),
+  createRunner("python", "Python (ruff → mypy)", [".py", ".pyi"],
+    (root) => ["pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "Pipfile"].some((file) => fs.existsSync(path.join(root, file))),
+    () => resolveCommand("ruff", ["check", "."]) ?? resolveCommand("mypy", ["."])),
 ];
 
 export const EXT_TO_RUNNERS = new Map<string, DiagnosticRunner[]>();
@@ -136,24 +104,14 @@ export async function runOne(
   if (result.enoent) return null;
 
   const output = (result.stderr || result.stdout || "").trim();
-  if (!output) {
-    const meta: DiagnosticBlockMeta = {
-      id: runner.name,
-      exitCode: result.exitCode,
-      ok: result.exitCode === 0,
-      elapsedMs: result.elapsedMs,
-    };
-    return { text: "", meta };
-  }
+  const meta = createDiagnosticMeta(runner.name, result.exitCode, result.elapsedMs);
+  if (!output) return { text: "", meta };
 
-  const text = buildBlockFromRawOutput(runner.label, output);
-  const meta: DiagnosticBlockMeta = {
-    id: runner.name,
-    exitCode: result.exitCode,
-    ok: result.exitCode === 0,
-    elapsedMs: result.elapsedMs,
-  };
-  return { text, meta };
+  return { text: buildBlockFromRawOutput(runner.label, output), meta };
+}
+
+function createDiagnosticMeta(id: string, exitCode: number | null, elapsedMs: number): DiagnosticBlockMeta {
+  return { id, exitCode, ok: exitCode === 0, elapsedMs };
 }
 
 export async function runLanguages(

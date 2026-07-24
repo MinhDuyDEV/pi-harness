@@ -1,11 +1,14 @@
 ---
 name: polar
-description: Use when implementing payment flows, subscriptions, license keys, or customer portals with Polar. MUST load before writing any checkout, monetization, or billing code using Polar platform.
-version: 1.0.0
-tags: [integration, mcp]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when implementing payment flows, subscriptions, license keys, or customer portals with Polar. MUST load before
+  writing any checkout, monetization, or billing code using Polar platform.
+metadata:
+  version: 1.0.0
+  tags:
+  - integration
+  - mcp
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Polar Integration

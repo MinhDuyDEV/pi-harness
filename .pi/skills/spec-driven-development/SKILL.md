@@ -1,11 +1,14 @@
 ---
 name: spec-driven-development
-description: Use when starting a new feature, significant change, product idea, or when requirements are ambiguous and need a concrete specification before implementation.
-version: 1.0.0
-tags: [workflow, planning, product]
-dependencies: []
-agent_types: [planner, scout]
-tools: [ask_user_question, TaskCreate, memory]
+description: Use when starting a new feature, significant change, product idea, or when requirements are ambiguous and need
+  a concrete specification before implementation.
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  - planning
+  - product
+  dependencies: []
 ---
 
 # Spec-Driven Development
@@ -79,6 +82,14 @@ No goal; no non-goals; no acceptance criteria; "make it good" (not specific); sp
 ## Self-Quiz
 
 Is the goal 1-2 sentences, observable, measurable? Are non-goals explicit? Are criteria checkable? Are open questions listed? Is the spec a single file, versioned? Is the test plan derived from criteria?
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I understand the feature, I'll build it" | Understanding ≠ specified; ambiguity in your head becomes wrong code. Write the spec first. |
+| "I'll refine the spec as I code" | Refining-while-coding is coding without a spec; the spec locks before code so changes are visible. |
+| "Non-goals can wait" | Non-goals defined late = invisible scope creep; list them now or the feature grows. |
 
 ## Anti-Patterns
 

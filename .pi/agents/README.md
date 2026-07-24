@@ -2,7 +2,7 @@
 
 Specialist agents for the `task` tool. Each file is a **standalone system prompt** — no `AGENTS.md` / `APPEND_SYSTEM.md` inheritance unless the parent passes rules in the task `prompt`.
 
-The **session agent** is always the parent. Task agents match **OpenCode-style** builtins where applicable: `explore`, `scout`, `general`, plus `reviewer`.
+The **session agent** is always the parent. Task agents match **OpenCode-style** builtins where applicable: `explore`, `scout`, `general`, `reviewer`, plus `proof-auditor`.
 
 Routing: `~/.pi/agent/APPEND_SYSTEM.md` (Delegation). Rules: `AGENTS.md` / project `.pi/AGENTS.md`.
 
@@ -37,6 +37,7 @@ tools:
 | `explore` | Read-only code exploration, path:line | Single known file (`read`) |
 | `general` | Multi-step tasks, implementation, parallel tracks | Trivial 1–2 file parent work |
 | `reviewer` | Post-change audit, path:line evidence | Before code exists |
+| `proof-auditor` | Verify evidence proves the claim (fake-green/fake-red) | Before code exists, or diff-shape review (`reviewer`) |
 
 ## Pick by task
 
@@ -46,6 +47,7 @@ tools:
 | Best practice / docs for Y? | `scout` |
 | Implement or multi-step delegated work | `general` |
 | Review diff / changes | `reviewer` |
+| Does the evidence actually prove it's done? | `proof-auditor` |
 | Product from short prompt | Workflow-style orchestration with `task` |
 
 ## Prompt template (parent → `task`)
@@ -56,7 +58,7 @@ Include: goal, non-goals, write/read policy, expected output, stop condition, ve
 
 ## Proactive delegation
 
-**explore, scout, general, reviewer** use `proactive: true`. Parent rules: `APPEND_SYSTEM.md`.
+**explore, scout, general, reviewer, proof-auditor** use `proactive: true`. Parent rules: `APPEND_SYSTEM.md`.
 
 ## Final message XML
 

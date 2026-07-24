@@ -1,7 +1,6 @@
 ---
 description: Generate a step-by-step plan for an existing work session — updates the work session block in `.pi/artifacts/PLAN.md`
 argument-hint: "<title> [--split] [--no-adrs] [--quick]"
-agentType: planner
 ---
 
 # Plan: $ARGUMENTS

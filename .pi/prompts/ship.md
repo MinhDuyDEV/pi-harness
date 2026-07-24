@@ -1,7 +1,6 @@
 ---
 description: Implement a planned work session — updates `.pi/artifacts/PROGRESS.md` with run report and review
 argument-hint: "<title> [--quick] [--no-verify] [--dry-run]"
-agentType: worker
 ---
 
 # Ship: $ARGUMENTS

@@ -54,6 +54,14 @@ read <cwd>/.pi/MEMORY.md
 - One bullet per learning, with type tag in brackets: `[decision]`, `[bugfix]`, `[pattern]`, `[feature]`, `[discovery]`, `[learning]`, `[warning]`.
 - Prefer concise titles; narrative only when essential.
 
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I'll remember it" | You won't, across compaction + sessions; MEMORY.md is durable because memory isn't. |
+| "I'll write it later" | "Later" after compaction is gone; append the learning now, while it's observed. |
+| "The context already has it" | Context compacts; MEMORY.md survives. If it mattered once, it matters to record. |
+
 ## When NOT to use
 
 - For session-internal scratch work — use the conversation, not MEMORY.md.

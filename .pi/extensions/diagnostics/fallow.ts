@@ -18,7 +18,7 @@ export interface FallowBuildOptions {
 }
 
 export const FALLOW_UNAVAILABLE_MESSAGE =
-  "Fallow CLI not available. Set FALLOW_BIN or install `fallow` (or use npx -y fallow).";
+  "Fallow CLI not available. Set FALLOW_BIN or install the repository's pinned fallow dependency.";
 
 function addCommonArgs(args: string[]): void {
   args.push("--format", "json", "--quiet");
@@ -41,18 +41,6 @@ export function buildFallowArgs(command: FallowCommandKind, opts: FallowBuildOpt
   addCommonArgs(args);
   args.push("--changed-since", opts.changedSince);
   return args;
-}
-
-function shouldTryNpxFallback(r: {
-  exitCode: number | null;
-  stdout: string;
-  stderr: string;
-  enoent?: boolean;
-}): boolean {
-  if (r.enoent) return true;
-  if (r.exitCode === 127) return true;
-  if (r.exitCode === 1 && !r.stdout && !r.stderr) return true;
-  return false;
 }
 
 async function execFallow(
@@ -89,17 +77,8 @@ async function execFallow(
   }
 
   const local = pathWhich("fallow");
-  if (local) {
-    const r = await tryRun(local, args);
-    if (!shouldTryNpxFallback(r)) return r;
-  }
-
-  const npx = pathWhich("npx");
-  if (!npx) {
-    return { bin: "fallow", args, stdout: "", stderr: "", exitCode: 127, elapsedMs: 0, enoent: true };
-  }
-
-  return tryRun(npx, ["--yes", "fallow", ...args]);
+  if (!local) return { bin: "fallow", args, stdout: "", stderr: "", exitCode: 127, elapsedMs: 0, enoent: true };
+  return tryRun(local, args);
 }
 
 function formatStdout(command: FallowCommandKind, stdout: string): string {
@@ -212,7 +191,7 @@ export async function runFallowAnalysis(
   const inner = [
     ...parts,
     "",
-    "  Tip: run `npx fallow` for the full suite.",
+    "  Tip: run `npm run quality:fallow` for the full suite.",
   ].join("\n");
 
   const text = buildBlock("Fallow (code quality)", inner.split("\n"));

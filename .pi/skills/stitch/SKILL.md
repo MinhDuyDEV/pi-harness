@@ -1,11 +1,15 @@
 ---
 name: stitch
-description: Use when generating, editing, or creating variants of UI screens in Google Stitch. MUST load before any stitch_generate_screen or stitch_edit_screens tool calls.
-version: 2.0.0
-tags: [design, ui, stitch]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when generating, editing, or creating variants of UI screens in Google Stitch. MUST load before any stitch_generate_screen
+  or stitch_edit_screens tool calls.
+metadata:
+  version: 2.0.0
+  tags:
+  - design
+  - ui
+  - stitch
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Google Stitch Plugin

@@ -1,11 +1,14 @@
 ---
 name: source-driven-development
-description: Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance and need to ground decisions in official docs, source code, and cited references.
-version: 1.0.0
-tags: [research, implementation, verification]
-dependencies: []
-agent_types: [scout, planner, worker]
-tools: [context7, websearch, web_fetch, codesearch]
+description: Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance and need
+  to ground decisions in official docs, source code, and cited references.
+metadata:
+  version: 1.0.0
+  tags:
+  - research
+  - implementation
+  - verification
+  dependencies: []
 ---
 
 # Source-Driven Development

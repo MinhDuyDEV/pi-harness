@@ -1,10 +1,3 @@
-/**
- * DCP Extension — Recall Types & Constants
- */
-
-import { join } from "node:path";
-import { homedir } from "node:os";
-
 export interface RecallEntry {
   index: number;
   source: "dcp" | "jsonl";
@@ -32,4 +25,4 @@ export interface RecallResult {
   total: number;
 }
 
-export const RAW_SESSION_DIR = join(homedir(), ".pi", "agent", "sessions");
+export const PAGE_SIZE = 5;

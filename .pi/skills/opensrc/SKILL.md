@@ -1,11 +1,15 @@
 ---
 name: opensrc
-description: Use when you need to understand how a library works internally, debug dependency issues, or inspect package source code beyond types and docs. Fetches source for npm, PyPI, crates.io packages and GitHub repos. Includes structured research workflow for deep investigation.
-version: 1.1.0
-tags: [research, integration, source-code]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when you need to understand how a library works internally, debug dependency issues, or inspect package source
+  code beyond types and docs. Fetches source for npm, PyPI, crates.io packages and GitHub repos. Includes structured research
+  workflow for deep investigation.
+metadata:
+  version: 1.1.0
+  tags:
+  - research
+  - integration
+  - source-code
+  dependencies: []
 ---
 
 # Open Source Code Investigation

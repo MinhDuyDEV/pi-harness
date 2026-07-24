@@ -1,11 +1,15 @@
 ---
 name: shipping-and-launch
 description: Use when preparing to merge, deploy, release, or declare a development branch complete.
-version: 1.0.0
-tags: [shipping, workflow, release]
-dependencies: [verification-before-completion, documentation-and-adrs]
-agent_types: [planner, reviewer]
-tools: [bash, ask_user_question, memory]
+metadata:
+  version: 1.0.0
+  tags:
+  - shipping
+  - workflow
+  - release
+  dependencies:
+  - verification-before-completion
+  - documentation-and-adrs
 ---
 
 # Shipping & Launch

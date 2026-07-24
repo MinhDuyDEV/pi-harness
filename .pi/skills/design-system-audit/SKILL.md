@@ -1,11 +1,15 @@
 ---
 name: design-system-audit
-description: Use when auditing an existing design system for consistency — token audits, pattern analysis, visual comparison against design specs. Load AFTER implementation to review, not during initial build.
-version: 2.0.0
-tags: [design, audit, ui]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when auditing an existing design system for consistency — token audits, pattern analysis, visual comparison
+  against design specs. Load AFTER implementation to review, not during initial build.
+metadata:
+  version: 2.0.0
+  tags:
+  - design
+  - audit
+  - ui
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Design System Audit

@@ -1,29 +1,37 @@
-import type { Static, TSchema } from "@earendil-works/pi-ai";
+import type {
+  AgentToolResult,
+  AgentToolUpdateCallback,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
+import type { Static, TSchema } from "typebox";
 
-export type XaiToolExecute = (input: {
+export type XaiToolExecuteInput = {
   toolCallId: string;
   params: unknown;
   signal: AbortSignal | undefined;
-  onUpdate: unknown;
-  ctx: unknown;
-}) => Promise<unknown>;
+  onUpdate: AgentToolUpdateCallback<unknown> | undefined;
+  ctx: ExtensionContext;
+};
 
-export interface XaiToolDef {
+export type XaiToolDef = {
   name: string;
   label: string;
   description: string;
   parameters: TSchema;
-  execute: XaiToolExecute;
-}
+  execute(input: XaiToolExecuteInput): Promise<AgentToolResult<unknown>>;
+};
 
-/** Build a typed tool definition. The runtime object is cast to `any` so
- *  pi's `registerTool` accepts it without a module-resolution error. */
 export function defineXaiTool<S extends TSchema>(def: {
   name: string;
   label: string;
   description: string;
   parameters: S;
-  execute: (input: { toolCallId: string; params: Static<S>; signal: AbortSignal | undefined; onUpdate: unknown; ctx: unknown }) => Promise<unknown>;
+  execute(input: Omit<XaiToolExecuteInput, "params"> & { params: Static<S> }): Promise<AgentToolResult<unknown>>;
 }): XaiToolDef {
-  return def as unknown as XaiToolDef;
+  return {
+    ...def,
+    execute(input) {
+      return def.execute({ ...input, params: input.params as Static<S> });
+    },
+  };
 }

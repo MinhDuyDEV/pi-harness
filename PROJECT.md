@@ -1,67 +1,45 @@
-# Project Map
+# Project contract
 
-A lean index of where things live in this repo. Maintained by the agent.
+## Purpose
 
-## Folders (top-level)
+`pikit` packages a conservative set of Pi Coding Agent resources. It is a Pi package, not a standalone application or workbench server.
 
-- `bin/` — CLI entry points
-- `scripts/` — npm scripts (validate-skills, run-extension-tests, etc.)
-- `src/` — application source (if present)
-- `tests/` — test suites (if present)
-- `docs/` — committed documentation (if present)
-- `templates/` — file templates
-- `themes/` — UI themes
-- `prompts/` — prompt definitions
-- `skills/` — agent skill definitions (78 skills)
-- `agents/` — agent role definitions (opencode-compatible)
-- `sessions/` — session state
+## Source of truth
 
-## `.pi/` (project-level agent config)
+- Package metadata and scripts: `package.json`
+- Pi runtime settings: `.pi/settings.json`
+- Resource entrypoints: `package.json` → `pi`
+- Active project instructions: `AGENTS.md`
+- Skill integrity: `skills-lock.json` and `npm run validate:skills`
 
-- `.pi/agents/` — agent role definitions
-- `.pi/extensions/` — 32 extensions (memory, deepseek, srcwalk, safety, etc.)
-- `.pi/integration/` — integration code (checkpoint, budget, etc.)
-- `.pi/checkpoint/` — checkpoint module
-- `.pi/artifacts/` — ephemeral working state (ADRs, PROGRESS, TODO from cleanup)
-- `.pi/cli/` — CLI plumbing
-- `.pi/skills/` — agent skills (~78 skills)
-- `.pi/prompts/` — prompt templates
-- `.pi/templates/` — file templates
-- `.pi/themes/` — UI themes
-- `.pi/shell-hooks/` — shell hook scripts
-- `.pi/sessions/` — session state
-- `.pi/cache/` — caches
-- `.pi/npm/` — npm package management
-- `.pi/git/` — git automation
-- `.pi/fff/` — fast-file-find cache
-- `.pi/pi-pretty/` — pretty-printer module
+Do not infer commands or paths from generated caches under `.pi/npm`, `.pi/git`, or `.pi/artifacts`.
 
-## Key Files (top-level)
+## Runtime contract
 
-- `package.json` — npm metadata, scripts (start, test, validate, typecheck)
-- `tsconfig.json` — TypeScript config
-- `README.md` — top-level readme
-- `LICENSE` — MIT
-- `AGENTS.md` (in `.pi/`) — agent behavior kernel
-- `DESIGN.md` (in `.pi/`) — design doc
-- `SYSTEM.md` (in `.pi/`) — system prompt
-- `APPEND_SYSTEM.md` (in `.pi/`) — system prompt append
+Pi discovers the standard `.pi/extensions`, `.pi/skills`, `.pi/prompts`, and `.pi/themes` directories. Package-level peer dependencies are supplied by the host Pi installation; development dependencies are used only for local checks. Supplemental Pi packages are pinned in project settings and must be installed explicitly when this repository is consumed only as a package.
 
-## Notable Sub-Extensions
+Project settings intentionally do not choose a provider, model, trust policy, or machine-specific path. Users can configure those globally or in their local Pi settings.
 
-- `.pi/extensions/memory/` — FTS5-backed memory (after ADR-001 cleanup, 2,438 lines)
-- `.pi/extensions/deepseek/` — DeepSeek model integration
-- `.pi/extensions/srcwalk/` — code analysis (read, search, callers, callees)
-- `.pi/extensions/safety/` — safety hooks
-- `.pi/extensions/checkpoint/` — checkpoint manager
-- `.pi/extensions/task/` — long-running subagent orchestration via the `task` tool
+## Development gates
 
-## Notes
+```bash
+npm ci
+npm run validate:skills
+npm run package:check
+npm run smoke:resources
+npm run typecheck
+npm run typecheck:extensions
+npm run typecheck:extension-tests
+npm run quality
+npm run test:all
+```
 
-- All extensions live under `.pi/extensions/<name>/` with an `index.ts` entry point
-- Agent definitions are in `.pi/agents/*.md` (opencode-compatible format)
-- `.pi/artifacts/` is gitignored (ephemeral state)
-- `.pi/docs/` would be the committed location for ADRs (currently empty)
-- Run `npm run validate` to check skills config
-- Run `npm run typecheck` to verify TypeScript
-- See [ADR-001](./.pi/artifacts/memory-extension-cleanup/ADR-001-memory-extension-cleanup.md) for the recent memory extension cleanup
+Use `npm run test:extensions` for extension-only iteration and `npm run test:skills` for root skill/context tests. Some extension tests require Bun because they use `bun:test`.
+
+## Change policy
+
+1. Inspect the current worktree and preserve unrelated edits.
+2. Make the smallest change that satisfies the contract.
+3. Add or update a behavior test when changing runtime behavior.
+4. Pin new package sources and update `skills-lock.json` when skill content changes.
+5. Record verification evidence before claiming completion.

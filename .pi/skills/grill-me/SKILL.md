@@ -1,11 +1,15 @@
 ---
 name: grill-me
 description: Use when you have a rough idea, ADR, PRD, or spec that needs to survive scrutiny before code is written.
-version: 1.1.0
-tags: [planning, review, decision]
-dependencies: [brainstorming, spec-driven-development]
-agent_types: [planner, worker, reviewer]
-tools: []
+metadata:
+  version: 1.1.0
+  tags:
+  - planning
+  - review
+  - decision
+  dependencies:
+  - brainstorming
+  - spec-driven-development
 ---
 
 # Grill Me
@@ -52,39 +56,16 @@ If you don't care: I'll proceed with <default>.
 
 Do not ask about low-risk choices a competent implementer can reverse cheaply. Record those as labeled assumptions and explain how they will be verified.
 
-## What a Good Grilling Looks Like
+## Anti-rationalization
 
-- Questions surface assumptions, not opinions.
-- The griller is curious, not confrontational.
-- The grillee answers in "I think" and "I'm assuming", not "it's obvious".
-- After 10-15 questions, the plan is either stronger or abandoned.
-- The griller doesn't need to "win" — they need to find the hole.
-
-## Common Targets
-
-| Target | Question |
+| Shortcut the model reaches for | Why it fails here |
 |---|---|
-| Cost estimate | "What if it takes 3x as long?" |
-| Scale estimate | "What if traffic grows 10x this month?" |
-| One-vendor risk | "What if vendor shuts down?" |
-| "Just use X" | "What does X not do?" |
-| "We'll iterate" | "What's the first working version look like?" |
-| "It's simple" | "Define simple. How many moving parts?" |
-| "Everyone agrees" | "Who did you not ask?" |
-| "No dependencies" | "What do you depend on that you don't control?" |
+| "The plan is solid, no need to grill" | "Solid" before grilling is exactly the confidence to test; grill the strong version, don't rubber-stamp. |
+| "I don't want to seem disagreeable" | Politeness kills the plan; the grilling is the value — press hard. |
+| "The user seems confident, back off" | User confidence is the bias to probe, not the signal to stop; the stop rule is exhaustion of flaws. |
 
-## When to Stop Grilling
+## Quality bar and stop rule
 
-Stop when the grillee has a concrete, specific answer to each question, not "I'll figure it out later." Stop when the questions are repeating (same shape, different topic).
+Questions should surface assumptions, not opinions. Stay curious rather than confrontational, document answers, and stop when each material question has a concrete answer or the questions begin repeating.
 
-## Common Mistakes
-
-Asking 5 questions in one message; grilling from a position of "I know better" (stifles ideas); stopping too early (first two questions are easy); stopping too late (grilling the trivial parts); not documenting the answers; "grilling as attack" (destroys trust, not plans).
-
-## Red Flags
-
-No assumptions stated; "I'll figure it out later" as a crutch; "everyone agrees" without asking everyone; cost estimate without a range; "it's simple" without definition; no rollback plan; "we'll iterate" before v1 is defined; "no dependencies" without checking; vulnerability mentioned, dismissed; "I'm not worried about X" (X is the thing to worry about).
-
-## Anti-Patterns
-
-**5 questions at once**; **"I know better"** (stifles); **stop too early** (first 2 are easy); **grill the trivial**; **no doc**; **attack mode**.
+Common mistakes are asking five questions at once, grilling trivial choices, stopping after easy questions, or treating the review as an attack. Require assumptions, a rollback plan, ranges for cost/scale, and explicit dependencies before approving the plan.

@@ -1,7 +1,11 @@
 ---
 name: opencode-ts-package
-version: 1.0.0
-description: "Use when creating a new npm package in a TypeScript monorepo, setting up package.json exports and build configuration, structuring internal vs published packages, handling platform-specific code with conditional imports, or configuring workspace/catalog dependency management. MUST load before creating a new package or modifying package.json in an Effect-based monorepo."
+description: Use when creating a new npm package in a TypeScript monorepo, setting up package.json exports and build configuration,
+  structuring internal vs published packages, handling platform-specific code with conditional imports, or configuring workspace/catalog
+  dependency management. MUST load before creating a new package or modifying package.json in an Effect-based monorepo.
+metadata:
+  version: 1.0.0
+disable-model-invocation: true
 ---
 
 # TypeScript Package (Effect-style)

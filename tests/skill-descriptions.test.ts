@@ -31,8 +31,8 @@ function getSkillFrontmatter(skillDir: string): { name: string; description: str
 	const descMatch = fm.match(/^description:\s*"?(.+?)"?\s*$/m);
 	if (!nameMatch || !descMatch) throw new Error(`Missing name/description in ${skillMd}`);
 	return {
-		name: nameMatch[1].trim(),
-		description: descMatch[1].trim(),
+		name: nameMatch[1].trim().replace(/^['"]|['"]$/g, ""),
+		description: descMatch[1].trim().replace(/^['"]|['"]$/g, ""),
 	};
 }
 

@@ -1,7 +1,7 @@
 /**
  * Focused regression tests for the safety extension policy boundary.
  *
- * Run: npx tsx .pi/extensions/safety/safety.test.ts
+ * Run: node --import tsx --test .pi/extensions/safety/safety.test.ts
  */
 
 import { strict as assert } from "node:assert";

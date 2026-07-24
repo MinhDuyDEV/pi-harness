@@ -1,11 +1,14 @@
 ---
 name: security-and-hardening
-description: Use when auditing for security vulnerabilities, implementing auth/authz, handling secrets, or hardening against OWASP Top 10 — covers input validation, authentication, dependency auditing, and secure defaults
-version: 1.0.0
-tags: [security, code-quality]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when auditing for security vulnerabilities, implementing auth/authz, handling secrets, or hardening against
+  OWASP Top 10 — covers input validation, authentication, dependency auditing, and secure defaults
+metadata:
+  version: 1.0.0
+  tags:
+  - security
+  - code-quality
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Security & Hardening

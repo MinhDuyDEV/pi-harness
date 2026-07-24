@@ -8,7 +8,7 @@ export default function gptExtension(pi: ExtensionAPI) {
   pi.on("before_agent_start", (event, ctx) => {
     if (
       ctx.model?.provider !== "openai-codex" ||
-      /^gpt-5\. 6(?: -|$)/.test(ctx.model.id)
+      /^gpt-5\.6(?:-|$)/.test(ctx.model.id)
     )
       return undefined;
     return {

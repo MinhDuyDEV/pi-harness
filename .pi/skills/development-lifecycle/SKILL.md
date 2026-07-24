@@ -1,10 +1,14 @@
 ---
 name: development-lifecycle
-description: Use when starting, planning, shipping, or verifying a work session — describes how `/create`, `/plan`, `/ship`, `/verify`, and `/research` interact with the 4 canonical artifact files at `.pi/artifacts/`.
-version: 2.0.0
-tags: [workflow, artifacts, planning, work-sessions]
-agent_types: [planner, worker, reviewer, scout]
-tools: [read, write, edit, grep, bash]
+description: Use when starting, planning, shipping, or verifying a work session — describes how `/create`, `/plan`, `/ship`,
+  `/verify`, and `/research` interact with the 4 canonical artifact files at `.pi/artifacts/`.
+metadata:
+  version: 2.0.0
+  tags:
+  - workflow
+  - artifacts
+  - planning
+  - work-sessions
 ---
 
 # Development Lifecycle

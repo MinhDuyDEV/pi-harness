@@ -16,14 +16,11 @@ import type {
   AssistantMessage,
   ToolCall,
   ToolResultMessage,
-  UserMessage,
 } from "@earendil-works/pi-ai";
 import type { DCPConfig } from "./config.js";
 import type { ProtectionProvenance } from "./compress-types.js";
 
-// ---------------------------------------------------------------------------
 // Protection policy (immutable after construction)
-// ---------------------------------------------------------------------------
 
 /**
  * Immutable set of message objects that are protected from removal/pruning/stripping
@@ -50,9 +47,7 @@ export class ProtectionPolicy {
   }
 }
 
-// ---------------------------------------------------------------------------
 // Path helpers
-// ---------------------------------------------------------------------------
 
 const PATH_LIKE_KEYS = new Set([
   "path",
@@ -89,13 +84,11 @@ export function normalizePath(p: string): string {
   return p.replace(/\\/g, "/");
 }
 
-// ---------------------------------------------------------------------------
 // Deterministic glob matching (no dependencies)
 // Supports *, **, and ? in the small documented subset:
 //   *  — matches any characters except /
 //   ** — matches any characters including /
 //   ?  — matches any single character except /
-// ---------------------------------------------------------------------------
 
 /**
  * Match a file path against a glob pattern.  Supports `*`, `**`, and `?`.
@@ -114,7 +107,6 @@ export function matchesGlob(path: string, pattern: string): boolean {
 }
 
 function splitSegs(s: string): string[] {
-  // Remove leading slash so we don't get an empty first segment
   return s.replace(/^\//, "").split("/");
 }
 
@@ -124,7 +116,6 @@ function matchSegs(
   pat: string[],
   pj: number,
 ): boolean {
-  // Both exhausted
   if (pi >= path.length && pj >= pat.length) return true;
   // Pattern exhausted while path remains
   if (pj >= pat.length) return false;
@@ -188,9 +179,7 @@ function matchChars(s: string, si: number, p: string, pj: number): boolean {
   return matchChars(s, si + 1, p, pj + 1);
 }
 
-// ---------------------------------------------------------------------------
 // Policy computation
-// ---------------------------------------------------------------------------
 
 /**
  * Compute a ProtectionPolicy for a message array.
@@ -254,9 +243,7 @@ export function computeProtectionPolicy(
     prov[reason]++;
   }
 
-  // -----------------------------------------------------------------------
   // Pass 1: tool name, file pattern, and user message protection
-  // -----------------------------------------------------------------------
   for (const msg of messages) {
     // User messages
     if (protectUserMessages && msg.role === "user") {
@@ -292,9 +279,7 @@ export function computeProtectionPolicy(
     }
   }
 
-  // -----------------------------------------------------------------------
   // Pass 2: recent-turns protection
-  // -----------------------------------------------------------------------
   if (effectiveRecentTurns > 0) {
     let turnsFound = 0;
     // Default to protecting everything — when there are fewer turns than
@@ -341,9 +326,7 @@ export function computeProtectionPolicy(
   return new ProtectionPolicy(protectedMessages, prov);
 }
 
-// ---------------------------------------------------------------------------
 // Argument path-matching helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Check whether `arguments` contains any value under a path-like key

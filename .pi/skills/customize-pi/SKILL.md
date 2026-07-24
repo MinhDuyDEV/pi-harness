@@ -1,7 +1,10 @@
 ---
 name: customize-pi
-version: 1.0.0
-description: "Use when optimizing Pi configuration — settings.json tuning, provider setup, context window limits, compaction, keybindings, extensions, skills, packages, model cycling, or troubleshooting Pi behavior. Covers the full customization surface from quick tweaks to architecture decisions."
+description: Use when optimizing Pi configuration — settings.json tuning, provider setup, context window limits, compaction,
+  keybindings, extensions, skills, packages, model cycling, or troubleshooting Pi behavior. Covers the full customization
+  surface from quick tweaks to architecture decisions.
+metadata:
+  version: 1.0.0
 ---
 
 # Customize Pi

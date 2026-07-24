@@ -1,7 +1,6 @@
 ---
 description: Create a work session — captures goal, scope, and success criteria as a block in `.pi/artifacts/PLAN.md`
 argument-hint: "<title> [--quick] [--ask]"
-agentType: planner
 ---
 
 # Create: $ARGUMENTS

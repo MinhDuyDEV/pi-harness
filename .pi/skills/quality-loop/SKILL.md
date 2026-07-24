@@ -1,11 +1,15 @@
 ---
 name: quality-loop
-version: 1.0.0
-description: "Use after implementation when an iterative fix-verify loop is needed until all quality gates pass or max iterations reached. Prevents the 'single-shot verification' failure mode where a fix introduces new issues."
-tags: [workflow, code-quality, verification]
-dependencies: [verification-before-completion]
-agent_types: [worker, reviewer]
-tools: [bash, grep, find, read]
+description: Use after implementation when an iterative fix-verify loop is needed until all quality gates pass or max iterations
+  reached. Prevents the 'single-shot verification' failure mode where a fix introduces new issues.
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  - code-quality
+  - verification
+  dependencies:
+  - verification-before-completion
 ---
 
 # Quality Loop
@@ -62,6 +66,14 @@ No iteration cap (infinite loop); counting iterations on a single tool (each too
 ## Red Flags
 
 Loop has no max; iterations counted wrong; "fix" introduces new errors (regression); same Nth attempt as 1st (no learning); scope grew with each iteration (now you're redesigning); error count isn't actually decreasing; gate changed between iterations (different test); "I think it's better" without re-running the gate.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "The fix should work, let me move on" | "Should" is the single-shot trap; re-run the gate or you shipped a fix that introduced a new issue. |
+| "It passed once, it's done" | One pass is the failure mode this loop exists for; iterate until no NEW issues. |
+| "I'm at the cap, it's good enough" | The cap escalates, it doesn't declare done; at the cap, escalate — don't claim green. |
 
 ## Self-Quiz
 

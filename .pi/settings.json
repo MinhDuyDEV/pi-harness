@@ -1,17 +1,15 @@
 {
-  "defaultProvider": "openai-codex",
-  "defaultModel": "gpt-5.6-terra",
-  "defaultThinkingLevel": "high",
   "editorPaddingX": 1,
   "images": {
-    "blockImages": false
+    "blockImages": false,
+    "autoResize": true
   },
   "packages": [
-    "npm:@heyhuynhgiabuu/pi-pretty",
-    "npm:@heyhuynhgiabuu/pi-diff",
+    "npm:@heyhuynhgiabuu/pi-pretty@0.6.20",
+    "npm:@heyhuynhgiabuu/pi-diff@0.7.6",
     "npm:@heyhuynhgiabuu/pi-search@0.2.7",
-    "npm:@heyhuynhgiabuu/pi-task",
-    "git:https://github.com/badlogic/pi-diff-review"
+    "npm:@minhduydev/pi-subagents@0.6.0",
+    "git:https://github.com/badlogic/pi-diff-review#57622138f5b02896a230b4fbfe702d24c6a515bb"
   ],
   "compaction": {
     "enabled": true,
@@ -32,24 +30,13 @@
   "steeringMode": "all",
   "followUpMode": "all",
   "enableSkillCommands": true,
-  "skills": [
-    ".pi/skills/"
-  ],
-  "prompts": [
-    ".pi/prompts/"
-  ],
-  "extensions": [
-    ".pi/extensions/"
-  ],
-  "lastChangelogVersion": "0.80.6",
   "treeFilterMode": "default",
   "transport": "auto",
   "hideThinkingBlock": false,
   "terminal": {
     "showTerminalProgress": true,
     "clearOnShrink": true,
-    "showImages": false,
-    "autoResize": true
+    "showImages": false
   },
   "collapseChangelog": false,
   "enableInstallTelemetry": false,
@@ -67,7 +54,6 @@
   "autocompleteMaxVisible": 10,
   "quietStartup": false,
   "doubleEscapeAction": "tree",
-  "defaultProjectTrust": "always",
   "outputPad": 1,
   "showCacheMissNotices": true
 }

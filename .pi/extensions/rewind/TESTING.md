@@ -17,7 +17,7 @@ git init
 ## 2. Copy ONLY the rewind extension there
 
 ```bash
-cp -r /Users/huynhgiabuu/dev/projects/pikit/.pi/extensions/rewind \
+cp -r .pi/extensions/rewind \
       /tmp/rewind-test/.pi/extensions/rewind
 ```
 

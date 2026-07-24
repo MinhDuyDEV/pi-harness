@@ -1,11 +1,14 @@
 ---
 name: root-cause-tracing
-description: Use when errors occur deep in execution and you need to trace back to find the original trigger - systematically traces bugs backward through call stack, adding instrumentation when needed, to identify source of invalid data or incorrect behavior
-version: 1.0.0
-tags: [debugging, workflow]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when errors occur deep in execution and you need to trace back to find the original trigger - systematically
+  traces bugs backward through call stack, adding instrumentation when needed, to identify source of invalid data or incorrect
+  behavior
+metadata:
+  version: 1.0.0
+  tags:
+  - debugging
+  - workflow
+  dependencies: []
 ---
 
 # Root-Cause Tracing
@@ -75,6 +78,14 @@ Tracing forward; adding 10 log lines at once; logging without a hypothesis; fixi
 ## Red Flags
 
 Hypothesis-free logging; log lines without structure (strings, not objects); tracing forward; "the bug is in X" without evidence; same fix looped; regression test skipped; trace stops at first plausible cause (might be a layer, not the root).
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I see the symptom, I'll fix it" | Fixing the symptom leaves the root; the bug recurs elsewhere. Trace backward. |
+| "The error message tells me the bug" | The message is where the failure surfaced, not where it started; the root is upstream. |
+| "I'll add a try/catch here" | A catch here hides the root, it doesn't fix it; find where the invalid data originated. |
 
 ## Anti-Patterns
 

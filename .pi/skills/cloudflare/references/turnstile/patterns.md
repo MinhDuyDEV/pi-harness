@@ -20,7 +20,7 @@ app.post('/submit', async (req, res) => {
 ### ❌ Exposing Secret Key
 ```javascript
 // WRONG - Secret in client code
-const SECRET = 'your-secret-key';
+const SECRET = '<turnstile-secret>';
 fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
   body: JSON.stringify({ secret: SECRET, response: token })
 });

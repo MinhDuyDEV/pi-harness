@@ -1,7 +1,8 @@
 ---
 name: grill-with-docs
 description: Use when user wants to stress-test a plan against their project's language and documented decisions.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 <what-to-do>
@@ -51,6 +52,14 @@ If a `CONTEXT-MAP.md` exists at the root, the repo has multiple contexts. The ma
 ```
 
 Create files lazily — only when you have something to write. If no `CONTEXT.md` exists, create one when the first term is resolved. If no `docs/adr/` exists, create it when the first ADR is needed.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I know the codebase, I'll grill from memory" | Memory drifts from docs; grill against the actual decisions/ADRs or you test a stale plan. |
+| "The docs are outdated, ignore them" | Outdated docs are a finding, not a skip; flag the drift + grill against current code. |
+| "The plan conflicts with an ADR but the ADR is old" | A conflict is the grill's target; surface the tension, don't rationalize the ADR away. |
 
 ## During the session
 

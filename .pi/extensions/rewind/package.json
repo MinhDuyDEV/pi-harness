@@ -1,22 +1,12 @@
 {
   "name": "pi-rewind",
   "version": "2.0.0",
-  "description": "Operation-level undo/redo for the pi coding agent. Fork of pi-rewind-hook ported to the current SDK.",
+  "description": "Operation-level undo/redo for the Pi Coding Agent.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/pi-rewind"
+    "url": "https://github.com/MinhDuyDEV/pi-harness.git"
   },
-  "keywords": [
-    "pi-package",
-    "pi",
-    "pi-agent",
-    "extension",
-    "checkpoint",
-    "rewind",
-    "undo",
-    "redo",
-    "git"
-  ],
+  "keywords": ["pi-package", "pi", "extension", "checkpoint", "rewind", "undo", "redo", "git"],
   "author": "pikit",
   "license": "MIT",
   "type": "module",
@@ -24,13 +14,13 @@
     "extensions": ["./index.ts"]
   },
   "scripts": {
-    "test": "node --import tsx --test index.test.ts",
+    "test": "node --import tsx --test index.test.ts ledger.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.80.7",
-        "@types/node": "^20.0.0 || ^22.0.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.0.0"
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "@types/node": "^24.0.0",
+    "tsx": "4.23.1",
+    "typescript": "^5.9.3"
   }
 }

@@ -17,10 +17,10 @@ export default function (pi: ExtensionAPI) {
     name: "xAI (OAuth)",
     baseUrl: XAI_API_BASE_URL,
     api: "xai-responses",
-    models: MODELS as any,
+    models: MODELS,
     authHeader: true,
-    streamSimple: streamSimpleXaiResponses as any,
-    oauth: createXaiOAuth({ getExistingCredentials: getGrokAuthCredentials }) as any,
+    streamSimple: streamSimpleXaiResponses,
+    oauth: createXaiOAuth({ getExistingCredentials: getGrokAuthCredentials }),
   });
 
   registerXaiTools(pi, resolveXaiToolConfig());

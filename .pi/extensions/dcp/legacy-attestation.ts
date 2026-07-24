@@ -8,9 +8,7 @@ import {
   quarantineLegacyBlocks,
 } from "./compress-state.js";
 
-// ---------------------------------------------------------------------------
 // Argument parsing
-// ---------------------------------------------------------------------------
 
 export interface ParsedLegacyArgs {
   command: "inspect" | "attest" | "quarantine";
@@ -55,20 +53,16 @@ export function parseLegacyArgs(raw: string): ParsedLegacyArgs | null {
   return { command, target, forceYes, raw };
 }
 
-// ---------------------------------------------------------------------------
 // Hashing
-// ---------------------------------------------------------------------------
 
 /** Compute SHA-256 hex digest of a block's summary text. */
 export function getBlockSummaryHash(block: CompressionBlock): string {
   return createHash("sha256").update(block.summary).digest("hex");
 }
 
-// ---------------------------------------------------------------------------
 // Display helpers
-// ---------------------------------------------------------------------------
 
-function formatBlock(block: CompressionBlock, index: number): string {
+function formatBlock(block: CompressionBlock): string {
   const lines: string[] = [];
   const summaryPreview =
     block.summary.length > 120
@@ -103,9 +97,7 @@ function formatStatusHeader(sessionId: string): string {
   return parts.join(" | ");
 }
 
-// ---------------------------------------------------------------------------
 // Inspect
-// ---------------------------------------------------------------------------
 
 function buildInspectOutput(sessionId: string, target: string): string {
   const status = getLegacyStatus(sessionId);
@@ -134,7 +126,7 @@ function buildInspectOutput(sessionId: string, target: string): string {
     const visibleBlocks = allBlocks.slice(0, maxDisplayedBlocks);
     for (let i = 0; i < visibleBlocks.length; i++) {
       if (i > 0) lines.push("");
-      lines.push(formatBlock(visibleBlocks[i], i));
+      lines.push(formatBlock(visibleBlocks[i]));
     }
 
     if (status.quarantined.length > 0) {
@@ -161,16 +153,14 @@ function buildInspectOutput(sessionId: string, target: string): string {
     if (!block) {
       lines.push(`Block ${target} not found.`);
     } else {
-      lines.push(formatBlock(block, 0));
+      lines.push(formatBlock(block));
     }
   }
 
   return lines.join("\n");
 }
 
-// ---------------------------------------------------------------------------
 // Attest
-// ---------------------------------------------------------------------------
 
 function buildAttestDryRun(
   sessionId: string,
@@ -218,9 +208,7 @@ function buildAttestSummary(sessionId: string, count: number): string {
   return `Attested ${count} block(s). Current: ${counts.validated} validated, ${counts.attested} attested, ${counts.legacyUnverified} unverified, ${counts.quarantined} quarantined.`;
 }
 
-// ---------------------------------------------------------------------------
 // Quarantine
-// ---------------------------------------------------------------------------
 
 function buildQuarantineDryRun(
   sessionId: string,
@@ -268,9 +256,7 @@ function buildQuarantineSummary(sessionId: string, count: number): string {
   return `Quarantined ${count} block(s). Current: ${counts.validated} validated, ${counts.attested} attested, ${counts.legacyUnverified} unverified, ${counts.quarantined} quarantined.`;
 }
 
-// ---------------------------------------------------------------------------
 // Parameters passed from index-commands.ts
-// ---------------------------------------------------------------------------
 
 export interface LegacyAttestationParams {
   /** DCP's durable state key (session file path, or cwd for in-memory sessions). */
@@ -281,9 +267,7 @@ export interface LegacyAttestationParams {
   appendState(reason: string): void;
 }
 
-// ---------------------------------------------------------------------------
 // Main handler
-// ---------------------------------------------------------------------------
 
 /**
  * Handle a `/dcp legacy ...` command.
@@ -320,7 +304,7 @@ export async function handleLegacyCommand(
     return;
   }
 
-  // ---- Mutation commands (attest / quarantine) ----
+  // Mutation commands (attest / quarantine)
 
   if (command === "attest") {
     const dryRun = buildAttestDryRun(sessionId, target);

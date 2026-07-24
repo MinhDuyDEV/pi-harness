@@ -91,10 +91,10 @@ variable "cloudflare_api_token" {
 }
 
 # terraform.tfvars (gitignored)
-cloudflare_api_token = "actual-token-here"
+cloudflare_api_token = "<cloudflare-api-token>"
 
 # Or use environment variables
-# export TF_VAR_cloudflare_api_token="actual-token-here"
+# export TF_VAR_cloudflare_api_token="<cloudflare-api-token>"
 ```
 
 ### 5. Use Separate Directories per Environment (RECOMMENDED)

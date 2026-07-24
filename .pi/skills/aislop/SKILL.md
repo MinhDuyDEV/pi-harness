@@ -1,7 +1,9 @@
 ---
 name: aislop
-version: 1.0.0
-description: "Use when checking for AI-generated code slop — narrative comments, swallowed exceptions, console.log leftovers, as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind"
+description: Use when checking for AI-generated code slop — narrative comments, swallowed exceptions, console.log leftovers,
+  as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind
+metadata:
+  version: 1.0.0
 ---
 
 # AI Slop Detection
@@ -43,7 +45,7 @@ The code is handwritten; the slop is already cleaned up; one-line change that's 
 - Read the diff, not just the final file.
 - Check for narrative. Agents narrate; humans don't.
 - Run `rg 'console\.(log|warn|error)' --type ts` before commit.
-- Run `npx fallow dead --format json` before merge.
+- Run your project's dead-code gate before merge (e.g. `npx @earendil-works/fallow dead-code`; in the pikit source checkout, `npm run quality:fallow`).
 - Don't approximate — each slop finding is a yes/no.
 
 ## Common Mistakes
@@ -53,6 +55,14 @@ Calling structural issues "slop" (it's design, use a different skill); opinion m
 ## Red Flags
 
 "Let me think about this" comment; `catch (e) {}`; `as any`; wrapper that does nothing; `helper.ts`; `console.log` left; dead code; TODO without owner; copy-paste block; unused import; "I'll clean later".
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "It works, the slop is cosmetic" | The next agent reads narrative comments as intent + thin wrappers as API; cosmetic-now is structural debt later. |
+| "It's just one console.log / one as any" | One is the pattern — the checklist catches the first because the second is free once the first ships. |
+| "I wrote it, I know what it means" | The reader is the next session, not you; generic names mislead a fresh reader. |
 
 ## Anti-Patterns
 

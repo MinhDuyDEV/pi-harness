@@ -1,11 +1,13 @@
 ---
 name: defense-in-depth
-description: Use when invalid data causes failures deep in execution, requiring validation at multiple system layers - validates at every layer data passes through to make bugs structurally impossible
-version: 1.0.0
-tags: [code-quality, debugging]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when invalid data causes failures deep in execution, requiring validation at multiple system layers - validates
+  at every layer data passes through to make bugs structurally impossible
+metadata:
+  version: 1.0.0
+  tags:
+  - code-quality
+  - debugging
+  dependencies: []
 ---
 
 # Defense in Depth
@@ -76,6 +78,14 @@ Validation only at network (deep code trusts the type, gets garbage); validation
 ## Red Flags
 
 `as any` near boundary; validation only at network; "we trust this source"; no validation for env / queue; validation in middle of function (should be at boundary); try/catch for validation (errors are data); no DB constraints; "the type system catches it" (catches what you typed, not what user sent).
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I validated at the entry point, that's enough" | One-layer validation moves the bug; the layer that uses the data must re-validate. |
+| "The caller already checks it" | Callers change; your layer's contract is its own validation, not the caller's memory. |
+| "Validating twice is redundant" | Redundancy is the point — each layer makes the next bug structurally impossible. |
 
 ## Anti-Patterns
 

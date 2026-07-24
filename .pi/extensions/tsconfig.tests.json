@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "bun-types"]
+  },
+  "include": ["../extensions/**/*.test.ts"],
+  "exclude": ["../artifacts/**", "../npm/**", "../git/**"]
+}

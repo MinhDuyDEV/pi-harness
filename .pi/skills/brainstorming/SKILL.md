@@ -1,11 +1,14 @@
 ---
 name: brainstorming
-description: Use when creating or developing, before writing code or implementation plans - refines rough ideas into fully-formed designs through collaborative questioning, alternative exploration, and incremental validation. Don't use during clear 'mechanical' processes
-version: 1.1.0
-tags: [planning, workflow]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when creating or developing, before writing code or implementation plans - refines rough ideas into fully-formed
+  designs through collaborative questioning, alternative exploration, and incremental validation. Don't use during clear 'mechanical'
+  processes
+metadata:
+  version: 1.1.0
+  tags:
+  - planning
+  - workflow
+  dependencies: []
 ---
 
 # Brainstorming
@@ -58,24 +61,21 @@ Map the gap before proposing. A simpler approach often exists — say so.
 4. **Validate** — incremental check-in: "does this match what you wanted?" before going deeper.
 5. **Hand off** — once design is approved, switch to `planning-and-task-breakdown` (or `incremental-implementation` for trivial slices).
 
-## Cheat Sheet
+## Compact decision guide
 
-| Situation | Default action |
+- Concrete single-file request: skip brainstorming and implement.
+- Vague or design-heavy request: surface the riskiest unknown, then show variants.
+- New library/framework: point to official source before committing.
+
+Avoid five questions at once, silent assumptions, premature plans, and using YAGNI to dismiss a stated requirement. Prefer a short evidence-backed question over a long speculative answer.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
 |---|---|
-| Spec concrete, single-file | Skip brainstorm, implement. |
-| Spec concrete, multi-file or design-heavy | One question on the riskiest unknown, then plan. |
-| Spec vague | Variants first, then interview. |
-| "Sanity check" / "prototype" | Use `prototype` skill, not this one. |
-| Multiple valid approaches | Show 2–4 variants with trade-offs. |
-| New library / framework | Point at official docs/source. |
-
-## Red Flags
-
-Skipping variants for a design decision; asking 5 questions in one message (overwhelming); "we can add caching later" hand-waving in a production-bound design; starting code/plan before user approval; "YAGNI" used to dismiss the user's stated requirement (use it against speculative creep, not stated requirements).
-
-## Anti-Patterns
-
-**The 200-word answer** when 2–4 variants would surface the same trade-off; **the leading question** ("Should we use X, which is obvious?") collapses the brainstorm; **the silent assumption** picks a stack/pattern without naming it; **premature implementation** drafts a plan before the user approves the design.
+| "I have the idea, let me build it" | An idea ≠ a design; pressure-test it before code locks the wrong shape. |
+| "The first approach is fine" | The first approach is the obvious one; the skill explores alternatives because obvious is usually shallow. |
+| "Questioning will slow us down" | Questioning now is faster than rebuilding after the wrong design ships. |
 
 ## Skill Result Contract
 

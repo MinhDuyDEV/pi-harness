@@ -1,146 +1,77 @@
 # pikit
 
-Batteries-included configuration kit for [pi](https://github.com/badlogic/pi-mono) coding agent. Installs as a pi package — adds extensions, agents, skills, prompts, and themes in one shot.
+`pikit` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## Install
+## Requirements
 
-```bash
-pi install git:github.com/heyhuynhgiabuu/pikit
-```
+- Node.js `>=22.19.0`
+- npm `>=11.12.1`
+- Pi Coding Agent `0.81.1` (tested against Pi 0.81.1; the package uses the active host's Pi packages through peer dependencies)
 
-**Compatibility:** requires `@earendil-works/pi-coding-agent` `0.65.0+` and is verified against 0.79.0.
-
-Then install the package dependencies declared in `.pi/settings.json`:
+## Install as a Pi package
 
 ```bash
-pi install
+pi install npm:pikit
 ```
 
-This pulls in the delegation stack (`@tintinweb/pi-subagents`, `@tintinweb/pi-tasks`, `pi-teams`) and other packages automatically. `TaskExecute` is expected to work directly against `@tintinweb/pi-subagents` without a custom bridge.
+Restart Pi after installation. Pi discovers the package manifest resources:
 
-## What's Included
+- `.pi/extensions/`
+- `.pi/skills/`
+- `.pi/prompts/`
+- `.pi/themes/`
 
-### Extensions (15)
+Pi package discovery does **not** automatically apply this repository's root `AGENTS.md`, `.pi/settings.json`, or `.pi/agents/` directory. Those files configure and document the source-checkout profile:
 
-Extensions auto-loaded from `.pi/extensions/`:
+- Run `/init` in a consuming repository to create or update that repository's own `AGENTS.md` from observed facts.
+- Install `@heyhuynhgiabuu/pi-task` separately if that repository needs delegated task agents.
+- Copy or adapt `.pi/agents/` only when project-specific pi-task overrides are wanted; otherwise use pi-task's bundled agents.
+- Never copy provider credentials, personal model defaults, caches, `.pi/MEMORY.md`, or `.pi/artifacts/`.
 
-| Extension             | Purpose                                                                                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `setup-global-agents` | Auto-installs `~/.pi/agent/AGENTS.md` on first run (non-destructive)                                                                                                     |
-| `deepseek-provider`   | DeepSeek provider with thinking mode support (reasoning_content)                                                                                                         |
-| `mimo-provider`       | Xiaomi MiMo provider via OpenAI-compatible API                                                                                                                           |
-| `usage-tracker`       | Token usage tracking via `/usage` command                                                                                                                                |
-| `safety`              | Unified safety module with composable rule system (26 rules, block/confirm)                                                                                              |
-| `srcwalk`             | Code intelligence via `srcwalk` binary                                                                                                                                   |
-| `webclaw`             | Web scraping via `webclaw` CLI binary                                                                                                                                    |
-| `tps`                 | Tokens-per-second tracking during streaming                                                                                                                              |
-| `dcp`                 | Dynamic context pruning — compress conversation to stay under token limits                                                                                               |
-| `tui`                 | Fixed-editor compositor with scrollable chat, sticky editor/footer, right sidebar, selection-to-clipboard, animated streaming prompt — overrides Pi's default TUI layout |
+## Source-checkout profile
 
-### Agents (7)
+When this repository is used directly, `.pi/settings.json` provides a pinned project profile for task delegation, diagnostics, source lookup, and web/documentation tools. Optional packages remain optional at runtime: prompts and policies must degrade explicitly when a tool is unavailable.
 
-Specialist agent definitions in `.pi/agents/`:
+Context ownership is intentionally layered:
 
-| Agent      | Role                                            |
-| ---------- | ----------------------------------------------- |
-| `worker`   | Small implementation tasks (1-3 files)          |
-| `explore`  | Read-only codebase search and pattern discovery |
-| `scout`    | External research and documentation lookup      |
-| `reviewer` | Code review, debugging, security audit          |
-| `planner`  | Architecture and implementation planning        |
-| `vision`   | UI/UX and accessibility analysis                |
-| `painter`  | Image generation and editing                    |
+- `AGENTS.md` — maintenance rules for this package checkout.
+- `.pi/APPEND_SYSTEM.md` — concise, repository-agnostic runtime policy.
+- `.pi/skills/*/SKILL.md` — detailed workflows loaded on demand.
+- `.pi/prompts/*.md` — user-invoked lifecycle orchestration.
+- `.pi/agents/*.md` — role-specific pi-task contracts loaded only in configured checkouts.
 
-### Prompts (7)
+`.pi/AGENTS.md` is intentionally absent because Pi discovers project context from root or nested `AGENTS.md` files, not from that duplicate location.
 
-Slash-command workflows in `.pi/prompts/`. Each core command has flag-based sub-tracks — no separate prompt file needed.
+## Prompt lifecycle
 
-| Command     | Flags                                                                                 | Coverage                                                                             |
-| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `/create`   | `--design`, `--spec-only`, `--type`                                                   | Clarify ambiguity → design exploration → spec writing → workspace setup              |
-| `/fix`      | `--refactor`, `--scope minimal\|moderate\|aggressive`                                 | Bug fix (default `--scope minimal`) or refactoring with scope levels                 |
-| `/init`     | `--context`, `--user`, `--all`, `--deep`                                              | Core setup, planning context (roadmap/state), or user profile                        |
-| `/plan`     | `--split`, `--architecture`                                                           | Implementation plan with institutional research, goal-backward analysis, safety gate |
-| `/research` | `--quick`, `--thorough`, `--alternatives`                                             | Evidence-gathering or alternatives/tradeoffs generation                              |
-| `/ship`     | `--pr`                                                                                | Execute tasks wave-by-wave, verify, commit, optionally create PR                     |
-| `/verify`   | `--quick`, `--full`, `--fix`, `--test`, `--review`, `--review --bloat`, `--ui-review` | Gates, completeness tracking, test writing, code review, bloat delete-list, UI audit |
+- `/init` — inspect a target repository and create or safely merge project guidance.
+- `/create` — specify and implement a change.
+- `/fix` — diagnose and fix a defect from root cause.
+- `/plan` — write an executable plan without implementation.
+- `/research` — gather decision-ready evidence.
+- `/verify` — run behavior, quality, and scope verification.
+- `/ship` — perform final review and repository-defined gates.
 
-**Merged into core:** clarify, explore, design, commit, pr, test, refactor, review-codebase, ui-review, improve-architecture — all now available as flags on the 7 core commands above.
-
-### Skills (75)
-
-Reusable procedures in `.pi/skills/` — loaded on demand:
-
-Covers: accessibility auditing, browser automation, Cloudflare, context management, Core Data, debugging, design systems, Figma, frontend design, git worktrees, mockup-to-code, Obsidian, PDF extraction, Playwright, React best practices, Resend, Supabase, Swift/SwiftUI, TDD, Vercel deployment, and more.
-
-### Themes
-
-two canonical palettes: `catppuccin.json` and `tokyo-night.json` are built from their respective canonical sources and not from the opencode translation.
-
-## Three-Layer Delegation
-
-pikit configures a three-layer delegation stack:
-
-```
-Layer 1: @tintinweb/pi-subagents  →  Fast in-process agents
-Layer 2: @tintinweb/pi-tasks      →  DAG task orchestration + auto-cascade
-Layer 3: pi-teams                  →  Multi-process tmux coordination
-```
-
-See `.pi/APPEND_SYSTEM.md` for the full delegation guide with decision flowchart and combo patterns.
-
-## Global Agent Rules
-
-On first session start, pikit auto-installs `~/.pi/agent/AGENTS.md` if it doesn't exist. This file contains universal rules (tone, execution approach, tool priorities, edit protocol) that stack into every project. The template now includes a compact **Behavioral Kernel** that keeps Pi agents anchored on four always-on habits: clarify uncertainty, choose the smallest working change, keep diffs surgical, and define proof before acting.
-
-The template lives at `.pi/templates/AGENTS.md`. To update after install:
-
-```bash
-cp .pi/templates/AGENTS.md ~/.pi/agent/AGENTS.md
-```
-
-To customize, edit `~/.pi/agent/AGENTS.md` directly — it's your personal config, not overwritten on updates.
-
-If you update the kernel source in `.pi/templates/AGENTS.md`, edit that file directly — the Operating Principles section is the single source of truth.
-
-## Configuration
-
-pikit's settings live in `.pi/settings.json`. Key defaults:
-
-- **Provider**: `github-copilot`
-- **Model**: `claude-opus-4.6`
-- **Thinking**: `high`
-- **Compaction**: enabled (reserves 16K tokens)
-- **Retry**: 3 retries with exponential backoff
-
-Override any setting in your project's `.pi/settings.json` — project settings merge over pikit's.
+Prompt frontmatter uses only Pi-supported fields. Prompt bodies declare skill dependencies as `skill: name`; they do not assume a dedicated skill tool or hard-code this repository's commands into consumer workflows.
 
 ## Verification
 
-From the repo root:
-
 ```bash
-npm test                      # all 15 extension test files
-npm run typecheck             # tsc --noEmit (.pi/extensions)
-npm run validate:skills:ci
+npm run validate:skills
+npm run typecheck
+npm run typecheck:extensions
+npm run test:all
+npm run package:check
+npm run pack:check
+npm run smoke:resources
+npm run smoke:packed
+npm run check
 ```
 
-**Anti-bloat workflow** (before merge):
+Before publishing, run:
 
-- `/verify --review --bloat` — diff-only tagged delete-list (`delete:`, `stdlib:`, `yagni:`, `shrink:`)
-- `/fix "..." --scope minimal` — smallest root-cause fix; note lazier alternatives in one line
-- Repo-wide audit — load the `fallow` skill, section "Repo-wide bloat audit"
-- Deferred shortcuts — mark with `// pikit: ceiling, upgrade path` and harvest via `code-cleanup` skill
+```bash
+npm run release:check
+```
 
-Optional for personal greenfield work: `pi install git:github.com/DietrichGebert/ponytail` (not included in pikit defaults).
-
-## Customizing
-
-- **Add agents**: create `.pi/agents/<name>.md` with frontmatter (`model`, `description`)
-- **Add prompts**: create `.pi/prompts/<name>.md` — available as `/<name>`
-- **Add extensions**: create `.pi/extensions/<name>.ts` — auto-loaded on startup
-- **Add skills**: create `.pi/skills/<name>/SKILL.md` — loaded on demand
-
-## License
-
-MIT
+The release gate runs the full project check, validates the npm payload, loads resources from an extracted package in an empty consumer directory, and performs a production dependency audit.

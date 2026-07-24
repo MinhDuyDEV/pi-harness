@@ -231,11 +231,11 @@ describe("extractCompactionOutcome — authoritative outcomes", () => {
   });
 
   it("correctly maps reason strings", () => {
-    const reasons: Array<{ reason: string; expected: string }> = [
+    const reasons = [
       { reason: "manual", expected: "manual" },
       { reason: "threshold", expected: "threshold" },
       { reason: "overflow", expected: "overflow" },
-    ];
+    ] as const;
     for (const { reason, expected } of reasons) {
       const outcome = extractCompactionOutcome({ reason }, 0, 0, false);
       expect(outcome.reason).toBe(expected);

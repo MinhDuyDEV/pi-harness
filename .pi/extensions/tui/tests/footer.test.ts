@@ -1,6 +1,5 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createDefaultFooterState } from "../footer.js";
 import {
   editorBorderColorForThinkingLevel,
   editorPromptForState,
@@ -11,17 +10,14 @@ import { displayedTurnUsage, restoreUsageSnapshotFromBranch } from "../usage.js"
 
 
 test("editor prompt keeps glyph stable and only changes by state/color", () => {
-  assert.equal(
-    editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "medium" }),
-    " ",
-  );
+  const idlePrompt = editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "medium" });
   assert.equal(
     editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "high" }),
-    " ",
+    idlePrompt,
   );
   assert.equal(
     editorPromptForState({ isShell: false, streamingPrompt: null, thinkingLevel: "off" }),
-    " ",
+    idlePrompt,
   );
   assert.equal(
     editorPromptForState({ isShell: false, streamingPrompt: "≈", thinkingLevel: "high" }),

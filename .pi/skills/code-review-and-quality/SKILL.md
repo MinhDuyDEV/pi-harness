@@ -1,11 +1,15 @@
 ---
 name: code-review-and-quality
-description: Use before merge, after subagent work, or when asked for a code review. Bloat Review mode hunts over-engineering only (delete-list with tagged findings).
-version: 1.0.0
-tags: [review, code-quality, verification]
-dependencies: [verification-before-completion]
-agent_types: [reviewer]
-tools: [grep, find, read, bash]
+description: Use before merge, after subagent work, or when asked for a code review. Bloat Review mode hunts over-engineering
+  only (delete-list with tagged findings).
+metadata:
+  version: 1.0.0
+  tags:
+  - review
+  - code-quality
+  - verification
+  dependencies:
+  - verification-before-completion
 ---
 
 # Code Review & Quality
@@ -63,6 +67,14 @@ LGTM-by-default (review passes when nothing flagged); style nits as review (run 
 ## Self-Quiz
 
 Did I find at least one `[delete]` / `[simplify]`? (If not, the review was shallow.) Are all `[blocker]`s named with the violated invariant? Did I run the verification command and see it pass? Are unrelated fixes `[NOTICED BUT NOT TOUCHING]`, not silently merged?
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "The author says it works" | Author self-report is the bias review exists to counter; read the diff, not the claim. |
+| "It passed CI" | CI tests the happy path; review catches scope, dead code, and shallow modules CI can't. |
+| "Bloat review = delete aggressively" | Bloat mode is over-engineering only; tag load-bearing complexity, don't delete blindly. |
 
 ## Skill Result Contract
 

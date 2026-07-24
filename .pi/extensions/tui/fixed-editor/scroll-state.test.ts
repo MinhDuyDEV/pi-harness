@@ -39,8 +39,7 @@ describe("createScrollState", () => {
 
 describe("scrollBy", () => {
   it("returns same object for zero delta", () => {
-    const s = createScrollState(20);
-    s.maxOffset = 50; // bypass frozen for test setup
+    const s = { ...createScrollState(20), maxOffset: 50 };
     const next = scrollBy(s, 0);
     expect(next).toBe(s);
   });

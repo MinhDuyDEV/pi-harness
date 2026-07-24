@@ -64,9 +64,6 @@ export function editorBorderColorForThinkingLevel(thinkingLevel: string): ThemeC
   }
 }
 
-export function editorPromptColorForThinkingLevel(thinkingLevel: string): ThemeColor {
-  return editorBorderColorForThinkingLevel(thinkingLevel);
-}
 
 export function streamingPromptFramesForThinkingLevel(
   thinkingLevel: string,

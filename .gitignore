@@ -1,18 +1,7 @@
-.beads/
-.opencode/
-docs/
-!.pi/docs/
-!.pi/docs/**
-
-# OS noise
+# OS and editor noise
 .DS_Store
 
-# Pi auto-generated sandbox profiles
-.pi/sandbox/
-.pi/docs/
-.pi/artifacts/
-
-# Node / package manager noise
+# Node tooling
 node_modules/
 coverage/
 *.tsbuildinfo
@@ -21,71 +10,47 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 *.tgz
+
+# Local secrets
 .env
 .env.*
 !.env.example
 
-# Pi auto-generated checkpoints (session state)
-.pi/task-registry.json
-.pi/checkpoints/
-
-# Pi local caches / generated dirs
-.pi/harness-runs/
+# Pi runtime state and caches
+.pi/artifacts/
+.pi/MEMORY.md
 .pi/git/
 .pi/npm/
-.pi/extensions/node_modules/
-.pi/extensions/bun.lock
-.pi/extensions/package-lock.json
-.pi/extensions/**/package-lock.json
-.pi/extensions/**/node_modules/
-.pi/tasks/
-.pi/.pi/
 .pi/cache/
 .pi/dcp-state/
 .pi/sessions/
-.pi/extensions/eko24ive-pi-ask.json
+.pi/harness-runs/
+.pi/checkpoints/
+.pi/tasks/
+.pi/task-registry.json
 .pi/task-session-history.json
-
-
-.pi/fff/
-.pi/pi-pretty/
-.pi/pi-crash.log
+.pi/trust.json
 .pi/auth.json
+.pi/models.json
+.pi/mcp.json
 .pi/mcp-cache.json
 .pi/mcp-npx-cache.json
-.pi/mcp.json
-.pi/models.json
-.pi/pi-sub-bar-settings.json
-.pi/pi-sub-core-settings.json
+.pi/pi-crash.log
+.pi/extensions/**/node_modules/
+.pi/extensions/**/package-lock.json
+.pi/extensions/**/bun.lock
+
+# Local extension/theme backups
 .pi/extensions/*.bak
-.pi/.openpi-goal.json
-.pi/.openpi-plan.json
-.pi/.openpi-workspace-trust.json
-.pi/trust.json
-.pi/pi-pretty.json
-.pi/pi-diff.json
-.pi/themes/*
-!.pi/themes/catppuccin.json
-!.pi/themes/tokyo-night.json
-!.pi/themes/README.md
+.pi/extensions/herdr-agent-state.ts
+.pi/themes/*.local.json
 
-# Pi skill source manifests are committed; runtime lock/caches are local.
-.pi/skills-lock.json
-.pi/MEMORY.md
-
-# SQLite databases (local state, not source code)
+# Database state
 *.db
 *.db-shm
 *.db-wal
 *.db-journal
-.pi.zip
 
-# bv (beads viewer) local config and caches
-.bv/
-.pi/.openpi-sync.json
-
-# Cursor SDK local session state
-.pi/cursor-sdk*.json
-
-# playwright-cli
-.pi/.playwright-cli
+# Local tool caches and temp dirs
+.fallow/
+.quality-scan-temp*/

@@ -4,7 +4,7 @@
 
 ```bash
 # Environment variable
-export CLOUDFLARE_API_TOKEN='your-token-here'
+export CLOUDFLARE_API_TOKEN='<cloudflare-api-token>'
 
 # curl
 curl "https://api.cloudflare.com/client/v4/zones" \

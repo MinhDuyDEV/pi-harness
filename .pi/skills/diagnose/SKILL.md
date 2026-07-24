@@ -1,7 +1,9 @@
 ---
 name: diagnose
-description: Use when the user says "diagnose this" / "debug this", reports a bug, says something is broken/throwing/failing, or describes a performance regression.
-version: 1.0.0
+description: Use when the user says "diagnose this" / "debug this", reports a bug, says something is broken/throwing/failing,
+  or describes a performance regression.
+metadata:
+  version: 1.0.0
 ---
 
 # Diagnose

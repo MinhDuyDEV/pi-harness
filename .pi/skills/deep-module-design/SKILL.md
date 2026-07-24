@@ -1,11 +1,13 @@
 ---
 name: deep-module-design
 description: Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.
-version: 1.0.0
-tags: [architecture, code-quality, ousterhout]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: [grep, find, read, bash]
+metadata:
+  version: 1.0.0
+  tags:
+  - architecture
+  - code-quality
+  - ousterhout
+  dependencies: []
 ---
 
 # Deep Module Design
@@ -90,6 +92,14 @@ Shallow modules; exposed state; config in args (env); "two ways to do it"; tests
 ## Red Flags
 
 10+ public methods; `addX`/`addY`/`addZ`; public state; config in args; "don't call from outside"; tests mock internals; pass-through; "two ways to do it"; 3+ methods in sequence.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "It works, the interface is fine" | Working ≠ deep; a shallow interface taxes every caller. Check the Depth Metric. |
+| "Splitting it more makes it simpler" | Splitting a deep module into shallow ones adds integration complexity; deep = complex inside, simple interface. |
+| "The refactor is too risky" | Shallow modules tax every future change; the refactor cost is paid once, the shallow tax forever. |
 
 ## Anti-Patterns
 

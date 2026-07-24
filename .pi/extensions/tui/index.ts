@@ -1,27 +1,25 @@
 
 import {
-  copyToClipboard,
   isBashToolResult,
   isEditToolResult,
   isWriteToolResult,
   VERSION,
+  copyToClipboard,
   type ExtensionAPI,
   type ExtensionContext,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import { visibleWidth, type TUI } from "@earendil-works/pi-tui";
-import { watch as fsWatch, type FSWatcher } from "node:fs";
-import { basename as pathBasename, dirname as pathDirname } from "node:path";
 import { createQueueTracker, createDefaultSidebarState, renderSidebar, sidebarTotalWidth } from "./sidebar.js";
 import {
   hasOpenTodos,
-  findCanonicalTodo,
   scanTodos,
   renderTodosWidget,
   type TodosState,
 } from "./todos-panel.js";
+import { createTodoFileWatcher } from "./todo-watcher.js";
 import { createDefaultFooterState } from "./footer.js";
-import { streamingPromptFramesForThinkingLevel } from "./editor-prompt.js";
+import { createStreamingPromptAnimator } from "./streaming-prompt.js";
 import {
   refreshGitInfo,
   invalidateGitStatus,
@@ -30,11 +28,8 @@ import {
 } from "./git-status.js";
 import { AmpBoxEditor } from "./editor.js";
 import { FixedEditorCompositor, emergencyTerminalModeReset } from "./fixed-editor/compositor.js";
+import { findRenderableContainerWithChild, isRenderable } from "./render-tree.js";
 import { readPiTuiSettings, type PiTuiSettings } from "./settings.js";
-import {
-  findRenderableContainerWithChild,
-  isRenderable,
-} from "./render-tree.js";
 import {
   pickRandomWorkingQuote,
   workingStatusSpacerLines,
@@ -51,8 +46,6 @@ import {
 } from "./usage.js";
 
 /** Lightweight wave animation for the editor streaming prompt. ~200ms for smooth feel. */
-const DEFAULT_STREAMING_PROMPT_FRAMES = ["≈", "≋", "⋍", "≋"];
-const STREAMING_PROMPT_INTERVAL_MS = 200;
 
 const PROVIDER_DISPLAY: Record<string, string> = {
   anthropic: "Anthropic",
@@ -107,84 +100,24 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       let todosState: TodosState = { items: [], sourceFile: null, sourceCount: 0 };
   const footer = createDefaultFooterState();
   const sidebar = createDefaultSidebarState();
-  let footerInstalled = false;
   let piTuiSettings: PiTuiSettings = {};
 
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let clipboardStatusTimer: ReturnType<typeof setTimeout> | null = null;
   let progressKeepalive: ReturnType<typeof setInterval> | null = null;
   let turnStartTime = 0;
-  let todosWatcher: FSWatcher | null = null;
-  let todosWatchDebounce: ReturnType<typeof setTimeout> | null = null;
-  let lastNotifiedOpenCount = -1;
-
-  // ── Todo file watcher ────────────────────────────────────────────
-  // Watches the canonical TODO.md so any change (editor, bash, other
-  // extensions, external) triggers an immediate widget refresh. The
-  // tool_result handler only catches Edit/Write/Bash results, so this
-  // is the safety net for vim, sed, and any out-of-band edit.
-  const TODO_WATCH_DEBOUNCE_MS = 100;
-
-  function teardownTodosWatcher(): void {
-    if (todosWatcher) {
-      todosWatcher.close();
-      todosWatcher = null;
-    }
-    if (todosWatchDebounce) {
-      clearTimeout(todosWatchDebounce);
-      todosWatchDebounce = null;
-    }
-  }
-
-  function refreshTodosWithNotify(cwd: string, source: string, piCtx: ExtensionContext): void {
-    refreshTodos(cwd);
-    const openCount = todosState.items.filter((it) => !it.done).length;
-    // Only notify when the open count actually changes — avoids
-    // notification spam while still surfacing meaningful updates.
-    if (openCount !== lastNotifiedOpenCount) {
-      lastNotifiedOpenCount = openCount;
-      try {
-        piCtx.ui.notify(`Todo list refreshed (${openCount} open, via ${source})`, "info");
-      } catch {
-        // best-effort; some UIs may not implement notify
-      }
-    }
-  }
-
-  function watchTodosFile(cwd: string, piCtx: ExtensionContext): void {
-    teardownTodosWatcher();
-    const todoPath = findCanonicalTodo(cwd);
-    if (!todoPath) return;
-    const dir = pathDirname(todoPath);
-    const target = pathBasename(todoPath);
-    try {
-      todosWatcher = fsWatch(dir, (eventType, changedFilename) => {
-        if (!changedFilename || changedFilename !== target) return;
-        if (todosWatchDebounce) clearTimeout(todosWatchDebounce);
-        todosWatchDebounce = setTimeout(() => {
-          todosWatchDebounce = null;
-          refreshTodosWithNotify(cwd, "file-watch", piCtx);
-          scheduleRefresh(piCtx);
-        }, TODO_WATCH_DEBOUNCE_MS);
-      });
-    } catch {
-      // fs.watch can throw on missing dirs / permission errors; skip silently
-      todosWatcher = null;
-    }
-  }
+  const todoFileWatcher = createTodoFileWatcher(
+    (cwd) => {
+      refreshTodos(cwd);
+      return todosState.items.filter((item) => !item.done).length;
+    },
+    (ctx) => scheduleRefresh(ctx),
+  );
 
   // ── Streaming prompt state ─────────────────────────────────────────────
-  let editorStreamingPrompt: string | null = null;
-  let streamPromptAnimTimer: ReturnType<typeof setInterval> | null = null;
-  let streamPromptAnimFrame = 0;
   let lastCompletedTurnUsage: UsageTokenMetrics = emptyUsageTokenMetrics();
   let currentCompletedTurnUsage: UsageTokenMetrics = emptyUsageTokenMetrics();
   let streamingTurnUsage: UsageTokenMetrics = emptyUsageTokenMetrics();
-
-  function setEditorStreamingPrompt(prompt: string | null) {
-    editorStreamingPrompt = prompt;
-    currentEditor?.setStreamingPrompt(prompt);
-  }
 
   function publishTurnUsage() {
     const metrics = displayedTurnUsage(lastCompletedTurnUsage, currentCompletedTurnUsage, streamingTurnUsage);
@@ -202,44 +135,6 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     // `Connecting neurons...`). Keep the native loader single-line.
     // Fixed-editor spacing is handled separately via workingStatusSpacerLines().
     ctx.ui.setWorkingMessage(pickRandomWorkingQuote());
-  }
-
-  function startFooterAnim(ctx: ExtensionContext) {
-    const frames = streamingPromptFramesForThinkingLevel(footer.thinkingLevel);
-    if (editorStreamingPrompt === frames[0]) return;
-
-    // Restore Pi's native animated working indicator (spinner).
-    if (ctx.hasUI) {
-      applyWorkingRowPadding(ctx);
-      ctx.ui.setWorkingIndicator();
-    }
-
-    // Editor wave animation is TUI-only — no editor in RPC/JSON/print modes.
-    if (ctx.mode !== "tui") return;
-
-    // Start lightweight wave animation for editor prompt character.
-    streamPromptAnimFrame = 0;
-    setEditorStreamingPrompt(frames[0]);
-    currentEditor?.setThinkingLevel(footer.thinkingLevel);
-
-    if (!streamPromptAnimTimer) {
-      streamPromptAnimTimer = setInterval(() => {
-        if (!footer.isStreaming) return;
-        const nextFrames = streamingPromptFramesForThinkingLevel(footer.thinkingLevel)
-          ?? DEFAULT_STREAMING_PROMPT_FRAMES;
-        streamPromptAnimFrame = (streamPromptAnimFrame + 1) % nextFrames.length;
-        setEditorStreamingPrompt(nextFrames[streamPromptAnimFrame]);
-      }, STREAMING_PROMPT_INTERVAL_MS);
-      streamPromptAnimTimer.unref?.();
-    }
-  }
-
-  function stopFooterAnim(ctx: ExtensionContext) {
-    setEditorStreamingPrompt(null);
-    if (streamPromptAnimTimer) {
-      clearInterval(streamPromptAnimTimer);
-      streamPromptAnimTimer = null;
-    }
   }
 
   // ── Refresh git info (fire-and-forget) ───────────────────────────────────
@@ -328,6 +223,11 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   let lastKnownGit: GitInfo | null = null;
 
   let currentEditor: AmpBoxEditor | null = null;
+  const streamingPrompt = createStreamingPromptAnimator(
+    footer,
+    () => currentEditor,
+    (ctx) => applyWorkingRowPadding(ctx),
+  );
   let compositor: FixedEditorCompositor | null = null;
   let tuiRef: any = null;
   let fixedEditorContainer: any = null;
@@ -353,7 +253,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     footer.isStreaming = false;
     footer.tokenCount = 0;
     footer.contextWindow = 0;
-    setEditorStreamingPrompt(null);
+    streamingPrompt.setPrompt(null);
     footer.cwd = ctx.cwd;
     footer.git = null;
     footer.thinkingLevel = "";
@@ -382,7 +282,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     refreshTodos(ctx.cwd);
     // Set up the file watcher so out-of-band edits (vim, sed, any tool
     // that doesn't match the path check below) still refresh the panel.
-    watchTodosFile(ctx.cwd, ctx);
+    todoFileWatcher.watch(ctx.cwd, ctx);
     piTuiSettings = readPiTuiSettings(ctx.cwd);
     fixedEditorEnabled = piTuiSettings.fixedEditorEnabled === true;
     applyWorkingRowPadding(ctx);
@@ -401,7 +301,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
           footer.thinkingLevel,
         );
 
-        currentEditor.setStreamingPrompt(editorStreamingPrompt);
+        currentEditor.setStreamingPrompt(streamingPrompt.getPrompt());
 
 
         // After editor is created, initialize the compositor if fixed-editor is enabled
@@ -415,7 +315,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
-    teardownTodosWatcher();
+    todoFileWatcher.dispose();
     if (compositor) {
       compositor.dispose();
       compositor = null;
@@ -432,7 +332,6 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     fixedWidgetContainerBelow = null;
     fixedFooterContainer = null;
     fixedEditorEnabled = false;
-    footerInstalled = false;
     footer.tui = null;
     if (refreshTimer) {
       clearTimeout(refreshTimer);
@@ -442,10 +341,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       clearTimeout(clipboardStatusTimer);
       clipboardStatusTimer = null;
     }
-    if (streamPromptAnimTimer) {
-      clearInterval(streamPromptAnimTimer);
-      streamPromptAnimTimer = null;
-    }
+    streamingPrompt.stop();
     if (progressKeepalive) {
       clearInterval(progressKeepalive);
       progressKeepalive = null;
@@ -521,7 +417,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
         progressKeepalive.unref();
       }
     }
-    startFooterAnim(ctx);
+    streamingPrompt.start(ctx);
     scheduleRefresh(ctx);
   });
 
@@ -595,7 +491,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       footer.turnElapsed = Date.now() - turnStartTime;
     }
     turnStartTime = 0;
-    stopFooterAnim(ctx);
+    streamingPrompt.stop();
     updateGit(ctx);
     refreshUI(ctx);
   });
@@ -608,15 +504,10 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     scheduleRefresh(ctx);
   });
 
-  pi.on("thinking_level_select", async (event, _ctx) => {
+  pi.on("thinking_level_select", async (event, ctx) => {
     footer.thinkingLevel = event.level;
     currentEditor?.setThinkingLevel(event.level);
-    if (streamPromptAnimTimer) {
-      streamPromptAnimFrame = 0;
-      const frames = streamingPromptFramesForThinkingLevel(event.level)
-        ?? DEFAULT_STREAMING_PROMPT_FRAMES;
-      setEditorStreamingPrompt(frames[0]);
-    }
+    if (footer.isStreaming) streamingPrompt.start(ctx);
     if (footer.tui) footer.tui.requestRender();
   });
 
@@ -697,7 +588,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
         piTuiSettings.editorPaddingX,
         footer.thinkingLevel,
       );
-      currentEditor.setStreamingPrompt(editorStreamingPrompt);
+      currentEditor.setStreamingPrompt(streamingPrompt.getPrompt());
 
       tryInitCompositor(tui, ctx);
       return currentEditor;
@@ -795,45 +686,43 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (changed && repaint) compositor.requestRepaint();
   }
 
-  /** Initialize the compositor if all conditions are met. */
-  function tryInitCompositor(tui: any, ctx: ExtensionContext) {
-    if (!fixedEditorEnabled) return;
-    if (!currentEditor) return;
-
-    const terminal = (tui as any).terminal;
+  function tryInitCompositor(tui: any, ctx: ExtensionContext): void {
+    if (!fixedEditorEnabled || !currentEditor) return;
+    const terminal = Reflect.get(tui, "terminal");
     if (!terminal || typeof terminal.write !== "function") return;
-
-    // If compositor already exists but the TUI changed (e.g., session
-    // resume: setEditorComponent fires again with a fresh tui object),
-    // the old input listener is bound to the old TUI and never fires
-    // on the new one. Dispose and recreate so the listener moves.
-    if (compositor && (compositor as unknown as { tui: unknown }).tui !== tui) {
+    if (compositor && Reflect.get(compositor, "tui") !== tui) {
       compositor.dispose();
       compositor = null;
     }
-
-    // If compositor already exists, re-discover containers for the new editor/footer.
     if (compositor) {
       syncFixedRenderables();
       return;
     }
+    installCompositor(tui, terminal, ctx);
+  }
 
-    compositor = new FixedEditorCompositor(tui, terminal, {
+  function installCompositor(tui: any, terminal: any, ctx: ExtensionContext): void {
+    compositor = new FixedEditorCompositor(tui, terminal, createCompositorOptions(tui, ctx));
+    try {
+      compositor.install();
+    } catch (error) {
+      compositor = null;
+      fixedEditorEnabled = false;
+      ctx.ui.notify(`[pi-tui] Failed to install compositor: ${String(error)}`, "error");
+      return;
+    }
+    syncFixedRenderables();
+  }
+
+  function createCompositorOptions(tui: any, ctx: ExtensionContext) {
+    return {
       getEditorLines: (width: number) => {
-        if (fixedEditorContainer)
-          return renderHiddenLines(fixedEditorContainer, width);
+        if (fixedEditorContainer) return renderHiddenLines(fixedEditorContainer, width);
         if (!currentEditor) return [];
-        return (
-          compositor?.renderHidden(currentEditor, width) ??
-          currentEditor.render(width)
-        );
+        return compositor?.renderHidden(currentEditor, width) ?? currentEditor.render(width);
       },
       getEditorText: () => currentEditor?.getText() ?? "",
       getStatusLines: (width: number) => {
-        // Sync first so fixedStatusContainer is resolved before we render.
-        // The above/below hooks do this too — we must not be the odd one out,
-        // otherwise the first status render returns [] because the reference
-        // is still null.
         syncFixedRenderables(false);
         const lines = renderHiddenLines(fixedStatusContainer, width, true);
         const pad = workingStatusSpacerLines(piTuiSettings.workingPaddingTop ?? 1);
@@ -841,54 +730,38 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       },
       getAboveWidgetLines: (width: number) => {
         syncFixedRenderables(false);
-        const queueLines = renderHiddenLines(fixedQueueContainer, width);
-        const widgetLines = renderHiddenLines(fixedWidgetContainerAbove, width);
-        return [...queueLines, ...widgetLines];
+        return [...renderHiddenLines(fixedQueueContainer, width), ...renderHiddenLines(fixedWidgetContainerAbove, width)];
       },
       getBelowWidgetLines: (width: number) => {
         syncFixedRenderables(false);
         return renderHiddenLines(fixedWidgetContainerBelow, width);
       },
-      getFooterLines: (width: number) =>
-        renderHiddenLines(fixedFooterContainer, width, true),
+      getFooterLines: (width: number) => renderHiddenLines(fixedFooterContainer, width, true),
       getSidebarWidth: (terminalWidth: number) => sidebarTotalWidth(sidebar, terminalWidth),
       getSidebarLines: (width: number, height: number) => renderSidebar(sidebar, width, height, {
-        subtext: (text) => ctx.ui.theme.fg("dim", text),
-        label: (text) => ctx.ui.theme.fg("accent", text),
-        success: (text) => ctx.ui.theme.fg("success", text),
-        error: (text) => ctx.ui.theme.fg("error", text),
-        warning: (text) => ctx.ui.theme.fg("warning", text),
+        subtext: (text: string) => ctx.ui.theme.fg("dim", text),
+        label: (text: string) => ctx.ui.theme.fg("accent", text),
+        success: (text: string) => ctx.ui.theme.fg("success", text),
+        error: (text: string) => ctx.ui.theme.fg("error", text),
+        warning: (text: string) => ctx.ui.theme.fg("warning", text),
       }),
-      getShowHardwareCursor: () =>
-        typeof tui.getShowHardwareCursor === "function" &&
-        tui.getShowHardwareCursor(),
+      getShowHardwareCursor: () => typeof tui.getShowHardwareCursor === "function" && tui.getShowHardwareCursor(),
       isStreaming: () => footer.isStreaming,
       keyboardScrollShortcuts: piTuiSettings.keyboardScrollShortcuts,
-      onCopySelection: async (text: string) => {
-        await copyToClipboard(text).catch(() => {
-          ctx.ui.setStatus("tui-copy", "Clipboard copy failed");
-          if (clipboardStatusTimer) clearTimeout(clipboardStatusTimer);
-          clipboardStatusTimer = setTimeout(() => {
-            ctx.ui.setStatus("tui-copy", undefined);
-            clipboardStatusTimer = null;
-          }, 2500);
-          clipboardStatusTimer.unref?.();
-        });
-      },
-    });
+      onCopySelection: async (text: string) => copyFixedSelection(text, ctx),
+    };
+  }
 
-        try {
-          compositor.install();
-        } catch (error) {
-          compositor = null;
-          fixedEditorEnabled = false;
-          ctx.ui.notify(
-            `[pi-tui] Failed to install compositor: ${String(error)}`,
-            "error",
-          );
-          return;
-        }
-        syncFixedRenderables();
+  async function copyFixedSelection(text: string, ctx: ExtensionContext): Promise<void> {
+    await copyToClipboard(text).catch(() => {
+      ctx.ui.setStatus("tui-copy", "Clipboard copy failed");
+      if (clipboardStatusTimer) clearTimeout(clipboardStatusTimer);
+      clipboardStatusTimer = setTimeout(() => {
+        ctx.ui.setStatus("tui-copy", undefined);
+        clipboardStatusTimer = null;
+      }, 2500);
+      clipboardStatusTimer.unref?.();
+    });
   }
 
   // ── Tool results ─────────────────────────────────────────────────────────
@@ -900,7 +773,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (isWriteToolResult(event) || isEditToolResult(event)) {
       const path = typeof event.input.path === "string" ? event.input.path : "";
       if (path.toLowerCase().includes("todo.md")) {
-        refreshTodosWithNotify(
+        todoFileWatcher.refresh(
           ctx.cwd,
           isEditToolResult(event) ? "edit" : "write",
           ctx,
@@ -912,7 +785,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       // Catches anything with "todo.md" (case-insensitive) in the command.
       const cmd = typeof event.input.command === "string" ? event.input.command : "";
       if (cmd.toLowerCase().includes("todo.md")) {
-        refreshTodosWithNotify(ctx.cwd, "bash", ctx);
+        todoFileWatcher.refresh(ctx.cwd, "bash", ctx);
         scheduleRefresh(ctx);
       }
     }

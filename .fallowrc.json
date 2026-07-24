@@ -4,13 +4,26 @@
     ".pi/extensions/*.ts",
     ".pi/extensions/*/index.ts",
     ".pi/extensions/**/*.test.ts",
-    ".pi/cli/*.mjs"
+    ".pi/skills/brave-search/*.js",
+    ".pi/skills/browser-tools/*.js",
+    "scripts/*.mjs",
+    "tests/**/*.ts",
+    "types/*.ts"
   ],
   "ignoreDependencies": [
     "@earendil-works/pi-ai",
     "@earendil-works/pi-coding-agent",
     "@earendil-works/pi-tui",
-    "@sinclair/typebox"
+    "@mozilla/readability",
+    "cheerio",
+    "jsdom",
+    "puppeteer",
+    "puppeteer-core",
+    "puppeteer-extra",
+    "puppeteer-extra-plugin-stealth",
+    "turndown",
+    "turndown-plugin-gfm",
+    "typebox"
   ],
   "ignorePatterns": [
     "**/node_modules/**",

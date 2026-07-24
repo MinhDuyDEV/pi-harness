@@ -37,14 +37,13 @@ export async function handleSessionBeforeCompact(
   event: SessionBeforeCompactEvent,
   ctx: ExtensionContext,
   config: DCPConfig,
-  nudge: { recordCompress: () => void },
 ): Promise<{ compaction?: unknown } | undefined> {
   const sessionId = ctx.sessionManager.getSessionFile() ?? ctx.cwd;
   const blocks = getBlocks(sessionId);
   const preparation = event.preparation;
   if (!preparation) return;
 
-  const prepLike = preparation as unknown as {
+  const prepLike = preparation as {
     messagesToSummarize?: readonly Message[];
     turnPrefixMessages?: readonly Message[];
     messages?: readonly Message[];
@@ -108,9 +107,7 @@ export async function handleSessionBeforeCompact(
           modifiedFiles: prepLike.fileOps?.modifiedFiles ?? [],
         },
       },
-      preparation as unknown as Parameters<
-        typeof enrichCompactionResult
-      >[1],
+      preparation as Parameters<typeof enrichCompactionResult>[1],
     );
     return { compaction: result };
   }
@@ -144,9 +141,7 @@ export async function handleSessionBeforeCompact(
   return {
     compaction: enrichCompactionResult(
       result,
-      preparation as unknown as Parameters<
-        typeof enrichCompactionResult
-      >[1],
+      preparation as Parameters<typeof enrichCompactionResult>[1],
     ),
   };
 }
@@ -156,14 +151,8 @@ export async function handleSessionBeforeTree(
   ctx: ExtensionContext,
   config: DCPConfig,
 ): Promise<{ summary?: unknown } | undefined> {
-  const prep = (event as Record<string, unknown>).preparation as unknown as {
-    userWantsSummary?: boolean;
-    entriesToSummarize?: readonly unknown[];
-    targetId?: string;
-    oldLeafId?: string;
-    commonAncestorId?: string;
-  };
-  if (!prep?.userWantsSummary) return;
+  const prep = toRecord(toRecord(event).preparation);
+  if (prep.userWantsSummary !== true) return;
   const sessionId = ctx.sessionManager.getSessionFile() ?? ctx.cwd;
   const entriesToSummarize = Array.isArray(prep.entriesToSummarize)
     ? prep.entriesToSummarize
@@ -171,7 +160,7 @@ export async function handleSessionBeforeTree(
   const deterministic = buildDeterministicSummary({
     messages: [],
     serializedConversation: serializeSessionEntries(entriesToSummarize),
-    previousSummary: `Branch navigation: ${prep.oldLeafId ?? "unknown"} -> ${prep.targetId ?? "unknown"}; common ancestor ${prep.commonAncestorId ?? "unknown"}.`,
+    previousSummary: `Branch navigation: ${stringValue(prep.oldLeafId) ?? "unknown"} -> ${stringValue(prep.targetId) ?? "unknown"}; common ancestor ${stringValue(prep.commonAncestorId) ?? "unknown"}.`,
     blocks: getBlocks(sessionId),
     persistentSummary: getPersistentSummary(sessionId),
     maxTranscriptLines: config.deterministicCompaction.maxTranscriptLines,
@@ -190,4 +179,12 @@ export async function handleSessionBeforeTree(
       },
     },
   };
+}
+
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? Object.fromEntries(Object.entries(value)) : {};
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }

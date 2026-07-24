@@ -1,43 +1,110 @@
 {
-	"name": "pikit",
-	"type": "module",
-	"bin": "./bin/cli.js",
-	"version": "1.0.0",
-	"description": "Batteries-included pi coding agent kit — extensions, agents, skills, prompts, and themes",
-	"keywords": [
-		"pi-package"
-	],
-	"license": "MIT",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/huynhgiabuu/pikit"
-	},
-	"devDependencies": {
-		"typescript": "^5.9.3"
-	},
-	"scripts": {
-		"start": "node scripts/serve-workbench.mjs",
-		"test": "npm run test:extensions",
-		"test:extensions": "node scripts/run-extension-tests.mjs",
-		"test:safety": "npx tsx .pi/extensions/safety/safety.test.ts",
-		"test:tui": "npx tsx --test .pi/extensions/tui/tests/fixed-editor.test.ts && npx tsx --test .pi/extensions/tui/tests/footer.test.ts && npx tsx --test .pi/extensions/tui/tests/render-tree.test.ts && npx tsx --test .pi/extensions/tui/tests/sidebar.test.ts",
-		"typecheck": "tsc --noEmit",
-		"postinstall": "cd .pi/extensions && npm install --ignore-scripts && npm rebuild better-sqlite3",
-		"install:hooks": "node scripts/install-git-hooks.mjs",
-		"setup": "npm run install:hooks && echo 'Ready.'"
-	},
-	"pi": {
-		"extensions": [
-			".pi/extensions"
-		],
-		"skills": [
-			".pi/skills"
-		],
-		"prompts": [
-			".pi/prompts"
-		],
-		"themes": [
-			".pi/themes"
-		]
-	}
+  "name": "pikit",
+  "version": "1.0.0",
+  "private": false,
+  "description": "A portable Pi Coding Agent package with curated extensions, skills, prompts, and themes.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "packageManager": "npm@11.12.1",
+  "scripts": {
+    "check": "npm run validate:skills && npm run package:check && npm run smoke:resources && npm run typecheck && npm run typecheck:extensions && npm run typecheck:extension-tests && npm run quality && npm run test:all",
+    "test": "npm run test:all",
+    "test:all": "npm run test:extensions && npm run test:skills",
+    "test:extensions": "node scripts/run-extension-tests.mjs .pi/extensions",
+    "test:skills": "node scripts/run-extension-tests.mjs tests",
+    "test:safety": "node scripts/run-extension-tests.mjs .pi/extensions/safety",
+    "test:tui": "node scripts/run-extension-tests.mjs .pi/extensions/tui",
+    "typecheck": "tsc --noEmit",
+    "typecheck:extensions": "tsc --noEmit -p .pi/extensions/tsconfig.json",
+    "typecheck:extension-tests": "tsc --noEmit -p .pi/extensions/tsconfig.tests.json",
+    "validate:skills": "node scripts/validate-skills.mjs",
+    "regen:skills": "node scripts/validate-skills.mjs --update",
+    "validate:skills:ci": "npm run validate:skills",
+    "package:check": "node scripts/validate-package.mjs",
+    "quality": "npm run quality:fallow && npm run quality:aislop",
+    "quality:fallow": "fallow dead-code",
+    "quality:aislop": "aislop ci --changes --human",
+    "smoke:resources": "node scripts/smoke-resources.mjs",
+    "smoke:packed": "node scripts/smoke-packed-resources.mjs",
+    "validate:package-payload": "node scripts/validate-package-payload.mjs",
+    "pack:check": "npm run validate:package-payload",
+    "release:check": "node scripts/release-check.mjs",
+    "prepublishOnly": "npm run release:check"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MinhDuyDEV/pi-harness.git"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "extensions",
+    "skills"
+  ],
+  "author": "Huynh Gia Buu",
+  "license": "MIT",
+  "files": [
+    "AGENTS.md",
+    "README.md",
+    "PROJECT.md",
+    "skills-lock.json",
+    "scripts",
+    "types",
+    "tsconfig.json",
+    "package.json",
+    ".pi/DESIGN.md",
+    ".pi/README.md",
+    ".pi/settings.json",
+    ".pi/agents",
+    ".pi/extensions",
+    ".pi/prompts",
+    ".pi/skills",
+    ".pi/templates",
+    ".pi/themes",
+    "!**/*.test.ts",
+    "!**/*.test.js",
+    "!**/*.test.d.ts",
+    "!.pi/extensions/rewind/PORT.md",
+    "!.pi/extensions/rewind/TESTING.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./.pi/extensions"
+    ],
+    "skills": [
+      "./.pi/skills"
+    ],
+    "prompts": [
+      "./.pi/prompts"
+    ],
+    "themes": [
+      "./.pi/themes"
+    ]
+  },
+  "overrides": {
+    "@hono/node-server": "2.0.11",
+    "adm-zip": "0.6.0",
+    "protobufjs": "7.6.5"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "1.1.38"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.81.1",
+    "@earendil-works/pi-coding-agent": "0.81.1",
+    "@earendil-works/pi-tui": "0.81.1",
+    "@types/node": "^24.0.0",
+    "bun-types": "1.3.10",
+    "aislop": "0.13.1",
+    "fallow": "3.7.1",
+    "tsx": "4.23.1",
+    "typebox": "1.1.38",
+    "typescript": "^5.9.3"
+  }
 }

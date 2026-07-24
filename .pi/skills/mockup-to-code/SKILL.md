@@ -1,11 +1,14 @@
 ---
 name: mockup-to-code
-description: Use when converting UI mockups, screenshots, Figma/Sketch designs, wireframes, or building component libraries from design systems into production-ready code
-version: 1.0.0
-tags: [ui, workflow]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when converting UI mockups, screenshots, Figma/Sketch designs, wireframes, or building component libraries
+  from design systems into production-ready code
+metadata:
+  version: 1.0.0
+  tags:
+  - ui
+  - workflow
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Mockup to Code

@@ -1,40 +1,66 @@
 #!/usr/bin/env node
+
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+
+const roots = process.argv.slice(2).length > 0 ? process.argv.slice(2) : [".pi/extensions"];
+const ignoredDirectories = new Set([".git", "node_modules", "dist", "build", "coverage"]);
+
+function collectTests(root) {
+  const absoluteRoot = resolve(root);
+  if (!existsSync(absoluteRoot)) {
+    throw new Error(`Test root does not exist: ${root}`);
+  }
+
+  const tests = [];
+  function visit(directory) {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        visit(path);
+      } else if (entry.isFile() && (entry.name.endsWith(".test.ts") || entry.name.endsWith(".test.mjs"))) {
+        tests.push(path);
+      }
+    }
+  }
+
+  visit(absoluteRoot);
+  return tests.sort();
+}
+
+function containsBunImport(path) {
+  return readFileSync(path, "utf8").includes('from "bun:test"') || readFileSync(path, "utf8").includes("from 'bun:test'");
+}
 
 function run(command, args) {
-	const result = spawnSync(command, args, { stdio: "inherit" });
-	if (result.status !== 0) process.exit(result.status ?? 1);
+  const result = spawnSync(command, args, { stdio: "inherit", shell: false });
+  if (result.error) {
+    console.error(`${command} could not be started: ${result.error.message}`);
+    return 1;
+  }
+  return result.status ?? 1;
 }
 
-const ROOT = process.cwd();
-const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "coverage"]);
-
-function findTestFiles(dir) {
-	const results = [];
-	for (const entry of readdirSync(dir)) {
-		if (SKIP_DIRS.has(entry)) continue;
-		const fullPath = join(dir, entry);
-		const stat = statSync(fullPath);
-		if (stat.isDirectory()) {
-			results.push(...findTestFiles(fullPath));
-		} else if (entry.endsWith(".test.ts") || entry.endsWith(".test.mjs")) {
-			results.push(relative(ROOT, fullPath));
-		}
-	}
-	return results;
+const tests = roots.flatMap(collectTests);
+if (tests.length === 0) {
+  console.error(`No test files found under: ${roots.join(", ")}`);
+  process.exit(1);
 }
 
-const testFiles = findTestFiles(join(ROOT, ".pi", "extensions")).sort();
-if (testFiles.length === 0) {
-	console.error("No test files found under .pi/extensions/");
-	process.exit(1);
+const bunTests = tests.filter(containsBunImport);
+const nodeTests = tests.filter((path) => !containsBunImport(path));
+let exitCode = 0;
+
+if (nodeTests.length > 0) {
+  console.log(`Running ${nodeTests.length} Node test file(s)`);
+  exitCode = run(process.execPath, ["--import", "tsx", "--test", ...nodeTests]) || exitCode;
 }
 
-const bunTests = testFiles.filter((file) => readFileSync(file, "utf8").includes("bun:test"));
-const nodeTests = testFiles.filter((file) => !bunTests.includes(file));
+if (bunTests.length > 0) {
+  console.log(`Running ${bunTests.length} Bun test file(s)`);
+  exitCode = run("bun", ["test", ...bunTests]) || exitCode;
+}
 
-if (nodeTests.length > 0) run("npx", ["tsx", "--test", ...nodeTests]);
-if (bunTests.length > 0) run("bun", ["test", ...bunTests.map((file) => `./${file}`)]);
-
+process.exit(exitCode);

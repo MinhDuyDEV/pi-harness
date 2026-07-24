@@ -36,7 +36,7 @@ describe("enrichCompactionResult", () => {
             10_000,
             estimateTokens(userMsg),
             Math.ceil(enriched.summary.length / 4),
-          ),
+          )!,
         );
   });
 });

@@ -1,11 +1,14 @@
 ---
 name: performance-optimization
-description: Use when profiling, optimizing, or adding performance budgets to applications — covers measure-first workflow, Core Web Vitals, common anti-patterns, and performance regression prevention
-version: 1.0.0
-tags: [performance, code-quality]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when profiling, optimizing, or adding performance budgets to applications — covers measure-first workflow,
+  Core Web Vitals, common anti-patterns, and performance regression prevention
+metadata:
+  version: 1.0.0
+  tags:
+  - performance
+  - code-quality
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Performance Optimization

@@ -1,11 +1,14 @@
 ---
 name: writing-skills
-description: "Use when creating new skills, editing existing skills, or verifying skills work before deployment - applies TDD to process documentation by testing with subagents before writing, iterating until bulletproof against rationalization. Includes complete pressure testing methodology."
-version: 1.0.0
-tags: [documentation, workflow]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when creating new skills, editing existing skills, or verifying skills work before deployment - applies TDD
+  to process documentation by testing with subagents before writing, iterating until bulletproof against rationalization.
+  Includes complete pressure testing methodology.
+metadata:
+  version: 1.0.0
+  tags:
+  - documentation
+  - workflow
+  dependencies: []
 ---
 
 # Writing Skills

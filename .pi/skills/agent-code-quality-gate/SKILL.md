@@ -1,7 +1,10 @@
 ---
 name: agent-code-quality-gate
-description: Use before a coding agent claims implementation work is complete, especially after bugfixes, feature edits, refactors, or subagent changes - converts code quality into an operational gate for scope, duplication, behavior tests, verification evidence, and regressions.
-version: 1.0.0
+description: Use before a coding agent claims implementation work is complete, especially after bugfixes, feature edits, refactors,
+  or subagent changes - converts code quality into an operational gate for scope, duplication, behavior tests, verification
+  evidence, and regressions.
+metadata:
+  version: 1.0.0
 ---
 
 # Agent Code Quality Gate
@@ -77,6 +80,14 @@ Skipping the gate; "I checked, it's fine" (no evidence); scope creep unmarked; t
 ## Red Flags
 
 "Should work" (run); "I tested it" (show run); truncated output; "tests later"; .skip on new; removed unmarked; "while I'm here" unmarked; scope creep unmarked.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "The tests pass, so it's done" | Green proves nothing about scope, duplication, or evidence — the gate's 5 checks exist because green ≠ quality. |
+| "It's a small change, skip the gate" | Small changes skip the regression + evidence-claim checks — exactly the change that ships a regression. |
+| "The subagent self-reported success" | Self-report is the failure mode the gate exists to catch; run the gate independently. |
 
 ## Anti-Patterns
 

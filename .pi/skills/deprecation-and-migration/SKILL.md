@@ -1,11 +1,13 @@
 ---
 name: deprecation-and-migration
-description: Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes — covers deprecation notices, migration guides, codemods, and staged rollout
-version: 1.0.0
-tags: [architecture, workflow]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes
+  — covers deprecation notices, migration guides, codemods, and staged rollout
+metadata:
+  version: 1.0.0
+  tags:
+  - architecture
+  - workflow
+  dependencies: []
 ---
 
 # Deprecation & Migration

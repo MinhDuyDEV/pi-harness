@@ -1,11 +1,17 @@
 ---
 name: fallow
-description: Use when analyzing code quality, finding dead code, detecting duplication, assessing complexity, checking blast radius, or cleaning up a TS/JS codebase — Fallow provides deterministic static analysis (dead code, dupes, health) and optional runtime intelligence.
-version: 1.0.0
-tags: [code-quality, static-analysis, cleanup, typescript, javascript]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: [bash]
+description: Use when analyzing code quality, finding dead code, detecting duplication, assessing complexity, checking blast
+  radius, or cleaning up a TS/JS codebase — Fallow provides deterministic static analysis (dead code, dupes, health) and optional
+  runtime intelligence.
+metadata:
+  version: 1.0.0
+  tags:
+  - code-quality
+  - static-analysis
+  - cleanup
+  - typescript
+  - javascript
+  dependencies: []
 ---
 
 # Fallow — Codebase Intelligence

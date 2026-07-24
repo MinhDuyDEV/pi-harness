@@ -1,11 +1,14 @@
 ---
 name: supabase-postgres-best-practices
-description: MUST load when writing, reviewing, or optimizing Postgres queries, schema designs, indexes, or RLS policies in Supabase. Covers Supabase-specific Postgres performance patterns and common pitfalls.
-version: 1.0.0
-tags: [integration, code-quality]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: MUST load when writing, reviewing, or optimizing Postgres queries, schema designs, indexes, or RLS policies in
+  Supabase. Covers Supabase-specific Postgres performance patterns and common pitfalls.
+metadata:
+  version: 1.0.0
+  tags:
+  - integration
+  - code-quality
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Supabase Postgres Best Practices

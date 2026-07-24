@@ -1,6 +1,7 @@
 ---
 name: diagnostics
-description: Use when checking for code errors, type issues, or lint warnings after making changes, before committing, or when troubleshooting build failures
+description: Use when checking for code errors, type issues, or lint warnings after making changes, before committing, or
+  when troubleshooting build failures
 ---
 
 # Diagnostics

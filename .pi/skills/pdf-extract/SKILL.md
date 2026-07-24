@@ -1,11 +1,14 @@
 ---
 name: pdf-extract
-description: Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction library based on PDF complexity — simple text vs structured data vs complex layouts.
-version: 1.0.0
-tags: [research, integration]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when extracting text, images, tables, or metadata from PDF files. MUST load to choose the correct extraction
+  library based on PDF complexity — simple text vs structured data vs complex layouts.
+metadata:
+  version: 1.0.0
+  tags:
+  - research
+  - integration
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # PDF Extraction

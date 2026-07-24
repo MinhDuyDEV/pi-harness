@@ -1,11 +1,13 @@
 ---
 name: testing-anti-patterns
-description: Use when writing or changing tests, adding mocks, or tempted to add test-only methods to production code - prevents testing mock behavior, production pollution with test-only methods, and mocking without understanding dependencies
-version: 1.0.0
-tags: [testing, code-quality]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when writing or changing tests, adding mocks, or tempted to add test-only methods to production code - prevents
+  testing mock behavior, production pollution with test-only methods, and mocking without understanding dependencies
+metadata:
+  version: 1.0.0
+  tags:
+  - testing
+  - code-quality
+  dependencies: []
 ---
 
 # Testing Anti-Patterns
@@ -89,6 +91,14 @@ Tautology tests; mock-only assertions; test-only methods; mocking the implementa
 ## Red Flags
 
 Test passes when body is empty; test asserts only `toHaveBeenCalled`; `_method` in prod; `jest.mock` without scope; shared `beforeEach` mutation; tests depend on each other; snapshot of a snapshot; testing private via cast.
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "The mock returns what the real thing would" | You're testing the mock's promise, not real behavior; the test passes when the real code breaks. |
+| "I need this method for the test" | A test-only method in production pollutes production for tests; test through the real interface. |
+| "Tautology tests are better than none" | A tautology test gives false confidence + blocks real tests; delete it, write a real one. |
 
 ## Anti-Patterns
 

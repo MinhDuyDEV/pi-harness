@@ -1,11 +1,13 @@
 ---
 name: documentation-and-adrs
-description: Use when writing technical documentation, Architecture Decision Records (ADRs), API docs, or project READMEs — covers documentation structure, ADR format, and keeping docs in sync with code
-version: 1.0.0
-tags: [workflow, code-quality]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when writing technical documentation, Architecture Decision Records (ADRs), API docs, or project READMEs
+  — covers documentation structure, ADR format, and keeping docs in sync with code
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  - code-quality
+  dependencies: []
 ---
 
 # Documentation & ADRs

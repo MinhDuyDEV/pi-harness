@@ -19,7 +19,6 @@ import { CustomEditor, type KeybindingsManager, type Theme } from "@earendil-wor
     } from "@earendil-works/pi-tui";
     import {
   editorBorderColorForThinkingLevel,
-  editorPromptColorForThinkingLevel,
   editorPromptForState,
   normalizeThinkingLevel,
 } from "./editor-prompt.js";
@@ -119,7 +118,7 @@ export class AmpBoxEditor extends CustomEditor {
     });
     const promptW = visibleWidth(prompt);
     const borderColorName = editorBorderColorForThinkingLevel(this.thinkingLevel);
-    const promptColorName = editorPromptColorForThinkingLevel(this.thinkingLevel);
+    const promptColorName = editorBorderColorForThinkingLevel(this.thinkingLevel);
     const promptThemed = this.color(promptColorName, prompt);
 
     const border = this.color(borderColorName, "─".repeat(width));
@@ -166,19 +165,17 @@ export class AmpBoxEditor extends CustomEditor {
         // Bottom border
         lines.push(border);
 
-        // Update lastWidth for visual-line cursor navigation (normally set by Editor.render)
-        (this as any).lastWidth = textAreaW;
+        Reflect.set(this, "lastWidth", textAreaW);
 
-        // Render autocomplete list directly (avoids double-render via super.render)
-        const ac = this as any;
-        const hasAutocomplete = ac.autocompleteState && ac.autocompleteList;
-        if (hasAutocomplete) {
+        const autocompleteState = Reflect.get(this, "autocompleteState");
+        const autocompleteList = Reflect.get(this, "autocompleteList") as { render(width: number): string[] } | undefined;
+        if (autocompleteState && autocompleteList) {
           const autocompleteIndent = " ".repeat(padX);
           const autocompleteWidth = Math.max(
             20,
             width - visibleWidth(autocompleteIndent),
           );
-          const autocompleteResult = ac.autocompleteList.render(autocompleteWidth);
+          const autocompleteResult = autocompleteList.render(autocompleteWidth);
           if (autocompleteResult.length > 0) {
             for (const al of autocompleteResult) {
               const vw = visibleWidth(al);

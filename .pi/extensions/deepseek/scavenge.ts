@@ -150,9 +150,9 @@ export interface ToolSpec {
 /**
  * Apply repairSchema to all tool specs, and return scavenge stats.
  */
-export function scavengeToolSpecs(
-  tools: ToolSpec[] | undefined,
-): { tools: ToolSpec[]; schemasRepaired: number; issuesFound: SchemaAnalysis } {
+export function scavengeToolSpecs<T extends ToolSpec>(
+  tools: T[] | undefined,
+): { tools: T[]; schemasRepaired: number; issuesFound: SchemaAnalysis } {
   if (!tools || tools.length === 0) {
     return { tools: tools ?? [], schemasRepaired: 0, issuesFound: emptyAnalysis() };
   }
@@ -175,13 +175,11 @@ export function scavengeToolSpecs(
       analysis.shouldFlatten
     ) {
       schemasRepaired++;
-      return {
-        ...tool,
-        function: {
-          ...tool.function,
+      return Object.assign({}, tool, {
+        function: Object.assign({}, tool.function, {
           parameters: repairSchema(tool.function.parameters),
-        },
-      };
+        }),
+      });
     }
 
     return tool;

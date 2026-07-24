@@ -14,11 +14,11 @@ Initialize project setup. Run once per project.
 
 ## Load Skills
 
-```typescript
-skill({ name: "brainstorming" });
-skill({ name: "git-workflow-and-versioning" }); // Git conventions
-skill({ name: "verification-before-completion" }); // Mode 1 validation
-```
+Load these available skills using the current session's skill-loading instructions. If no dedicated loader is exposed, read each skill's listed `SKILL.md` file.
+
+- skill: `brainstorming`
+- skill: `git-workflow-and-versioning`
+- skill: `verification-before-completion`
 
 ## Idempotency Rules
 

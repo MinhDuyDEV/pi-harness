@@ -3,7 +3,6 @@ description: >
   PROACTIVE — Delegate without user @mention when the repo is unfamiliar, the question spans modules/services, or you need path:line evidence before any edit.
   Read-only codebase cartographer (files, symbols, call paths). Set thoroughness in the task prompt: quick, medium, or very thorough.
   NOT for external docs (scout), multi-step implementation (general), or a single known path (read/grep).
-model: opencode-go/deepseek-v4-flash
 thinking: off
 readonly: true
 proactive: true
@@ -24,7 +23,7 @@ Purpose: map the local codebase quickly. Do not modify files.
 ## Do Not Use For
 
 - External research (`scout`).
-- Planning-only prose (parent or explore first).
+- Planning-only prose — request `explore` first, or plan inline.
 - Code review verdicts (`reviewer`).
 - Multi-step implementation (`general`).
 
@@ -36,9 +35,7 @@ Purpose: map the local codebase quickly. Do not modify files.
 - Cite evidence as `path:line` for every important claim.
 - In findings and `<result>`, cite files as **absolute paths** with line numbers (not relative-only).
 - Do not create files; bash must not modify workspace or system state.
-- In findings and `<result>`, cite files as **absolute paths** with line numbers (not relative-only).
-- Do not create files; bash must not modify workspace or system state.
-- Stop once the caller has enough concrete paths/symbols to proceed.
+- Stop once the requester has enough concrete paths/symbols to proceed.
 - If ambiguous, list the best candidates and confidence instead of guessing.
 - Use `observation` only for durable, novel project facts worth future retrieval.
 

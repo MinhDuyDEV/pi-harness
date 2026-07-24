@@ -8,8 +8,13 @@ const BOOTSTRAP_MARKER = "pikit:superpi bootstrap";
 
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(extensionDir, "../..");
-const skillsDir = resolve(packageRoot, "skills");
+const skillsDir = resolve(packageRoot, ".pi", "skills");
 const bootstrapSkillPath = resolve(skillsDir, "superpi", "SKILL.md");
+
+/** Absolute path to the bootstrap skill this extension injects. Exposed for tests. */
+export function getBootstrapSkillPath(): string {
+	return bootstrapSkillPath;
+}
 
 let cachedBootstrap: string | null | undefined;
 
@@ -86,6 +91,10 @@ export default function superpiExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("context", async (event) => {
+		// Opt-out: PIKIT_NO_SUPERPI=1 disables bootstrap injection entirely.
+		// The ~247-token routing guidance is on by default; consumers who want only
+		// the skills/extensions without the forced bootstrap can opt out here.
+		if (process.env.PIKIT_NO_SUPERPI === "1" || process.env.PIKIT_NO_SUPERPI === "true") return;
 		if (!injectBootstrap) return;
 		if (event.messages.some((m) => messageContainsBootstrap(m, BOOTSTRAP_MARKER))) return;
 

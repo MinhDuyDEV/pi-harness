@@ -1,7 +1,12 @@
 ---
 name: effect-schema
-version: 1.0.0
-description: "Use when defining data validation schemas, domain types, branded primitives, or typed errors with Effect Schema in a TypeScript project. Covers Schema.Struct vs Schema.Class, Schema.TaggedErrorClass for domain errors, branded types for type-safe primitives, decodeUnknownEffect pipeline, filters, transformations, JSON Schema/OpenAPI generation, and Zod replacement patterns. MUST load before writing any Schema definitions in an Effect-based codebase."
+description: Use when defining data validation schemas, domain types, branded primitives, or typed errors with Effect Schema
+  in a TypeScript project. Covers Schema.Struct vs Schema.Class, Schema.TaggedErrorClass for domain errors, branded types
+  for type-safe primitives, decodeUnknownEffect pipeline, filters, transformations, JSON Schema/OpenAPI generation, and Zod
+  replacement patterns. MUST load before writing any Schema definitions in an Effect-based codebase.
+metadata:
+  version: 1.0.0
+disable-model-invocation: true
 ---
 
 # Effect Schema

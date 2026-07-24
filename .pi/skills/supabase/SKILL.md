@@ -1,11 +1,14 @@
 ---
 name: supabase
-description: Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management. MUST load before writing Supabase queries, RLS policies, or edge functions.
-version: 1.0.0
-tags: [integration, mcp]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when working with any Supabase service — database operations, edge functions, auth, storage, or project management.
+  MUST load before writing Supabase queries, RLS policies, or edge functions.
+metadata:
+  version: 1.0.0
+  tags:
+  - integration
+  - mcp
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Supabase Platform (MCP)
@@ -116,7 +119,7 @@ For advanced usage, modify `mcp.json`:
     "command": "npx",
     "args": ["-y", "@supabase/mcp@latest"],
     "env": {
-      "SUPABASE_ACCESS_TOKEN": "your-token-here"
+      "SUPABASE_ACCESS_TOKEN": "<cloudflare-api-token>"
     },
     "includeTools": ["list_tables", "execute_sql", "..."]
   }

@@ -1,73 +1,10 @@
-import type { Api, Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+import type { Api, AssistantMessage, Context, Model, SimpleStreamOptions } from "@earendil-works/pi-ai";
 import { randomUUID } from "crypto";
 import { isGrokCliProxyModel, xaiBaseUrlForModel, xaiModelForRequest, xaiModelRequestHeaders, xaiResponsesUrlForModel } from "./models";
 import { rewriteXaiResponsesPayload } from "./payload";
-import type { XaiError, XaiResponsesBody } from "./types";
 
-type AssistantStreamEvent = Record<string, any>;
-
-function resultFromStreamEvent(event: AssistantStreamEvent): unknown {
-  if (event.type === "done") return event.message;
-  if (event.type === "error") return event.error;
-  return undefined;
-}
-
-function createForwardingAssistantStream() {
-  const queue: AssistantStreamEvent[] = [];
-  const waiting: Array<(result: IteratorResult<AssistantStreamEvent>) => void> = [];
-  let done = false;
-  let resolveResult: (result: unknown) => void = () => {
-    // Placeholder until the deferred Promise assigns the real resolver.
-  };
-  const resultPromise = new Promise<unknown>((resolve) => {
-    resolveResult = resolve;
-  });
-
-  function finish(result: unknown) {
-    if (done) return;
-    done = true;
-    resolveResult(result);
-  }
-
-  return {
-    push(event: AssistantStreamEvent) {
-      const finalResult = resultFromStreamEvent(event);
-      const isTerminal = event.type === "done" || event.type === "error";
-      if (isTerminal) finish(finalResult);
-      if (done && !isTerminal) return;
-      const waiter = waiting.shift();
-      if (waiter) {
-        waiter({ value: event, done: false });
-      } else {
-        queue.push(event);
-      }
-    },
-    end(result?: unknown) {
-      finish(result);
-      while (waiting.length > 0) {
-        waiting.shift()?.({ value: undefined as unknown, done: true });
-      }
-    },
-    result() {
-      return resultPromise;
-    },
-    async *[Symbol.asyncIterator]() {
-      while (true) {
-        if (queue.length > 0) {
-          yield queue.shift()!;
-        } else if (done) {
-          return;
-        } else {
-          const result = await new Promise<IteratorResult<AssistantStreamEvent>>((resolve) => waiting.push(resolve));
-          if (result.done) return;
-          yield result.value;
-        }
-      }
-    },
-  };
-}
-
-function streamErrorMessage(model: Model<Api>, error: unknown) {
+function streamErrorMessage(model: Model<Api>, error: unknown): AssistantMessage {
   return {
     role: "assistant",
     content: [],
@@ -138,7 +75,7 @@ export async function createXaiResponse(apiKey: string, body: Record<string, any
  * Stream pi's simple Responses flow through xAI with payload normalization.
  *
  * The transport is delegated to pi's OpenAI Responses helper with a temporary
- * `openai-responses` API tag so pi 0.79.8+ accepts the helper call, while xAI
+ * `openai-responses` API tag so Pi 0.81.1 accepts the helper call, while xAI
  * routing headers, request URLs, and payload rewriting continue to use the
  * original xAI model metadata. Returned events are forwarded through an
  * assistant stream exposing async iteration and `result()`. Delegate load or
@@ -156,21 +93,21 @@ export function streamSimpleXaiResponses(model: Model<Api>, context: Context, op
     ...model,
     baseUrl: xaiBaseUrlForModel(model.id),
     headers: {
-      ...((model as Model<Api> & { headers?: Record<string, string> }).headers ?? {}),
+      ...(model as Model<Api> & { headers?: Record<string, string> }).headers,
       ...xaiModelRequestHeaders(model.id, grokCliSessionId),
     },
   };
-  // pi 0.79.8+ API-guards the OpenAI Responses helper; keep the xAI
+  // Pi 0.81.1 API-guards the OpenAI Responses helper; keep the xAI
   // stream model for routing/payload rewriting, but delegate with the API
   // tag expected by the helper.
   const openAIResponsesModel = {
     ...streamModel,
     api: "openai-responses" as const,
   };
-  const headers = { ...(options?.headers || {}) };
+  const headers = { ...options?.headers };
   if (grokCliSessionId && !headers["x-grok-conv-id"]) headers["x-grok-conv-id"] = grokCliSessionId;
 
-  const stream = createForwardingAssistantStream();
+  const stream = createAssistantMessageEventStream();
   void (async () => {
     try {
       const { streamSimple } = await import("@earendil-works/pi-ai/compat");
@@ -183,14 +120,14 @@ export function streamSimpleXaiResponses(model: Model<Api>, context: Context, op
           return userRewritten === undefined ? rewritten : userRewritten;
         },
       });
-      for await (const event of inner as AsyncIterable<AssistantStreamEvent>) {
+      for await (const event of inner) {
         stream.push(event);
       }
       stream.end();
     } catch (error) {
       const message = streamErrorMessage(model, error);
       stream.push({ type: "error", reason: "error", error: message });
-      stream.end(message);
+      stream.end();
     }
   })();
   return stream;

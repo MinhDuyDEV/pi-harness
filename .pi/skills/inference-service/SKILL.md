@@ -1,7 +1,12 @@
 ---
 name: inference-service
-version: 1.0.0
-description: "Use when building, reviewing, or debugging inference service backends in TypeScript/JavaScript — covers request ingestion architecture, batching strategies, semantic caching, SSE streaming, circuit breakers, fallback chains, rate limiting, GPU observability, and graceful degradation. MUST load before designing inference service architecture or writing any inference-serving code."
+description: Use when building, reviewing, or debugging inference service backends in TypeScript/JavaScript — covers request
+  ingestion architecture, batching strategies, semantic caching, SSE streaming, circuit breakers, fallback chains, rate limiting,
+  GPU observability, and graceful degradation. MUST load before designing inference service architecture or writing any inference-serving
+  code.
+metadata:
+  version: 1.0.0
+disable-model-invocation: true
 ---
 
 # Inference Service (TS/JS)

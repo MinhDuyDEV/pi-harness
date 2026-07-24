@@ -91,19 +91,6 @@ export interface ArtifactTrackerEntry {
   wasCompressed: boolean;
 }
 
-const COMPACTABLE_TOOLS = new Set([
-  "read",
-  "bash",
-  "grep",
-  "find",
-  "ls",
-  "glob",
-  "webfetch",
-  "websearch",
-  "codesearch",
-  "multi_grep",
-]);
-
 export const READ_TOOLS = new Set([
   "read",
   "grep",

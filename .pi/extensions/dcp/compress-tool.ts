@@ -11,7 +11,7 @@
  * on every request after session_start — including resume.
  */
 
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import type {
   ExtensionAPI,
   ExtensionContext,

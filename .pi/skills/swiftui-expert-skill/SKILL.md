@@ -1,11 +1,14 @@
 ---
 name: swiftui-expert-skill
-description: Use when building new SwiftUI features, refactoring existing views, reviewing code quality, or adopting modern SwiftUI patterns (state management, view composition, performance, modern APIs, iOS 26+ Liquid Glass).
-version: 1.0.0
-tags: [apple, ui]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when building new SwiftUI features, refactoring existing views, reviewing code quality, or adopting modern
+  SwiftUI patterns (state management, view composition, performance, modern APIs, iOS 26+ Liquid Glass).
+metadata:
+  version: 1.0.0
+  tags:
+  - apple
+  - ui
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # SwiftUI Expert

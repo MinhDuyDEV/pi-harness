@@ -1,11 +1,15 @@
 ---
 name: incremental-implementation
-description: Use when implementing any feature, refactor, or change touching more than one file, or when tempted to write a large patch before testing.
-version: 1.0.0
-tags: [workflow, implementation, safety]
-dependencies: [verification-before-completion]
-agent_types: [worker]
-tools: [grep, find, read, bash, edit, write]
+description: Use when implementing any feature, refactor, or change touching more than one file, or when tempted to write
+  a large patch before testing.
+metadata:
+  version: 1.0.0
+  tags:
+  - workflow
+  - implementation
+  - safety
+  dependencies:
+  - verification-before-completion
 ---
 
 # Incremental Implementation
@@ -48,6 +52,14 @@ Large patch (>~100 lines) without intermediate test runs; "I'll add tests later"
 ## Anti-Patterns
 
 Big-bang patch (write everything, test at the end); premature abstraction (DRYing two call sites when one is speculative); hero commit (15 files, 3 features, 1 PR); "verify by inspection" (read carefully, *believe* it works — run the check).
+
+## Anti-rationalization
+
+| Shortcut the model reaches for | Why it fails here |
+|---|---|
+| "I can see the whole change, I'll write it all" | Seeing it ≠ it working; the slice loop tests each slice because integration bugs hide in interactions. |
+| "Testing after I finish is faster" | Testing-after finds the bug somewhere in the whole patch; testing-each-slice finds it in the last 20 lines. |
+| "One more file and I'm done" | "One more" is how a slice becomes a patch; ship the slice, start the next. |
 
 ## Skill Result Contract
 

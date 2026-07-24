@@ -1,11 +1,15 @@
 ---
 name: swift-concurrency
-description: Use when developers mention Swift Concurrency, async/await, actors, or tasks; say "use Swift Concurrency" or "modern concurrency patterns"; report data races or thread safety issues; need to migrate to Swift 6; refactor closures to async/await; or hit concurrency-related linter warnings (async_without_await, Sendable/actor isolation, MainActor lint).
-version: 1.0.0
-tags: [apple, code-quality]
-dependencies: []
-agent_types: [planner, worker, reviewer]
-tools: []
+description: Use when developers mention Swift Concurrency, async/await, actors, or tasks; say "use Swift Concurrency" or
+  "modern concurrency patterns"; report data races or thread safety issues; need to migrate to Swift 6; refactor closures
+  to async/await; or hit concurrency-related linter warnings (async_without_await, Sendable/actor isolation, MainActor lint).
+metadata:
+  version: 1.0.0
+  tags:
+  - apple
+  - code-quality
+  dependencies: []
+disable-model-invocation: true
 ---
 
 # Swift Concurrency
