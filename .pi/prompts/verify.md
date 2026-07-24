@@ -102,7 +102,7 @@ If `--review` or `--ui-review` is set, add their subsections too.
 
 ### Update `status: done` in `.pi/artifacts/TODO.md` and `.pi/artifacts/PLAN.md`
 
-Edit the `status:` line in place. Do not move or hide the block.
+For `TODO.md` prefer the `todo` tool: `todo done "<title>"` (closes the phase, completes remaining items, sets `status: done`). `PLAN.md` has no `todo` tool — edit its `status:` line to `done` in place. Do not move or hide the block.
 
 ## 6. Output
 

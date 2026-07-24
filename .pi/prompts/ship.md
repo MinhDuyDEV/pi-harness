@@ -31,10 +31,10 @@ Read the work session blocks from `PLAN.md` (Spec, Plan, Phases if present) and 
 
 ## 4. Implement
 
-Execute the steps in order. After each step:
-- Run the step's verification (skip with `--quick`)
-- Update the corresponding checkbox in `TODO.md`
-- If verification fails, stop and report
+Execute the steps in order. For each step:
+- Mark it in_progress — prefer the `todo` tool: `todo start "<step>"` (sets `[/]`, completes the previous in_progress, drives the live TUI widget spinner); otherwise edit `TODO.md` `[ ]` → `[/]` in place
+- Implement the step, then run its verification (skip with `--quick`); on failure, stop and report
+- Mark it done — prefer `todo done "<step>"` (sets `[x]`, auto-promotes the next pending in the phase); otherwise edit `TODO.md` `[/]` → `[x]` in place
 
 `--dry-run` halts here. Show the planned file changes (read first, list, summarize) and stop.
 
@@ -55,7 +55,7 @@ Fix Critical and Important before completion. Minor can ship and be cleaned up l
 
 ### `.pi/artifacts/TODO.md`
 
-Mark all step checkboxes as done. Add the run report reference. Keep the block in place.
+Mark the phase done — prefer the `todo` tool: `todo done "<title>"` (sets every remaining item `[x]` and `status: done`, promotes the next active phase); otherwise set each checkbox `[x]` and the `status:` line to `done` in place. Add the run report reference. Keep the block in place.
 
 ```markdown
 ### YYYY-MM-DD - <title>

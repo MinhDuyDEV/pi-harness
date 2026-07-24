@@ -63,6 +63,10 @@ At `.pi/artifacts/`, maintained in the working copy:
 4. **DECISIONS.md is for trade-offs, not choices** — if there's only one viable option, it goes in PLAN.md as a fact, not an ADR.
 5. **/verify is non-negotiable** — every "done" claim cites evidence.
 
+## Tool integration
+
+When the `todo` tool is available (the `pi-todo` extension is pinned), the lifecycle commands prefer it for TODO.md mutations: `/ship` uses `todo start "<step>"` / `todo done "<step>"` per step (live TUI widget + single-active-task invariant) and `todo done "<title>"` to close the phase; `/verify` closes the phase the same way. `/create` and `/plan` still bulk-write the markdown directly (pi-todo's file watcher reconciles external edits). `PLAN.md` / `PROGRESS.md` / `DECISIONS.md` have no `todo` tool — edit them in place.
+
 ## Red Flags
 
 - TODO.md has no `### YYYY-MM-DD - <title>` entries — likely stale or skipped.
