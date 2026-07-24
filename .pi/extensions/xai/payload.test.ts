@@ -51,7 +51,7 @@ test("rewriteXaiResponsesPayload allows prompt_cache_key opt-out with false", ()
 });
 
 test("rewriteXaiResponsesPayload normalizes local PDF file parts into xAI input_file data URIs", () => {
-  const dir = mkdtempSync(join(tmpdir(), "pikit-xai-pdf-"));
+  const dir = mkdtempSync(join(tmpdir(), "pi-harness-xai-pdf-"));
   const pdfPath = join(dir, "quarterly-report.pdf");
   writeFileSync(pdfPath, "%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n");
 
@@ -89,7 +89,7 @@ test("rewriteXaiResponsesPayload normalizes local PDF file parts into xAI input_
 });
 
 test("rewriteXaiResponsesPayload normalizes already-tagged input_file PDF parts", () => {
-  const dir = mkdtempSync(join(tmpdir(), "pikit-xai-input-file-"));
+  const dir = mkdtempSync(join(tmpdir(), "pi-harness-xai-input-file-"));
   const pdfPath = join(dir, "spec.pdf");
   writeFileSync(pdfPath, "%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n");
 

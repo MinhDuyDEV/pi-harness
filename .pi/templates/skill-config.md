@@ -1,19 +1,19 @@
 ---
-name: pikit-skill-config
+name: pi-harness-skill-config
 description: >-
-  Reference schema for pikit skill config.md files. Defines the layered
+  Reference schema for pi-harness skill config.md files. Defines the layered
   config convention with project-level and user-level paths, first-time
   setup flow, and standard preference keys.
 version: 1.0.0
 ---
 
-# Pikit Skill Config Convention
+# Pi-harness Skill Config Convention
 
 Based on baoyu-skills EXTEND.md pattern, adapted for the Pi agent ecosystem.
 
 ## Layered Config Resolution
 
-Every pikit skill that needs configuration resolves its config.md in priority order.
+Every pi-harness skill that needs configuration resolves its config.md in priority order.
 First hit wins. If higher-priority path exists, lower-priority paths are never read.
 
 ### Priority 1: Project-Level
@@ -28,9 +28,9 @@ Lives alongside the skill's `SKILL.md` in the project tree. Version-controlled w
 
 **Path**: `~/.pi/agent/config/skills/<skill-name>.md`
 
-The user's personal override. Not version-controlled. Survives pikit updates. Add to `.gitignore` if it contains secrets.
+The user's personal override. Not version-controlled. Survives pi-harness updates. Add to `.gitignore` if it contains secrets.
 
-**Env override**: If `PIKIT_CONFIG_DIR` env var is set, it replaces `~/.pi/agent/config/` as the user-level root.
+**Env override**: If `PI_HARNESS_CONFIG_DIR` env var is set, it replaces `~/.pi/agent/config/` as the user-level root.
 
 ## Config File Format
 
@@ -80,7 +80,7 @@ When config.md is not found at any priority level, the SKILL.md workflow **block
 
 ## Standard Preference Keys
 
-These keys are shared across all pikit skills. Skill-specific keys go in the skill's own schema.
+These keys are shared across all pi-harness skills. Skill-specific keys go in the skill's own schema.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -93,7 +93,7 @@ These keys are shared across all pikit skills. Skill-specific keys go in the ski
 
 ```markdown
 ---
-name: pikit-translate
+name: pi-harness-translate
 version: 1.0.0
 ---
 

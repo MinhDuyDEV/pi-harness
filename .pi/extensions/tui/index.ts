@@ -615,7 +615,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     );
     if (!editorContainerMatch) {
       console.error(
-        "[pikit-tui] Fixed editor mode disabled: render tree does not contain the expected editor container. This typically means the Pi runtime render-tree structure has changed. Disabling fixed mode to prevent broken layout.",
+        "[pi-harness-tui] Fixed editor mode disabled: render tree does not contain the expected editor container. This typically means the Pi runtime render-tree structure has changed. Disabling fixed mode to prevent broken layout.",
       );
       fixedEditorEnabled = false;
       compositor.dispose();

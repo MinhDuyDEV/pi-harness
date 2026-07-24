@@ -1,6 +1,6 @@
 # `.pi/` harness resources
 
-This directory contains project-local Pi resources and the resources published by the `pikit` Pi package.
+This directory contains project-local Pi resources and the resources published by the `pi-harness` Pi package.
 
 ## Published manifest resources
 

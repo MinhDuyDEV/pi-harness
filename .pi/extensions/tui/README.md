@@ -1,4 +1,4 @@
-# pikit-tui
+# pi-harness-tui
 
 EXTENSION STATUS: **PRIVATE API DEPENDENCY** (see below).
 

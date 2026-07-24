@@ -7,7 +7,7 @@
     "url": "https://github.com/MinhDuyDEV/pi-harness.git"
   },
   "keywords": ["pi-package", "pi", "extension", "checkpoint", "rewind", "undo", "redo", "git"],
-  "author": "pikit",
+  "author": "pi-harness",
   "license": "MIT",
   "type": "module",
   "pi": {

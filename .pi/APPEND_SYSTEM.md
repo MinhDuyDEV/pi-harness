@@ -1,4 +1,4 @@
-<!-- pikit-runtime-policy:v1 -->
+<!-- pi-harness-runtime-policy:v1 -->
 # Pi harness runtime guidance
 
 This is supplemental project guidance. Follow the host system message, user request, and Pi's native tool/resource contracts first; these notes add harness-specific detail only where higher-priority instructions are silent.

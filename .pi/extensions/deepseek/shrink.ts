@@ -7,7 +7,7 @@
  * breaks tool-call pairing and loses information), we shrink oversized
  * tool results and tool call arguments.
  *
- * Since we don't have direct access to the DeepSeek tokenizer from pikit,
+ * Since we don't have direct access to the DeepSeek tokenizer from pi-harness,
  * we use a conservative byte-based estimation: ~4 tokens per ~5 ASCII chars,
  * or ~1 token per CJK char. This is calibrated against the deepseek-tokenizer.
  *

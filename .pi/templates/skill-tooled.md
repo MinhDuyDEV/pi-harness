@@ -1,5 +1,5 @@
 ---
-name: pikit-<name>
+name: pi-harness-<name>
 description: >-
   <Third-person description. What it does + when an agent should invoke it.
   Must include trigger keywords for automatic invocation. Max 1024 chars.>
@@ -53,7 +53,7 @@ This step MUST complete before proceeding — execution is blocked until prefere
 
 ### Config Paths (priority order)
 
-Check these paths in order; first hit wins. If env var `PIKIT_CONFIG_DIR` is set, it overrides user-level path resolution.
+Check these paths in order; first hit wins. If env var `PI_HARNESS_CONFIG_DIR` is set, it overrides user-level path resolution.
 
 | Priority | Path | Scope |
 |----------|------|-------|

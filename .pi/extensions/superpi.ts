@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const EXTREMELY_IMPORTANT_MARKER = "<EXTREMELY-IMPORTANT>";
-const BOOTSTRAP_MARKER = "pikit:superpi bootstrap";
+const BOOTSTRAP_MARKER = "pi-harness:superpi bootstrap";
 
 const extensionDir = dirname(fileURLToPath(import.meta.url));
 const packageRoot = resolve(extensionDir, "../..");
@@ -58,7 +58,7 @@ function getBootstrapContent(): string | null {
 		cachedBootstrap = `${EXTREMELY_IMPORTANT_MARKER}
 ${BOOTSTRAP_MARKER}
 
-You have pikit skills.
+You have pi-harness skills.
 
 The superpi content is included below and is already loaded for this Pi session. Follow it now. Do not try to load superpi again.
 
@@ -91,10 +91,10 @@ export default function superpiExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("context", async (event) => {
-		// Opt-out: PIKIT_NO_SUPERPI=1 disables bootstrap injection entirely.
+		// Opt-out: PI_HARNESS_NO_SUPERPI=1 disables bootstrap injection entirely.
 		// The ~247-token routing guidance is on by default; consumers who want only
 		// the skills/extensions without the forced bootstrap can opt out here.
-		if (process.env.PIKIT_NO_SUPERPI === "1" || process.env.PIKIT_NO_SUPERPI === "true") return;
+		if (process.env.PI_HARNESS_NO_SUPERPI === "1" || process.env.PI_HARNESS_NO_SUPERPI === "true") return;
 		if (!injectBootstrap) return;
 		if (event.messages.some((m) => messageContainsBootstrap(m, BOOTSTRAP_MARKER))) return;
 

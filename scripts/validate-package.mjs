@@ -17,7 +17,7 @@ for (const path of packageJson.files ?? []) {
   if (!existsSync(path)) errors.push(`package.json files entry does not exist: ${path}`);
 }
 
-if (packageJson.bin) errors.push("package.json must not expose the removed pikit CLI");
+if (packageJson.bin) errors.push("package.json must not expose the removed pi-harness CLI");
 if (packageJson.scripts?.postinstall) errors.push("package.json must not run a nested postinstall install");
 if (existsSync(".pi/extensions/package.json")) errors.push("extension dependencies must live at the package root");
 if (existsSync(".pi/extensions/herdr-agent-state.ts")) errors.push("machine-managed HerdR state must not be tracked as a project extension");

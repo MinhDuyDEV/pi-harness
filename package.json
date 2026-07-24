@@ -1,5 +1,5 @@
 {
-  "name": "pikit",
+  "name": "pi-harness",
   "version": "1.0.0",
   "private": false,
   "description": "A portable Pi Coding Agent package with curated extensions, skills, prompts, and themes.",

@@ -1,5 +1,5 @@
 /**
- * DeepSeek Provider Extension for pikit
+ * DeepSeek Provider Extension for pi-harness
  *
  * A Pi custom provider that brings all Reasonix learnings:
  * - Thinking mode (reasoning_content) support for V4 Pro/Flash

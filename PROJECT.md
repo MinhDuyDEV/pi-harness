@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`pikit` packages a conservative set of Pi Coding Agent resources. It is a Pi package, not a standalone application or workbench server.
+`pi-harness` packages a conservative set of Pi Coding Agent resources. It is a Pi package, not a standalone application or workbench server.
 
 ## Source of truth
 

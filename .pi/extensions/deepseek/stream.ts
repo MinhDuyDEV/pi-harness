@@ -31,7 +31,7 @@ import {
 
 export const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEEPSEEK_API_KEY_ENV = "DEEPSEEK_API_KEY";
-const USER_AGENT = "pikit-deepseek/1.0";
+const USER_AGENT = "pi-harness-deepseek/1.0";
 const MAX_TOOL_RESULT_TOKENS = 40_000;
 const DEFAULT_MAX_TOKENS = 64_000;
 

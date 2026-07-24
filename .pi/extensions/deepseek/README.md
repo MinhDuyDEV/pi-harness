@@ -1,4 +1,4 @@
-# DeepSeek Provider Extension for pikit
+# DeepSeek Provider Extension for pi-harness
 
 A Pi custom provider extension bringing DeepSeek-specific optimizations
 stolen from [Reasonix](https://github.com/esengine/DeepSeek-Reasonix).

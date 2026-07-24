@@ -45,7 +45,7 @@ The code is handwritten; the slop is already cleaned up; one-line change that's 
 - Read the diff, not just the final file.
 - Check for narrative. Agents narrate; humans don't.
 - Run `rg 'console\.(log|warn|error)' --type ts` before commit.
-- Run your project's dead-code gate before merge (e.g. `npx @earendil-works/fallow dead-code`; in the pikit source checkout, `npm run quality:fallow`).
+- Run your project's dead-code gate before merge (e.g. `npx @earendil-works/fallow dead-code`; in the pi-harness source checkout, `npm run quality:fallow`).
 - Don't approximate — each slop finding is a yes/no.
 
 ## Common Mistakes

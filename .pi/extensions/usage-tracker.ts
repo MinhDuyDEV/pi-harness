@@ -50,7 +50,7 @@ export default function usageTrackerExtension(pi: ExtensionAPI): void {
       lastRecordedTurn = currentTurn;
     } catch (error) {
       usageDisabled = true;
-      console.warn("pikit usage-tracker: disabling usage recording:", error instanceof Error ? error.message : error);
+      console.warn("pi-harness usage-tracker: disabling usage recording:", error instanceof Error ? error.message : error);
       return;
     }
   });
@@ -67,7 +67,7 @@ export default function usageTrackerExtension(pi: ExtensionAPI): void {
       lastRecordedTurn = currentTurn;
     } catch (error) {
       usageDisabled = true;
-      console.warn("pikit usage-tracker: disabling usage recording:", error instanceof Error ? error.message : error);
+      console.warn("pi-harness usage-tracker: disabling usage recording:", error instanceof Error ? error.message : error);
       return;
     }
   });

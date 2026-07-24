@@ -1,6 +1,6 @@
 # Themes
 
-Pi TUI color palettes for the pikit workspace.
+Pi TUI color palettes for the pi-harness workspace.
 
 ## Canonical themes
 

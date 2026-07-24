@@ -50,25 +50,25 @@ name: foo
 });
 
 test("messageContainsBootstrap detects marker in string content", () => {
-	const marker = "pikit:superpi bootstrap";
+	const marker = "pi-harness:superpi bootstrap";
 	const msg = { role: "user", content: `prefix ${marker} suffix` };
 	assert.equal(messageContainsBootstrap(msg, marker), true);
 });
 
 test("messageContainsBootstrap detects marker in array text part", () => {
-	const marker = "pikit:superpi bootstrap";
+	const marker = "pi-harness:superpi bootstrap";
 	const msg = { role: "user", content: [{ type: "text", text: `prefix ${marker} suffix` }] };
 	assert.equal(messageContainsBootstrap(msg, marker), true);
 });
 
 test("messageContainsBootstrap returns false for unrelated string content", () => {
-	const marker = "pikit:superpi bootstrap";
+	const marker = "pi-harness:superpi bootstrap";
 	const msg = { role: "user", content: "nothing relevant here" };
 	assert.equal(messageContainsBootstrap(msg, marker), false);
 });
 
 test("messageContainsBootstrap returns false for array with non-text parts", () => {
-	const marker = "pikit:superpi bootstrap";
+	const marker = "pi-harness:superpi bootstrap";
 	const msg = { role: "user", content: [{ type: "image", url: "x" }] };
 	assert.equal(messageContainsBootstrap(msg, marker), false);
 });
@@ -102,7 +102,7 @@ test("firstNonCompactionSummaryIndex returns 0 for empty array", () => {
 	assert.equal(firstNonCompactionSummaryIndex([]), 0);
 });
 
-test("PIKIT_NO_SUPERPI=1 disables bootstrap injection", async () => {
+test("PI_HARNESS_NO_SUPERPI=1 disables bootstrap injection", async () => {
 	const handlers: Record<string, (...args: unknown[]) => unknown> = {};
 	const mockPi = {
 		on: (event: string, handler: (...args: unknown[]) => unknown) => {
@@ -110,19 +110,19 @@ test("PIKIT_NO_SUPERPI=1 disables bootstrap injection", async () => {
 		},
 	} as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI;
 	superpiExtension(mockPi);
-	const prev = process.env.PIKIT_NO_SUPERPI;
+	const prev = process.env.PI_HARNESS_NO_SUPERPI;
 	try {
-		process.env.PIKIT_NO_SUPERPI = "1";
+		process.env.PI_HARNESS_NO_SUPERPI = "1";
 		await handlers.session_start?.();
 		const result = await handlers.context({ messages: [{ role: "user", content: "hello" }] });
-		assert.equal(result, undefined, "bootstrap must not inject when PIKIT_NO_SUPERPI=1");
+		assert.equal(result, undefined, "bootstrap must not inject when PI_HARNESS_NO_SUPERPI=1");
 	} finally {
-		if (prev === undefined) delete process.env.PIKIT_NO_SUPERPI;
-		else process.env.PIKIT_NO_SUPERPI = prev;
+		if (prev === undefined) delete process.env.PI_HARNESS_NO_SUPERPI;
+		else process.env.PI_HARNESS_NO_SUPERPI = prev;
 	}
 });
 
-test("PIKIT_NO_SUPERPI unset allows bootstrap injection", async () => {
+test("PI_HARNESS_NO_SUPERPI unset allows bootstrap injection", async () => {
 	const handlers: Record<string, (...args: unknown[]) => unknown> = {};
 	const mockPi = {
 		on: (event: string, handler: (...args: unknown[]) => unknown) => {
@@ -130,21 +130,21 @@ test("PIKIT_NO_SUPERPI unset allows bootstrap injection", async () => {
 		},
 	} as unknown as import("@earendil-works/pi-coding-agent").ExtensionAPI;
 	superpiExtension(mockPi);
-	const prev = process.env.PIKIT_NO_SUPERPI;
+	const prev = process.env.PI_HARNESS_NO_SUPERPI;
 	try {
-		delete process.env.PIKIT_NO_SUPERPI;
+		delete process.env.PI_HARNESS_NO_SUPERPI;
 		await handlers.session_start?.();
 		const messages = [{ role: "user", content: "hello" }];
 		const result = (await handlers.context({ messages })) as
 			| { messages: unknown[] }
 			| undefined;
-		assert.ok(result, "bootstrap should inject when PIKIT_NO_SUPERPI is unset");
+		assert.ok(result, "bootstrap should inject when PI_HARNESS_NO_SUPERPI is unset");
 		assert.ok(
 			result && result.messages.length > messages.length,
 			"injection should add a bootstrap message",
 		);
 	} finally {
-		if (prev === undefined) delete process.env.PIKIT_NO_SUPERPI;
-		else process.env.PIKIT_NO_SUPERPI = prev;
+		if (prev === undefined) delete process.env.PI_HARNESS_NO_SUPERPI;
+		else process.env.PI_HARNESS_NO_SUPERPI = prev;
 	}
 });

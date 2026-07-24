@@ -20,7 +20,7 @@ try {
   const files = JSON.parse(output)[0]?.files?.map((file) => file.path) ?? [];
   if (files.length === 0) throw new Error("npm pack returned no files");
 
-  packageRoot = mkdtempSync(join(tmpdir(), "pikit-packed-package-"));
+  packageRoot = mkdtempSync(join(tmpdir(), "pi-harness-packed-package-"));
   for (const path of files) {
     const relativePath = normalizePackPath(path);
     const destination = join(packageRoot, relativePath);
@@ -34,7 +34,7 @@ try {
     }
   }
 
-  consumerRoot = mkdtempSync(join(tmpdir(), "pikit-packed-consumer-"));
+  consumerRoot = mkdtempSync(join(tmpdir(), "pi-harness-packed-consumer-"));
   const settings = SettingsManager.inMemory({ packages: [packageRoot] });
   settings.setProjectTrusted(true);
   const loader = new DefaultResourceLoader({

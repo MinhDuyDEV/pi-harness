@@ -1,6 +1,6 @@
-# pikit
+# pi-harness
 
-`pikit` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
+`pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
 ## Requirements
 
@@ -11,7 +11,7 @@
 ## Install as a Pi package
 
 ```bash
-pi install npm:pikit
+pi install npm:pi-harness
 ```
 
 Restart Pi after installation. Pi discovers the package manifest resources:

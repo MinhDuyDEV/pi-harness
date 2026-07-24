@@ -1,5 +1,5 @@
 /**
- * Xiaomi MiMo Provider Extension for pikit
+ * Xiaomi MiMo Provider Extension for pi-harness
  *
  * Lightweight provider that registers MiMo models via Pi's built-in
  * openai-completions handler. MiMo is a clean OpenAI-compatible API

@@ -26,7 +26,7 @@ test("sidebar renders all open todos without a slice limit", () => {
   state.enabled = true;
   state.modelLabel = "OpenAI / GPT-5.5";
   state.git = { branch: "main", staged: 0, unstaged: 0, untracked: 0 };
-  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pikit/.pi`;
+  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pi-harness/.pi`;
   state.todos = {
     sourceFile: "TODO.md",
     sourceCount: 1,
@@ -89,7 +89,7 @@ test("sidebar omits the queue section when there is no pending queue", () => {
   state.enabled = true;
   state.modelLabel = "OpenAI / GPT-5.5";
   state.git = { branch: "main", staged: 0, unstaged: 0, untracked: 0 };
-  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pikit/.pi`;
+  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pi-harness/.pi`;
   state.piVersion = "1.2.3";
 
   const text = renderSidebar(state, 34, 18).map(plain).join("\n");
@@ -111,7 +111,7 @@ test("sidebar omits the TODO section when all tracked tasks are complete", () =>
             items: [{ text: "Finished", done: true, sourceFile: "TODO.md", blockTitle: null, status: null }],
       };
   state.git = { branch: "main", staged: 0, unstaged: 0, untracked: 0 };
-  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pikit/.pi`;
+  state.cwd = `${process.env.HOME ?? "/Users/test"}/dev/projects/pi-harness/.pi`;
   state.piVersion = "1.2.3";
 
   const text = renderSidebar(state, 34, 18).map(plain).join("\n");
@@ -140,7 +140,7 @@ test("sidebar renders compact session todos queue and bottom identity rows", () 
   state.queue = { steerCount: 1, followUpCount: 2, hasPending: true };
   state.git = { branch: "main", staged: 1, unstaged: 2, untracked: 3 };
   const home = process.env.HOME ?? "/Users/test";
-  state.cwd = `${home}/dev/projects/pikit/.pi`;
+  state.cwd = `${home}/dev/projects/pi-harness/.pi`;
   state.piVersion = "1.2.3";
 
   const lines = renderSidebar(state, 34, 22);
@@ -160,7 +160,7 @@ test("sidebar renders compact session todos queue and bottom identity rows", () 
   assert.doesNotMatch(plain(text), /\n\s*Git\s*\n/);
   assert.doesNotMatch(text, /\x1b\[32m\+1\x1b\[0m \x1b\[31m-2\x1b\[0m \x1b\[33m\?3\x1b\[0m/);
   assert.doesNotMatch(text, /Resources|collapsed/);
-  assert.match(plain(lines.at(-2) ?? ""), /~\/dev\/projects\/pikit\/\.pi:main\s*$/);
+  assert.match(plain(lines.at(-2) ?? ""), /~\/dev\/projects\/pi-harness\/\.pi:main\s*$/);
   assert.match(plain(lines.at(-1) ?? ""), /Pi 1\.2\.3\s*$/);
 });
 

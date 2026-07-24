@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DefaultResourceLoader, SettingsManager } from "@earendil-works/pi-coding-agent";
 import { assertResourcesLoad } from "./lib/resource-smoke.mjs";
 
-const agentDir = mkdtempSync(join(tmpdir(), "pikit-smoke-"));
+const agentDir = mkdtempSync(join(tmpdir(), "pi-harness-smoke-"));
 try {
   const settings = SettingsManager.inMemory({ packages: [] });
   settings.setProjectTrusted(true);

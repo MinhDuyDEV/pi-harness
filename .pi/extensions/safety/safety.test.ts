@@ -84,7 +84,7 @@ function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 
 {
 	const t = "workspace rules canonicalize traversal and symlink escapes";
-	const root = mkdtempSync(join(tmpdir(), "pikit-safety-workspace-"));
+	const root = mkdtempSync(join(tmpdir(), "pi-harness-safety-workspace-"));
 	const protectedDir = join(root, "protected");
 	const workspaceDir = join(root, "workspace");
 	mkdirSync(protectedDir);
