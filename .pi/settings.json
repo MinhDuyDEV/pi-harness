@@ -5,11 +5,12 @@
     "autoResize": true
   },
   "packages": [
-    "npm:@heyhuynhgiabuu/pi-pretty@0.6.20",
     "npm:@heyhuynhgiabuu/pi-diff@0.7.6",
     "npm:@heyhuynhgiabuu/pi-search@0.2.7",
     "npm:@minhduydev/pi-subagents@0.6.0",
     "git:https://github.com/badlogic/pi-diff-review#57622138f5b02896a230b4fbfe702d24c6a515bb",
+    "git:https://github.com/sting8k/pi-droid-styling",
+    "git:https://github.com/sting8k/pi-themes",
     "npm:@minhduydev/pi-todo@0.1.1"
   ],
   "pi-todo": {
@@ -52,10 +53,10 @@
   "piTui": {
     "workingPaddingTop": 1,
     "fixedEditor": {
-      "enabled": false
+      "enabled": true
     }
   },
-  "theme": "catppuccin",
+  "theme": "onedark-pro",
   "showHardwareCursor": false,
   "autocompleteMaxVisible": 10,
   "quietStartup": false,
