@@ -24,6 +24,10 @@ These resources are active when this repository is used directly but are not aut
 
 Detailed workflows belong in `skills/`; lifecycle orchestration belongs in `prompts/`; universal runtime rules stay in `APPEND_SYSTEM.md`. `.pi/AGENTS.md` is intentionally absent because it is not a supported project-context location.
 
+## Auto-safe learning profile
+
+The harness pins `@minhduydev/pi-learning` and enables its `auto-safe` profile in `settings.json`. The learning coordinator translates verified subagent proof, TODO lifecycle, DCP, and review signals into bounded versioned observations. Only digest-bound low-risk observations may activate automatically; policy-bearing files and curated `MEMORY.md` still require explicit promotion. Learning context is bounded, provenance-labelled, and fail-open.
+
 ## Local runtime state
 
 - `.pi/artifacts/`
