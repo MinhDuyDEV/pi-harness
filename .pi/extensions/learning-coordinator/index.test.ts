@@ -1,137 +1,140 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import learningCoordinator from "./index.js";
 import {
+  buildCompactionCompletedEvent,
   DCP_TELEMETRY_EVENT,
-  KNOWLEDGE_SIGNAL_EVENT,
+} from "../dcp/telemetry.js";
+import register, {
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
   SUBAGENT_PROOF_EVENT,
-  SUBAGENT_REVIEW_EVENT,
-  TODO_ITEM_EVENT,
-  TODO_PHASE_EVENT,
   createObservation,
-  parseContextRequest,
+  knowledgeSignalFromEvent,
   parseProof,
-} from "./protocol.js";
+  stableEventIdentity,
+} from "./index.js";
 
-interface Harness {
-  pi: ExtensionAPI;
-  hook(name: string): (event: unknown, ctx: { cwd: string }) => unknown;
-  emit(name: string, payload: unknown): void;
-  emitted: Array<{ name: string; payload: unknown }>;
-  throwOn: Set<string>;
+interface Listener {
+  (payload: unknown): void | Promise<void>;
 }
 
-function harness(): Harness {
-  const hooks = new Map<string, (event: unknown, ctx: { cwd: string }) => unknown>();
-  const listeners = new Map<string, Array<(payload: unknown) => void>>();
-  const emitted: Array<{ name: string; payload: unknown }> = [];
-  const throwOn = new Set<string>();
-  const pi = {
-    on: (name: string, handler: (event: unknown, ctx: { cwd: string }) => unknown) => hooks.set(name, handler),
-    events: {
-      on: (name: string, handler: (payload: unknown) => void) => listeners.set(name, [...(listeners.get(name) ?? []), handler]),
-      emit: (name: string, payload: unknown) => {
-        if (throwOn.has(name)) throw new Error("listener failed");
-        emitted.push({ name, payload });
-        for (const listener of listeners.get(name) ?? []) listener(payload);
-      },
+class HarnessEventBus {
+  readonly listeners = new Map<string, Listener[]>();
+  readonly emitted: Array<{ event: string; payload: unknown }> = [];
+
+  on(event: string, listener: Listener): void {
+    const listeners = this.listeners.get(event) ?? [];
+    listeners.push(listener);
+    this.listeners.set(event, listeners);
+  }
+
+  async emit(event: string, payload: unknown): Promise<void> {
+    this.emitted.push({ event, payload });
+    for (const listener of this.listeners.get(event) ?? []) {
+      try {
+        await listener(payload);
+      } catch {
+        // Model Pi EventBus: one async listener failure does not reject the bus.
+      }
+    }
+  }
+}
+
+function install(bus: HarnessEventBus): void {
+  register({
+    events: bus,
+    on(name: string, handler: (event: unknown, context: { cwd: string }) => void) {
+      if (name === "session_start") handler({}, { cwd: "/tmp/project" });
     },
-  } as unknown as ExtensionAPI;
-  return {
-    pi,
-    hook: (name) => {
-      const handler = hooks.get(name);
-      assert.ok(handler);
-      return handler;
-    },
-    emit: (name, payload) => {
-      for (const listener of listeners.get(name) ?? []) listener(payload);
-    },
-    emitted,
-    throwOn,
-  };
+  } as unknown as ExtensionAPI);
 }
 
-const DIGEST = "a".repeat(64);
+const request = {
+  protocolVersion: 1,
+  taskId: "task-42",
+  agentType: "general",
+  description: "Use the verified migration procedure",
+} as const;
 
-function request(description = "Run the focused coordinator test before the full suite") {
-  return { protocolVersion: 1, taskId: "task-1", agentType: "reviewer", description };
-}
+const proof = {
+  protocolVersion: 1,
+  taskId: "task-42",
+  verificationPassed: true,
+  verificationIssues: [],
+  evidenceDigests: ["a".repeat(64)],
+  timestamp: "2026-01-02T03:04:05.000Z",
+} as const;
 
-function proof(verificationPassed = true) {
-  return {
-    protocolVersion: 1,
-    taskId: "task-1",
-    verificationPassed,
-    verificationIssues: verificationPassed ? [] : ["failed"],
-    evidenceDigests: [DIGEST],
-    timestamp: "2026-07-25T00:00:00.000Z",
-  };
-}
+test("correlates a context request with proof and emits the v1 learning schema", async () => {
+  const bus = new HarnessEventBus();
+  let contextListenerRan = false;
+  bus.on(SUBAGENT_CONTEXT_REQUEST_EVENT, async (payload) => {
+    contextListenerRan = true;
+    assert.equal((payload as { taskId: string }).taskId, request.taskId);
+  });
+  install(bus);
 
-test("parses bounded context and proof payloads", () => {
-  assert.equal(parseContextRequest(request())?.taskId, "task-1");
-  assert.equal(parseContextRequest(request("ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij")), undefined);
-  assert.deepEqual(parseProof(proof())?.evidenceDigests, [DIGEST]);
-  assert.equal(parseProof({ ...proof(), evidenceDigests: ["invalid"] })?.evidenceDigests.length, 0);
-});
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(SUBAGENT_PROOF_EVENT, proof);
+  await new Promise<void>((resolve) => setImmediate(resolve));
 
-test("creates an observation only from passed proof with evidence", () => {
-  const context = parseContextRequest(request());
-  const passed = parseProof(proof());
-  const failed = parseProof(proof(false));
-  assert.ok(context && passed && failed);
-  const observation = createObservation(context, passed, "/repo");
-  assert.equal(observation?.source, "pi-subagents:proof-verified");
-  assert.equal(observation?.evidenceRefs[0]?.digest, DIGEST);
-  assert.equal(createObservation(context, failed, "/repo"), undefined);
-});
-
-test("correlates context with proof and suppresses duplicate delivery", () => {
-  const h = harness();
-  learningCoordinator(h.pi);
-  h.hook("session_start")({}, { cwd: "/repo" });
-  h.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request());
-  h.emit(SUBAGENT_PROOF_EVENT, proof());
-  h.emit(SUBAGENT_PROOF_EVENT, proof());
-  const observations = h.emitted.filter((event) => event.name === LEARNING_OBSERVATION_EVENT);
+  assert.equal(contextListenerRan, true);
+  const observations = bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT);
   assert.equal(observations.length, 1);
+  const observation = observations[0]?.payload as Record<string, unknown>;
+  assert.equal(observation.protocolVersion, 1);
+  assert.equal(observation.confidence, "high");
+  assert.match(observation.digest as string, /^[a-f0-9]{64}$/);
+  assert.equal(observation.idempotencyKey, observation.digest);
+  assert.equal(observation.timestamp, Date.parse(proof.timestamp));
 });
 
-test("does not turn failed proof or missing context into learning", () => {
-  const h = harness();
-  learningCoordinator(h.pi);
-  h.hook("session_start")({}, { cwd: "/repo" });
-  h.emit(SUBAGENT_PROOF_EVENT, proof());
-  h.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request());
-  h.emit(SUBAGENT_PROOF_EVENT, proof(false));
-  assert.equal(h.emitted.some((event) => event.name === LEARNING_OBSERVATION_EVENT), false);
+test("uses at-least-once emission instead of a delivered-before-ack dedupe", async () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(SUBAGENT_PROOF_EVENT, proof);
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(SUBAGENT_PROOF_EVENT, proof);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.equal(bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT).length, 2);
 });
 
-test("retries delivery after a throwing listener", () => {
-  const h = harness();
-  learningCoordinator(h.pi);
-  h.hook("session_start")({}, { cwd: "/repo" });
-  h.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request());
-  h.throwOn.add(LEARNING_OBSERVATION_EVENT);
-  h.emit(SUBAGENT_PROOF_EVENT, proof());
-  h.throwOn.delete(LEARNING_OBSERVATION_EVENT);
-  h.emit(SUBAGENT_PROOF_EVENT, proof());
-  assert.equal(h.emitted.filter((event) => event.name === LEARNING_OBSERVATION_EVENT).length, 1);
+test("does not register knowledge relays without a pi-learning consumer", () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+  assert.deepEqual([...bus.listeners.keys()].sort(), [SUBAGENT_CONTEXT_REQUEST_EVENT, SUBAGENT_PROOF_EVENT].sort());
+  assert.equal(DCP_TELEMETRY_EVENT, "dcp:telemetry");
 });
 
-test("relays todo, DCP, and review metadata as non-proof signals", () => {
-  const h = harness();
-  learningCoordinator(h.pi);
-  h.hook("session_start")({}, { cwd: "/repo" });
-  h.emit(TODO_ITEM_EVENT, { idempotencyKey: "item-1", todoRef: ".pi/artifacts/TODO.md", docDigest: DIGEST });
-  h.emit(TODO_PHASE_EVENT, { idempotencyKey: "phase-1", todoRef: ".pi/artifacts/TODO.md", docDigest: DIGEST });
-  h.emit(DCP_TELEMETRY_EVENT, { type: "compaction_completed", timestamp: "2026-07-25T00:00:00Z" });
-  h.emit(SUBAGENT_REVIEW_EVENT, { taskId: "task-1", timestamp: "2026-07-25T00:00:00Z" });
-  const signals = h.emitted.filter((event) => event.name === KNOWLEDGE_SIGNAL_EVENT);
-  assert.equal(signals.length, 4);
-  assert.equal(h.emitted.some((event) => event.name === LEARNING_OBSERVATION_EVENT), false);
+test("uses the real numeric DCP timestamp and bounded stable identity", () => {
+  const event = buildCompactionCompletedEvent({
+    blockCount: 3,
+    artifactCount: 2,
+    deterministic: true,
+    reason: "threshold",
+    willRetry: false,
+  });
+  assert.equal(typeof event.timestamp, "number");
+  const first = stableEventIdentity("dcp", event);
+  const second = stableEventIdentity("dcp", { ...event });
+  assert.match(first ?? "", /^[a-f0-9]{64}$/);
+  assert.equal(first, second);
+  assert.equal(knowledgeSignalFromEvent("dcp-compaction", "dcp", event)?.idempotencyKey, first);
+});
+
+test("rejects malformed proof data and redacts secrets before emission", () => {
+  assert.equal(parseProof({ ...proof, timestamp: 1700000000000 }), undefined);
+  assert.equal(parseProof({ ...proof, evidenceDigests: ["not-a-digest"] }), undefined);
+  const observation = createObservation(
+    { ...request, description: "password=super-secret" },
+    proof,
+    "/tmp/project",
+  );
+  assert.ok(observation);
+  assert.equal(observation.content.includes("super-secret"), false);
+  assert.equal(observation.content.includes("[REDACTED]"), true);
 });
