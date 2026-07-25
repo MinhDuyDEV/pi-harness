@@ -4,6 +4,21 @@
     "blockImages": false,
     "autoResize": true
   },
+  "pi-learning": {
+    "enabled": true,
+    "mode": "auto-safe",
+    "autoActivate": true,
+    "autoActivation": {
+      "enabled": true,
+      "allowedKinds": ["pattern", "discovery"],
+      "minEvidenceTrust": "verified-command"
+    },
+    "retrieval": {
+      "maxItems": 3,
+      "maxItemChars": 400,
+      "maxTotalChars": 1200
+    }
+  },
   "packages": [
     "npm:@heyhuynhgiabuu/pi-diff@0.7.6",
     "npm:@heyhuynhgiabuu/pi-search@0.2.7",
