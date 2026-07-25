@@ -143,7 +143,7 @@ test("sidebar renders compact session todos queue and bottom identity rows", () 
   state.cwd = `${home}/dev/projects/pi-harness/.pi`;
   state.piVersion = "1.2.3";
 
-  const lines = renderSidebar(state, 34, 22);
+  const lines = renderSidebar(state, 37, 22);
   const text = lines.join("\n");
 
   assert.ok(lines.every((line) => !line.includes("│")), "sidebar has no left border");
