@@ -8,6 +8,38 @@ import { pathToFileURL } from "node:url";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
+
+/**
+ * The sibling package versions under test come from `.pi/settings.json`, which
+ * is the single place this harness declares what it ships against.
+ *
+ * They used to be hard-coded defaults here, and they drifted one to two minors
+ * behind the pins — so this gate (which `release:check` runs) was green on a
+ * combination nobody would ever install. An env override is kept for
+ * bisecting, but the default MUST track the pins.
+ */
+function pinnedSiblingSpecs(): string[] {
+  const settings = JSON.parse(readFileSync(join(REPO_ROOT, ".pi", "settings.json"), "utf8")) as {
+    packages?: string[];
+  };
+  const specs = (settings.packages ?? [])
+    .filter((entry) => /@minhduydev\/pi-(?:learning|todo|subagents)@/.test(entry))
+    .map((entry) => entry.replace(/^npm:/, ""));
+  assert.equal(
+    specs.length,
+    3,
+    ".pi/settings.json must pin exactly pi-learning, pi-subagents and pi-todo",
+  );
+  const overrides: Record<string, string | undefined> = {
+    "pi-learning": process.env.PI_LEARNING_SPEC,
+    "pi-subagents": process.env.PI_SUBAGENTS_SPEC,
+    "pi-todo": process.env.PI_TODO_SPEC,
+  };
+  return specs.map((spec) => {
+    const name = spec.match(/pi-(?:learning|todo|subagents)/)?.[0] ?? "";
+    return overrides[name] ?? spec;
+  });
+}
 const LEARNING_OBSERVATION_EVENT = "pi-learning:observation:v1";
 const SUBAGENT_CONTEXT_REQUEST_EVENT = "pi-subagents:v1:context-request";
 const SUBAGENT_PROOF_EVENT = "pi-subagents:v1:proof-verified";
@@ -67,13 +99,13 @@ async function installConsumer(root: string): Promise<Consumer> {
     { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
   ).trim().split("\n").at(-1);
   assert.ok(packedName, "npm pack must return the harness tarball name");
+  const siblings = pinnedSiblingSpecs();
+  process.stderr.write(`verify:auto-safe ► sibling pins: ${siblings.join(", ")}\n`);
   const packages = [
     "@earendil-works/pi-coding-agent@0.81.1",
     "@earendil-works/pi-tui@0.81.1",
     "typebox@1.1.38",
-    process.env.PI_LEARNING_SPEC ?? "@minhduydev/pi-learning@0.1.2",
-    process.env.PI_SUBAGENTS_SPEC ?? "@minhduydev/pi-subagents@0.6.1",
-    process.env.PI_TODO_SPEC ?? "@minhduydev/pi-todo@0.1.5",
+    ...siblings,
     join(root, packedName),
   ];
   execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--save-exact", ...packages], {
@@ -82,7 +114,7 @@ async function installConsumer(root: string): Promise<Consumer> {
   });
   const coordinator = await loadPackageModule(
     consumer,
-    "pi-harness/.pi/extensions/learning-coordinator/index.ts",
+    "@minhduydev/pi-harness/.pi/extensions/learning-coordinator/index.ts",
   );
   return {
     path: consumer,

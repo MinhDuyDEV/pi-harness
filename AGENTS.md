@@ -24,7 +24,7 @@ This repository is a reusable Pi Coding Agent package. Follow host system, devel
 
 - `.pi/settings.json` contains portable runtime settings and pinned package sources.
 - `.pi/extensions/`, `.pi/skills/`, `.pi/prompts/`, and `.pi/themes/` are package resources discovered through Pi's manifest conventions.
-- `.pi/agents/` contains definitions consumed by the pinned `pi-task` extension, not by Pi core.
+- `.pi/agents/` contains definitions consumed by the pinned `@minhduydev/pi-subagents` extension, not by Pi core. (`@heyhuynhgiabuu/pi-task` is NOT pinned in `.pi/settings.json` and is not loaded.)
 - `.pi/artifacts/` and `.pi/MEMORY.md` are local runtime state and must remain untracked.
 - `skills-lock.json`, `package-lock.json`, package metadata, and release checks are tracked reproducibility contracts.
 

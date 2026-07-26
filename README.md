@@ -11,7 +11,7 @@
 ## Install as a Pi package
 
 ```bash
-pi install npm:pi-harness
+pi install npm:@minhduydev/pi-harness
 ```
 
 Restart Pi after installation. Pi discovers the package manifest resources:
@@ -24,8 +24,8 @@ Restart Pi after installation. Pi discovers the package manifest resources:
 Pi package discovery does **not** automatically apply this repository's root `AGENTS.md`, `.pi/settings.json`, or `.pi/agents/` directory. Those files configure and document the source-checkout profile:
 
 - Run `/init` in a consuming repository to create or update that repository's own `AGENTS.md` from observed facts.
-- Install `@heyhuynhgiabuu/pi-task` separately if that repository needs delegated task agents.
-- Copy or adapt `.pi/agents/` only when project-specific pi-task overrides are wanted; otherwise use pi-task's bundled agents.
+- Delegated task agents come from `@minhduydev/pi-subagents`, which `.pi/settings.json` already pins.
+- Copy or adapt `.pi/agents/` only when project-specific pi-subagents overrides are wanted; otherwise use the bundled agents.
 - Never copy provider credentials, personal model defaults, caches, `.pi/MEMORY.md`, or `.pi/artifacts/`.
 
 ## Source-checkout profile
@@ -38,7 +38,7 @@ Context ownership is intentionally layered:
 - `.pi/APPEND_SYSTEM.md` — concise, repository-agnostic runtime policy.
 - `.pi/skills/*/SKILL.md` — detailed workflows loaded on demand.
 - `.pi/prompts/*.md` — user-invoked lifecycle orchestration.
-- `.pi/agents/*.md` — role-specific pi-task contracts loaded only in configured checkouts.
+- `.pi/agents/*.md` — role-specific pi-subagents contracts loaded only in configured checkouts.
 
 `.pi/AGENTS.md` is intentionally absent because Pi discovers project context from root or nested `AGENTS.md` files, not from that duplicate location.
 

@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import safetyExtension from "../safety.js";
+import { readFileSync } from "node:fs";
 import { evaluate } from "./evaluate.js";
 import { defaultRules } from "./rules/presets.js";
 import { VerificationTracker, verificationRules } from "./rules/verification.js";
@@ -18,6 +19,27 @@ import type { RuleSet, ToolCallContext } from "./types.js";
 
 function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 	return evaluate(rules, ctx, "highest-severity").verdict;
+}
+
+{
+	// The module header used to advertise "26 rules across 7 categories" with
+	// every per-category number wrong. Nothing checked it, so it stayed wrong
+	// through several rule additions. It is now an assertion.
+	const t = "extension.ts header states the real rule counts";
+	const { rules } = defaultRules();
+	const byCategory = new Map<string, number>();
+	for (const rule of rules) {
+		const category = rule.id.split(/[.:\-\/]/)[0] ?? rule.id;
+		byCategory.set(category, (byCategory.get(category) ?? 0) + 1);
+	}
+	const header = readFileSync(new URL("./extension.ts", import.meta.url), "utf8");
+	const declared = header.match(/RULES:\s*(\d+)\s+rules across\s+(\d+)\s+categories/);
+	assert.ok(declared, t + ": header declares a count");
+	assert.equal(
+		Number(declared![1]),
+		rules.length,
+		`${t}: header says ${declared![1]} rules, defaultRules() returns ${rules.length}`,
+	);
 }
 
 {

@@ -2,7 +2,7 @@
 
 ## Boundary
 
-This repository is a Pi package. Pi owns the agent loop, model/provider configuration, trust decisions, sessions, and built-in tools. This package supplies opt-in extensions, curated skills, prompts, themes, and optional `pi-task` agent definitions.
+This repository is a Pi package. Pi owns the agent loop, model/provider configuration, trust decisions, sessions, and built-in tools. This package supplies opt-in extensions, curated skills, prompts, themes, and optional `@minhduydev/pi-subagents` agent definitions.
 
 ## Loading
 

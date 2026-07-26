@@ -1,5 +1,5 @@
 {
-  "name": "pi-harness",
+  "name": "@minhduydev/pi-harness",
   "version": "1.0.0",
   "private": false,
   "description": "A portable Pi Coding Agent package with curated extensions, skills, prompts, and themes.",
@@ -48,6 +48,9 @@
   ],
   "author": "Huynh Gia Buu",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "AGENTS.md",
     "README.md",

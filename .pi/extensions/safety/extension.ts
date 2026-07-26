@@ -5,9 +5,13 @@
  * composable safety module. One tool_call hook, one audit log,
  * one /safety command.
  *
- * RULES: 26 deduplicated rules across 7 categories:
- *   git (11), credentials (3), destructive (6), publish (4),
- *   system (2), workspace (2), verification (1)
+ * RULES: 30 rules across 9 categories:
+ *   git (8), destructive (7), credentials (5), publish (3), workspace (3),
+ *   injection (1), network (1), system (1), verification (1)
+ *
+ * These counts are asserted by `safety.test.ts` — the header used to claim
+ * "26 rules across 7 categories" with every per-category number wrong, because
+ * nothing checked it.
  *
  * CAPABILITIES PRESERVED:
  *   - Block (hard deny) for critical threats

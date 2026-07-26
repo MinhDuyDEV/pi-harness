@@ -6,10 +6,13 @@
  * Steps (stop on first failure):
  *   1. npm run check            — validate:skills, package:check, smoke:resources,
  *                                  typechecks, quality, full test suite
- *   2. npm audit                — security audit (all deps, not --omit=dev)
- *   3. validate:package-payload — deterministic packed-manifest contract
+ *   2. verify:auto-safe         — Auto-safe E2E against a packed harness plus the
+ *                                  sibling versions pinned in .pi/settings.json
+ *   3. verify:phase5-packed     — the Phase 5 chain against those same pins
+ *   4. npm audit                — security audit (all deps, not --omit=dev)
+ *   5. validate:package-payload — deterministic packed-manifest contract
  *                                  (npm pack --dry-run --json --ignore-scripts)
- *   4. smoke:packed             — clean-consumer native Pi resource load from the
+ *   6. smoke:packed             — clean-consumer native Pi resource load from the
  *                                  reconstructed package (npm pack --ignore-scripts)
  *
  * No recursion: package steps use `--ignore-scripts`, and this script never invokes
@@ -21,6 +24,9 @@ import { spawnSync } from "node:child_process";
 const steps = [
   { name: "check", cmd: "npm", args: ["run", "check"] },
   { name: "verify:auto-safe", cmd: "npm", args: ["run", "verify:auto-safe"] },
+  // The only gate that reads the real pins end-to-end. It was defined in
+  // package.json but wired into nothing, so it never ran.
+  { name: "verify:phase5-packed", cmd: "npm", args: ["run", "verify:phase5-packed"] },
   { name: "audit", cmd: "npm", args: ["audit"] },
   { name: "pack:check", cmd: "npm", args: ["run", "pack:check"] },
   { name: "smoke:packed", cmd: "npm", args: ["run", "smoke:packed"] },
@@ -41,5 +47,7 @@ if (failed) {
   process.exit(failed.status);
 }
 
-process.stderr.write(`\nrelease:check: OK — full check, Auto-safe E2E, audit, and package validation passed\n`);
+process.stderr.write(
+  `\nrelease:check: OK — full check, Auto-safe E2E, Phase 5 packed E2E, audit, and package validation passed\n`,
+);
 process.exit(0);
