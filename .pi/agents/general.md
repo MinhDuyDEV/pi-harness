@@ -3,7 +3,8 @@ description: >
   PROACTIVE — General-purpose agent for researching complex questions and executing multi-step tasks.
   Use for parallel units of work across multiple concurrent task runs. May edit when needed.
   NOT for in-repo-only mapping (explore) or docs-only external research (scout).
-thinking: xhigh
+model: openai-codex/gpt-5.6-luna
+thinking: high
 proactive: true
 prompt_mode: append
 ---

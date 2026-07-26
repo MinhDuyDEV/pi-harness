@@ -5,6 +5,7 @@ description: >
   for adversarial verification. Catches fake-green (tests pass without exercising the requirement),
   fake-red (failures caused by environment not code), and coverage gaps (claim broader than evidence).
   Read-only; never edits. NOT for first-pass diff-shape review (`reviewer`) or code exploration (`explore`).
+model: openai-codex/gpt-5.6-sol
 thinking: high
 proactive: true
 readonly: true
