@@ -17,6 +17,8 @@ Install dependencies into a persistent user directory so they survive `pi update
 
 ```bash
 SKILL_DEPS="$HOME/.pi/agent/skill-deps/brave-search"
+mkdir -p "$SKILL_DEPS"
+cp "{baseDir}/package.json" "{baseDir}/package-lock.json" "$SKILL_DEPS/"
 npm ci --prefix "$SKILL_DEPS" --ignore-scripts        # persistent; rerun only if deps change
 ln -sfn "$SKILL_DEPS/node_modules" "{baseDir}/node_modules"  # relink after pi update/remove
 export BRAVE_API_KEY="..."

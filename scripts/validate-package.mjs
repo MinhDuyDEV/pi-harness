@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 
 const errors = [];
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
@@ -19,12 +19,41 @@ for (const path of packageJson.files ?? []) {
 
 if (packageJson.bin) errors.push("package.json must not expose the removed pi-harness CLI");
 if (packageJson.scripts?.postinstall) errors.push("package.json must not run a nested postinstall install");
-if (existsSync(".pi/extensions/package.json")) errors.push("extension dependencies must live at the package root");
+// Recursive, not just the top of .pi/extensions: a nested package.json with
+// its own `pi.extensions` (e.g. rewind/) ships inside the payload and can
+// double-register when installed as a package (audit roadmap 34). Every
+// manifest below .pi/ must be deliberate; today none are allowed.
+// Scan only the .pi trees that SHIP (per the files list above), recursively —
+// the old check looked at exactly one path. A nested manifest declaring its
+// own `pi` config (e.g. rewind/ used to) ships in the payload — npm
+// force-includes nested package.json, a files negation cannot exclude it —
+// and can double-register its extensions when installed as a package (audit
+// roadmap 34). Manifests without a `pi` field (skill dependency manifests)
+// are fine.
+for (const shipped of (packageJson.files ?? []).filter((entry) => entry.startsWith(".pi/"))) {
+  if (!existsSync(shipped)) continue;
+  for (const nested of globSync(`${shipped}/**/package.json`)) {
+    if (nested.includes("node_modules")) continue;
+    try {
+      const manifest = JSON.parse(readFileSync(nested, "utf8"));
+      if (manifest.pi !== undefined) {
+        errors.push(
+          `nested manifest declares pi config and ships in the payload (double-register risk): ${nested}`,
+        );
+      }
+    } catch {
+      errors.push(`nested manifest is unreadable: ${nested}`);
+    }
+  }
+}
 if (existsSync(".pi/extensions/herdr-agent-state.ts")) errors.push("machine-managed HerdR state must not be tracked as a project extension");
+// One bounded range across the whole pi-* suite (audit X-C): "*" protected
+// nothing, and pi-learning's caret range excluded 0.82 while the others
+// accepted it — the peer conflict would have appeared only at install time.
 for (const [dependency, version] of Object.entries({
-  "@earendil-works/pi-ai": "*",
-  "@earendil-works/pi-coding-agent": "*",
-  "@earendil-works/pi-tui": "*",
+  "@earendil-works/pi-ai": ">=0.81.1 <0.82.0",
+  "@earendil-works/pi-coding-agent": ">=0.81.1 <0.82.0",
+  "@earendil-works/pi-tui": ">=0.81.1 <0.82.0",
   typebox: "1.1.38",
 })) {
   if (packageJson.peerDependencies?.[dependency] !== version) errors.push(`${dependency} peer version must be ${version}`);

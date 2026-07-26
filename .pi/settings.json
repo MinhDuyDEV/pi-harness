@@ -10,7 +10,10 @@
     "autoActivate": true,
     "autoActivation": {
       "enabled": true,
-      "allowedKinds": ["pattern", "discovery"],
+      "allowedKinds": [
+        "pattern",
+        "discovery"
+      ],
       "minEvidenceTrust": "verified-command"
     },
     "retrieval": {
@@ -79,5 +82,9 @@
   "quietStartup": false,
   "doubleEscapeAction": "tree",
   "outputPad": 1,
-  "showCacheMissNotices": true
+  "showCacheMissNotices": true,
+  "pi-harness": {
+    "superpi": true,
+    "gptPersonality": true
+  }
 }

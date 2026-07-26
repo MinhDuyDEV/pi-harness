@@ -55,7 +55,7 @@
       "sourceType": "local",
       "skillPath": ".pi/skills/brave-search/SKILL.md",
       "trust": "local",
-      "computedHash": "c6209721974954404e658d03bd5fe9ed5762c9eb3c81aad0537e920d734c23f7"
+      "computedHash": "7f8d1e96622c218bf6a73a16aa104bafebb9558c94254f6186a069b7ffa43455"
     },
     "browser-testing-with-devtools": {
       "source": "local",
@@ -69,7 +69,7 @@
       "sourceType": "local",
       "skillPath": ".pi/skills/browser-tools/SKILL.md",
       "trust": "local",
-      "computedHash": "364824e57347f0cc805929f877805cf45b3328898ac036a32e8d44080ac5b1db"
+      "computedHash": "049c310f426f78eeca5dad2d3794da776ee4b15ee206e3c1f4a592c0c0710deb"
     },
     "chrome-devtools": {
       "source": "local",

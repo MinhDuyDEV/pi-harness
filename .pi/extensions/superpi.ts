@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readHarnessSettings } from "./lib/harness-settings.js";
 
 const EXTREMELY_IMPORTANT_MARKER = "<EXTREMELY-IMPORTANT>";
 const BOOTSTRAP_MARKER = "pi-harness:superpi bootstrap";
@@ -91,10 +92,13 @@ export default function superpiExtension(pi: ExtensionAPI) {
 	});
 
 	pi.on("context", async (event) => {
-		// Opt-out: PI_HARNESS_NO_SUPERPI=1 disables bootstrap injection entirely.
-		// The ~247-token routing guidance is on by default; consumers who want only
-		// the skills/extensions without the forced bootstrap can opt out here.
+		// OPT-IN (audit H-A): `.pi/settings.json` → `"pi-harness": {"superpi": true}`.
+		// This injection was on by default with only an env opt-out while the
+		// README promised the harness never injects policy into a consumer's
+		// prompt — the docs described the intent, the code shipped the opposite.
+		// The env kill-switch still wins for quick bisecting.
 		if (process.env.PI_HARNESS_NO_SUPERPI === "1" || process.env.PI_HARNESS_NO_SUPERPI === "true") return;
+		if (readHarnessSettings().superpi !== true) return;
 		if (!injectBootstrap) return;
 		if (event.messages.some((m) => messageContainsBootstrap(m, BOOTSTRAP_MARKER))) return;
 

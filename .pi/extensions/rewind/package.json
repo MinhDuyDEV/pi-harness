@@ -6,13 +6,19 @@
     "type": "git",
     "url": "https://github.com/MinhDuyDEV/pi-harness.git"
   },
-  "keywords": ["pi-package", "pi", "extension", "checkpoint", "rewind", "undo", "redo", "git"],
+  "keywords": [
+    "pi-package",
+    "pi",
+    "extension",
+    "checkpoint",
+    "rewind",
+    "undo",
+    "redo",
+    "git"
+  ],
   "author": "pi-harness",
   "license": "MIT",
   "type": "module",
-  "pi": {
-    "extensions": ["./index.ts"]
-  },
   "scripts": {
     "test": "node --import tsx --test index.test.ts ledger.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json"

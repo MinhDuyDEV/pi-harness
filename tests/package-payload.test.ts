@@ -219,7 +219,14 @@ test("package metadata follows Pi's portable package conventions", () => {
     "@earendil-works/pi-coding-agent",
     "@earendil-works/pi-tui",
   ]) {
-    assert.equal(manifest.peerDependencies?.[name], "*", `${name} must come from the active Pi host`);
+    // One bounded range across the pi-* suite (audit X-C): "*" protected
+    // nothing — a Pi 0.82 host would have satisfied it while the code was
+    // only ever verified against 0.81.x.
+    assert.equal(
+      manifest.peerDependencies?.[name],
+      ">=0.81.1 <0.82.0",
+      `${name} must pin the verified Pi host range`,
+    );
   }
   assert.equal(manifest.scripts?.prepublishOnly, "npm run release:check");
   assert.match(manifest.scripts?.["pack:check"] ?? "", /validate:package-payload/);
