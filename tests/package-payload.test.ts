@@ -26,6 +26,8 @@ import {
   normalizePackPath,
 } from "../scripts/lib/package-payload.mjs";
 
+const REPO_ROOT = resolve(import.meta.dirname, "..");
+
 const VALID_BASE = [
   "package.json",
   "README.md",
@@ -52,6 +54,16 @@ const VALID_BASE = [
 function withBase(extra: string[]): string[] {
   return [...VALID_BASE, ...extra];
 }
+
+test("settings pin portable exact Auto-safe package sources", () => {
+  const settings = JSON.parse(readFileSync(resolve(REPO_ROOT, ".pi/settings.json"), "utf8")) as {
+    packages?: string[];
+  };
+  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-learning@0.1.2"));
+  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-subagents@0.6.1"));
+  assert.ok(settings.packages?.includes("git:github.com/MinhDuyDEV/pi-todo#b7dbf9c1650394df6a6388d803fd5109294ed5d3"));
+  assert.equal(settings.packages?.some((entry) => entry.startsWith("local:../pi-")), false);
+});
 
 test("a payload containing every required resource and no forbidden files passes", () => {
   const { errors } = validatePackagePayload(withBase([]), defaultPayloadContract);

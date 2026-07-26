@@ -26,6 +26,7 @@ const SECRET_PATTERNS = [
 export interface ContextRequestV1 {
   protocolVersion: 1;
   taskId: string;
+  correlationId: string;
   agentType: string;
   description: string;
   response?: unknown;
@@ -34,6 +35,7 @@ export interface ContextRequestV1 {
 export interface ProofVerifiedV1 {
   protocolVersion: 1;
   taskId: string;
+  correlationId: string;
   verificationPassed: boolean;
   verificationIssues: readonly string[];
   evidenceDigests: readonly string[];
@@ -41,9 +43,7 @@ export interface ProofVerifiedV1 {
 }
 
 export interface LearningObservationV1 {
-  protocolVersion: 1;
   kind: "pattern" | "discovery";
-  confidence: "high";
   content: string;
   projectKey: string;
   source: string;
@@ -55,7 +55,6 @@ export interface LearningObservationV1 {
   }>;
   context: string;
   timestamp: number;
-  digest: string;
   idempotencyKey: string;
 }
 
@@ -148,18 +147,20 @@ export function parseContextRequest(value: unknown): ContextRequestV1 | undefine
   const input = record(value);
   if (!input || input.protocolVersion !== PROTOCOL_VERSION) return undefined;
   const taskId = boundedIdentifier(input.taskId, 128);
+  const correlationId = boundedIdentifier(input.correlationId, 128) ?? taskId;
   const agentType = boundedIdentifier(input.agentType, 64);
   const description = sanitizeText(input.description, MAX_DESCRIPTION);
-  if (!taskId || !agentType || !description) return undefined;
-  return { protocolVersion: PROTOCOL_VERSION, taskId, agentType, description };
+  if (!taskId || !correlationId || !agentType || !description) return undefined;
+  return { protocolVersion: PROTOCOL_VERSION, taskId, correlationId, agentType, description };
 }
 
 export function parseProof(value: unknown): ProofVerifiedV1 | undefined {
   const input = record(value);
   if (!input || input.protocolVersion !== PROTOCOL_VERSION || typeof input.verificationPassed !== "boolean") return undefined;
   const taskId = boundedIdentifier(input.taskId, 128);
+  const correlationId = boundedIdentifier(input.correlationId, 128) ?? taskId;
   const timestamp = boundedIdentifier(input.timestamp, MAX_TIMESTAMP);
-  if (!taskId || !timestamp || !Number.isFinite(Date.parse(timestamp)) || !Array.isArray(input.evidenceDigests) || !Array.isArray(input.verificationIssues)) return undefined;
+  if (!taskId || !correlationId || !timestamp || !Number.isFinite(Date.parse(timestamp)) || !Array.isArray(input.evidenceDigests) || !Array.isArray(input.verificationIssues)) return undefined;
   if (input.evidenceDigests.some((item) => typeof item !== "string" || !SHA256.test(item))) return undefined;
   const evidenceDigests = input.evidenceDigests
     .slice(0, 20)
@@ -168,7 +169,15 @@ export function parseProof(value: unknown): ProofVerifiedV1 | undefined {
     .map((item) => sanitizeText(item, 300))
     .filter((item): item is string => item !== undefined)
     .slice(0, 10);
-  return { protocolVersion: PROTOCOL_VERSION, taskId, verificationPassed: input.verificationPassed, verificationIssues, evidenceDigests, timestamp };
+  return {
+    protocolVersion: PROTOCOL_VERSION,
+    taskId,
+    correlationId,
+    verificationPassed: input.verificationPassed,
+    verificationIssues,
+    evidenceDigests,
+    timestamp,
+  };
 }
 
 export function createObservation(
@@ -182,9 +191,7 @@ export function createObservation(
   const timestamp = Date.parse(proof.timestamp);
   if (!Number.isFinite(timestamp)) return undefined;
   return {
-    protocolVersion: PROTOCOL_VERSION,
     kind: "pattern",
-    confidence: "high",
     content,
     projectKey: projectKey(cwd),
     source: "pi-subagents:proof-verified",
@@ -196,7 +203,6 @@ export function createObservation(
     })),
     context: request.agentType,
     timestamp,
-    digest: observationDigest,
     idempotencyKey: observationDigest,
   };
 }

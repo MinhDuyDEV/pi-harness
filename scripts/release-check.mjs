@@ -12,7 +12,7 @@
  *   4. smoke:packed             — clean-consumer native Pi resource load from the
  *                                  reconstructed package (npm pack --ignore-scripts)
  *
- * No recursion: steps 3-4 use `--ignore-scripts`, and this script never invokes
+ * No recursion: package steps use `--ignore-scripts`, and this script never invokes
  * `npm publish`/`npm pack` without that flag, so `prepack`/`prepublishOnly`
  * cannot re-enter `check`. The full suite runs exactly once (inside step 1).
  */
@@ -20,6 +20,7 @@ import { spawnSync } from "node:child_process";
 
 const steps = [
   { name: "check", cmd: "npm", args: ["run", "check"] },
+  { name: "verify:auto-safe", cmd: "npm", args: ["run", "verify:auto-safe"] },
   { name: "audit", cmd: "npm", args: ["audit"] },
   { name: "pack:check", cmd: "npm", args: ["run", "pack:check"] },
   { name: "smoke:packed", cmd: "npm", args: ["run", "smoke:packed"] },
@@ -40,5 +41,5 @@ if (failed) {
   process.exit(failed.status);
 }
 
-process.stderr.write(`\nrelease:check: OK — full check, audit, and package validation passed\n`);
+process.stderr.write(`\nrelease:check: OK — full check, Auto-safe E2E, audit, and package validation passed\n`);
 process.exit(0);

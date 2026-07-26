@@ -53,6 +53,7 @@ function install(bus: HarnessEventBus): void {
 const request = {
   protocolVersion: 1,
   taskId: "task-42",
+  correlationId: "task-42",
   agentType: "general",
   description: "Use the verified migration procedure",
 } as const;
@@ -60,6 +61,7 @@ const request = {
 const proof = {
   protocolVersion: 1,
   taskId: "task-42",
+  correlationId: "task-42",
   verificationPassed: true,
   verificationIssues: [],
   evidenceDigests: ["a".repeat(64)],
@@ -83,11 +85,65 @@ test("correlates a context request with proof and emits the v1 learning schema",
   const observations = bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT);
   assert.equal(observations.length, 1);
   const observation = observations[0]?.payload as Record<string, unknown>;
-  assert.equal(observation.protocolVersion, 1);
-  assert.equal(observation.confidence, "high");
-  assert.match(observation.digest as string, /^[a-f0-9]{64}$/);
-  assert.equal(observation.idempotencyKey, observation.digest);
+  assert.equal(observation.protocolVersion, undefined);
+  assert.equal(observation.confidence, undefined);
+  assert.equal(observation.digest, undefined);
+  assert.match(observation.idempotencyKey as string, /^[a-f0-9]{64}$/);
   assert.equal(observation.timestamp, Date.parse(proof.timestamp));
+});
+
+test("correlates context and proof by stable correlationId when task IDs differ", async () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+  const correlatedRequest = {
+    ...request,
+    taskId: "invocation-42",
+    correlationId: "correlation-42",
+  };
+  const correlatedProof = {
+    ...proof,
+    taskId: "canonical-task-42",
+    correlationId: "correlation-42",
+  };
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, correlatedRequest);
+  await bus.emit(SUBAGENT_PROOF_EVENT, correlatedProof);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  const observations = bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT);
+  assert.equal(observations.length, 1);
+});
+
+test("normalizes pi-learning context responses to the subagent v1 schema", async () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+  bus.on(SUBAGENT_CONTEXT_REQUEST_EVENT, (payload) => {
+    (payload as { response?: unknown }).response = {
+      protocolVersion: 1,
+      facts: [{
+        domain: "testing",
+        summary: "Run focused tests first",
+        confidence: "high",
+        evidenceDigest: "a".repeat(64),
+      }],
+    };
+  });
+  const payload: Record<string, unknown> = {
+    ...request,
+    correlationId: "correlation-42",
+  };
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, payload);
+
+  assert.deepEqual(payload.response, {
+    version: 1,
+    facts: [{
+      domain: "testing",
+      summary: "Run focused tests first",
+      confidence: "high",
+      evidenceDigest: "a".repeat(64),
+    }],
+  });
 });
 
 test("uses at-least-once emission instead of a delivered-before-ack dedupe", async () => {
