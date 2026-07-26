@@ -43,6 +43,44 @@ function parseBlockedHostPatterns(): string[] {
 		.filter(Boolean);
 }
 
+/**
+ * Hosts the operator has explicitly vouched for, e.g.
+ * `PI_SAFETY_URL_ALLOWLIST=localhost:5173,localhost:3000`.
+ *
+ * Every tool is evaluated now — including browser-type tools where navigating
+ * to a local dev server is the whole point — so the blanket private-host block
+ * needs a *narrow* exception mechanism. This is not a rule kill-switch (that
+ * is refused for critical rules): each entry names one host, optionally one
+ * port, and metadata endpoints stay blocked no matter what is listed.
+ */
+function parseAllowedHosts(): Set<string> {
+	const raw = process.env.PI_SAFETY_URL_ALLOWLIST ?? "";
+	return new Set(
+		raw
+			.split(",")
+			.map((entry) => entry.trim().toLowerCase())
+			.filter(Boolean),
+	);
+}
+
+/** Metadata endpoints are never allowlistable — they are why this rule exists. */
+const NEVER_ALLOWED_HOSTS = new Set([
+	"169.254.169.254",
+	"169.254.170.2",
+	"100.100.100.200",
+	"metadata.google.internal",
+	"metadata.google.internal.",
+]);
+
+function isOperatorAllowedHost(parsed: URL): boolean {
+	const hostname = parsed.hostname.toLowerCase().replace(/\.$/, "");
+	if (NEVER_ALLOWED_HOSTS.has(hostname)) return false;
+	const allowed = parseAllowedHosts();
+	if (allowed.size === 0) return false;
+	const hostWithPort = parsed.port ? `${hostname}:${parsed.port}` : hostname;
+	return allowed.has(hostname) || allowed.has(hostWithPort);
+}
+
 function parseNumericPart(part: string): number | null {
 	for (const [pattern, radix] of NUMERIC_PART_PATTERNS) {
 		const match = part.match(pattern);
@@ -123,7 +161,7 @@ function classifyDangerousUrl(urlValue: string): string | null {
 		return `unsupported scheme ${parsed.protocol}`;
 	}
 
-	if (isPrivateHostname(parsed.hostname)) {
+	if (isPrivateHostname(parsed.hostname) && !isOperatorAllowedHost(parsed)) {
 		return `private or local host ${parsed.hostname}`;
 	}
 

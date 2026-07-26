@@ -53,7 +53,11 @@ export function confirm(
 export interface ToolCallContext {
 	/** Tool being invoked */
 	readonly tool: string;
-	/** Normalized bash command (whitespace-collapsed, trimmed). Undefined for non-bash. */
+	/**
+	 * For bash: the normalized command (whitespace-collapsed, trimmed).
+	 * For tools without a specialized context: their serialized input, so
+	 * text-scanning wildcard rules see nested parameters.
+	 */
 	readonly command?: string;
 	/** File path for write/edit tools */
 	readonly path?: string;

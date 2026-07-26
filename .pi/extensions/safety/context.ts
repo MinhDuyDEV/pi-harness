@@ -2,10 +2,47 @@
  * Safety Module — Context Normalization
  *
  * Single point that converts raw pi events into typed ToolCallContext.
- * Handles bash, read, write, edit, and TaskUpdate tools.
+ * bash, read, write, edit, and TaskUpdate get specialized contexts; EVERY
+ * other tool gets a generic one carrying its serialized input.
+ *
+ * The generic fallback is the policy boundary. This module used to return
+ * null for any tool it did not recognize, and the extension treats null as
+ * "nothing to evaluate" — so every MCP tool, and every tool Pi grows later,
+ * bypassed all rules including the ones registered with `targets: ["*"]`.
+ * A safety layer that only sees five tool names is a safety layer for
+ * exactly five tool names.
  */
 
 import type { ToolCallContext } from "./types.js";
+
+/**
+ * Bound on serialized input fed to rules for unknown tools. Rules run on
+ * every tool call; an unbounded payload turns the policy check into the
+ * slowest part of the call. Truncation only narrows scanning for inputs
+ * this large, and the size is recorded so the audit shows it happened.
+ */
+const MAX_SERIALIZED_INPUT = 16_384;
+
+function serializeInput(input: Record<string, unknown>): string {
+	let raw: string;
+	try {
+		raw = JSON.stringify(input) ?? "";
+	} catch {
+		// Circular or hostile input. Fall back to the values that stringify.
+		const parts: string[] = [];
+		for (const [key, value] of Object.entries(input)) {
+			try {
+				parts.push(`${key}=${JSON.stringify(value)}`);
+			} catch {
+				parts.push(`${key}=[unserializable]`);
+			}
+		}
+		raw = parts.join(" ");
+	}
+	return raw.length > MAX_SERIALIZED_INPUT
+		? `${raw.slice(0, MAX_SERIALIZED_INPUT)}…[truncated ${raw.length - MAX_SERIALIZED_INPUT} chars]`
+		: raw;
+}
 
 function getEventUrls(
 	input: Record<string, unknown>,
@@ -104,27 +141,34 @@ export function contextFromEvent(
 	const sessionId = String(e.sessionId ?? "default");
 	const { url, urls } = getEventUrls(input);
 
+	// A specialized builder returning null means the event was missing its
+	// primary field (no command, no path) — fall through to the generic
+	// context rather than skipping evaluation: the rest of the input may
+	// still contain something a wildcard rule cares about.
 	if (toolName === "bash") {
-		return buildBashContext(input, url, urls, cwd, sessionId);
+		const bashContext = buildBashContext(input, url, urls, cwd, sessionId);
+		if (bashContext) return bashContext;
 	}
 
 	if (toolName === "read" || toolName === "write" || toolName === "edit") {
-		return buildFileContext(input, toolName, url, urls, cwd, sessionId);
+		const fileContext = buildFileContext(input, toolName, url, urls, cwd, sessionId);
+		if (fileContext) return fileContext;
 	}
 
 	if (isTaskUpdate(toolName)) {
 		return buildTaskUpdateContext(input, sessionId, cwd);
 	}
 
-	if (url || (urls && urls.length > 0)) {
-		return {
-			tool: toolName,
-			url,
-			urls,
-			cwd,
-			sessionId,
-		};
-	}
-
-	return null;
+	// Every other tool: evaluate by default. The serialized input goes into
+	// `command` so wildcard rules that scan text (URL extraction, credential
+	// patterns) see nested parameters, not just a top-level `url` field.
+	const serialized = serializeInput(input);
+	return {
+		tool: toolName,
+		command: serialized || undefined,
+		url,
+		urls,
+		cwd,
+		sessionId,
+	};
 }

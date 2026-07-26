@@ -25,13 +25,41 @@
  * DEPENDENCIES: None (pure event-based, no SQLite needed)
  */
 
-import { AuditLog } from "./audit.js";
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { AuditLog, type AuditEntry } from "./audit.js";
 import { describe, exclude } from "./compose.js";
 import { contextFromEvent } from "./context.js";
 import { evaluate } from "./evaluate.js";
 import type { RuleSet, Verdict } from "./types.js";
 import { defaultRules } from "./rules/presets.js";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+
+/**
+ * Durable audit trail. The in-memory ring holds 500 entries and dies with the
+ * process — meaning the sessions someone actually needs to reconstruct (the
+ * ones that crashed, or that a user reports days later) were exactly the ones
+ * with no audit left. Failures are counted, never thrown: auditing must not
+ * take down the tool call it is auditing.
+ */
+class JsonlAuditSink {
+	private ready = false;
+	failures = 0;
+
+	constructor(private readonly path: string) {}
+
+	append(entry: AuditEntry): void {
+		try {
+			if (!this.ready) {
+				mkdirSync(dirname(this.path), { recursive: true });
+				this.ready = true;
+			}
+			appendFileSync(this.path, `${JSON.stringify(entry)}\n`, "utf8");
+		} catch {
+			this.failures += 1;
+		}
+	}
+}
 
 type BlockResult = { block: true; reason: string };
 
@@ -69,16 +97,39 @@ function confirmVerdict(
 export default function safetyExtension(pi: ExtensionAPI): void {
 	const cwd = process.cwd();
 	const audit = new AuditLog();
+	// PI_SAFETY_AUDIT_DIR relocates the durable audit (tests point it at a temp
+	// dir); it cannot disable it.
+	const auditDirectory = process.env.PI_SAFETY_AUDIT_DIR || join(cwd, ".pi", "artifacts");
+	const auditSink = new JsonlAuditSink(join(auditDirectory, "safety-audit.jsonl"));
 
 	// 1. Build the ruleset
 	const { rules: baseRules, tracker } = defaultRules();
 
-	// 2. Apply disabled rules from env (comma-separated)
+	// 2. Apply disabled rules from env (comma-separated) — with a severity
+	// floor. `exclude` filtered by id alone, so the same undocumented env that
+	// reasonably mutes a medium nuisance rule could also switch off
+	// force-push protection or credential blocking. Critical rules are the
+	// reason this extension exists; they do not come off via an env var.
 	let rules: RuleSet = baseRules;
 	const disabledEnv = process.env.PI_SAFETY_DISABLED_RULES;
-	const disabledRuleIds = disabledEnv?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+	const requestedDisabledIds = disabledEnv?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+	const criticalIds = new Set(
+		baseRules.filter((r) => r.severity === "critical").map((r) => r.id),
+	);
+	const refusedDisabledIds = requestedDisabledIds.filter((id) => criticalIds.has(id));
+	const disabledRuleIds = requestedDisabledIds.filter((id) => !criticalIds.has(id));
 	if (disabledRuleIds.length > 0) {
 		rules = exclude(rules, ...disabledRuleIds);
+	}
+	if (refusedDisabledIds.length > 0) {
+		// Refusing silently would look exactly like the rule being disabled.
+		pi.on("session_start", (_event, ctx) => {
+			ctx.ui?.notify?.(
+				`[safety] PI_SAFETY_DISABLED_RULES cannot disable critical rules; ` +
+					`still active: ${refusedDisabledIds.join(", ")}`,
+				"warning",
+			);
+		});
 	}
 
 	// 3. Track verification commands from tool_result events
@@ -123,23 +174,43 @@ export default function safetyExtension(pi: ExtensionAPI): void {
 
 	// 4. Single tool_call hook — replaces 3 separate hooks
 	pi.on("tool_call", (event: unknown, hookCtx?: ExtensionContext) => {
-		const ctx = contextFromEvent(event, cwd);
-		if (!ctx) return;
+		let verdict: Verdict | null;
+		let firedVerdicts: ReadonlyArray<Verdict>;
+		let toolContext: ReturnType<typeof contextFromEvent>;
+		try {
+			toolContext = contextFromEvent(event, cwd);
+			if (!toolContext) return;
+			({ verdict, fired: firedVerdicts } = evaluate(rules, toolContext, "highest-severity"));
+		} catch (error) {
+			// The policy check itself failed. What Pi does with a throwing hook
+			// is not ours to assume, so do not let it throw: an unevaluated call
+			// is not an approved call.
+			return makeBlockResult(
+				`[safety] BLOCKED: the policy check failed and cannot approve this call: ` +
+					`${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
 
-		const { verdict, fired } = evaluate(rules, ctx, "highest-severity");
-
-		// Audit all fired rules
-		for (const v of fired) {
-			audit.append({
+		// Audit all fired rules — in memory for /safety, on disk for forensics,
+		// and on the bus for anything correlating safety with other signals.
+		for (const v of firedVerdicts) {
+			const entry = {
 				timestamp: Date.now(),
 				ruleId: v.ruleId,
 				severity: v.severity,
 				threat: v.threat,
 				kind: v.kind,
-				tool: ctx.tool,
-				detail: (ctx.command ?? ctx.path ?? "").slice(0, 200),
-				sessionId: ctx.sessionId,
-			});
+				tool: toolContext.tool,
+				detail: (toolContext.command ?? toolContext.path ?? "").slice(0, 200),
+				sessionId: toolContext.sessionId,
+			};
+			audit.append(entry);
+			auditSink.append(entry);
+			try {
+				pi.events?.emit?.("pi-harness:safety:verdict:v1", { version: 1, ...entry });
+			} catch {
+				// A bus listener must never be able to break the policy hook.
+			}
 		}
 
 		if (!verdict) return;
@@ -177,6 +248,18 @@ export default function safetyExtension(pi: ExtensionAPI): void {
 					"### Disabled Rules",
 					...disabledRuleIds.map((id) => `  ${id}`),
 				);
+			}
+
+			if (refusedDisabledIds.length > 0) {
+				lines.push(
+					"",
+					"### Disable Requests REFUSED (critical severity)",
+					...refusedDisabledIds.map((id) => `  ${id}`),
+				);
+			}
+
+			if (auditSink.failures > 0) {
+				lines.push("", `**Audit persistence failures**: ${auditSink.failures}`);
 			}
 
 			if (recentBlocks.length > 0) {

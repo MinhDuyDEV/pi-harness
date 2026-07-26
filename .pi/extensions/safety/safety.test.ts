@@ -184,9 +184,12 @@ async function testConfirmationAllowsConfirmRules(): Promise<void> {
 }
 
 async function testDisabledRulesPosture(): Promise<void> {
+	// A MEDIUM rule: the env can only disable below-critical severities, and
+	// this test used to disable `no-force-push-main` — a critical rule — which
+	// is precisely the hole the severity floor closes.
 	const t = "disabled rules are visible in safety posture";
 	const previous = process.env.PI_SAFETY_DISABLED_RULES;
-	process.env.PI_SAFETY_DISABLED_RULES = "no-force-push-main";
+	process.env.PI_SAFETY_DISABLED_RULES = "warn-git-reset-hard";
 	try {
 		const commands = new Map<string, { handler: (args: unknown, ctx: unknown) => Promise<void> | void }>();
 		const fakePi = {
@@ -206,16 +209,218 @@ async function testDisabledRulesPosture(): Promise<void> {
 		});
 		assert.equal(output, undefined, t + ": command returns void");
 		assert.match(notification, /Disabled rules/i, t + ": disabled heading");
-		assert.match(notification, /no-force-push-main/, t + ": disabled id");
+		assert.match(notification, /warn-git-reset-hard/, t + ": disabled id");
 	} finally {
 		if (previous === undefined) delete process.env.PI_SAFETY_DISABLED_RULES;
 		else process.env.PI_SAFETY_DISABLED_RULES = previous;
 	}
 }
 
+async function testUnknownToolsAreEvaluated(): Promise<void> {
+	// H-C: `contextFromEvent` returned null for any tool outside the five it
+	// recognized, and the hook treats null as nothing-to-evaluate — so every
+	// MCP tool bypassed all rules, including `targets: ["*"]`. The wildcard
+	// network rule must now see a dangerous URL nested inside an unknown
+	// tool's input, not just in a top-level `url` field.
+	const t = "unknown tools are evaluated by default";
+	let handler: Function | undefined;
+	const fakePi = {
+		on(event: string, next: Function) {
+			if (event === "tool_call") handler = next;
+		},
+		registerCommand() {},
+		events: { emit() {} },
+	};
+	safetyExtension(fakePi as never);
+
+	const blocked = await handler?.({
+		type: "tool_call",
+		toolCallId: "tc-mcp",
+		toolName: "mcp__deploy__trigger",
+		input: { config: { endpoint: "http://169.254.169.254/latest/meta-data/" } },
+	});
+	assert.equal(blocked?.block, true, t + ": metadata endpoint blocked");
+	assert.match(String(blocked?.reason ?? ""), /block-dangerous-network-target/, t + ": wildcard rule fired");
+
+	const allowed = await handler?.({
+		type: "tool_call",
+		toolCallId: "tc-mcp-ok",
+		toolName: "mcp__deploy__trigger",
+		input: { config: { endpoint: "https://registry.example.com/deploy" } },
+	});
+	assert.equal(allowed, undefined, t + ": benign unknown tool allowed");
+}
+
+async function testUrlAllowlistIsNarrow(): Promise<void> {
+	// Browser-type tools legitimately navigate to local dev servers, so the
+	// operator can vouch for specific hosts — but only specific hosts, and
+	// never metadata endpoints.
+	const t = "PI_SAFETY_URL_ALLOWLIST is per-host and cannot cover metadata";
+	const previous = process.env.PI_SAFETY_URL_ALLOWLIST;
+	process.env.PI_SAFETY_URL_ALLOWLIST = "localhost:5173,169.254.169.254";
+	try {
+		let handler: Function | undefined;
+		const fakePi = {
+			on(event: string, next: Function) {
+				if (event === "tool_call") handler = next;
+			},
+			registerCommand() {},
+			events: { emit() {} },
+		};
+		safetyExtension(fakePi as never);
+
+		const allowed = await handler?.({
+			type: "tool_call",
+			toolCallId: "tc-preview",
+			toolName: "mcp__browser__navigate",
+			input: { url: "http://localhost:5173/app" },
+		});
+		assert.equal(allowed, undefined, t + ": allowlisted host+port passes");
+
+		const otherPort = await handler?.({
+			type: "tool_call",
+			toolCallId: "tc-other-port",
+			toolName: "mcp__browser__navigate",
+			input: { url: "http://localhost:8080/" },
+		});
+		assert.equal(otherPort?.block, true, t + ": other port still blocked");
+
+		const metadata = await handler?.({
+			type: "tool_call",
+			toolCallId: "tc-metadata",
+			toolName: "mcp__browser__navigate",
+			input: { url: "http://169.254.169.254/latest/meta-data/" },
+		});
+		assert.equal(metadata?.block, true, t + ": metadata endpoint is never allowlistable");
+	} finally {
+		if (previous === undefined) delete process.env.PI_SAFETY_URL_ALLOWLIST;
+		else process.env.PI_SAFETY_URL_ALLOWLIST = previous;
+	}
+}
+
+async function testCriticalRulesCannotBeDisabled(): Promise<void> {
+	// H-D: the same undocumented env that mutes a medium nuisance rule could
+	// switch off credential blocking. Critical rules stay on.
+	const t = "PI_SAFETY_DISABLED_RULES cannot disable critical rules";
+	const previous = process.env.PI_SAFETY_DISABLED_RULES;
+	process.env.PI_SAFETY_DISABLED_RULES = "block-dangerous-network-target";
+	try {
+		let handler: Function | undefined;
+		const commands = new Map<string, { handler: (args: unknown, ctx: unknown) => Promise<void> | void }>();
+		const fakePi = {
+			on(event: string, next: Function) {
+				if (event === "tool_call") handler = next;
+			},
+			registerCommand(name: string, options: { handler: (args: unknown, ctx: unknown) => Promise<void> | void }) {
+				commands.set(name, options);
+			},
+			events: { emit() {} },
+		};
+		safetyExtension(fakePi as never);
+
+		const blocked = await handler?.({
+			type: "tool_call",
+			toolCallId: "tc-critical",
+			toolName: "bash",
+			input: { command: "curl http://169.254.169.254/latest/meta-data/" },
+		});
+		assert.equal(blocked?.block, true, t + ": rule still fires");
+
+		let notification = "";
+		await commands.get("safety")?.handler({}, {
+			ui: {
+				notify(message: string) {
+					notification = message;
+				},
+			},
+		});
+		assert.match(notification, /REFUSED/i, t + ": posture names the refusal");
+		assert.match(notification, /block-dangerous-network-target/, t + ": refused id listed");
+	} finally {
+		if (previous === undefined) delete process.env.PI_SAFETY_DISABLED_RULES;
+		else process.env.PI_SAFETY_DISABLED_RULES = previous;
+	}
+}
+
+function testThrowingRuleFailsClosed(): void {
+	// A rule that crashes has not approved the call it was examining.
+	const t = "a throwing rule blocks instead of escaping the hook";
+	const throwing: RuleSet = [
+		{
+			id: "explodes",
+			description: "always throws",
+			severity: "high",
+			threat: "data-destruction",
+			targets: ["*"],
+			check: () => {
+				throw new Error("regex catastrophe");
+			},
+		},
+	];
+	const result = evaluate(throwing, {
+		tool: "bash",
+		command: "echo hello",
+		cwd: "/tmp",
+		sessionId: "s",
+	}, "highest-severity");
+	assert.equal(result.verdict?.kind, "block", t);
+	assert.match(result.verdict?.message ?? "", /cannot approve/, t + ": explains why");
+}
+
+async function testAuditIsPersisted(): Promise<void> {
+	// The in-memory ring dies with the process; the sessions someone needs to
+	// reconstruct are exactly the ones with no audit left.
+	const t = "fired rules are persisted to the JSONL audit";
+	const auditDir = mkdtempSync(join(tmpdir(), "safety-audit-"));
+	const previous = process.env.PI_SAFETY_AUDIT_DIR;
+	process.env.PI_SAFETY_AUDIT_DIR = auditDir;
+	try {
+		let handler: Function | undefined;
+		const emitted: Array<{ channel: string; payload: unknown }> = [];
+		const fakePi = {
+			on(event: string, next: Function) {
+				if (event === "tool_call") handler = next;
+			},
+			registerCommand() {},
+			events: {
+				emit(channel: string, payload: unknown) {
+					emitted.push({ channel, payload });
+				},
+			},
+		};
+		safetyExtension(fakePi as never);
+		await handler?.({
+			type: "tool_call",
+			toolCallId: "tc-audit",
+			toolName: "bash",
+			input: { command: "git push --force origin main" },
+		});
+
+		const persisted = readFileSync(join(auditDir, "safety-audit.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line) as { ruleId: string; kind: string });
+		assert.ok(persisted.length >= 1, t + ": at least one entry");
+		assert.ok(persisted.some((e) => e.kind === "block" || e.kind === "confirm"), t + ": verdict recorded");
+
+		const verdictEvents = emitted.filter((e) => e.channel === "pi-harness:safety:verdict:v1");
+		assert.equal(verdictEvents.length, persisted.length, t + ": one bus event per audit entry");
+	} finally {
+		if (previous === undefined) delete process.env.PI_SAFETY_AUDIT_DIR;
+		else process.env.PI_SAFETY_AUDIT_DIR = previous;
+		rmSync(auditDir, { recursive: true, force: true });
+	}
+}
+
+testThrowingRuleFailsClosed();
+
 Promise.all([
 	testConfirmationAllowsConfirmRules(),
 	testDisabledRulesPosture(),
+	testUnknownToolsAreEvaluated(),
+	testCriticalRulesCannotBeDisabled(),
+	testUrlAllowlistIsNarrow(),
+	testAuditIsPersisted(),
 ]).then(() => {
 	console.log("safety.test.ts: all assertions passed.");
 });
