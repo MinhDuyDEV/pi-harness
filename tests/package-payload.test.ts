@@ -59,9 +59,21 @@ test("settings pin portable exact Auto-safe package sources", () => {
   const settings = JSON.parse(readFileSync(resolve(REPO_ROOT, ".pi/settings.json"), "utf8")) as {
     packages?: string[];
   };
-  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-learning@0.2.1"));
-  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-subagents@0.7.1"));
-  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-todo@0.2.1"));
+  // Structural, not version-literal: hard-coding versions here recreated the
+  // drift this suite exists to prevent (audit H-E) — the assertion broke on
+  // every legitimate pin bump and would have been "fixed" by copying whatever
+  // the file said. Each sibling must be pinned via npm to one EXACT version.
+  for (const name of ["pi-learning", "pi-subagents", "pi-todo"]) {
+    const pins = (settings.packages ?? []).filter((entry) =>
+      entry.includes(`@minhduydev/${name}@`),
+    );
+    assert.equal(pins.length, 1, `exactly one pin for ${name}`);
+    assert.match(
+      pins[0],
+      new RegExp(`^npm:@minhduydev/${name}@\\d+\\.\\d+\\.\\d+$`),
+      `${name} is pinned to an exact npm version`,
+    );
+  }
   assert.equal(settings.packages?.some((entry) => entry.startsWith("local:../pi-")), false);
 });
 

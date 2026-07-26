@@ -47,14 +47,16 @@ export default function register(pi: ExtensionAPI): void {
     },
   };
   let cwd: string | undefined;
-  let ports = Promise.resolve([] as Awaited<ReturnType<typeof loadProducerReplayPorts>>);
+  let ports = Promise.resolve({ ports: [], report: [] } as Awaited<
+    ReturnType<typeof loadProducerReplayPorts>
+  >);
   let replayChain = Promise.resolve();
   let replayFailed = false;
   const scheduleReplay = (): void => {
     const projectDirectory = cwd;
     if (!projectDirectory) return;
     replayChain = replayChain.then(async () => {
-      for (const source of await ports) {
+      for (const source of (await ports).ports) {
         await replayPortToSink({
           producer: source.producer,
           port: source.port,
@@ -80,6 +82,21 @@ export default function register(pi: ExtensionAPI): void {
     cwd = context.cwd;
     ports = loadProducerReplayPorts(context.cwd);
     pending.clear();
+    // A producer that exists but fails to LOAD is a broken integration, and
+    // silence here is exactly how a consumer ran with ports = [] and no
+    // replay for months. "Not installed" stays quiet — the integration is
+    // optional — but a real load error reaches the operator.
+    void ports.then((loaded) => {
+      const broken = loaded.report.filter((entry) => entry.status === "error");
+      if (broken.length > 0) {
+        context.ui.notify(
+          `Learning replay ports failed to load: ${broken
+            .map((entry) => `${entry.producer} (${entry.detail ?? "unknown error"})`)
+            .join("; ")}`,
+          "warning",
+        );
+      }
+    });
     scheduleReplay();
     if (replayFailed) {
       context.ui.notify(
