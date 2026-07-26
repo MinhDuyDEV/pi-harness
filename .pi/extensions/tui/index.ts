@@ -371,6 +371,13 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       scheduleRefresh(ctx);
     }
 
+    // TODO ownership gate (audit §4, roadmap 24): when another todo package
+    // owns the region (`piTui.todosWidget: false`, as this harness ships with
+    // @minhduydev/pi-todo enabled), the TUI must not ALSO inject a todo nudge —
+    // two cadences firing at once was an active duplication, and pi-todo's
+    // reminder cadence is the one with a gate.
+    if (piTuiSettings.todosWidget === false) return;
+
     const openItems = todosState.items.filter((item) => !item.done);
     if (openItems.length === 0) return;
     const lines = openItems.map((item) => `- [ ] ${item.text}`);

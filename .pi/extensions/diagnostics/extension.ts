@@ -30,6 +30,19 @@ export default function (pi: ExtensionAPI) {
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const resolved = resolveParams((params || {}) as Record<string, unknown>, ctx.cwd);
       const { text, details } = await runFullDiagnostics(ctx.cwd, resolved, signal);
+      // The harness consumed everyone else's events but emitted none of its
+      // own (audit roadmap 23). A diagnostics verdict is a signal other
+      // extensions correlate with (safety, learning, checkpoints).
+      try {
+        pi.events?.emit?.("pi-harness:diagnostics:result:v1", {
+          version: 1,
+          cwd: ctx.cwd,
+          details,
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        // The bus must never break the tool result.
+      }
       return {
         content: [{ type: "text" as const, text }],
         details,

@@ -222,7 +222,22 @@ export default function (pi: any): void {
     if (!piDir) return;
     const sessionId = getSessionId(ctx);
     if (!sessionId) return;
-    await writeCheckpoint(config, piDir, ctx, sessionId);
+    const path = await writeCheckpoint(config, piDir, ctx, sessionId);
+    // The harness consumed everyone else's events but emitted none of its own
+    // (audit roadmap 23); a written checkpoint is a durable fact other
+    // extensions (DCP, learning) may correlate with.
+    if (path) {
+      try {
+        pi.events?.emit?.("pi-harness:checkpoint:written:v1", {
+          version: 1,
+          sessionId,
+          path,
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        // The bus must never break the checkpoint.
+      }
+    }
   });
 
   pi.on("session_shutdown", () => {});
