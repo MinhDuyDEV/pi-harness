@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import integrationExtension, { COMPATIBILITY, integrationReport } from "./integration.js";
+import integrationExtension, { COMPATIBILITY, integrationReport } from "./extension.js";
 
 test("the matrix covers exactly the four suite packages", () => {
   assert.deepEqual(Object.keys(COMPATIBILITY).sort(), [
