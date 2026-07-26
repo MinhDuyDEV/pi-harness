@@ -1,0 +1,66 @@
+# Cross-package integration gate (AUDIT-2026-07-26 X-D, roadmap 22).
+#
+# The bugs this catches only exist when the four packages run together —
+# digest agreement, the confidence field, listener wiring — and no
+# per-package CI can see them. This workflow checks out the sibling
+# repositories next to the harness and runs the two end-to-end gates in
+# PI_E2E_SIBLINGS=local mode: each sibling is BUILT and PACKED from source,
+# installed into a clean consumer, and driven through the real event chain
+# (context request → served binding → proof → observation written →
+# next-turn injection with usage receipts).
+#
+# This is the pre-publish gate: it validates the combination about to ship.
+# The registry-pin variant of the same gates runs in release:check.
+name: Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e26f53fdd6af78d2d5eb # v4
+        with:
+          path: pi-harness
+      # Sibling checkouts land NEXT TO the harness — the layout
+      # PI_E2E_SIBLINGS=local expects. Same-org branches with a matching name
+      # are preferred so a cross-repo contract change can be validated as one
+      # unit before any of it merges.
+      - name: Clone siblings
+        shell: bash
+        env:
+          ORG: ${{ github.repository_owner }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          for repo in pi-core pi-subagents pi-learning pi-todo; do
+            if ! git clone --depth 1 --branch "$BRANCH" "https://github.com/$ORG/$repo.git" "$repo" 2>/dev/null; then
+              git clone --depth 1 "https://github.com/$ORG/$repo.git" "$repo"
+            fi
+          done
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+      - name: Install workspaces
+        shell: bash
+        run: |
+          for repo in pi-core pi-subagents pi-learning pi-todo pi-harness; do
+            (cd "$repo" && npm install --ignore-scripts --no-audit --no-fund)
+          done
+      - name: Auto-safe end-to-end (local siblings)
+        working-directory: pi-harness
+        run: PI_E2E_SIBLINGS=local npx tsx scripts/verify-auto-safe-e2e.ts
+      - name: Phase 5 packed end-to-end (local siblings)
+        working-directory: pi-harness
+        run: PI_E2E_SIBLINGS=local npx tsx scripts/verify-phase5-packed-e2e.ts
