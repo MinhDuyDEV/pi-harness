@@ -22,12 +22,12 @@
   "packages": [
     "npm:@heyhuynhgiabuu/pi-diff@0.7.6",
     "npm:@heyhuynhgiabuu/pi-search@0.2.7",
-    "npm:@minhduydev/pi-subagents@0.7.1",
+    "npm:@minhduydev/pi-subagents@0.8.0",
     "git:https://github.com/badlogic/pi-diff-review#57622138f5b02896a230b4fbfe702d24c6a515bb",
     "git:https://github.com/sting8k/pi-droid-styling#14d320ee5aaddaf55277a53c179c846887988315",
     "git:https://github.com/sting8k/pi-themes#c3b6da18ee694493bfe253bf10f3a98ef2b1f54b",
-    "npm:@minhduydev/pi-todo@0.2.1",
-    "npm:@minhduydev/pi-learning@0.2.1"
+    "npm:@minhduydev/pi-todo@0.3.0",
+    "npm:@minhduydev/pi-learning@0.3.0"
   ],
   "pi-todo": {
     "enabled": true,

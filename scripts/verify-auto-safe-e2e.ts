@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createEventBus } from "@earendil-works/pi-coding-agent";
+import {
+  makeContextRequestPayload,
+  makeProofVerifiedPayload,
+} from "@minhduydev/pi-core";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 
@@ -17,8 +20,18 @@ const REPO_ROOT = resolve(import.meta.dirname, "..");
  * behind the pins — so this gate (which `release:check` runs) was green on a
  * combination nobody would ever install. An env override is kept for
  * bisecting, but the default MUST track the pins.
+ *
+ * `PI_E2E_SIBLINGS=local` packs the sibling CHECKOUTS instead: the pre-publish
+ * mode, validating the combination that is about to ship rather than the one
+ * that already did. Contract changes land across four repos at once, and this
+ * gate must be runnable before any of them is published.
  */
-function pinnedSiblingSpecs(): string[] {
+function pinnedSiblingSpecs(packDestination: string): string[] {
+  if (process.env.PI_E2E_SIBLINGS === "local") {
+    return ["pi-learning", "pi-subagents", "pi-todo"].map((name) =>
+      packSibling(name, packDestination),
+    );
+  }
   const settings = JSON.parse(readFileSync(join(REPO_ROOT, ".pi", "settings.json"), "utf8")) as {
     packages?: string[];
   };
@@ -39,6 +52,34 @@ function pinnedSiblingSpecs(): string[] {
     const name = spec.match(/pi-(?:learning|todo|subagents)/)?.[0] ?? "";
     return overrides[name] ?? spec;
   });
+}
+
+function packSibling(name: string, packDestination: string): string {
+  const siblingRoot = resolve(REPO_ROOT, "..", name);
+  assert.ok(
+    existsSync(join(siblingRoot, "package.json")),
+    `PI_E2E_SIBLINGS=local requires a ${name} checkout next to this repo`,
+  );
+  // `npm pack --ignore-scripts` skips prepack, so a compiled sibling would be
+  // packed with whatever stale dist/ was on disk — the gate would then test
+  // code that no longer exists. Build explicitly first.
+  execFileSync("npm", ["run", "build", "--if-present"], {
+    cwd: siblingRoot,
+    stdio: ["ignore", "ignore", "inherit"],
+  });
+  const tarball = execFileSync(
+    "npm",
+    ["pack", "--ignore-scripts", "--pack-destination", packDestination],
+    { cwd: siblingRoot, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+  ).trim().split("\n").at(-1);
+  assert.ok(tarball, `npm pack must return a tarball name for ${name}`);
+  return join(packDestination, tarball);
+}
+
+/** pi-core is the shared contract layer; the coordinator imports it at runtime. */
+function piCoreSpec(packDestination: string): string {
+  if (process.env.PI_E2E_SIBLINGS === "local") return packSibling("pi-core", packDestination);
+  return process.env.PI_CORE_SPEC ?? "@minhduydev/pi-core@0.1.0";
 }
 const LEARNING_OBSERVATION_EVENT = "pi-learning:observation:v1";
 const SUBAGENT_CONTEXT_REQUEST_EVENT = "pi-subagents:v1:context-request";
@@ -99,12 +140,13 @@ async function installConsumer(root: string): Promise<Consumer> {
     { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
   ).trim().split("\n").at(-1);
   assert.ok(packedName, "npm pack must return the harness tarball name");
-  const siblings = pinnedSiblingSpecs();
+  const siblings = pinnedSiblingSpecs(root);
   process.stderr.write(`verify:auto-safe ► sibling pins: ${siblings.join(", ")}\n`);
   const packages = [
     "@earendil-works/pi-coding-agent@0.81.1",
     "@earendil-works/pi-tui@0.81.1",
     "typebox@1.1.38",
+    piCoreSpec(root),
     ...siblings,
     join(root, packedName),
   ];
@@ -162,45 +204,34 @@ async function createRuntime(consumer: Consumer, root: string, trusted: boolean)
   return { root, events, dispatch };
 }
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (!value || typeof value !== "object") return value;
-  const input = value as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.keys(input).sort().map((key) => [key, canonical(input[key])]),
-  );
-}
-
-function taggedDigest(value: unknown): string {
-  return `sha256:v1:${createHash("sha256")
-    .update(JSON.stringify(canonical(value)))
-    .digest("hex")}`;
-}
-
+// Payloads come from pi-core's REAL constructors — this script used to
+// reimplement the digest, which meant the gate could pass while the shipped
+// canonicalization was wrong (§2.2). Requests carry no binding fields:
+// pi-learning announces the binding itself on `pi-learning:v1:context-served`.
 function request(id: string, description: string): Record<string, unknown> {
-  const evidenceDigest = `sha256:v1:${DIGEST}`;
-  const claimBody = {
-    version: 1 as const,
-    kind: "pattern" as const,
+  // The claim INPUT goes to the constructor unvalidated, as a real caller's
+  // would: a statement pi-core rejects (e.g. one carrying a secret) is
+  // dropped from the emitted request rather than thrown here — the "secret"
+  // scenario depends on that.
+  const claimInput = {
+    version: 1,
+    kind: "pattern",
     statement: description,
     applicability: "verified task execution",
     support: {
-      mode: "task-outcome" as const,
-      evidenceRefs: [{ kind: "evidence-receipt" as const, ref: "e2e-receipt", digest: evidenceDigest }],
+      mode: "task-outcome",
+      evidenceRefs: [
+        { kind: "evidence-receipt", ref: "e2e-receipt", digest: `sha256:v1:${DIGEST}` },
+      ],
     },
   };
-  const learningClaims = [{ ...claimBody, claimId: taggedDigest(claimBody) }];
-  const requestBody = {
-    taskId: `invocation-${id}`,
-    correlationId: `correlation-${id}`,
-    projectId: "e2e-project",
-    trustEpoch: "e2e-trust-epoch",
-    sessionGeneration: "e2e-session-generation",
-    agentType: "reviewer",
+  return makeContextRequestPayload(
+    `invocation-${id}`,
+    "reviewer",
     description,
-    learningClaims,
-  };
-  return { protocolVersion: 1, ...requestBody, requestDigest: taggedDigest(requestBody) };
+    `correlation-${id}`,
+    [claimInput],
+  ) as unknown as Record<string, unknown>;
 }
 
 function proof(
@@ -210,36 +241,38 @@ function proof(
   evidenceDigests: string[] = [DIGEST],
 ): Record<string, unknown> {
   const contextRequest = request(id, description) as {
-    requestDigest: string;
+    requestDigest: `sha256:v1:${string}`;
     learningClaims: Array<{ claimId: string }>;
   };
-  return {
-    protocolVersion: 1,
+  return makeProofVerifiedPayload({
     taskId: `canonical-${id}`,
+    verificationPassed: passed,
+    issues: passed ? [] : ["focused check failed"],
+    evidenceDigests,
     correlationId: `correlation-${id}`,
     requestDigest: contextRequest.requestDigest,
-    projectId: "e2e-project",
-    trustEpoch: "e2e-trust-epoch",
-    sessionGeneration: "e2e-session-generation",
-    supportedClaims: [{
-      claimId: contextRequest.learningClaims[0]!.claimId,
+    // A request whose claim was dropped at construction (e.g. it carried a
+    // secret) has nothing to support — the proof mirrors that.
+    supportedClaims: contextRequest.learningClaims.slice(0, 1).map((claim) => ({
+      claimId: claim.claimId,
       supported: passed,
       evidenceDigests: passed && evidenceDigests.every((item) => /^[a-f0-9]{64}$/.test(item))
         ? evidenceDigests.map((item) => `sha256:v1:${item}`)
         : [],
-    }],
-    verificationPassed: passed,
-    verificationIssues: passed ? [] : ["focused check failed"],
-    evidenceDigests,
-    timestamp: new Date().toISOString(),
-  };
+    })),
+  }) as unknown as Record<string, unknown>;
 }
 
 async function emitProof(runtime: Runtime, id: string, description: string, options?: {
   passed?: boolean;
   evidenceDigests?: string[];
 }): Promise<void> {
-  await runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request(id, description));
+  const contextRequest = request(id, description);
+  await runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
+  // Settle the serve: pi-learning emits `context-served` (the binding the
+  // coordinator needs) inside the response promise, exactly as the real
+  // producer awaits the response before proceeding.
+  await (contextRequest as { response?: Promise<unknown> }).response;
   await runtime.events.emit(
     SUBAGENT_PROOF_EVENT,
     proof(
@@ -292,10 +325,14 @@ async function positiveAndContext(consumer: Consumer, root: string): Promise<voi
   assert.match(rendered, /focused alpha verification/i);
   assert.match(rendered, new RegExp(DIGEST));
 
-  const contextRequest = request("context", "Use project learning for alpha verification");
+  // The description doubles as the retrieval query, and retrieval matches the
+  // whole query as a substring of the learned title/guidance — so query with
+  // the phrase the learned statement actually contains.
+  const contextRequest = request("context", "focused alpha verification");
   runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
-  await new Promise<void>((resolve) => setImmediate(resolve));
-  const response = contextRequest.response as LearningContext | undefined;
+  // The response container holds a promise; the real consumer awaits it
+  // (`await Promise.resolve(contextRequest.response)` in pi-subagents).
+  const response = (await contextRequest.response) as LearningContext | undefined;
   assert.equal(response?.version, 1, `context response=${JSON.stringify(response)}`);
   assert.equal(response?.facts.length, 1);
   assert.equal(response?.facts[0]?.confidence, "high");
@@ -357,13 +394,20 @@ async function idempotencyBoundsAndFailOpen(consumer: Consumer, root: string): P
 
   const result = await injected(runtime, "theta");
   assert.ok(result);
-  const contextRequest = request("bounds-context", "Use theta project guidance");
+  const contextRequest = request("bounds-context", "theta");
   runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
-  await new Promise<void>((resolve) => setImmediate(resolve));
-  const response = contextRequest.response as LearningContext | undefined;
+  const response = (await contextRequest.response) as LearningContext & {
+    usageReceipts?: unknown[];
+  };
   assert.ok(response);
   assert.ok(response.facts.length <= 3);
-  assert.ok(JSON.stringify(response).length <= 1_600);
+  // Bound what the config bounds: the fact payload (retrieval.maxTotalChars =
+  // 1200 plus field overhead). The previous assertion serialized the whole
+  // response — and passed vacuously, because before the response was awaited
+  // it was measuring the string "{}" of a pending Promise. Receipts are fixed
+  // protocol overhead, one per fact, so their count is the meaningful bound.
+  assert.ok(JSON.stringify(response.facts).length <= 1_600);
+  assert.equal(response.usageReceipts?.length, response.facts.length);
 
   const ledger = learningEvents(root).trim().split("\n").filter(Boolean);
   const duplicateEvents = ledger.filter((line) => line.includes("Theta duplicate guidance remains idempotent"));

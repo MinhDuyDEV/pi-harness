@@ -1,77 +1,78 @@
-import { createHash } from "node:crypto";
+/**
+ * Learning-coordinator protocol layer, now sourced from @minhduydev/pi-core.
+ *
+ * This file used to reimplement the context-request and proof parsers with
+ * its own digest — the one copy of `taggedDigest` (of the audit's nine) that
+ * had actually diverged, and a digest preimage that never matched what the
+ * producer signed (§2.2). The parsers and the digest are pi-core's now; what
+ * remains here is the coordinator's OWN job: turning a verified
+ * request + proof pair into bounded learning observations.
+ */
+import {
+  bindingDigestFor,
+  parseContextRequest as coreParseContextRequest,
+  parseProofVerified,
+  sha256Hex,
+  taggedDigest,
+  PI_EVENTS_V1,
+  type ContextRequestPayloadV1,
+  type ProofVerifiedPayloadV1,
+  type SupportedLearningClaimV1,
+} from "@minhduydev/pi-core";
 
 export const PROTOCOL_VERSION = 1 as const;
-export const LEARNING_OBSERVATION_EVENT = "pi-learning:observation:v1";
-export const SUBAGENT_CONTEXT_REQUEST_EVENT = "pi-subagents:v1:context-request";
-export const SUBAGENT_PROOF_EVENT = "pi-subagents:v1:proof-verified";
+export const LEARNING_OBSERVATION_EVENT = PI_EVENTS_V1.LEARNING_OBSERVATION;
+export const SUBAGENT_CONTEXT_REQUEST_EVENT = PI_EVENTS_V1.SUBAGENT_CONTEXT_REQUEST;
+export const SUBAGENT_PROOF_EVENT = PI_EVENTS_V1.SUBAGENT_PROOF_VERIFIED;
+/** pi-learning announces the project binding for a served request here. */
+export const CONTEXT_SERVED_EVENT = "pi-learning:v1:context-served";
 export const DCP_TELEMETRY_EVENT = "dcp:telemetry";
 
-const SHA256 = /^[a-f0-9]{64}$/i;
-const TAGGED_SHA256 = /^sha256:v1:[a-f0-9]{64}$/;
-const MAX_DESCRIPTION = 300;
-const MAX_TIMESTAMP = 40;
-const SECRET_PATTERNS = [
-  /-----BEGIN [^-]+ PRIVATE KEY-----[\s\S]*?-----END [^-]+ PRIVATE KEY-----/gi,
-  /\b(?:bearer|basic)\s+[a-z0-9._~+/=-]{12,}/gi,
-  /\b(?:api[_-]?key|access[_-]?token|auth(?:orization)?|password|passwd|secret)\s*[:=]\s*[^\s,;]+/gi,
-  /\b(?:gh[pousr]_|sk-|xox[baprs]-)[a-z0-9_-]{12,}/gi,
-  /\bAKIA[A-Z0-9]{16}\b/gi,
-  /\beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b/gi,
-  /\bignore\s+(?:all\s+|any\s+)?(?:previous|prior|earlier)\s+instructions\b/gi,
-];
+export type ContextRequestV1 = ContextRequestPayloadV1;
+export type ProofVerifiedV1 = ProofVerifiedPayloadV1;
 
-export interface LearningEvidenceRefV1 {
-  kind: "repository-file" | "evidence-receipt";
-  ref: string;
-  digest: string;
-}
+export const parseContextRequest = coreParseContextRequest;
+export const parseProof = parseProofVerified;
 
-export interface LearningClaimV1 {
-  version: 1;
-  claimId: string;
-  kind: "pattern" | "discovery";
-  statement: string;
-  applicability: string;
-  support: {
-    mode: "direct-artifact" | "task-outcome";
-    evidenceRefs: readonly LearningEvidenceRefV1[];
-  };
-}
-
-export interface SupportedLearningClaimV1 {
-  claimId: string;
-  supported: boolean;
-  evidenceDigests: readonly string[];
-}
-
-export interface ContextRequestV1 {
-  protocolVersion: 1;
-  taskId: string;
-  correlationId: string;
-  requestDigest: string;
-  projectId?: string;
-  trustEpoch?: string;
-  sessionGeneration?: string;
-  agentType: string;
-  description: string;
-  confidence?: "high" | "medium" | "low";
-  learningClaims: readonly LearningClaimV1[];
-  response?: unknown;
-}
-
-export interface ProofVerifiedV1 {
-  protocolVersion: 1;
-  taskId: string;
-  correlationId: string;
-  requestDigest: string;
+/** The project identity pi-learning binds a served request to. */
+export interface ContextBindingV1 {
   projectId: string;
   trustEpoch: string;
   sessionGeneration: string;
-  supportedClaims: readonly SupportedLearningClaimV1[];
-  verificationPassed: boolean;
-  verificationIssues: readonly string[];
-  evidenceDigests: readonly string[];
-  timestamp: string;
+}
+
+/**
+ * Parse and VERIFY a `pi-learning:v1:context-served` announcement: the
+ * binding must digest-match the request it claims to bind. This event is how
+ * the binding travels now — pi-learning no longer writes identity fields
+ * into the producer's payload, so nothing here depends on listener order.
+ */
+export function parseContextServed(value: unknown): (ContextBindingV1 & {
+  taskId: string;
+  correlationId: string;
+  requestDigest: string;
+}) | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const input = value as Record<string, unknown>;
+  if (input.version !== 1) return undefined;
+  const taskId = boundedIdentifier(input.taskId, 128);
+  const correlationId = boundedIdentifier(input.correlationId, 240);
+  const requestDigest = typeof input.requestDigest === "string" ? input.requestDigest : undefined;
+  const projectId = boundedIdentifier(input.projectId, 240);
+  const trustEpoch = boundedIdentifier(input.trustEpoch, 240);
+  const sessionGeneration = boundedIdentifier(input.sessionGeneration, 240);
+  if (!taskId || !correlationId || !requestDigest || !projectId || !trustEpoch || !sessionGeneration) {
+    return undefined;
+  }
+  if (!/^sha256:v1:[0-9a-f]{64}$/.test(requestDigest)) return undefined;
+  const expected = bindingDigestFor({
+    requestDigest: requestDigest as `sha256:v1:${string}`,
+    projectId,
+    trustEpoch,
+    sessionGeneration,
+  });
+  if (input.bindingDigest !== expected) return undefined;
+  return { taskId, correlationId, requestDigest, projectId, trustEpoch, sessionGeneration };
 }
 
 export interface LearningObservationV1 {
@@ -90,9 +91,15 @@ export interface LearningObservationV1 {
   idempotencyKey: string;
 }
 
-function record(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
-}
+const SECRET_PATTERNS = [
+  /-----BEGIN [^-]+ PRIVATE KEY-----[\s\S]*?-----END [^-]+ PRIVATE KEY-----/gi,
+  /\b(?:bearer|basic)\s+[a-z0-9._~+/=-]{12,}/gi,
+  /\b(?:api[_-]?key|access[_-]?token|auth(?:orization)?|password|passwd|secret)\s*[:=]\s*[^\s,;]+/gi,
+  /\b(?:gh[pousr]_|sk-|xox[baprs]-)[a-z0-9_-]{12,}/gi,
+  /\bAKIA[A-Z0-9]{16}\b/gi,
+  /\beyJ[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+\b/gi,
+  /\bignore\s+(?:all\s+|any\s+)?(?:previous|prior|earlier)\s+instructions\b/gi,
+];
 
 function clean(value: string): string {
   return SECRET_PATTERNS.reduce((result, pattern) => result.replace(pattern, "[REDACTED]"), value);
@@ -110,209 +117,42 @@ function boundedIdentifier(value: unknown, max: number): string | undefined {
   return normalized && !normalized.includes("[REDACTED]") ? normalized : undefined;
 }
 
-export function digest(value: string): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-
-export function projectKey(cwd: string): string {
-  return `project:${digest(cwd)}`;
-}
-
-/** Stable, bounded identity for JSON-safe event payloads, including numeric timestamps. */
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  const input = record(value);
-  if (input) {
-    return `{${Object.keys(input).sort().map((key) => `${JSON.stringify(key)}:${canonical(input[key])}`).join(",")}}`;
-  }
-  return JSON.stringify(value) ?? "null";
-}
-
-function hasOnlyKeys(input: Record<string, unknown>, allowed: readonly string[]): boolean {
-  const keys = new Set(allowed);
-  return Object.keys(input).every((key) => keys.has(key));
-}
-
-function taggedDigest(value: unknown): string {
-  return `sha256:v1:${digest(canonical(value))}`;
-}
-
-function parseLearningEvidenceRef(value: unknown): LearningEvidenceRefV1 | undefined {
-  const input = record(value);
-  if (
-    !input ||
-    !hasOnlyKeys(input, ["kind", "ref", "digest"]) ||
-    (input.kind !== "repository-file" && input.kind !== "evidence-receipt") ||
-    !TAGGED_SHA256.test(String(input.digest))
-  ) return undefined;
-  const ref = boundedIdentifier(input.ref, 240);
-  return ref ? { kind: input.kind, ref, digest: String(input.digest) } : undefined;
-}
-
-function parseLearningClaim(value: unknown): LearningClaimV1 | undefined {
-  const input = record(value);
-  if (
-    !input ||
-    !hasOnlyKeys(input, ["version", "claimId", "kind", "statement", "applicability", "support"]) ||
-    input.version !== 1 ||
-    (input.kind !== "pattern" && input.kind !== "discovery") ||
-    !TAGGED_SHA256.test(String(input.claimId))
-  ) return undefined;
-  const statement = boundedIdentifier(input.statement, 400);
-  const applicability = boundedIdentifier(input.applicability, 240);
-  const support = record(input.support);
-  if (
-    !statement ||
-    !applicability ||
-    !support ||
-    !hasOnlyKeys(support, ["mode", "evidenceRefs"]) ||
-    (support.mode !== "direct-artifact" && support.mode !== "task-outcome") ||
-    !Array.isArray(support.evidenceRefs) ||
-    support.evidenceRefs.length === 0 ||
-    support.evidenceRefs.length > 16
-  ) return undefined;
-  const evidenceRefs = support.evidenceRefs.map(parseLearningEvidenceRef);
-  if (evidenceRefs.some((item) => !item)) return undefined;
-  const body: Omit<LearningClaimV1, "claimId"> = {
-    version: 1,
-    kind: input.kind as LearningClaimV1["kind"],
-    statement,
-    applicability,
-    support: {
-      mode: support.mode as LearningClaimV1["support"]["mode"],
-      evidenceRefs: evidenceRefs as LearningEvidenceRefV1[],
-    },
-  };
-  if (taggedDigest(body) !== input.claimId) return undefined;
-  return { ...body, claimId: String(input.claimId) };
-}
-
-function parseSupportedClaim(value: unknown): SupportedLearningClaimV1 | undefined {
-  const input = record(value);
-  if (
-    !input ||
-    !hasOnlyKeys(input, ["claimId", "supported", "evidenceDigests"]) ||
-    !TAGGED_SHA256.test(String(input.claimId)) ||
-    typeof input.supported !== "boolean" ||
-    !Array.isArray(input.evidenceDigests) ||
-    input.evidenceDigests.length > 16 ||
-    !input.evidenceDigests.every((item) => typeof item === "string" && TAGGED_SHA256.test(item))
-  ) return undefined;
-  return {
-    claimId: String(input.claimId),
-    supported: input.supported,
-    evidenceDigests: [...input.evidenceDigests] as string[],
-  };
-}
-
-export function parseContextRequest(value: unknown): ContextRequestV1 | undefined {
-  const input = record(value);
-  if (
-    !input ||
-    !hasOnlyKeys(input, ["protocolVersion", "taskId", "correlationId", "requestDigest", "projectId", "trustEpoch", "sessionGeneration", "agentType", "description", "confidence", "learningClaims", "response"]) ||
-    input.protocolVersion !== PROTOCOL_VERSION ||
-    !TAGGED_SHA256.test(String(input.requestDigest)) ||
-    !Array.isArray(input.learningClaims) ||
-    input.learningClaims.length > 16
-  ) return undefined;
-  const taskId = boundedIdentifier(input.taskId, 128);
-  const correlationId = boundedIdentifier(input.correlationId, 128) ?? taskId;
-  const projectId = input.projectId === undefined ? undefined : boundedIdentifier(input.projectId, 160);
-  const trustEpoch = input.trustEpoch === undefined ? undefined : boundedIdentifier(input.trustEpoch, 160);
-  const sessionGeneration = input.sessionGeneration === undefined ? undefined : boundedIdentifier(input.sessionGeneration, 160);
-  const agentType = boundedIdentifier(input.agentType, 64);
-  const description = input.description === "" ? "" : sanitizeText(input.description, MAX_DESCRIPTION);
-  const learningClaims = input.learningClaims.map(parseLearningClaim);
-  if (!taskId || !correlationId || !agentType || description === undefined || learningClaims.some((claim) => !claim)) return undefined;
-  const claims = learningClaims as LearningClaimV1[];
-  const expectedDigest = taggedDigest({ taskId, agentType, description, correlationId, ...(projectId ? { projectId } : {}), ...(trustEpoch ? { trustEpoch } : {}), ...(sessionGeneration ? { sessionGeneration } : {}), learningClaims: claims });
-  if (expectedDigest !== input.requestDigest) return undefined;
-  return {
-    protocolVersion: PROTOCOL_VERSION,
-    taskId,
-    correlationId,
-    requestDigest: String(input.requestDigest),
-    ...(projectId ? { projectId } : {}),
-    ...(trustEpoch ? { trustEpoch } : {}),
-    ...(sessionGeneration ? { sessionGeneration } : {}),
-    agentType,
-    description,
-    learningClaims: claims,
-    ...(input.confidence === "high" || input.confidence === "medium" || input.confidence === "low"
-      ? { confidence: input.confidence }
-      : {}),
-    ...(input.response === undefined ? {} : { response: input.response }),
-  };
-}
-
-export function parseProof(value: unknown): ProofVerifiedV1 | undefined {
-  const input = record(value);
-  if (
-    !input ||
-    !hasOnlyKeys(input, ["protocolVersion", "taskId", "correlationId", "requestDigest", "projectId", "trustEpoch", "sessionGeneration", "supportedClaims", "verificationPassed", "verificationIssues", "evidenceDigests", "timestamp"]) ||
-    input.protocolVersion !== PROTOCOL_VERSION ||
-    typeof input.verificationPassed !== "boolean" ||
-    !TAGGED_SHA256.test(String(input.requestDigest)) ||
-    !Array.isArray(input.supportedClaims)
-  ) return undefined;
-  const taskId = boundedIdentifier(input.taskId, 128);
-  const correlationId = boundedIdentifier(input.correlationId, 128) ?? taskId;
-  const projectId = boundedIdentifier(input.projectId, 160);
-  const trustEpoch = boundedIdentifier(input.trustEpoch, 160);
-  const sessionGeneration = boundedIdentifier(input.sessionGeneration, 160);
-  const timestamp = boundedIdentifier(input.timestamp, MAX_TIMESTAMP);
-  if (!taskId || !correlationId || !projectId || !trustEpoch || !sessionGeneration || !timestamp || !Number.isFinite(Date.parse(timestamp)) || !Array.isArray(input.evidenceDigests) || !Array.isArray(input.verificationIssues)) return undefined;
-  if (input.evidenceDigests.some((item) => typeof item !== "string" || !SHA256.test(item))) return undefined;
-  const supportedClaims = input.supportedClaims.map(parseSupportedClaim);
-  if (supportedClaims.some((claim) => !claim)) return undefined;
-  const evidenceDigests = input.evidenceDigests.slice(0, 20).map((item) => (item as string).toLowerCase());
-  const verificationIssues = input.verificationIssues
-    .map((item) => sanitizeText(item, 300))
-    .filter((item): item is string => item !== undefined)
-    .slice(0, 10);
-  return {
-    protocolVersion: PROTOCOL_VERSION,
-    taskId,
-    correlationId,
-    requestDigest: String(input.requestDigest),
-    projectId,
-    trustEpoch,
-    sessionGeneration,
-    supportedClaims: supportedClaims as SupportedLearningClaimV1[],
-    verificationPassed: input.verificationPassed,
-    verificationIssues,
-    evidenceDigests,
-    timestamp,
-  };
-}
-
 function sameDigestSet(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && new Set(left).size === left.length && right.every((digestValue) => left.includes(digestValue));
+  return (
+    left.length === right.length &&
+    new Set(left).size === left.length &&
+    right.every((digestValue) => left.includes(digestValue))
+  );
 }
 
+/**
+ * Turn a verified (request, proof, binding) triple into learning observations.
+ *
+ * The binding is an explicit parameter, verified by {@link parseContextServed}
+ * before it gets here. It used to be read off the request and the proof —
+ * fields another package had written into payloads it did not own — and the
+ * requirement that BOTH carried it silently dropped every observation when
+ * the listener order changed.
+ */
 export function createObservations(
   request: ContextRequestV1,
   proof: ProofVerifiedV1,
+  binding: ContextBindingV1,
   _cwd: string,
 ): LearningObservationV1[] {
   if (
     !proof.verificationPassed ||
-    !request.projectId ||
-    !request.trustEpoch ||
-    !request.sessionGeneration ||
-    !proof.projectId ||
-    !proof.trustEpoch ||
-    !proof.sessionGeneration ||
     proof.correlationId !== request.correlationId ||
-    proof.requestDigest !== request.requestDigest ||
-    proof.projectId !== request.projectId ||
-    proof.trustEpoch !== request.trustEpoch ||
-    proof.sessionGeneration !== request.sessionGeneration
+    proof.requestDigest !== request.requestDigest
+  ) return [];
+  // A proof that DOES carry identity fields must agree with the binding.
+  if (
+    (proof.projectId !== undefined && proof.projectId !== binding.projectId) ||
+    (proof.trustEpoch !== undefined && proof.trustEpoch !== binding.trustEpoch) ||
+    (proof.sessionGeneration !== undefined && proof.sessionGeneration !== binding.sessionGeneration)
   ) return [];
   const timestamp = Date.parse(proof.timestamp);
   if (!Number.isFinite(timestamp)) return [];
-  const projectKeyValue = request.projectId;
-  if (!projectKeyValue) return [];
   const supportByClaim = new Map<string, SupportedLearningClaimV1>();
   for (const support of proof.supportedClaims) {
     if (supportByClaim.has(support.claimId)) return [];
@@ -332,12 +172,12 @@ export function createObservations(
     return [{
       kind: claim.kind,
       content,
-      projectKey: projectKeyValue,
+      projectKey: binding.projectId,
       source: "pi-subagents:proof-verified",
       evidenceRefs,
       context: claim.applicability,
       timestamp,
-      idempotencyKey: digest(`${request.taskId}\0${claim.claimId}\0${request.requestDigest}`),
+      idempotencyKey: sha256Hex(`${request.taskId}\0${claim.claimId}\0${request.requestDigest}`),
     }];
   });
 }
@@ -345,7 +185,10 @@ export function createObservations(
 export function createObservation(
   request: ContextRequestV1,
   proof: ProofVerifiedV1,
+  binding: ContextBindingV1,
   cwd: string,
 ): LearningObservationV1 | undefined {
-  return createObservations(request, proof, cwd)[0];
+  return createObservations(request, proof, binding, cwd)[0];
 }
+
+export { taggedDigest };

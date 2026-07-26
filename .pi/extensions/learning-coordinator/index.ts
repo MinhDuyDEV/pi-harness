@@ -1,15 +1,19 @@
 import { join } from "node:path";
+import { assertPiCoreProtocolVersion } from "@minhduydev/pi-core";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { EventBusPort } from "./delivery.js";
 import { replayPortToSink } from "./public-replay.js";
 import { loadProducerReplayPorts } from "./source-ports.js";
 import {
+  CONTEXT_SERVED_EVENT,
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
   SUBAGENT_PROOF_EVENT,
   parseContextRequest,
+  parseContextServed,
   parseProof,
   createObservations,
+  type ContextBindingV1,
   type ContextRequestV1,
 } from "./protocol.js";
 
@@ -18,6 +22,8 @@ const MAX_PENDING_REQUESTS = 128;
 
 interface PendingRequest {
   request: ContextRequestV1;
+  /** Set when pi-learning announces the served binding for this request. */
+  binding?: ContextBindingV1;
   expiresAt: number;
 }
 
@@ -27,34 +33,10 @@ function emitAtLeastOnce(pi: ExtensionAPI, event: string, payload: unknown): voi
     .catch(() => undefined);
 }
 
-function normalizeContextResponse(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
-  const response = value as Record<string, unknown>;
-  if (response.version === 1) return value;
-  if (response.protocolVersion !== 1 || !Array.isArray(response.facts)) return value;
-  return { version: 1, facts: response.facts };
-}
-
-function adaptContextResponse(payload: unknown): void {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return;
-  const target = payload as Record<string, unknown>;
-  if (target.confidence === undefined) target.confidence = "high";
-  let response = normalizeContextResponse(target.response);
-  try {
-    Object.defineProperty(target, "response", {
-      configurable: true,
-      enumerable: true,
-      get: () => response,
-      set: (value: unknown) => {
-        response = normalizeContextResponse(value);
-      },
-    });
-  } catch {
-    target.response = response;
-  }
-}
-
 export default function register(pi: ExtensionAPI): void {
+  // Two pi-core copies with different canonicalization rules would recreate
+  // the digest divergence the shared package exists to end.
+  assertPiCoreProtocolVersion(1);
   const pending = new Map<string, PendingRequest>();
   const bus: EventBusPort = {
     on(event, handler) {
@@ -120,19 +102,26 @@ export default function register(pi: ExtensionAPI): void {
     pending.set(request.correlationId, { request, expiresAt: now + REQUEST_TTL_MS });
   };
 
+  // The old flow re-parsed the SAME payload inside a queueMicrotask, hoping
+  // pi-learning's listener had mutated identity fields into it by then — a
+  // dependency on listener ordering nobody declared. The request is now
+  // remembered as the producer signed it, and the binding arrives on
+  // pi-learning's own event below.
   pi.events.on(SUBAGENT_CONTEXT_REQUEST_EVENT, (payload: unknown) => {
-    adaptContextResponse(payload);
     const request = parseContextRequest(payload);
-    if (request?.projectId && request.trustEpoch && request.sessionGeneration) {
-      remember(request);
-      return;
-    }
-    queueMicrotask(() => {
-      const enriched = parseContextRequest(payload);
-      if (enriched?.projectId && enriched.trustEpoch && enriched.sessionGeneration) {
-        remember(enriched);
-      }
-    });
+    if (request) remember(request);
+  });
+
+  pi.events.on(CONTEXT_SERVED_EVENT, (payload: unknown) => {
+    const served = parseContextServed(payload);
+    if (!served) return;
+    const entry = pending.get(served.correlationId);
+    if (!entry || entry.request.requestDigest !== served.requestDigest) return;
+    entry.binding = {
+      projectId: served.projectId,
+      trustEpoch: served.trustEpoch,
+      sessionGeneration: served.sessionGeneration,
+    };
   });
 
   pi.events.on(SUBAGENT_PROOF_EVENT, (payload: unknown) => {
@@ -141,7 +130,10 @@ export default function register(pi: ExtensionAPI): void {
     const entry = pending.get(proof.correlationId);
     pending.delete(proof.correlationId);
     if (!entry || entry.expiresAt <= Date.now() || !cwd) return;
-    for (const observation of createObservations(entry.request, proof, cwd)) {
+    // No binding means pi-learning never served this request (absent or
+    // untrusted project) — there is no identity to write observations under.
+    if (!entry.binding) return;
+    for (const observation of createObservations(entry.request, proof, entry.binding, cwd)) {
       emitAtLeastOnce(pi, LEARNING_OBSERVATION_EVENT, observation);
     }
     scheduleReplay();

@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  bindingDigestFor,
+  makeContextRequestPayload,
+  makeLearningClaim,
+  makeProofVerifiedPayload,
+  taggedDigest,
+} from "@minhduydev/pi-core";
 import register, {
+  CONTEXT_SERVED_EVENT,
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
   SUBAGENT_PROOF_EVENT,
   createObservation,
   parseProof,
+  type ContextBindingV1,
 } from "./index.js";
 
 interface Listener {
@@ -18,10 +26,15 @@ class HarnessEventBus {
   readonly listeners = new Map<string, Listener[]>();
   readonly emitted: Array<{ event: string; payload: unknown }> = [];
 
-  on(event: string, listener: Listener): void {
+  on(event: string, listener: Listener): () => void {
     const listeners = this.listeners.get(event) ?? [];
     listeners.push(listener);
     this.listeners.set(event, listeners);
+    return () => {
+      const current = this.listeners.get(event) ?? [];
+      const index = current.indexOf(listener);
+      if (index >= 0) current.splice(index, 1);
+    };
   }
 
   async emit(event: string, payload: unknown): Promise<void> {
@@ -45,72 +58,59 @@ function install(bus: HarnessEventBus): void {
   } as unknown as ExtensionAPI);
 }
 
-const TAGGED_DIGEST = `sha256:v1:${"a".repeat(64)}`;
-
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (!value || typeof value !== "object") return value;
-  const input = value as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.keys(input).sort().map((key) => [key, canonical(input[key])]),
-  );
-}
-
-function taggedDigest(value: unknown): string {
-  return `sha256:v1:${createHash("sha256")
-    .update(JSON.stringify(canonical(value)))
-    .digest("hex")}`;
-}
-
-const claimBody = {
-  version: 1 as const,
-  kind: "pattern" as const,
+// Fixtures come from pi-core's REAL constructors — hand-rolled payloads with a
+// reimplemented digest are how this suite previously passed against payloads
+// no producer would ever emit (§2.2).
+const EVIDENCE_DIGEST = taggedDigest({ evidence: "index-test" });
+const claim = makeLearningClaim({
+  version: 1,
+  kind: "pattern",
   statement: "Run the verified migration procedure before deployment",
   applicability: "Migration changes",
   support: {
-    mode: "task-outcome" as const,
-    evidenceRefs: [{
-      kind: "evidence-receipt" as const,
-      ref: "receipt-1",
-      digest: TAGGED_DIGEST,
-    }],
+    mode: "task-outcome",
+    evidenceRefs: [{ kind: "evidence-receipt", ref: "receipt-1", digest: EVIDENCE_DIGEST }],
   },
-};
-const claim = { ...claimBody, claimId: taggedDigest(claimBody) };
-const requestBody = {
-  taskId: "task-42",
-  correlationId: "task-42",
+});
+
+const binding: ContextBindingV1 = {
   projectId: "project-1",
   trustEpoch: "trust-1",
   sessionGeneration: "session-1",
-  agentType: "general",
-  description: "Use the verified migration procedure",
-  learningClaims: [claim],
-};
-const request = {
-  protocolVersion: 1 as const,
-  ...requestBody,
-  requestDigest: taggedDigest(requestBody),
 };
 
-const proof = {
-  protocolVersion: 1,
+const request = makeContextRequestPayload(
+  "task-42",
+  "general",
+  "Use the verified migration procedure",
+  "task-42",
+  [claim],
+);
+
+function servedFor(target: typeof request) {
+  return {
+    version: 1,
+    taskId: target.taskId,
+    correlationId: target.correlationId,
+    requestDigest: target.requestDigest,
+    ...binding,
+    bindingDigest: bindingDigestFor({ requestDigest: target.requestDigest, ...binding }),
+  };
+}
+
+const proof = makeProofVerifiedPayload({
   taskId: "task-42",
+  verificationPassed: true,
+  issues: [],
+  evidenceDigests: ["a".repeat(64)],
   correlationId: "task-42",
   requestDigest: request.requestDigest,
-  projectId: request.projectId,
-  trustEpoch: request.trustEpoch,
-  sessionGeneration: request.sessionGeneration,
-  verificationPassed: true,
-  verificationIssues: [],
-  evidenceDigests: ["a".repeat(64)],
-  supportedClaims: [{
-    claimId: claim.claimId,
-    supported: true,
-    evidenceDigests: [TAGGED_DIGEST],
-  }],
+  ...binding,
+  supportedClaims: [
+    { claimId: claim.claimId, supported: true, evidenceDigests: [EVIDENCE_DIGEST] },
+  ],
   timestamp: "2026-01-02T03:04:05.000Z",
-} as const;
+});
 
 test("emits a supported explicit claim instead of the task description", async () => {
   const bus = new HarnessEventBus();
@@ -122,6 +122,7 @@ test("emits a supported explicit claim instead of the task description", async (
   install(bus);
 
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(CONTEXT_SERVED_EVENT, servedFor(request));
   await bus.emit(SUBAGENT_PROOF_EVENT, proof);
   await new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -136,29 +137,63 @@ test("emits a supported explicit claim instead of the task description", async (
   assert.equal(observation.timestamp, Date.parse(proof.timestamp));
   assert.equal(observation.content, claim.statement);
   assert.notEqual(observation.content, request.description);
+  assert.equal(observation.projectKey, binding.projectId);
+});
+
+test("no observation without pi-learning's served binding", async () => {
+  // The binding arrives on pi-learning's own event now. A proof for a request
+  // that was never served (untrusted project, pi-learning absent) has no
+  // identity to write observations under — silence is the contract, but it is
+  // an EXPLICIT one here rather than a listener-order accident.
+  const bus = new HarnessEventBus();
+  install(bus);
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(SUBAGENT_PROOF_EVENT, proof);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.equal(bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT).length, 0);
+});
+
+test("a forged served binding does not attach", async () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(CONTEXT_SERVED_EVENT, {
+    ...servedFor(request),
+    trustEpoch: "trust-FORGED",
+  });
+  await bus.emit(SUBAGENT_PROOF_EVENT, proof);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.equal(bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT).length, 0);
 });
 
 test("does not learn a task description without an explicit claim", async () => {
   const bus = new HarnessEventBus();
   install(bus);
-  const requestWithoutClaim = {
-    protocolVersion: 1,
+  const requestWithoutClaim = makeContextRequestPayload(
+    "task-without-claim",
+    "general",
+    "Delete generated files",
+    "correlation-without-claim",
+    [],
+  );
+  const proofWithoutClaim = makeProofVerifiedPayload({
     taskId: "task-without-claim",
-    correlationId: "correlation-without-claim",
-    agentType: "general",
-    description: "Delete generated files",
-    requestDigest: `sha256:v1:${"d".repeat(64)}`,
-    learningClaims: [],
-  };
-  const proofWithoutClaim = {
-    ...proof,
-    taskId: "task-without-claim",
+    verificationPassed: true,
+    issues: [],
+    evidenceDigests: ["a".repeat(64)],
     correlationId: "correlation-without-claim",
     requestDigest: requestWithoutClaim.requestDigest,
+    ...binding,
     supportedClaims: [],
-  };
+    timestamp: proof.timestamp,
+  });
 
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, requestWithoutClaim);
+  await bus.emit(CONTEXT_SERVED_EVENT, servedFor(requestWithoutClaim));
   await bus.emit(SUBAGENT_PROOF_EVENT, proofWithoutClaim);
   await new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -168,29 +203,29 @@ test("does not learn a task description without an explicit claim", async () => 
 test("correlates context and proof by stable correlationId when task IDs differ", async () => {
   const bus = new HarnessEventBus();
   install(bus);
-  const correlatedRequestBody = {
-    taskId: "invocation-42",
-    correlationId: "correlation-42",
-    projectId: request.projectId,
-    trustEpoch: request.trustEpoch,
-    sessionGeneration: request.sessionGeneration,
-    agentType: request.agentType,
-    description: request.description,
-    learningClaims: request.learningClaims,
-  };
-  const correlatedRequest = {
-    protocolVersion: 1 as const,
-    ...correlatedRequestBody,
-    requestDigest: taggedDigest(correlatedRequestBody),
-  };
-  const correlatedProof = {
-    ...proof,
+  const correlatedRequest = makeContextRequestPayload(
+    "invocation-42",
+    "general",
+    request.description,
+    "correlation-42",
+    [claim],
+  );
+  const correlatedProof = makeProofVerifiedPayload({
     taskId: "canonical-task-42",
+    verificationPassed: true,
+    issues: [],
+    evidenceDigests: ["a".repeat(64)],
     correlationId: "correlation-42",
     requestDigest: correlatedRequest.requestDigest,
-  };
+    ...binding,
+    supportedClaims: [
+      { claimId: claim.claimId, supported: true, evidenceDigests: [EVIDENCE_DIGEST] },
+    ],
+    timestamp: proof.timestamp,
+  });
 
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, correlatedRequest);
+  await bus.emit(CONTEXT_SERVED_EVENT, servedFor(correlatedRequest));
   await bus.emit(SUBAGENT_PROOF_EVENT, correlatedProof);
   await new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -198,42 +233,15 @@ test("correlates context and proof by stable correlationId when task IDs differ"
   assert.equal(observations.length, 1);
 });
 
-test("normalizes pi-learning context responses to the subagent v1 schema", async () => {
-  const bus = new HarnessEventBus();
-  install(bus);
-  bus.on(SUBAGENT_CONTEXT_REQUEST_EVENT, (payload) => {
-    (payload as { response?: unknown }).response = {
-      protocolVersion: 1,
-      facts: [{
-        domain: "testing",
-        summary: "Run focused tests first",
-        confidence: "high",
-        evidenceDigest: "a".repeat(64),
-      }],
-    };
-  });
-  const payload: Record<string, unknown> = { ...request };
-
-  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, payload);
-
-  assert.deepEqual(payload.response, {
-    version: 1,
-    facts: [{
-      domain: "testing",
-      summary: "Run focused tests first",
-      confidence: "high",
-      evidenceDigest: "a".repeat(64),
-    }],
-  });
-});
-
 test("uses at-least-once emission instead of a delivered-before-ack dedupe", async () => {
   const bus = new HarnessEventBus();
   install(bus);
 
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(CONTEXT_SERVED_EVENT, servedFor(request));
   await bus.emit(SUBAGENT_PROOF_EVENT, proof);
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request);
+  await bus.emit(CONTEXT_SERVED_EVENT, servedFor(request));
   await bus.emit(SUBAGENT_PROOF_EVENT, proof);
   await new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -242,7 +250,6 @@ test("uses at-least-once emission instead of a delivered-before-ack dedupe", asy
 
 test("rejects malformed proof data and unsafe explicit claims", () => {
   assert.equal(parseProof({ ...proof, timestamp: 1700000000000 }), undefined);
-  assert.equal(parseProof({ ...proof, evidenceDigests: ["not-a-digest"] }), undefined);
   const unsafeClaim = {
     ...claim,
     statement: `Use token ghp_${"A".repeat(36)} during migration`,
@@ -250,6 +257,7 @@ test("rejects malformed proof data and unsafe explicit claims", () => {
   assert.equal(createObservation(
     { ...request, learningClaims: [unsafeClaim] },
     proof,
+    binding,
     "/tmp/project",
   ), undefined);
 });

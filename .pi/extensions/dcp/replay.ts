@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { taggedDigest } from "@minhduydev/pi-core";
 import { createDcpKnowledgeEvent } from "./knowledge-port.js";
 import {
   listDurableSessionStates,
@@ -16,18 +16,8 @@ export interface DcpReplayCursorV1 {
   payloadDigest: string;
 }
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (!value || typeof value !== "object") return value;
-  const input = value as Record<string, unknown>;
-  return Object.fromEntries(Object.keys(input).sort().map((key) => [key, canonical(input[key])]));
-}
-
-function taggedDigest(value: unknown): string {
-  return `sha256:v1:${createHash("sha256")
-    .update(JSON.stringify(canonical(value)))
-    .digest("hex")}`;
-}
+// The digest and its canonicalization come from @minhduydev/pi-core —
+// this file carried one of the audit's nine independent copies (§2.2).
 
 async function events(): Promise<Record<string, unknown>[]> {
   const states = await listDurableSessionStates();

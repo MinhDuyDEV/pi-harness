@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { taggedDigest } from "@minhduydev/pi-core";
 import type { SessionState } from "./compress-types.js";
 
 export interface DcpUsageReference {
@@ -61,18 +61,8 @@ function exact(input: Record<string, unknown>, keys: readonly string[]): boolean
   return Object.keys(input).every((key) => allowed.has(key));
 }
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (!value || typeof value !== "object") return value;
-  const input = value as Record<string, unknown>;
-  return Object.fromEntries(Object.keys(input).sort().map((key) => [key, canonical(input[key])]));
-}
-
-function taggedDigest(value: unknown): string {
-  return `sha256:v1:${createHash("sha256")
-    .update(JSON.stringify(canonical(value)))
-    .digest("hex")}`;
-}
+// The digest and its canonicalization come from @minhduydev/pi-core —
+// this file carried one of the audit's nine independent copies (§2.2).
 
 export function parseDcpUsageReference(value: unknown): DcpUsageReference | undefined {
   const input = record(value);
