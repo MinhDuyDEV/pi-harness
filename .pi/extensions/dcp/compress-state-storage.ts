@@ -1,4 +1,8 @@
 import { getSessionKey, type DurableSessionState } from "./storage.js";
+import {
+  emptyDcpKnowledgeReferences,
+  isDcpKnowledgeReferences,
+} from "./knowledge-port.js";
 import type { PersistentSessionSummary, SessionState } from "./compress-types.js";
 
 function parseMetadataArray(value: unknown): string[] {
@@ -42,6 +46,7 @@ export function newSessionState(): SessionState {
     currentTurn: 0,
     reReadSeenKeys: new Set(),
     quarantinedBlocks: [],
+    knowledgeReferences: emptyDcpKnowledgeReferences(),
   };
 }
 
@@ -82,6 +87,9 @@ export function sessionStateFromDurable(durable: DurableSessionState): SessionSt
   if (durable.quarantinedBlocks) {
     state.quarantinedBlocks = durable.quarantinedBlocks;
   }
+  if (isDcpKnowledgeReferences(durable.knowledgeReferences)) {
+    state.knowledgeReferences = durable.knowledgeReferences;
+  }
   return state;
 }
 
@@ -120,6 +128,7 @@ export function durableFromSessionState(
     updatedAt: Date.now(),
     quarantinedBlocks:
       state.quarantinedBlocks.length > 0 ? state.quarantinedBlocks : undefined,
+    knowledgeReferences: state.knowledgeReferences,
   };
 }
 

@@ -59,9 +59,9 @@ test("settings pin portable exact Auto-safe package sources", () => {
   const settings = JSON.parse(readFileSync(resolve(REPO_ROOT, ".pi/settings.json"), "utf8")) as {
     packages?: string[];
   };
-  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-learning@0.1.2"));
-  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-subagents@0.6.1"));
-  assert.ok(settings.packages?.includes("git:github.com/MinhDuyDEV/pi-todo#b7dbf9c1650394df6a6388d803fd5109294ed5d3"));
+  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-learning@0.2.1"));
+  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-subagents@0.7.1"));
+  assert.ok(settings.packages?.includes("npm:@minhduydev/pi-todo@0.2.1"));
   assert.equal(settings.packages?.some((entry) => entry.startsWith("local:../pi-")), false);
 });
 

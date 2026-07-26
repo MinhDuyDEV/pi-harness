@@ -1,11 +1,15 @@
+import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { EventBusPort } from "./delivery.js";
+import { replayPortToSink } from "./public-replay.js";
+import { loadProducerReplayPorts } from "./source-ports.js";
 import {
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
   SUBAGENT_PROOF_EVENT,
   parseContextRequest,
   parseProof,
-  createObservation,
+  createObservations,
   type ContextRequestV1,
 } from "./protocol.js";
 
@@ -52,11 +56,56 @@ function adaptContextResponse(payload: unknown): void {
 
 export default function register(pi: ExtensionAPI): void {
   const pending = new Map<string, PendingRequest>();
+  const bus: EventBusPort = {
+    on(event, handler) {
+      return pi.events.on(event, handler);
+    },
+    emit(event, payload) {
+      pi.events.emit(event, payload);
+    },
+  };
   let cwd: string | undefined;
+  let ports = Promise.resolve([] as Awaited<ReturnType<typeof loadProducerReplayPorts>>);
+  let replayChain = Promise.resolve();
+  let replayFailed = false;
+  const scheduleReplay = (): void => {
+    const projectDirectory = cwd;
+    if (!projectDirectory) return;
+    replayChain = replayChain.then(async () => {
+      for (const source of await ports) {
+        await replayPortToSink({
+          producer: source.producer,
+          port: source.port,
+          bus,
+          cursorPath: join(
+            projectDirectory,
+            ".pi",
+            "artifacts",
+            "learning-coordinator",
+            "cursors",
+            `${source.producer}.json`,
+          ),
+          timeoutMs: 2_000,
+          retries: 2,
+        });
+      }
+    }).catch(() => {
+      replayFailed = true;
+    });
+  };
 
   pi.on("session_start", (_event, context) => {
     cwd = context.cwd;
+    ports = loadProducerReplayPorts(context.cwd);
     pending.clear();
+    scheduleReplay();
+    if (replayFailed) {
+      context.ui.notify(
+        "Durable learning-signal replay is paused; source cursors were not advanced.",
+        "warning",
+      );
+      replayFailed = false;
+    }
   });
 
   const remember = (request: ContextRequestV1): void => {
@@ -74,7 +123,16 @@ export default function register(pi: ExtensionAPI): void {
   pi.events.on(SUBAGENT_CONTEXT_REQUEST_EVENT, (payload: unknown) => {
     adaptContextResponse(payload);
     const request = parseContextRequest(payload);
-    if (request) remember(request);
+    if (request?.projectId && request.trustEpoch && request.sessionGeneration) {
+      remember(request);
+      return;
+    }
+    queueMicrotask(() => {
+      const enriched = parseContextRequest(payload);
+      if (enriched?.projectId && enriched.trustEpoch && enriched.sessionGeneration) {
+        remember(enriched);
+      }
+    });
   });
 
   pi.events.on(SUBAGENT_PROOF_EVENT, (payload: unknown) => {
@@ -83,10 +141,13 @@ export default function register(pi: ExtensionAPI): void {
     const entry = pending.get(proof.correlationId);
     pending.delete(proof.correlationId);
     if (!entry || entry.expiresAt <= Date.now() || !cwd) return;
-    const observation = createObservation(entry.request, proof, cwd);
-    if (observation) emitAtLeastOnce(pi, LEARNING_OBSERVATION_EVENT, observation);
+    for (const observation of createObservations(entry.request, proof, cwd)) {
+      emitAtLeastOnce(pi, LEARNING_OBSERVATION_EVENT, observation);
+    }
+    scheduleReplay();
   });
 
+  pi.on("turn_end", scheduleReplay);
 }
 
 export * from "./protocol.js";

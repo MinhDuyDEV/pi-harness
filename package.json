@@ -14,6 +14,7 @@
     "test:all": "npm run test:extensions && npm run test:skills",
     "test:extensions": "node scripts/run-extension-tests.mjs .pi/extensions",
     "verify:auto-safe": "node --import tsx scripts/verify-auto-safe-e2e.ts",
+    "verify:phase5-packed": "node --import tsx scripts/verify-phase5-packed-e2e.ts",
     "test:skills": "node scripts/run-extension-tests.mjs tests",
     "test:safety": "node scripts/run-extension-tests.mjs .pi/extensions/safety",
     "test:tui": "node scripts/run-extension-tests.mjs .pi/extensions/tui",

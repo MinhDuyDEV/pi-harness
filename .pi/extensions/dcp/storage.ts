@@ -1,16 +1,21 @@
 import {
+  closeSync,
   existsSync,
+  fsyncSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   renameSync,
   rmSync,
   statSync,
-  writeFileSync,
+  writeSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { createHash } from "node:crypto";
+import type { DcpKnowledgeReferences } from "./knowledge-port.js";
+import { emptyDcpKnowledgeReferences, isDcpKnowledgeReferences } from "./knowledge-port.js";
 import type { DcpProvenanceV2, LegacyAttestationMetadata, QuarantinedBlock } from "./compress-types.ts";
 
 export interface DurableCompressionBlock {
@@ -54,6 +59,8 @@ export interface DurableSessionState {
   updatedAt: number;
   /** V2: Quarantined blocks that failed provenance validation */
   quarantinedBlocks?: QuarantinedBlock[];
+  /** V2 extension: non-content learning, usage, and checkpoint references. */
+  knowledgeReferences?: DcpKnowledgeReferences;
 }
 
 export interface DurableSessionInfo {
@@ -80,31 +87,80 @@ function getSessionStatePath(sessionId: string): string {
   return join(DCP_STATE_DIR, `${getSessionKey(sessionId)}.json`);
 }
 
-export function loadDurableSessionState(
-  sessionId: string,
-): DurableSessionState | undefined {
-  const path = getSessionStatePath(sessionId);
+function migrateDurableSessionState(value: unknown): DurableSessionState | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const parsed = value as Partial<DurableSessionState>;
+  if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.blocks)) return undefined;
+  const knowledgeReferences = isDcpKnowledgeReferences(parsed.knowledgeReferences)
+    ? parsed.knowledgeReferences
+    : emptyDcpKnowledgeReferences();
+  return {
+    ...parsed,
+    version: 2,
+    knowledgeReferences,
+  } as DurableSessionState;
+}
+
+export function loadDurableSessionStateFromPath(path: string): DurableSessionState | undefined {
   if (!existsSync(path)) return undefined;
   try {
-    const parsed = JSON.parse(
-      readFileSync(path, "utf8"),
-    ) as DurableSessionState;
-    if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.blocks)) return undefined;
-    return parsed;
+    return migrateDurableSessionState(JSON.parse(readFileSync(path, "utf8")));
   } catch {
+    // A truncated primary checkpoint is not usable; its previous atomic state
+    // remains the recovery boundary for callers that retain one.
     return undefined;
+  }
+}
+
+export function loadDurableSessionState(sessionId: string): DurableSessionState | undefined {
+  return loadDurableSessionStateFromPath(getSessionStatePath(sessionId));
+}
+
+export function saveDurableSessionStateToPath(
+  state: DurableSessionState,
+  path: string,
+): void {
+  ensureStateDir();
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.tmp`;
+  const payload = JSON.stringify(
+    {
+      ...state,
+      version: 2,
+      knowledgeReferences: isDcpKnowledgeReferences(state.knowledgeReferences)
+        ? state.knowledgeReferences
+        : emptyDcpKnowledgeReferences(),
+      updatedAt: Date.now(),
+    },
+    null,
+    2,
+  );
+  try {
+    const fd = openSync(tmp, "w", 0o600);
+    try {
+      const buffer = Buffer.from(payload, "utf8");
+      let offset = 0;
+      while (offset < buffer.length) offset += writeSync(fd, buffer, offset, buffer.length - offset);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(tmp, path);
+    const directoryFd = openSync(dirname(path), "r");
+    try {
+      fsyncSync(directoryFd);
+    } finally {
+      closeSync(directoryFd);
+    }
+  } catch (error) {
+    rmSync(tmp, { force: true });
+    throw error;
   }
 }
 
 export function saveDurableSessionState(state: DurableSessionState): void {
   ensureStateDir();
-  const path = getSessionStatePath(state.sessionId);
-  const tmp = `${path}.tmp`;
-  writeFileSync(
-    tmp,
-    JSON.stringify({ ...state, updatedAt: Date.now() }, null, 2),
-  );
-  renameSync(tmp, path);
+  saveDurableSessionStateToPath(state, getSessionStatePath(state.sessionId));
 }
 
 export function deleteDurableSessionState(sessionId: string): void {
@@ -133,18 +189,4 @@ export function listDurableSessionStates(): DurableSessionInfo[] {
     })
     .filter((entry): entry is DurableSessionInfo => Boolean(entry))
     .sort((a, b) => b.updatedAt - a.updatedAt);
-}
-
-export function loadDurableSessionStateFromPath(
-  path: string,
-): DurableSessionState | undefined {
-  try {
-    const parsed = JSON.parse(
-      readFileSync(path, "utf8"),
-    ) as DurableSessionState;
-    if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.blocks)) return undefined;
-    return parsed;
-  } catch {
-    return undefined;
-  }
 }

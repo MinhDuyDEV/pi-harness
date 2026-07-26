@@ -1,18 +1,13 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import {
-  buildCompactionCompletedEvent,
-  DCP_TELEMETRY_EVENT,
-} from "../dcp/telemetry.js";
 import register, {
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
   SUBAGENT_PROOF_EVENT,
   createObservation,
-  knowledgeSignalFromEvent,
   parseProof,
-  stableEventIdentity,
 } from "./index.js";
 
 interface Listener {
@@ -50,25 +45,74 @@ function install(bus: HarnessEventBus): void {
   } as unknown as ExtensionAPI);
 }
 
-const request = {
-  protocolVersion: 1,
+const TAGGED_DIGEST = `sha256:v1:${"a".repeat(64)}`;
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (!value || typeof value !== "object") return value;
+  const input = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.keys(input).sort().map((key) => [key, canonical(input[key])]),
+  );
+}
+
+function taggedDigest(value: unknown): string {
+  return `sha256:v1:${createHash("sha256")
+    .update(JSON.stringify(canonical(value)))
+    .digest("hex")}`;
+}
+
+const claimBody = {
+  version: 1 as const,
+  kind: "pattern" as const,
+  statement: "Run the verified migration procedure before deployment",
+  applicability: "Migration changes",
+  support: {
+    mode: "task-outcome" as const,
+    evidenceRefs: [{
+      kind: "evidence-receipt" as const,
+      ref: "receipt-1",
+      digest: TAGGED_DIGEST,
+    }],
+  },
+};
+const claim = { ...claimBody, claimId: taggedDigest(claimBody) };
+const requestBody = {
   taskId: "task-42",
   correlationId: "task-42",
+  projectId: "project-1",
+  trustEpoch: "trust-1",
+  sessionGeneration: "session-1",
   agentType: "general",
   description: "Use the verified migration procedure",
-} as const;
+  learningClaims: [claim],
+};
+const request = {
+  protocolVersion: 1 as const,
+  ...requestBody,
+  requestDigest: taggedDigest(requestBody),
+};
 
 const proof = {
   protocolVersion: 1,
   taskId: "task-42",
   correlationId: "task-42",
+  requestDigest: request.requestDigest,
+  projectId: request.projectId,
+  trustEpoch: request.trustEpoch,
+  sessionGeneration: request.sessionGeneration,
   verificationPassed: true,
   verificationIssues: [],
   evidenceDigests: ["a".repeat(64)],
+  supportedClaims: [{
+    claimId: claim.claimId,
+    supported: true,
+    evidenceDigests: [TAGGED_DIGEST],
+  }],
   timestamp: "2026-01-02T03:04:05.000Z",
 } as const;
 
-test("correlates a context request with proof and emits the v1 learning schema", async () => {
+test("emits a supported explicit claim instead of the task description", async () => {
   const bus = new HarnessEventBus();
   let contextListenerRan = false;
   bus.on(SUBAGENT_CONTEXT_REQUEST_EVENT, async (payload) => {
@@ -90,20 +134,60 @@ test("correlates a context request with proof and emits the v1 learning schema",
   assert.equal(observation.digest, undefined);
   assert.match(observation.idempotencyKey as string, /^[a-f0-9]{64}$/);
   assert.equal(observation.timestamp, Date.parse(proof.timestamp));
+  assert.equal(observation.content, claim.statement);
+  assert.notEqual(observation.content, request.description);
+});
+
+test("does not learn a task description without an explicit claim", async () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+  const requestWithoutClaim = {
+    protocolVersion: 1,
+    taskId: "task-without-claim",
+    correlationId: "correlation-without-claim",
+    agentType: "general",
+    description: "Delete generated files",
+    requestDigest: `sha256:v1:${"d".repeat(64)}`,
+    learningClaims: [],
+  };
+  const proofWithoutClaim = {
+    ...proof,
+    taskId: "task-without-claim",
+    correlationId: "correlation-without-claim",
+    requestDigest: requestWithoutClaim.requestDigest,
+    supportedClaims: [],
+  };
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, requestWithoutClaim);
+  await bus.emit(SUBAGENT_PROOF_EVENT, proofWithoutClaim);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  assert.equal(bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT).length, 0);
 });
 
 test("correlates context and proof by stable correlationId when task IDs differ", async () => {
   const bus = new HarnessEventBus();
   install(bus);
-  const correlatedRequest = {
-    ...request,
+  const correlatedRequestBody = {
     taskId: "invocation-42",
     correlationId: "correlation-42",
+    projectId: request.projectId,
+    trustEpoch: request.trustEpoch,
+    sessionGeneration: request.sessionGeneration,
+    agentType: request.agentType,
+    description: request.description,
+    learningClaims: request.learningClaims,
+  };
+  const correlatedRequest = {
+    protocolVersion: 1 as const,
+    ...correlatedRequestBody,
+    requestDigest: taggedDigest(correlatedRequestBody),
   };
   const correlatedProof = {
     ...proof,
     taskId: "canonical-task-42",
     correlationId: "correlation-42",
+    requestDigest: correlatedRequest.requestDigest,
   };
 
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, correlatedRequest);
@@ -128,10 +212,7 @@ test("normalizes pi-learning context responses to the subagent v1 schema", async
       }],
     };
   });
-  const payload: Record<string, unknown> = {
-    ...request,
-    correlationId: "correlation-42",
-  };
+  const payload: Record<string, unknown> = { ...request };
 
   await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, payload);
 
@@ -159,38 +240,16 @@ test("uses at-least-once emission instead of a delivered-before-ack dedupe", asy
   assert.equal(bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT).length, 2);
 });
 
-test("does not register knowledge relays without a pi-learning consumer", () => {
-  const bus = new HarnessEventBus();
-  install(bus);
-  assert.deepEqual([...bus.listeners.keys()].sort(), [SUBAGENT_CONTEXT_REQUEST_EVENT, SUBAGENT_PROOF_EVENT].sort());
-  assert.equal(DCP_TELEMETRY_EVENT, "dcp:telemetry");
-});
-
-test("uses the real numeric DCP timestamp and bounded stable identity", () => {
-  const event = buildCompactionCompletedEvent({
-    blockCount: 3,
-    artifactCount: 2,
-    deterministic: true,
-    reason: "threshold",
-    willRetry: false,
-  });
-  assert.equal(typeof event.timestamp, "number");
-  const first = stableEventIdentity("dcp", event);
-  const second = stableEventIdentity("dcp", { ...event });
-  assert.match(first ?? "", /^[a-f0-9]{64}$/);
-  assert.equal(first, second);
-  assert.equal(knowledgeSignalFromEvent("dcp-compaction", "dcp", event)?.idempotencyKey, first);
-});
-
-test("rejects malformed proof data and redacts secrets before emission", () => {
+test("rejects malformed proof data and unsafe explicit claims", () => {
   assert.equal(parseProof({ ...proof, timestamp: 1700000000000 }), undefined);
   assert.equal(parseProof({ ...proof, evidenceDigests: ["not-a-digest"] }), undefined);
-  const observation = createObservation(
-    { ...request, description: "password=super-secret" },
+  const unsafeClaim = {
+    ...claim,
+    statement: `Use token ghp_${"A".repeat(36)} during migration`,
+  };
+  assert.equal(createObservation(
+    { ...request, learningClaims: [unsafeClaim] },
     proof,
     "/tmp/project",
-  );
-  assert.ok(observation);
-  assert.equal(observation.content.includes("super-secret"), false);
-  assert.equal(observation.content.includes("[REDACTED]"), true);
+  ), undefined);
 });

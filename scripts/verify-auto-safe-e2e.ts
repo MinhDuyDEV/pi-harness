@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -72,7 +73,7 @@ async function installConsumer(root: string): Promise<Consumer> {
     "typebox@1.1.38",
     process.env.PI_LEARNING_SPEC ?? "@minhduydev/pi-learning@0.1.2",
     process.env.PI_SUBAGENTS_SPEC ?? "@minhduydev/pi-subagents@0.6.1",
-    process.env.PI_TODO_SPEC ?? "github:MinhDuyDEV/pi-todo#b7dbf9c1650394df6a6388d803fd5109294ed5d3",
+    process.env.PI_TODO_SPEC ?? "@minhduydev/pi-todo@0.1.5",
     join(root, packedName),
   ];
   execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--save-exact", ...packages], {
@@ -129,21 +130,72 @@ async function createRuntime(consumer: Consumer, root: string, trusted: boolean)
   return { root, events, dispatch };
 }
 
-function request(id: string, description: string): Record<string, unknown> {
-  return {
-    protocolVersion: 1,
-    taskId: `invocation-${id}`,
-    correlationId: `correlation-${id}`,
-    agentType: "reviewer",
-    description,
-  };
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (!value || typeof value !== "object") return value;
+  const input = value as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.keys(input).sort().map((key) => [key, canonical(input[key])]),
+  );
 }
 
-function proof(id: string, passed = true, evidenceDigests: string[] = [DIGEST]): Record<string, unknown> {
+function taggedDigest(value: unknown): string {
+  return `sha256:v1:${createHash("sha256")
+    .update(JSON.stringify(canonical(value)))
+    .digest("hex")}`;
+}
+
+function request(id: string, description: string): Record<string, unknown> {
+  const evidenceDigest = `sha256:v1:${DIGEST}`;
+  const claimBody = {
+    version: 1 as const,
+    kind: "pattern" as const,
+    statement: description,
+    applicability: "verified task execution",
+    support: {
+      mode: "task-outcome" as const,
+      evidenceRefs: [{ kind: "evidence-receipt" as const, ref: "e2e-receipt", digest: evidenceDigest }],
+    },
+  };
+  const learningClaims = [{ ...claimBody, claimId: taggedDigest(claimBody) }];
+  const requestBody = {
+    taskId: `invocation-${id}`,
+    correlationId: `correlation-${id}`,
+    projectId: "e2e-project",
+    trustEpoch: "e2e-trust-epoch",
+    sessionGeneration: "e2e-session-generation",
+    agentType: "reviewer",
+    description,
+    learningClaims,
+  };
+  return { protocolVersion: 1, ...requestBody, requestDigest: taggedDigest(requestBody) };
+}
+
+function proof(
+  id: string,
+  description: string,
+  passed = true,
+  evidenceDigests: string[] = [DIGEST],
+): Record<string, unknown> {
+  const contextRequest = request(id, description) as {
+    requestDigest: string;
+    learningClaims: Array<{ claimId: string }>;
+  };
   return {
     protocolVersion: 1,
     taskId: `canonical-${id}`,
     correlationId: `correlation-${id}`,
+    requestDigest: contextRequest.requestDigest,
+    projectId: "e2e-project",
+    trustEpoch: "e2e-trust-epoch",
+    sessionGeneration: "e2e-session-generation",
+    supportedClaims: [{
+      claimId: contextRequest.learningClaims[0]!.claimId,
+      supported: passed,
+      evidenceDigests: passed && evidenceDigests.every((item) => /^[a-f0-9]{64}$/.test(item))
+        ? evidenceDigests.map((item) => `sha256:v1:${item}`)
+        : [],
+    }],
     verificationPassed: passed,
     verificationIssues: passed ? [] : ["focused check failed"],
     evidenceDigests,
@@ -158,7 +210,12 @@ async function emitProof(runtime: Runtime, id: string, description: string, opti
   await runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, request(id, description));
   await runtime.events.emit(
     SUBAGENT_PROOF_EVENT,
-    proof(id, options?.passed ?? true, options?.evidenceDigests ?? [DIGEST]),
+    proof(
+      id,
+      description,
+      options?.passed ?? true,
+      options?.evidenceDigests ?? [DIGEST],
+    ),
   );
 }
 

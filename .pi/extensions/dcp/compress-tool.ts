@@ -11,6 +11,7 @@
  * on every request after session_start — including resume.
  */
 
+import { createHash } from "node:crypto";
 import { Type } from "typebox";
 import type {
   ExtensionAPI,
@@ -25,7 +26,9 @@ import type {
       getDcpSessionId,
       getQualityMetrics,
       getStats,
+      getState,
       makeDcpStateEntryPayload,
+      persistState,
     } from "./compress-state.js";
     import { computeProtectionPolicy } from "./protection.js";
     import { getSessionBranchMessages } from "./branch-messages.js";
@@ -41,6 +44,12 @@ import {
 } from "./compress-metrics.js";
 import { renderCompressResult } from "./compress-render.js";
 import { DCP_STATE_ENTRY_TYPE } from "./compress-types.js";
+import {
+  appendDcpCheckpointReference,
+  appendDcpUsageReference,
+  emptyDcpKnowledgeReferences,
+  type DcpUsageReference,
+} from "./knowledge-port.js";
 import type { QualityMetricsData, StructuredSummaryFields } from "./compress-types.js";
 
 type CompressToolDetails =
@@ -89,12 +98,19 @@ const compressParams = Type.Object({
       description: "Comma-separated remaining tasks / next steps",
     }),
   ),
+  usage_ids: Type.Optional(
+    Type.Array(Type.String(), {
+      maxItems: 16,
+      description: "Exact pi-learning usage receipt IDs for learnings this checkpoint actually uses",
+    }),
+  ),
 });
 
 export function registerCompressTool(
   pi: ExtensionAPI,
   config: DCPConfig,
   nudge?: (msg: string) => void,
+  resolveUsageIds?: (ids: readonly string[]) => DcpUsageReference[],
 ): void {
   pi.registerTool<typeof compressParams, CompressToolDetails>({
     name: "compress",
@@ -111,6 +127,7 @@ export function registerCompressTool(
         files_modified?: string;
         decisions?: string;
         next_steps?: string;
+        usage_ids?: string[];
       },
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
@@ -166,6 +183,27 @@ export function registerCompressTool(
             },
             provenance,
           );
+
+      const usage = resolveUsageIds?.(params.usage_ids ?? []) ?? [];
+      if (usage.length > 0) {
+        const state = getState(sessionId);
+        let references = state.knowledgeReferences ?? emptyDcpKnowledgeReferences();
+        for (const receipt of usage) {
+          references = appendDcpUsageReference(references, receipt);
+        }
+        const subjectDigest = `sha256:v1:${createHash("sha256")
+          .update(block.summary)
+          .digest("hex")}`;
+        references = appendDcpCheckpointReference(references, {
+          checkpointId: `checkpoint:${block.blockId}`,
+          blockId: String(block.blockId),
+          subjectDigest,
+          occurredAt: new Date(block.createdAt).toISOString(),
+          usageIds: usage.map((receipt) => receipt.usageId),
+        });
+        state.knowledgeReferences = references;
+        persistState(sessionId);
+      }
 
       mergeIntoPersistentSummary(sessionId, fields, "manual", block.blockId);
       recordCompressEvent(sessionId, block.blockId, fields);

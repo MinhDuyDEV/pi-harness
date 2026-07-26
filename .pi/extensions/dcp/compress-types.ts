@@ -1,3 +1,5 @@
+import type { DcpKnowledgeReferences } from "./knowledge-port.js";
+
 import type { DurableSessionState } from "./storage.js";
 
 export const DCP_STATE_ENTRY_TYPE = "dcp_state";
@@ -248,4 +250,6 @@ export interface SessionState {
   reReadSeenKeys: Set<string>;
   /** V3: Quarantined blocks that failed provenance validation */
   quarantinedBlocks: QuarantinedBlock[];
+  /** Non-content learning, usage, and checkpoint references. */
+  knowledgeReferences: DcpKnowledgeReferences;
 }

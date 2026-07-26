@@ -22,6 +22,10 @@ import {
 import type { Message } from "@earendil-works/pi-ai";
 import { DEFAULT_CONFIG, type DCPConfig } from "./config.js";
 import {
+  parseDcpUsageReference,
+  type DcpUsageReference,
+} from "./knowledge-port.js";
+import {
   cleanupSession,
   getBlocks,
   getDcpSessionId,
@@ -68,7 +72,27 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   if (!config.enabled) return;
 
   const nudge = new NudgeManager(config);
+  const usageReceipts = new Map<string, DcpUsageReference>();
   let initialized = false;
+
+  if (pi.events) {
+    pi.events.on("pi-learning:v1:usage-receipts-issued", (payload: unknown) => {
+      if (!payload || typeof payload !== "object") return;
+      const receipts = (payload as { receipts?: unknown }).receipts;
+      if (!Array.isArray(receipts)) return;
+      for (const value of receipts) {
+        const receipt = parseDcpUsageReference(value);
+        if (receipt) usageReceipts.set(receipt.usageId, receipt);
+      }
+    });
+  }
+
+  const resolveUsageIds = (ids: readonly string[]): DcpUsageReference[] =>
+    ids.map((id) => {
+      const receipt = usageReceipts.get(id);
+      if (!receipt) throw new Error(`Unknown or expired usage receipt: ${id}`);
+      return receipt;
+    });
 
   /** Emit JSON-safe telemetry for extension and RPC consumers. */
   function emitTelemetry(evt: DCPTelemetryEvent): void {
@@ -100,7 +124,7 @@ export default function dcpExtension(pi: ExtensionAPI): void {
     }
     if (initialized) return;
 
-    registerCompressTool(pi, config);
+    registerCompressTool(pi, config, undefined, resolveUsageIds);
     if (config.recall.enabled) registerRecallTool(pi);
 
     // Register commands

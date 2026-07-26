@@ -47,6 +47,8 @@ The control tool is **`task_control`** (renamed from `herdr` in 0.5+): `status`,
 
 Execution, verification, and review are independent states; a completed child is not verified success. Handoff evidence is context-only and **cannot** pass a proof gate. For `evidence-only` proof, use `task_control record_evidence` (binds producer identity, observation time, artifact digest, claim) or rely on the canonical Pi session (auto-bound by the completion hook). Reviews need a real, completed `reviewer_task_id` distinct from the producer and matching `reviewer_agent` when configured. Never invent an orchestration identity, evidence path, test result, or reviewer task ID; use `task_control worktree_merge` only after `ship` passes, and `worktree_remove` to explicitly discard retained changes.
 
+Task outcomes may contribute learning only through explicit `orchestration.context.learning_claims` that name bounded evidence refs. Task descriptions, free-form context claims, review prose, TODO text, and DCP summaries are never learning candidates by themselves. Do not invent claim IDs, evidence digests, usage receipts, or lower-trust outcome bindings; omit the learning claim when the producer cannot supply the canonical contract.
+
 ### Discipline defaults for this harness
 
 For `task` calls that WRITE files or touch sensitive scope, pass `orchestration` with exclusive project-relative `claims`, `lease_ttl_ms`, `proof = { mode: "evidence-only" }`, and `context` (goal, known_facts, decisions, references) so the subagent starts with provenance, not a blank slate. Keep the opt-in intentional — orchestration is off by default to preserve the additive, non-clobbering contract; turn it on where evidence and single-ownership matter.
