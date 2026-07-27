@@ -4,6 +4,8 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { HARD_WORD_CAP } from "./lib/skill-budget.mjs";
+
 const root = ".pi/skills";
 const errors = [];
 const skills = [];
@@ -31,8 +33,34 @@ function parseFrontmatter(path) {
   return { text, body: text.slice(end + 4), values };
 }
 
+/** Recursively list every file under `dir`, skipping node_modules and .DS_Store. Returns paths relative to `dir`, sorted. */
+function listSkillFiles(dir, prefix = "") {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name === "node_modules" || entry.name === ".DS_Store") continue;
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) files.push(...listSkillFiles(join(dir, entry.name), rel));
+    else if (entry.isFile()) files.push(rel);
+    else if (entry.isSymbolicLink()) {
+      // Hash symlinks by target file content when resolvable; skip broken links.
+      try {
+        statSync(join(dir, entry.name));
+        files.push(rel);
+      } catch {
+        // Broken symlink: nothing to hash.
+      }
+    }
+  }
+  return files;
+}
+
+function sha256(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
 for (const directory of readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
-  const path = join(root, directory.name, "SKILL.md");
+  const skillDir = join(root, directory.name);
+  const path = join(skillDir, "SKILL.md");
   try {
     statSync(path);
   } catch {
@@ -45,8 +73,12 @@ for (const directory of readdirSync(root, { withFileTypes: true }).filter((entry
   if (!name) errors.push(`${path}: missing name`);
   if (!description.trim()) errors.push(`${path}: missing description`);
   if (name && name !== directory.name) errors.push(`${path}: name ${name} does not match directory ${directory.name}`);
-  if (parsed.body.trim().split(/\s+/).filter(Boolean).length > 700) errors.push(`${path}: body exceeds 700 words; compress or split the skill`);
-  skills.push({ name: directory.name, path, hash: createHash("sha256").update(readFileSync(path)).digest("hex") });
+  if (parsed.body.trim().split(/\s+/).filter(Boolean).length > HARD_WORD_CAP) {
+    errors.push(`${path}: body exceeds ${HARD_WORD_CAP} words; compress or split the skill`);
+  }
+  const files = {};
+  for (const rel of listSkillFiles(skillDir)) files[rel] = sha256(join(skillDir, rel));
+  skills.push({ name: directory.name, path, files });
 }
 
 const names = new Set();
@@ -57,12 +89,13 @@ for (const skill of skills) {
 
 if (process.argv.includes("--update")) {
   let existing = {};
-  let version = 1;
+  let version = 2;
   try {
     const prev = JSON.parse(readFileSync("skills-lock.json", "utf8"));
     existing = prev.skills ?? {};
-    version = prev.version ?? version;
-  } catch {}
+  } catch {
+    // No previous lock (or unparseable): regenerate from scratch.
+  }
   const next = {};
   for (const skill of skills) {
     const prev = existing[skill.name] ?? {};
@@ -71,11 +104,12 @@ if (process.argv.includes("--update")) {
       sourceType: prev.sourceType ?? "local",
       skillPath: skill.path,
       trust: prev.trust ?? "local",
-      computedHash: skill.hash,
+      files: skill.files,
     };
   }
   writeFileSync("skills-lock.json", JSON.stringify({ version, skills: next }, null, 2) + "\n");
-  console.log(`✓ regenerated skills-lock.json (${skills.length} skills)`);
+  const fileCount = skills.reduce((total, skill) => total + Object.keys(skill.files).length, 0);
+  console.log(`✓ regenerated skills-lock.json (${skills.length} skills, ${fileCount} files)`);
   if (errors.length > 0) {
     console.error(errors.map((error) => `✗ ${error}`).join("\n"));
     process.exit(1);
@@ -86,13 +120,35 @@ if (process.argv.includes("--update")) {
 try {
   const lock = JSON.parse(readFileSync("skills-lock.json", "utf8"));
   const locked = lock.skills ?? {};
-  if (Object.keys(locked).length !== skills.length) {
-    errors.push(`skills-lock.json contains ${Object.keys(locked).length} entries; expected ${skills.length}`);
-  }
-  for (const skill of skills) {
-    const entry = locked[skill.name];
-    if (!entry) errors.push(`skills-lock.json missing ${skill.name}`);
-    else if (entry.computedHash !== skill.hash) errors.push(`skills-lock.json hash mismatch for ${skill.name}`);
+  const legacy = Object.values(locked).some((entry) => entry && typeof entry === "object" && !entry.files);
+  if (legacy) {
+    errors.push(
+      "skills-lock.json uses the legacy per-skill computedHash format; the lock now records a per-file manifest ({ files: { relPath: sha256 } }). Run `npm run regen:skills` to migrate.",
+    );
+  } else {
+    if (Object.keys(locked).length !== skills.length) {
+      errors.push(`skills-lock.json contains ${Object.keys(locked).length} entries; expected ${skills.length}`);
+    }
+    for (const skill of skills) {
+      const entry = locked[skill.name];
+      if (!entry) {
+        errors.push(`skills-lock.json missing ${skill.name}`);
+        continue;
+      }
+      const lockedFiles = entry.files ?? {};
+      for (const [rel, hash] of Object.entries(skill.files)) {
+        if (!(rel in lockedFiles)) errors.push(`skills-lock.json: ${skill.name}/${rel} is on disk but not in the lock (run npm run regen:skills)`);
+        else if (lockedFiles[rel] !== hash) errors.push(`skills-lock.json: hash mismatch for ${skill.name}/${rel}`);
+      }
+      for (const rel of Object.keys(lockedFiles)) {
+        if (!(rel in skill.files)) errors.push(`skills-lock.json: ${skill.name}/${rel} is in the lock but missing on disk`);
+      }
+    }
+    for (const name of Object.keys(locked)) {
+      if (!skills.some((skill) => skill.name === name)) {
+        errors.push(`skills-lock.json: ${name} is in the lock but has no skill directory`);
+      }
+    }
   }
 } catch (error) {
   errors.push(`skills-lock.json: ${error.message}`);
@@ -103,4 +159,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(`✓ validated ${skills.length} skills and matching hashes`);
+const fileCount = skills.reduce((total, skill) => total + Object.keys(skill.files).length, 0);
+console.log(`✓ validated ${skills.length} skills (${fileCount} files) against skills-lock.json`);

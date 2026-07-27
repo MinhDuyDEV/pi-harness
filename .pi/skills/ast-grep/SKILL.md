@@ -1,8 +1,6 @@
 ---
 name: ast-grep
-description: Use when searching for code patterns structurally, finding anti-patterns, enforcing conventions, or checking
-  for specific AST patterns across the codebase — ast-grep is an AST-aware structural code search tool (like grep for syntax
-  trees). Supports TS/JS, Rust, Go, Python, Java, and more.
+description: Structural code search and rewrite with ast-grep — AST-aware patterns instead of text. Use when finding all calls to X, hunting anti-patterns, enforcing conventions via rules, or running codemods.
 metadata:
   version: 1.0.0
 ---
@@ -76,14 +74,6 @@ fix: $$$ARGS  # optional rewrite
 5. **Re-run tests.** Some rewrites break things.
 6. **Commit the rewrite** as a single commit.
 
-## Common Mistakes
-
-Using `rg` for code patterns (misses structural matches); forgetting language flag; pattern with too-specific whitespace (use metavariables); running rewrite without dry-run first; "match-all" pattern matches the test fixtures; codemod that breaks a deliberate exception; no verification after rewrite; "I trust the rewrite" without re-running tests; pattern that matches the import + the call (use kinds or fields to disambiguate).
-
 ## Red Flags
 
-Using `rg` for "all calls to X" (use ast-grep); pattern with literal variable names; no `$$$` for variadic; no `language: TypeScript` (or the right one); no dry-run before rewrite; rewrite without test re-run; "I checked the diff visually" (run the tests); rule file in wrong dir (project root); pattern matches test fixtures but prod is fine.
-
-## Anti-Patterns
-
-**`rg` for code patterns** (use ast-grep); **literal variable names in pattern** (use `$X`); **no `$$$` for variadic**; **no dry-run**; **rewrite without test re-run**; **"checked the diff"** (run tests); **pattern matches test fixtures** (scope it).
+Using `rg` for "all calls to X" (misses structural matches — use ast-grep); pattern with literal variable names (use `$X`); no `$$$` for variadic args; missing language flag (`-l ts` or `language:` in the rule); pattern with too-specific whitespace (use metavariables); pattern matching both the import and the call (use kinds or fields to disambiguate); no dry-run before rewrite; codemod that breaks a deliberate exception; pattern matching test fixtures (scope it); "I checked the diff visually" / "I trust the rewrite" (re-run the tests).

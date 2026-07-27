@@ -1,8 +1,9 @@
 ---
 name: redesign-existing-projects
-description: Use when upgrading an existing website or app's visual design to premium quality. Audits current design, identifies
-  generic AI patterns, applies high-end standards without breaking functionality. MUST load before any design overhaul of
-  existing projects.
+description: >-
+  Audits an existing site or app's visual design and upgrades it to premium quality without changing behavior —
+  names specific AI tells, then rebuilds typography, color, spacing, and components token-first. User-invoked: load
+  via /skill:redesign-existing-projects when asked to redesign, restyle, or "make it look premium".
 metadata:
   version: 1.0.0
   tags:
@@ -77,14 +78,6 @@ Don't redesign the whole site at once. That's a rewrite, not a redesign.
 - Database / API contracts
 - Working components that just look "fine" (focus on tells first)
 
-## Common Mistakes
-
-Redesigning without auditing; changing IA; new copy without asking; redesigning all at once; missing a11y; not testing with real data; "premium" = "more visual"; removing features; only testing happy path.
-
 ## Red Flags
 
-No screenshot audit; "more premium" without definition; changing IA in visual redesign; invented copy; missing focus states; no real-data test; "added gradients to make it pop"; no tokens; mobile not considered.
-
-## Anti-Patterns
-
-**"Looked generic"** (no audit); **"Make it pop"** (adds noise); **"Changed copy too"** (out of scope); **"Ship the whole redesign"** (component-by-component); **"Mobile later"** (mobile-first); **"Dark mode = invert"**.
+Redesigning without a screenshot audit ("it looked generic" is not an audit); "more premium" with no definition ("make it pop" adds noise); changing IA or user flows during a visual redesign; invented copy without asking; shipping the whole redesign at once instead of component-by-component; no design tokens; missing focus states and other a11y regressions; testing only the happy path with sample data; "mobile later" (design mobile-first); dark mode as naive inversion.

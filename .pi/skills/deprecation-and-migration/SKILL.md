@@ -1,7 +1,6 @@
 ---
 name: deprecation-and-migration
-description: Use when deprecating APIs, migrating between library versions, removing legacy code, or planning breaking changes
-  — covers deprecation notices, migration guides, codemods, and staged rollout
+description: Removes or replaces APIs without breaking users — deprecation lifecycle, migration paths, codemods, staged rollout. Use when deprecating an API, planning a breaking change, or migrating major versions.
 metadata:
   version: 1.0.0
   tags:
@@ -25,88 +24,26 @@ metadata:
 ## Deprecation Lifecycle
 
 ```
-[1] Add @deprecated notice + runtime warning
-[2] Document migration path (with codemod if possible)
+[1] Add @deprecated JSDoc (since-version, replacement, removal version,
+    migration link) + a rate-limited runtime warning
+[2] Document the migration path: TL;DR, step-by-step, codemod
 [3] Wait at least one minor version (or 3 months, whichever longer)
 [4] Remove in next major version
 [5] Changelog: "Removed X. Use Y. Migration: <link>"
 ```
 
-Skipping steps breaks trust. Users need time. The cadence is conservative on purpose.
+Skipping steps breaks trust. The cadence is conservative on purpose.
 
-## Deprecation Notice Template
+The migration guide serves three audiences: the TL;DR is for the impatient, the step-by-step is for the careful, the codemod is for the many.
 
-```ts
-/**
- * @deprecated since 2.3.0. Use `newApi()` instead.
- * Will be removed in 3.0.0.
- * Migration: https://docs.example.com/migration/2.3
- */
-function oldApi() { ... }
-```
+## The Codemod Test
 
-In code: `@deprecated` JSDoc + runtime `console.warn` (rate-limited). In docs: a migration guide. In changelog: the same notice.
-
-## Migration Guide Anatomy
-
-```markdown
-# Migrating from X to Y
-
-## Why
-[What changed and why.]
-
-## TL;DR
-[Smallest possible change.]
-
-## Step-by-step
-1. [First change. With code example.]
-2. [...]
-
-## Codemod
-[Link to or inline a script that does the migration.]
-
-## FAQ
-[Common questions from the team or community.]
-```
-
-The TL;DR is for the impatient. The step-by-step is for the careful. The codemod is for the many.
-
-## Codemod
-
-A codemod script that automates the migration. Lives in `scripts/codemod/`. Tested on real code (not just samples).
-
-```ts
-// jscodeshift example
-module.exports = (file, api) => {
-  const j = api.jscodeshift
-  return j(file.source)
-    .find(j.CallExpression, { callee: { name: "oldApi" } })
-    .replaceWith(({ node }) => j.callExpression(j.identifier("newApi"), node.arguments))
-    .toSource()
-}
-```
-
-If you can't write a codemod, the migration is too complex for a deprecation. Reconsider.
+Ship a codemod (`scripts/codemod/`, jscodeshift or ast-grep) tested on real code, not just samples. **If you can't write a codemod, the migration is too complex for a deprecation.** Reconsider the design.
 
 ## Staged Rollout
 
-For breaking changes in libraries: feature flag the new behavior, default to old, opt-in for early adopters, default to new in next major.
-
-```ts
-function process(input) {
-  if (featureFlags.newBehavior) return newProcess(input)
-  return oldProcess(input) // deprecated path
-}
-```
-
-## Common Mistakes
-
-Removing without deprecation period; "deprecated" without a migration guide; bundling multiple breaks into one major; no runtime warning; no changelog entry; codemod that doesn't run on real code; guide that's only the TL;DR; deprecating without telling users; @deprecated JSDoc forever; "we removed it, use the new one" (no link).
+For breaking behavior changes in libraries: feature-flag the new behavior, default to old, opt-in for early adopters, flip the default in the next major.
 
 ## Red Flags
 
-Removal without notice; `@deprecated` without runtime warning; no migration guide; codemod not tested; deprecation period < 1 minor version; "deprecated" not in changelog; multiple breaks in one major; asking users to read source for migration; no opt-in for early adopters; "we'll keep both forever" (that's a feature, not a migration).
-
-## Anti-Patterns
-
-**Remove without deprecating**; **deprecate without migration path**; **silent deprecation**; **codemod that breaks real code**; **bundled breaking changes**; **no changelog entry**; **"forever deprecated"** (commit to the timeline).
+Removal without a deprecation period; `@deprecated` without a runtime warning or changelog entry; "deprecated" without a migration guide; guide that is only the TL;DR; codemod untested on real code; deprecation period shorter than one minor version; multiple breaks bundled into one major; asking users to read source to migrate; no opt-in for early adopters; `@deprecated` forever with no removal date (that's a feature, not a migration); "we removed it, use the new one" with no link.

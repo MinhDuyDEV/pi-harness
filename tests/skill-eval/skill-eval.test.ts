@@ -64,11 +64,20 @@ for (const [name, s] of Object.entries(SCENARIOS)) {
   });
 }
 
-test("harness has at least one verification skill scenario and one TDD scenario", () => {
+test("harness covers the core skills (vfc, tdd, debug, review, ctx)", () => {
   const names = Object.keys(SCENARIOS);
   // Naming convention: <skill-or-abbrev>-<pressure>
-  const hasVFC = names.some((n) => n.startsWith("vfc-"));
-  const hasTDD = names.some((n) => n.startsWith("tdd-"));
-  assert.ok(hasVFC, `Expected a verification-before-completion scenario; have: ${names.join(", ")}`);
-  assert.ok(hasTDD, `Expected a test-driven-development scenario; have: ${names.join(", ")}`);
+  const expected: Array<[string, string]> = [
+    ["vfc-", "verification-before-completion"],
+    ["tdd-", "test-driven-development"],
+    ["debug-", "debugging-and-error-recovery"],
+    ["review-", "code-review-and-quality"],
+    ["ctx-", "context-engineering"],
+  ];
+  for (const [prefix, skill] of expected) {
+    assert.ok(
+      names.some((n) => n.startsWith(prefix)),
+      `Expected a ${skill} scenario (prefix "${prefix}"); have: ${names.join(", ")}`,
+    );
+  }
 });

@@ -20,7 +20,7 @@ Read `.pi/artifacts/{TODO,PROGRESS,DECISIONS}.md` and `.pi/MEMORY.md` for curren
 
 ## 3. Write the handoff
 
-Append to `.pi/artifacts/HANDOFF.md` (create if absent) a section:
+Append to `.pi/artifacts/HANDOFF.md` (create if absent) a 12-field context pack. Empty fields stay in with "none" — an absent field is indistinguishable from a forgotten one.
 
 ```
 ## <title> — <date> — handoff to <receiver>
@@ -28,17 +28,38 @@ Append to `.pi/artifacts/HANDOFF.md` (create if absent) a section:
 ### Goal
 <what the receiver is supposed to accomplish>
 
-### State
-<done so far, with evidence — cite file:line or commands run>
+### Current state
+<where the work stands right now — what exists, what is in flight>
 
-### Decisions
-<decisions that stand, each with rationale; mark open decisions separately>
+### Verified
+<claims already proven, each with evidence — command output or file:line; no self-report>
 
-### Open decisions / unknowns
-<what is undecided and what information would resolve it>
+### Unknowns
+<what is unclear or unverified, and what information would resolve it>
 
-### Non-goals
-<what the receiver must NOT touch>
+### Real constraints
+<hard constraints (verified against code/requirements) — separate from mere preferences, labeled as such>
+
+### Relevant files / modules
+<the files and modules the receiver will touch or must read first>
+
+### Closed decisions
+<decisions that stand, each with rationale — do not reopen without new information>
+
+### Open decisions
+<what is undecided and who/what resolves it>
+
+### Existing evidence
+<test runs, logs, repro commands, benchmarks already produced — where to find them>
+
+### Expected deliverable
+<the concrete artifact or outcome that means "done">
+
+### Permissions (write scope)
+<what the receiver may modify; everything else is read-only — includes non-goals / must-not-touch>
+
+### Anti-patterns to avoid
+<known failure modes for this work — see `.pi/ANTI_PATTERNS.md` for the shared list>
 
 ### Next step
 <the concrete first action>
@@ -49,9 +70,11 @@ Append to `.pi/artifacts/HANDOFF.md` (create if absent) a section:
 
 ## 4. Verify
 
-- Every "done" claim cites evidence (command output or file:line); no self-report.
+- Every claim under Verified cites evidence (command output or file:line); no self-report.
 - The receiver could start from "Next step" alone without re-reading the whole session.
-- Open decisions are separated from decided ones.
+- Open decisions are separated from closed ones; constraints are separated from preferences.
+- Write scope is explicit — the receiver knows what they must not touch.
+- All 12 fields are present (use "none" rather than omitting).
 
 ## 5. Report
 

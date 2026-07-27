@@ -44,6 +44,8 @@ Run the project's gates: `npm run typecheck`, `npm run lint`, `npm test`. If any
 
 ## 6. Self-Review
 
+This is a pre-filter, not the review: it catches the obvious before handing off, and does not replace an independent reviewer or proof audit (`/verify <title> --review` / `--audit`).
+
 After gates pass, review the diff:
 - Critical: bug, security issue, broken build
 - Important: missing test, missing error handling, unclear code

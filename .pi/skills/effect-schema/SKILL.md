@@ -1,9 +1,10 @@
 ---
 name: effect-schema
-description: Use when defining data validation schemas, domain types, branded primitives, or typed errors with Effect Schema
-  in a TypeScript project. Covers Schema.Struct vs Schema.Class, Schema.TaggedErrorClass for domain errors, branded types
-  for type-safe primitives, decodeUnknownEffect pipeline, filters, transformations, JSON Schema/OpenAPI generation, and Zod
-  replacement patterns. MUST load before writing any Schema definitions in an Effect-based codebase.
+description: >-
+  Effect Schema patterns for domain types — Schema.Struct vs Schema.Class, branded primitives,
+  Schema.TaggedError domain errors, boundary decoding with decodeUnknown, filters,
+  transformations, and JSON Schema generation. Use when defining validation schemas, typed
+  errors, or branded IDs in an Effect codebase, or when replacing Zod.
 metadata:
   version: 1.0.0
 disable-model-invocation: true
@@ -15,8 +16,8 @@ disable-model-invocation: true
 
 <EXTREMELY-IMPORTANT>
 - **Schema = single source of truth.** Generated types, validators, and JSON Schema all derive from one definition.
-- **`Schema.TaggedErrorClass` for domain errors.** Not `class X extends Error`. The tag enables exhaustive `match` switching.
-- **`decodeUnknownEffect` at the boundary.** Untrusted input → typed value. Never trust the type of `JSON.parse`.
+- **`Schema.TaggedError` for domain errors.** Not `class X extends Error`. The tag enables exhaustive `match` switching.
+- **`decodeUnknown` at the boundary.** Untrusted input → typed value. Never trust the type of `JSON.parse`.
 - **Branded primitives for IDs and units.** `UserId`, `Email`, `Meters` — prevent mixing at the type level.
 - **No `as` casts.** If you need a cast, the schema is incomplete. Fix the schema.
 </EXTREMELY-IMPORTANT>
@@ -85,12 +86,12 @@ The `_tag` field is added automatically. Handlers can `match` exhaustively.
 
 ```ts
 const parseRequest = (body: unknown) =>
-  Schema.decodeUnknownEffect(RequestBody)(body).pipe(
+  Schema.decodeUnknown(RequestBody)(body).pipe(
     Effect.mapError((e) => new ValidationError({ cause: e }))
   )
 ```
 
-`decodeUnknownEffect` returns an `Effect` (so it composes). `decodeUnknownSync` throws (use only at startup).
+`decodeUnknown` returns an `Effect` (so it composes). `decodeUnknownSync` throws (use only at startup).
 
 ## Filters & Transformations
 
@@ -113,14 +114,6 @@ import { JSONSchema } from "effect"
 const jsonSchema = JSONSchema.make(User)
 ```
 
-## Common Mistakes
-
-Using `Schema.Class` for DTOs (use `Struct`); `decodeUnknownSync` in request handlers (blocks, throws); `as User` casts (defeats the purpose); unbranded IDs (`string` everywhere); generic `Error` thrown (loses tag); schema for an internal struct (validation has cost); "trust the input" at API boundaries; duplicated types (schema + interface + zod); missing `_tag` on errors; schemas that don't match the wire format.
-
 ## Red Flags
 
-`any` or `as` near a `decode` call; `try/catch` around `decodeUnknownSync`; `Error` thrown from a service; `string` for what should be a branded ID; JSON Schema manually written; same shape defined in 3 places (schema, type, zod); `Schema.Unknown` in a service return; `decodeUnknown` (sync, throws) in a request handler; circular schema references; schemas that don't match the database.
-
-## Anti-Patterns
-
-**Zod alongside Effect Schema** (two systems); **`as` cast to "fix" parse error** (schema is the source of truth); **generic `Error` in a service** (use TaggedError); **`string` IDs** (brand them); **manual OpenAPI** (generate from schema); **schema without `decode` in tests** (round-trip every schema).
+`as` casts or `any` near a `decode` call (the schema is incomplete — fix the schema, don't cast); `decodeUnknownSync` or `try/catch` decoding inside a request handler (throws, blocks — use `decodeUnknown`); generic `Error` thrown from a service (use `Schema.TaggedError`; missing `_tag` kills exhaustive match); plain `string` where a branded ID belongs; `Schema.Class` for plain DTOs (use `Struct`); the same shape defined in schema + interface + Zod (one system, one definition); Zod alongside Effect Schema; hand-written JSON Schema or OpenAPI (generate from the schema); schemas that don't match the wire or database format; schemas for hot internal structs (validation has cost); `Schema.Unknown` in a service return; "trust the input" at an API boundary; schemas never round-tripped through `decode` in tests.

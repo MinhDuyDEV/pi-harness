@@ -1,7 +1,6 @@
 ---
 name: code-cleanup
-description: Use after behavior is working but the diff is noisy, repetitive, over-complicated, or obviously AI-shaped - lock
-  behavior first, then simplify the changed code and re-verify without expanding scope
+description: Locks working behavior, then simplifies the changed code and re-verifies without expanding scope. Use when tests pass but the diff is noisy or over-complicated, as the final pass before review.
 metadata:
   version: 1.0.0
   tags:
@@ -47,13 +46,9 @@ Behavior is broken or unverified; "cleanup" is cover for redesign; cleanup sprea
 - "Fixing" unrelated lint warnings in the same diff
 - Reformatting the whole file (no behavior change, but noise in diff)
 
-## Common Mistakes
-
-Cleanup before behavior is locked (can't prove nothing broke); expanding scope (renaming across the codebase); adding abstractions for "future reuse"; deleting without checking consumers; reformatting the whole file; "improving" code style in unrelated parts; "we'll add tests after" (the tests are how you prove nothing broke).
-
 ## Red Flags
 
-Cleanup before tests pass; "I just want to refactor this"; expanding into unrelated files; "while I'm here" fixes; tests deleted (not the cleanup target); reformatting the whole file; rename of public API; no baseline saved; re-verify skipped; "I'll write tests for the new structure later".
+Cleanup before tests pass (can't prove nothing broke); "I just want to refactor this"; expanding into unrelated files; "while I'm here" fixes; deleting without checking consumers; tests deleted (not the cleanup target); reformatting the whole file; rename of public API; no baseline saved; re-verify skipped; "we'll add tests after" / "I'll write tests for the new structure later" (the tests are how you prove nothing broke).
 
 ## Anti-rationalization
 

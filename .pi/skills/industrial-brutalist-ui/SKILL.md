@@ -1,8 +1,11 @@
 ---
 name: industrial-brutalist-ui
-description: Use INSTEAD OF design-taste-frontend when user requests brutalist, military-terminal, or raw mechanical aesthetics.
-  Swiss typographic print meets utilitarian color. For data-heavy dashboards or editorial sites needing declassified-blueprint
-  energy.
+description: >-
+  Brutalist/industrial UI overlay replacing design-taste-frontend defaults: monospace everything,
+  hard edges, hairline black borders, functional color only, exposed system chrome. User-invoked:
+  load via /skill:industrial-brutalist-ui when the user asks for brutalist, terminal,
+  declassified-blueprint, or raw mechanical aesthetics — data-heavy dashboards, dev/ops tools,
+  editorial gravitas.
 metadata:
   version: 1.0.0
   tags:
@@ -134,14 +137,6 @@ Brackets. Mono. Uppercase. Information only.
 
 Information is the design. Hide it and the design loses its character.
 
-## Common Mistakes
-
-Rounded corners; gradients; shadows; "playful" decoration; "premium" feel; warm colors; image backgrounds; sans-serif body; "make it approachable"; colorful status indicators; tailwind defaults without overriding.
-
 ## Red Flags
 
-`border-radius: 0.5rem`; `box-shadow: 0 4px 6px`; warm colors; sans for body; "approachable" copy; emoji; `gap: 16px` between rows (use 0); "premium" feel; "make it look modern".
-
-## Anti-Patterns
-
-**Rounded corners**; **gradients**; **shadows**; **warm colors**; **sans for body**; **emoji**; **"approachable"**; **smooth transitions**; **"premium"**; **"modern"**.
+Rounded corners (`border-radius: 0.5rem`); gradients; shadows (`box-shadow: 0 4px 6px`); warm colors; sans-serif body; image backgrounds; smooth transitions; emoji; colorful status indicators; `gap: 16px` between rows (use 0); "playful" / "premium" decoration; "make it approachable" / "make it look modern"; Tailwind defaults left unoverridden.

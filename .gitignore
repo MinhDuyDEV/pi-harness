@@ -39,6 +39,7 @@ pnpm-debug.log*
 .pi/extensions/**/node_modules/
 .pi/extensions/**/package-lock.json
 .pi/extensions/**/bun.lock
+.pi/skills/*/node_modules
 
 # Local extension/theme backups
 .pi/extensions/*.bak

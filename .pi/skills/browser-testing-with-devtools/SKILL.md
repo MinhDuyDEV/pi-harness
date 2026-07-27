@@ -1,7 +1,10 @@
 ---
 name: browser-testing-with-devtools
-description: 'Use when verifying or debugging browser behavior with live runtime evidence: DOM state, console errors, network
-  requests, screenshots, performance traces, or end-to-end user flows. Routes between Chrome DevTools and Playwright.'
+description: >-
+  Verifies and debugs browser behavior with live runtime evidence — DOM state, console errors,
+  network requests, screenshots, performance traces — and routes between the chrome-devtools and
+  playwright skills. User-invoked: load via /skill:browser-testing-with-devtools when a UI change
+  needs runtime proof or a browser-only bug needs reproduction.
 metadata:
   version: 1.0.0
   tags:

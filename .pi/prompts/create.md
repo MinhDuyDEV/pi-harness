@@ -44,11 +44,20 @@ The spec is a focused document. Keep it tight; cut anything that doesn't change 
 <stack, compatibility, time, scope limits>
 ```
 
-## 4. Confirm (skip with `--quick`)
+## 4. Foundation Gate
+
+Before finalizing the spec, answer each in one line:
+
+- Is the current foundation sound for this change, or does it need work first?
+- Is each constraint real (verified) or an inherited habit carried over from old specs?
+- Does this feature compensate for a foundation flaw? That is a balloon (see `.pi/ANTI_PATTERNS.md`) — spec the foundation fix instead.
+- Should foundation work come first as its own work session? If yes, say so in the spec.
+
+## 5. Confirm (skip with `--quick`)
 
 Show the spec summary in 5-10 lines and ask: "Looks right, or adjust?"
 
-## 5. Write Work Session Blocks
+## 6. Write Work Session Blocks
 
 ### `.pi/artifacts/TODO.md`
 
@@ -76,7 +85,7 @@ status: active | updated: YYYY-MM-DD
 <the spec from step 3>
 ```
 
-## 6. Output
+## 7. Output
 
 Report:
 1. Title and date

@@ -1,7 +1,6 @@
 ---
 name: development-lifecycle
-description: Use when starting, planning, shipping, or verifying a work session — describes how `/create`, `/plan`, `/ship`,
-  `/verify`, and `/research` interact with the 4 canonical artifact files at `.pi/artifacts/`.
+description: Maps the session lifecycle commands — /create, /plan, /ship, /verify, /research — onto the artifact files in .pi/artifacts/. Use when starting, planning, shipping, or verifying a session.
 metadata:
   version: 2.0.0
   tags:
@@ -25,6 +24,8 @@ At `.pi/artifacts/`, maintained in the working copy:
 | `DECISIONS.md` | ADRs (Architecture Decision Records) | Real trade-off between two or more viable options |
 
 **Entry format (TODO.md, PROGRESS.md):** `### YYYY-MM-DD - <title>` followed by `status: active | done | abandoned | updated: <date>`.
+
+The full file spec and entry grammar are owned by the `artifact-format` skill — this skill only decides when each file is touched.
 
 ## Slash Commands (Lifecycle Hooks)
 
@@ -65,7 +66,7 @@ At `.pi/artifacts/`, maintained in the working copy:
 
 ## Tool integration
 
-When the `todo` tool is available (the `pi-todo` extension is pinned), the lifecycle commands prefer it for TODO.md mutations: `/ship` uses `todo start "<step>"` / `todo done "<step>"` per step (live TUI widget + single-active-task invariant) and `todo done "<title>"` to close the phase; `/verify` closes the phase the same way. `/create` and `/plan` still bulk-write the markdown directly (pi-todo's file watcher reconciles external edits). `PLAN.md` / `PROGRESS.md` / `DECISIONS.md` have no `todo` tool — edit them in place.
+When the `todo` tool is available (the `pi-todo` extension is pinned), lifecycle commands prefer it for TODO.md mutations: `/ship` and `/verify` use `todo start "<step>"` / `todo done "<step>"` per step and `todo done "<title>"` to close the phase. `/create` and `/plan` still bulk-write the markdown directly (pi-todo's file watcher reconciles external edits). `PLAN.md` / `PROGRESS.md` / `DECISIONS.md` have no `todo` tool — edit them in place.
 
 ## Red Flags
 

@@ -7,11 +7,12 @@ materially better than one without it on a designed pressure scenario.
 
 ## What This Is
 
-A minimal harness. Two scenarios. Two skills. Two scoring rubrics. Expandable.
+A minimal harness. Five scenarios. Five skills. Five scoring rubrics. Expandable.
 
 **Not** a full eval suite — that's the multi-week effort the deferral note
-for P6 describes. This is the 2-3-scenario concrete next step the deferral
-recommends as the right starting point in a fresh session.
+for P6 describes. This started as the 2-3-scenario concrete next step the
+deferral recommends; the 2026-07 skills overhaul expanded it to cover the
+merged skills.
 
 ## Structure
 
@@ -20,10 +21,23 @@ tests/skill-eval/
   README.md           this file
   harness.ts          runner, scoring, comparison
   scenarios/
-    vfc-claim-done.ts  verification-before-completion pressure test
-    tdd-skip.ts       test-driven-development pressure test
+    vfc-claim-done.ts        verification-before-completion: "just confirm done"
+    tdd-skip.ts              test-driven-development: skip the failing test
+    debug-no-repro.ts        debugging-and-error-recovery: patch without a red-capable command
+    review-wrong-problem.ts  code-review-and-quality: polish a diff that misses the spec
+    ctx-contradiction.ts     context-engineering: silent pick + guessed test command
   results.md          human-eval scoring sheet
 ```
+
+## Scenario Index
+
+| Scenario | Skill under test | Pressure applied | Discriminating marker |
+|---|---|---|---|
+| `vfc-claim-done` | verification-before-completion | "I'm in a hurry, just confirm done" | `<skill_result>` with non-empty `<evidence>` |
+| `tdd-skip` | test-driven-development | "obvious fix, just make it pass" | visible RED before implementation |
+| `debug-no-repro` | debugging-and-error-recovery | ready-made theory + "no time to reproduce" | "No red-capable command, no theory-building" gate |
+| `review-wrong-problem` | code-review-and-quality | immaculate diff, "mostly want style feedback" | stage-1 spec check before any quality nit |
+| `ctx-contradiction` | context-engineering | "pick whichever" + "npm test, don't go digging" | `CONFUSION:` callout + stack discovery |
 
 ## How a Scenario Works
 
@@ -71,11 +85,14 @@ export is what the test file validates.)
 
 To add a new scenario:
 
-1. Create `tests/skill-eval/scenarios/<skill>-<pressure>.ts`.
-2. Export `prompt`, `rubric`, `expectedFailure`, `expectedCompliance`.
-3. Register it in `harness.ts` SCENARIOS map.
-4. Add a test in `skill-eval.test.ts` asserting the scenario file has
-   all four exports and the rubric sums to a meaningful total.
+1. Create `tests/skill-eval/scenarios/<skill-abbrev>-<pressure>.ts`.
+2. Export `scenario`, `prompt`, `rubric`, `expectedFailure`, `expectedCompliance`.
+3. Registration is automatic — `harness.ts` loads every `.ts` file in
+   `scenarios/` at import time; the shape tests in `skill-eval.test.ts`
+   run against each registered scenario (exports present, rubric weights
+   sum to `maxScore`, pass descriptions substantive).
+4. If the scenario covers a new skill, add its prefix to the coverage
+   test at the bottom of `skill-eval.test.ts`.
 5. Run RED, then GREEN, score, record in `results.md`.
 
 ## Pass Criteria

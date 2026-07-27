@@ -1,7 +1,10 @@
 ---
 name: core-data-expert
-description: Use when writing, debugging, or optimizing Core Data code on iOS/macOS — fetch requests, migrations, merge conflicts,
-  threading, CloudKit sync. MUST load before any Core Data schema changes or performance work.
+description: >-
+  Guides Core Data work on iOS/macOS — fetch requests with predicates, batch operations, migrations,
+  merge policies, threading, CloudKit sync — with detailed reference docs per topic. User-invoked:
+  load via /skill:core-data-expert when writing or debugging Core Data code, planning schema changes,
+  or fixing slow fetches and Core Data crashes.
 metadata:
   version: 1.0.0
   tags:
@@ -58,14 +61,19 @@ context.mergePolicy = mergePolicy
 
 Set on the context. `NSMergeByPropertyStoreTrumpMergePolicy` = DB wins. `NSMergeByPropertyObjectTrumpMergePolicy` = in-memory wins.
 
-## Common Mistakes
+## References
 
-Post-fetch filtering (no predicate); fetch without limit/batch; one-by-one insert (use batch); migration without testing; main thread fetch for batch data; not using `performBackgroundTask`; "I'll fix the slow fetch later" (do it now); no CloudKit sync setup; merge conflicts not handled; `NSManagedObject` passed across threads; "Core Data is slow" (you need an index); fetch returning 1000+ rows.
+Deep dives live in `references/`; read the matching file before non-trivial work:
+
+- `stack-setup.md`, `model-configuration.md` — container setup, entity/attribute configuration
+- `fetch-requests.md`, `performance.md` — predicates, batching, indexes, slow-fetch diagnosis
+- `saving.md`, `batch-operations.md` — save patterns, `NSBatchInsertRequest`/`NSBatchUpdateRequest`
+- `concurrency.md`, `threading.md` — context confinement, `perform`, background work
+- `migration.md` — lightweight/staged/mapping-model migrations
+- `persistent-history.md` — change tracking across contexts, extensions, batch ops
+- `cloudkit-integration.md` — `NSPersistentCloudKitContainer` sync, merge policy setup
+- `testing.md`, `project-audit.md`, `glossary.md` — test setup, audit checklist, terms
 
 ## Red Flags
 
-Filtering after fetch; no fetch limit; one-by-one insert; no migration test; main thread for batch data; no `performBackgroundTask`; "slow fetch later"; merge conflict not handled; `NSManagedObject` across threads; "Core Data is slow" (need index); 1000+ rows fetched; no CloudKit sync; no batch insert.
-
-## Anti-Patterns
-
-**No predicate** (post-filter); **no fetch limit**; **one-by-one insert**; **no migration test**; **main thread for batch**; **"slow later"**; **no CloudKit**; **`NSManagedObject` across threads**; **no batch insert**; **no index**.
+Filtering in Swift after fetch (no predicate); fetch without limit/batch size; 1000+ rows fetched; one-by-one inserts (use batch requests); migration shipped without testing; main-thread fetches for batch data; no `performBackgroundTask`; `NSManagedObject` passed across threads; merge conflicts unhandled; "Core Data is slow" (you likely need an index); "I'll fix the slow fetch later" (do it now).

@@ -1,8 +1,9 @@
 ---
 name: vercel-deploy-claimable
-description: Use this skill when the user requests Vercel deployment actions such as "Deploy my app", "Deploy this to production",
-  "Create a preview deployment", "Deploy and give me the link", or "Push this live". No authentication required - returns
-  preview URL and claimable deployment link.
+description: >-
+  Deploys a project to Vercel without authentication via scripts/deploy.sh — returns a live preview URL plus a
+  claimable link that transfers the deployment to the user's Vercel account. User-invoked: load via
+  /skill:vercel-deploy-claimable when asked to deploy to Vercel, get a preview link, or "push this live".
 metadata:
   version: 1.0.0
   tags:
@@ -100,28 +101,10 @@ For projects without a `package.json`:
 
 ## Present Results to User
 
-Always show both URLs:
-
-```
-✓ Deployment successful!
-
-Preview URL: https://skill-deploy-abc123.vercel.app
-Claim URL:   https://vercel.com/claim-deployment?code=...
-
-View your site at the Preview URL.
-To transfer this deployment to your Vercel account, visit the Claim URL.
-```
+Always show both URLs: the Preview URL to view the live site, and the Claim URL to transfer the deployment to the user's Vercel account.
 
 ## Troubleshooting
 
 ### Network Egress Error
 
-If deployment fails due to network restrictions (common on claude.ai), tell the user:
-
-```
-Deployment failed due to network restrictions. To fix this:
-
-1. Go to https://claude.ai/settings/capabilities
-2. Add *.vercel.com to the allowed domains
-3. Try deploying again
-```
+If deployment fails due to network restrictions, the environment must allow outbound HTTPS to `*.vercel.com` (the deploy endpoint and preview hosts). Ask the user to allowlist that domain in their sandbox or network policy, then retry the deploy.

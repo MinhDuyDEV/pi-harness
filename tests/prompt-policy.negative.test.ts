@@ -65,7 +65,6 @@ test("mutation: a real fix.md with one skill name corrupted is rejected", () => 
 
   const result = validatePromptSkillRefs({ "fix.md": corrupted }, [
     knownSkill,
-    "root-cause-tracing",
     "verification-before-completion",
     "code-cleanup",
     "deep-module-design",

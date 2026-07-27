@@ -1,9 +1,10 @@
 ---
 name: effect-http-api
-description: Use when building HTTP APIs with Effect HttpApi — defining typed endpoints and groups, implementing handlers
-  with Effect services, mapping service errors to HTTP errors with proper status codes, adding SSE streaming endpoints, implementing
-  auth middleware with typed provides, generating OpenAPI documentation, and serving production HTTP servers. MUST load before
-  writing any HttpApi endpoint or handler.
+description: >-
+  Schema-first patterns for Effect's HttpApi — typed endpoints and groups, domain-error-to-status
+  mapping, SSE streaming endpoints, auth middleware, and generated OpenAPI. User-invoked: load via
+  /skill:effect-http-api when writing or reviewing HttpApi endpoints or handlers in an Effect
+  codebase.
 metadata:
   version: 1.0.0
 disable-model-invocation: true
@@ -72,7 +73,6 @@ Handlers are pure (no HTTP concerns). They take a request, return an effect that
 .addError(ValidationError, { status: 400 })
 .addError(Unauthorized, { status: 401 })
 .addError(Forbidden, { status: 403 })
-.addError(NotFound, { status: 404 })
 .addError(Conflict, { status: 409 })
 .addError(RateLimited, { status: 429 })
 ```
@@ -127,14 +127,6 @@ const spec = OpenApi.fromApi(api)
 
 The OpenAPI spec is derived from the schemas. No manual maintenance.
 
-## Common Mistakes
-
-Raw `HttpApp`; generic `Error`; business logic in handlers; auth in handler; manual SSE; manual OpenAPI; `JSON.parse` in handlers; 500 for known errors; missing `addError`; `try/catch`; no rate limit; no CORS; no `request.signal`.
-
 ## Red Flags
 
-Raw `HttpApp`; `throw new Error`; auth in handler; 500 on validation; manual EventSource; no rate limit; no validation; hand-maintained OpenAPI; missing CORS; no graceful shutdown; no backpressure; no size limits.
-
-## Anti-Patterns
-
-**"Just add a route"** (skip the schema); **"catch in handler"**; **"auth here is fine"** (middleware); **"manual SSE"**; **hand-written OpenAPI**.
+Raw `HttpApp` instead of schema-defined endpoints ("just add a route"); `throw new Error` / generic errors (loses the status mapping); 500 for a known business error or validation failure; business logic or auth inside handlers (auth is `Security` middleware); manual SSE / `EventSource` plumbing; hand-maintained OpenAPI; `JSON.parse` or `try/catch` in handlers; missing `addError` for a known failure; no rate limit, CORS, request size limits, backpressure, graceful shutdown, or `request.signal` handling.

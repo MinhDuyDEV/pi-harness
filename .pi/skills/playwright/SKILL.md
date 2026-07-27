@@ -1,8 +1,10 @@
 ---
 name: playwright
-description: Use when running automated browser tests, taking screenshots, validating forms, or verifying UX flows. Playwright
-  CLI for token efficiency with MCP fallback for complex exploration. Also covers agent-browser CLI alternative. MUST load
-  before any automated browser testing.
+description: >-
+  Automated browser testing with Playwright: role-based locators, user-visible wait strategy,
+  CLI-first execution with MCP fallback, and an agent-browser CLI alternative. Use when writing or
+  fixing browser tests, validating forms or UX flows, taking screenshots, or debugging flaky
+  selectors and timeouts.
 metadata:
   version: 1.0.0
   tags:
@@ -44,7 +46,9 @@ npx playwright test --debug
 npx playwright show-report
 ```
 
-Prefer CLI over MCP for token efficiency. Use MCP only for: complex exploration, error screenshots, or when the test environment is too dynamic to script.
+Prefer CLI over MCP for token efficiency. Use MCP (see `mcp.json`) only for: complex exploration, error screenshots, or when the test environment is too dynamic to script.
+
+See [references/agent-browser-cli.md](references/agent-browser-cli.md) for the agent-browser CLI alternative to Playwright MCP.
 
 ## Locator Strategy
 
@@ -105,14 +109,6 @@ await page.screenshot({ path: "screenshot.png", fullPage: true })
 
 Use for visual regression. Don't screenshot in every test — only when visual state matters.
 
-## Common Mistakes
-
-CSS locators (brittle); `waitForTimeout` (flaky); tests that depend on each other; "test everything" coverage; screenshotting in every test; testing implementation (form posts to /api/X); ignoring accessibility (use `getByRole`); retrying on failure instead of fixing the test; sharing state between tests; browser-specific selectors without fallback; long test files with no `describe` blocks.
-
 ## Red Flags
 
-`page.waitForTimeout`; CSS selector chains; `page.locator(".x").nth(2)`; tests that pass in CI but fail locally (or vice versa); tests that depend on order; shared login state via cookies; "wait for response" assertions; flaky retries without root cause; no `test.describe` grouping; one file with 50+ tests; missing `await` on expect (silent pass).
-
-## Anti-Patterns
-
-**CSS selectors** (use role/label); **`waitForTimeout`** (wait for state); **testing implementation** (test user intent); **"test everything"** (5 critical flows); **shared state** (independent tests); **flaky retries** (fix the test).
+CSS selector chains or `page.locator(".x").nth(2)` (brittle — use role/label); `page.waitForTimeout` (flaky — wait for user-visible state); "wait for response" assertions (race conditions); testing implementation ("form posts to /api/X") instead of user intent; tests that depend on order or share state (cookies, login); tests that pass in CI but fail locally (or vice versa); "test everything" coverage instead of the 5 critical flows; screenshotting in every test; flaky retries without root cause; missing `await` on `expect` (silent pass); one file with 50+ tests and no `test.describe` grouping.

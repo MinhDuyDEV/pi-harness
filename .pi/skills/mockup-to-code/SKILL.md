@@ -1,7 +1,10 @@
 ---
 name: mockup-to-code
-description: Use when converting UI mockups, screenshots, Figma/Sketch designs, wireframes, or building component libraries
-  from design systems into production-ready code
+description: >-
+  Converts visual designs (Figma, Sketch, screenshots, wireframes) into production code via token
+  extraction, ordered component builds, and screenshot validation. User-invoked: load via
+  /skill:mockup-to-code when implementing a UI from a mockup or building a component library from a
+  design system.
 metadata:
   version: 1.0.0
   tags:
@@ -56,12 +59,11 @@ Each step validates the previous.
 
 ## Validation
 
-```ts
-// Compare screenshot vs design
-// Option 1: overlay (screenshot overlay, adjust opacity)
-// Option 2: Playwright screenshot comparison
-// Option 3: manual review (designer inspects the implementation)
-```
+Compare implementation against the design, in increasing rigor:
+
+1. **Overlay** — screenshot the implementation, overlay the design export at ~50% opacity, inspect offsets.
+2. **Automated** — Playwright screenshot comparison (`toHaveScreenshot()`) against the design export.
+3. **Manual** — designer inspects the implementation side by side with the design.
 
 If the designer can't tell the difference, it's done. If they can, fix the gap.
 
@@ -74,14 +76,6 @@ If the designer can't tell the difference, it's done. If they can, fix the gap.
 
 Document the decisions. "Assumed hover state based on spec for button."
 
-## Common Mistakes
-
-"No token" (magic numbers); "close enough" (visible gap); missing states (no hover, no error); "I'll add responsive later" (mobile-first); "I'll fix the tokens later" (tokens first); component order wrong (skip typography, build carousel); no validation step; "designer says it's fine" (ask specifically); building from memory, not from the design.
-
 ## Red Flags
 
-Magic numbers; "close enough"; missing states; no tokens; "responsive later"; no validation; component order wrong; building from memory; design not accessible; design and code diverge; "I'll fix it later" for visual gaps.
-
-## Anti-Patterns
-
-**Magic numbers** (tokens); **"close enough"** (design is the spec); **missing states**; **"responsive later"**; **no tokens**; **no validation**; **wrong component order**; **"from memory"**; **"fix later"**.
+Magic numbers (the token is missing); "close enough" (the design is the spec — a visible gap is design debt); missing states (no hover, no error, no loading, no empty); "I'll add responsive later" (mobile-first now); "I'll fix the tokens later" (tokens first); wrong component order (carousel before typography); no validation step; building from memory instead of the open design; "designer says it's fine" (ask specifically); design and code silently diverging.

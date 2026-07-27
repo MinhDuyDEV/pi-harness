@@ -40,15 +40,19 @@ const VALID_BASE = [
   ".pi/agents/general.md",
   ".pi/extensions/rewind/index.ts",
   ".pi/themes/harness.json",
+  "scripts/init-consumer.mjs",
   "scripts/lib/package-payload.mjs",
   "scripts/lib/prompt-policy.mjs",
   "scripts/lib/resource-smoke.mjs",
+  "scripts/lib/skill-budget.mjs",
   "scripts/release-check.mjs",
   "scripts/smoke-packed-resources.mjs",
   "scripts/smoke-resources.mjs",
   "scripts/validate-package-payload.mjs",
   "scripts/validate-package.mjs",
   "scripts/validate-skills.mjs",
+  "templates/consumer-settings.json",
+  "docs/herdr-integration.md",
 ];
 
 function withBase(extra: string[]): string[] {

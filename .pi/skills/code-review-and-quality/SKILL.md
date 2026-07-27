@@ -1,9 +1,8 @@
 ---
 name: code-review-and-quality
-description: Use before merge, after subagent work, or when asked for a code review. Bloat Review mode hunts over-engineering
-  only (delete-list with tagged findings).
+description: Operational code review — a five-check quality gate, severity-tagged findings, and a Bloat Review mode hunting over-engineering. Use before merge, before claiming work done, or when asked for review.
 metadata:
-  version: 1.0.0
+  version: 2.0.0
   tags:
   - review
   - code-quality
@@ -16,34 +15,34 @@ metadata:
 
 ## Core Principle
 
-**Bloat is the default failure mode.** Code grows; review subtracts. The goal is a tight, minimal change that solves the stated problem — nothing more. A review that lists nits without identifying deletion candidates has missed the point.
+**Bloat is the default failure mode.** Code grows; review subtracts. The goal is a tight, minimal change that solves the stated problem. A review that lists nits without identifying deletion candidates has missed the point.
 
-## Two Review Modes
+## Two-Stage Review
 
-### 1. Standard Review
+1. **Spec compliance** — does the diff do what was asked, and only that? Missing requirements and out-of-scope changes are found here first.
+2. **Quality** — is the change well-built? Duplication, dead code, shallow abstractions, missing tests.
 
-Before merge. Findings tagged `[blocker]`, `[should-fix]`, `[nit]`, `[question]`. For `[blocker]`, name the violated invariant and the smallest fix. For `[should-fix]`, name why it matters and the cost of leaving it.
+A beautiful diff that solves the wrong problem fails stage 1; don't polish it.
 
-### 2. Bloat Review
+## The Gate (5 Checks)
 
-For AI-generated code, after a refactor, or when scope may have crept. Output a **delete-list** tagged `[delete]`, `[simplify]`, `[keep-with-reason]`. Default for any line that does not serve the stated problem is `[delete]`.
+Code changed this session → the gate runs. Not optional.
 
-## Workflow
+1. **Scope** — every line traceable to the stated problem? Anything outside → split or revert. Unrelated cleanup in the diff = wrong diff.
+2. **Duplication** — copy-paste instead of reuse? New file with high overlap? Agents duplicate by reflex.
+3. **Behavior tests** — new behavior: a test. Bug fix: a regression test. Refactor: existing tests still green.
+4. **Verification evidence** — named check ran, exit 0, output captured. Not "should work".
+5. **Regressions** — no new failures, no removed tests, no `.skip` on new tests.
 
-1. **Scope check** — diff match stated problem? Outside is `[blocker]` (split) or `[delete]`.
-2. **Iron-law scan** — domain-relevant iron law followed? (TDD: failing test first. Effect: typed errors. UI: design taste. Performance: profile first.)
-3. **Read for deletion** — "If I delete this, what breaks?" If nothing, it's bloat.
-4. **Verify behavior** — test pass? Path exercised? `[question]` if unsure.
-5. **Mark dead** — unused exports, dead branches, ownerless TODOs, restating comments.
-6. **Verify in one pass** — typecheck + lint + relevant test.
+Any check fails → work is not done. Overrides (approved scope creep, quarantined flaky test, test replaced by a better one) are legitimate but must be documented, not hidden.
 
-## Delete-List Categories
+## Severity Tags
 
-| Tag | Meaning | Action |
-| --- | --- | --- |
-| `[delete]` | Unused / dead / speculative | Remove |
-| `[simplify]` | Works but over-engineered | Reduce |
-| `[keep-with-reason]` | Looks bloat, is load-bearing | Justify, or move to `[delete]` |
+`[blocker]` name the violated invariant and smallest fix · `[should-fix]` name the cost of leaving it · `[nit]` note, don't block · `[question]` need clarification. Unrelated issues: `[NOTICED BUT NOT TOUCHING]` — never silently fix.
+
+## Bloat Review Mode
+
+For AI-generated code, post-refactor, or suspected scope creep. Output a **delete-list**: `[delete]` unused/dead/speculative · `[simplify]` works but over-engineered · `[keep-with-reason]` looks bloat, is load-bearing (justify or demote to `[delete]`). Default for any line that does not serve the stated problem is `[delete]`. Ask: "If I delete this, what breaks?" If nothing — bloat.
 
 ## Iron Laws by Domain
 
@@ -52,38 +51,25 @@ For AI-generated code, after a refactor, or when scope may have crept. Output a 
 | Any feature / bugfix | Failing test first (`test-driven-development`) |
 | TS / JS with Effect | Typed errors, no `any` (`typescript-coding-standards`) |
 | React / Next.js | Server components, bundle discipline (`react-best-practices`) |
-| UI | Match form to failure (`writing-skills`); design-taste layer |
+| UI | Base aesthetic rules (`design-taste-frontend`) |
 | Performance | Measure before optimizing (`performance-optimization`) |
 | Security | Validate at every layer (`defense-in-depth`) |
 
-## Red Flags (Bloat)
+## Requesting and Receiving Review
 
-Abstraction with one call site; wrapper that does nothing; restating comment; helper "for future use" with no caller; generic name (`helper`, `util`, `manager`) hiding intent; feature flag never toggled; "might need this" branches; AI-shaped comments; `as any` casts; tests that mock the behavior they claim to test.
-
-## Anti-Patterns
-
-LGTM-by-default (review passes when nothing flagged); style nits as review (run the linter); scope creep (fixing unrelated issues — note `[NOTICED BUT NOT TOUCHING]`, don't fix); approving-vibes review ("looks good" without evidence — cite test runs, paths, lines).
-
-## Self-Quiz
-
-Did I find at least one `[delete]` / `[simplify]`? (If not, the review was shallow.) Are all `[blocker]`s named with the violated invariant? Did I run the verification command and see it pass? Are unrelated fixes `[NOTICED BUT NOT TOUCHING]`, not silently merged?
+- **Requesting:** state the problem, the approach, and the verification command with its output.
+- **Receiving:** treat `[blocker]`s as claims to verify, not orders — push back with evidence if the reviewer is wrong, fix if right. Never resubmit without re-running the gate.
+- **Reviewing others/subagents:** read the diff, not the self-report. Self-reported success is the failure mode review exists to catch.
 
 ## Anti-rationalization
 
 | Shortcut the model reaches for | Why it fails here |
 |---|---|
-| "The author says it works" | Author self-report is the bias review exists to counter; read the diff, not the claim. |
-| "It passed CI" | CI tests the happy path; review catches scope, dead code, and shallow modules CI can't. |
-| "Bloat review = delete aggressively" | Bloat mode is over-engineering only; tag load-bearing complexity, don't delete blindly. |
+| "The tests pass, so it's done" | Green proves nothing about scope, duplication, or evidence. |
+| "It's a small change, skip the gate" | Small changes skip regression checks — exactly how regressions ship. |
+| "The author says it works" | Read the diff, not the claim. |
+| "Bloat review = delete aggressively" | Bloat mode targets over-engineering; tag load-bearing complexity, don't delete blindly. |
 
-## Skill Result Contract
+## Red Flags
 
-```
-<skill_result>
-  <skill>code-review-and-quality</skill>
-  <status>success|partial|blocked|failure</status>
-  <evidence>Tagged findings, verification run, delete-list (Bloat)</evidence>
-  <artifacts>Review with tagged findings</artifacts>
-  <risks>Untested claims, scope creep, LGTM-by-default, none</risks>
-</skill_result>
-```
+"Should work" / "I tested it" without output; truncated output hiding errors; `.skip` on new tests; removed tests unmarked; "while I'm here" changes unmarked; LGTM-by-default; style nits as the whole review (run the linter); review with zero `[delete]`/`[simplify]` findings (shallow); blockers downgraded to nits to avoid friction.

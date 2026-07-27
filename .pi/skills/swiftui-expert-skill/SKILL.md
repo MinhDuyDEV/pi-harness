@@ -1,7 +1,6 @@
 ---
 name: swiftui-expert-skill
-description: Use when building new SwiftUI features, refactoring existing views, reviewing code quality, or adopting modern
-  SwiftUI patterns (state management, view composition, performance, modern APIs, iOS 26+ Liquid Glass).
+description: SwiftUI architecture and API guidance — state management with @State and @Observable, view composition, NavigationStack, performance, modern iOS 17+ APIs, and iOS 26 Liquid Glass. User-invoked; load via /skill:swiftui-expert-skill when building or refactoring SwiftUI views, choosing state wrappers, or adopting modern SwiftUI patterns.
 metadata:
   version: 1.0.0
   tags:
@@ -76,10 +75,10 @@ Small, named views. The parent passes values, the child renders. Easy to test, e
 
 ## iOS 26+ Liquid Glass
 
-- Use `.glassEffect()` for surface treatments
-- `GlassEffectContainer` for grouped glass
-- `glassButtonStyle` for primary actions
-- Combine with `.symbolEffect` for icon animation
+- `.glassEffect()` for surface treatments (`.regular` / `.prominent`, tint, `.interactive()`)
+- `GlassEffectContainer` for grouped glass elements
+- `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)` for buttons
+- Requires iOS 26+; provide a materials fallback via `if #available(iOS 26, *)`
 
 ## Performance
 
@@ -115,14 +114,10 @@ struct SettingsView: View {
 
 `Form` for input. `List` for selection.
 
-## Common Mistakes
+## References
 
-`@State` for shared state; mutable view models; `ObservableObject` for new code; `GeometryReader` for layout; force unwraps; side effects in `body`; `onAppear` for state; `NavigationView`; huge modifier chains; no previews; not testing model.
+Deep dives in `references/`: `state-management.md`, `view-structure.md`, `layout-best-practices.md`, `list-patterns.md`, `scroll-patterns.md`, `sheet-navigation-patterns.md`, `modern-apis.md`, `animation-basics.md`, `animation-transitions.md`, `animation-advanced.md`, `performance-patterns.md`, `image-optimization.md`, `text-formatting.md`, `liquid-glass.md` (iOS 26). Load the matching file before answering non-trivial questions in that area.
 
 ## Red Flags
 
-`@StateObject` in new code; `ObservableObject` after iOS 17; `GeometryReader` for layout; force unwraps; `body` does I/O; views that remember via @State trickery; no previews; no model test; `NavigationView`.
-
-## Anti-Patterns
-
-**`@StateObject` everywhere**; **`GeometryReader` for centering**; **views own their network**; **force unwraps**; **no previews**; **testing the view**.
+`@State` for shared state; `@StateObject`/`ObservableObject` in new iOS 17+ code; `GeometryReader` for simple layout or centering; force unwraps; side effects or I/O in `body`; `onAppear` for work that belongs in `.task`; `NavigationView` (deprecated); 20-line modifier chains instead of named subviews; views that own their network calls; no previews; testing the view instead of the model.

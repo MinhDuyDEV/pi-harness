@@ -1,8 +1,6 @@
 ---
 name: git-workflow-and-versioning
-description: Use when making code changes that need safe git hygiene, atomic commits, branch strategy, versioning, changelog
-  entries, or release preparation. Covers trunk-based development, commit-as-save-point discipline, and avoiding accidental
-  unrelated changes.
+description: Git hygiene for agents in shared worktrees — atomic commits, trunk-based flow, scoped staging, versioning. Use when committing, branching, splitting a large diff, or editing in a dirty worktree.
 metadata:
   version: 1.0.0
   tags:

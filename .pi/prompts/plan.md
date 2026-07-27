@@ -43,11 +43,20 @@ Use `--split` to group steps into phases when the work has natural sequencing (d
 
 Number of steps should match the size of the work. Don't pad with ceremony steps. Don't under-spec a 10-file change with 3 vague steps.
 
-## 5. Confirm (skip with `--quick`)
+## 5. Foundation Gate
+
+Before finalizing the plan, answer each in one line:
+
+- Is the current foundation sound for this change, or does it need work first?
+- Is each constraint real (verified against code/requirements) or an inherited habit?
+- Does any step compensate for a foundation flaw? That is a balloon (see `.pi/ANTI_PATTERNS.md`) — plan the foundation fix instead.
+- Should foundation work be sequenced as the first steps? If yes, reorder before confirming.
+
+## 6. Confirm (skip with `--quick`)
 
 Show the plan and confirm.
 
-## 6. Update Blocks
+## 7. Update Blocks
 
 ### `.pi/artifacts/PLAN.md`
 
@@ -82,7 +91,7 @@ status: active | updated: YYYY-MM-DD
 
 Number ADRs sequentially (`001`, `002`, ...) within the work session block. If multiple, repeat the H4 pattern.
 
-## 7. Output
+## 8. Output
 
 Report:
 1. Number of steps (and phases if `--split`)

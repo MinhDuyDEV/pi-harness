@@ -1,15 +1,12 @@
 ---
 name: frontend-design
-description: MUST load when building any web UI with React-based frameworks — components, pages, or full applications. Covers
-  Tailwind CSS v4, shadcn/ui, Motion animations. Base UI implementation skill; combine with aesthetic overlays (minimalist-ui,
-  high-end-visual-design) for specific styles.
+description: React UI implementation patterns for Next.js App Router, Tailwind CSS v4, shadcn/ui, and Motion. Use when building React components, pages, forms, or full apps, or deciding server vs client components.
 metadata:
   version: 1.1.0
   tags:
   - ui
   - design
   dependencies: []
-disable-model-invocation: true
 ---
 
 # Frontend Design (React + Tailwind + shadcn)
@@ -69,14 +66,10 @@ Use `"use client"` for: `useState`, `useEffect`, event handlers, browser APIs, `
 ## shadcn/ui
 
 ```bash
-npx shadcn@latest add button
-npx shadcn@latest add card
-npx shadcn@latest add dialog
+npx shadcn@latest add button card dialog
 ```
 
 This adds to `components/ui/`. You own the code. Customize freely. Don't add what you won't customize — copy and edit.
-
-Common: Button, Card, Dialog, Input, Select, Form, Table, Tabs, Toast, Tooltip, Sheet, DropdownMenu, Avatar, Badge, Calendar, Checkbox, Command, Popover, RadioGroup, ScrollArea, Separator, Slider, Switch, Textarea.
 
 ## Tailwind v4 (key changes from v3)
 
@@ -127,14 +120,18 @@ React Hook Form + Zod = typed forms with validation. Use shadcn's `<Form>` for b
 - **Client**: `useSWR`, `useQuery`, or React Suspense. Loading, error, revalidation.
 - **Mutations**: Server Actions (Next.js) or API routes. Optimistic with `useOptimistic`.
 
-## Common Mistakes
+## References (load on demand)
 
-`"use client"` everywhere; custom Button; `useEffect` for derived state; prop drilling; `localStorage` in server components; `Math.random()` in render; no loading/error; CSS-in-JS.
+Deep-dives live in `references/`:
+
+- `references/tailwind/` — `v4-config.md`, `v4-features.md`, `utilities-layout.md`, `utilities-styling.md`, `responsive.md`
+- `references/shadcn/` — `setup.md`, `core-components.md`, `form-components.md`, `theming.md`, `accessibility.md`
+- `references/animation/` — `motion-core.md`, `motion-advanced.md`
+- `references/design/` — `color-system.md`, `typography-rules.md`, `interaction.md`, `ux-writing.md`
+- `references/canvas/` — `philosophy.md`, `execution.md` (creative canvas work)
+
+Read the relevant file before deep work in that area instead of guessing APIs.
 
 ## Red Flags
 
-`"use client"` everywhere; custom Button; `useEffect` for derived state; prop drilling 4+; `localStorage` in server; `Math.random()` in render; no error boundary; "memoize everything".
-
-## Anti-Patterns
-
-**`"use client"` everywhere**; **custom Button**; **`useEffect` for derived state**; **prop drilling**; **no loading/error**; **CSS-in-JS**; **"memoize later"**.
+`"use client"` on everything (server by default); hand-rolled Button/Dialog/Select (copy shadcn); `useEffect` for derived state; prop drilling 4+ levels; `localStorage` or browser APIs in server components; `Math.random()` in render (hydration mismatch); no loading, error, or boundary states; CSS-in-JS in new code; "memoize everything" / "memoize later".

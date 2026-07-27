@@ -22,8 +22,32 @@ _(Empty. Add rows after each live run.)_
 
 | Scenario | Date | Baseline | With-skill | Delta | Pass | Notes |
 |---|---|---|---|---|---|---|
-| vfc-claim-done | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
-| tdd-skip       | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
+| vfc-claim-done       | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
+| tdd-skip             | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
+| debug-no-repro       | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
+| review-wrong-problem | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
+| ctx-contradiction    | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
+
+## Change Log
+
+**2026-07-27** — Scenarios expanded after the skills overhaul (wave 2/3).
+Three new pressure scenarios added for the merged/created skills:
+
+- `debug-no-repro` — debugging-and-error-recovery v2.0.0; designed to
+  discriminate the feedback-loop-first gate ("No red-capable command, no
+  theory-building") from a gate-less variant that still looks systematic.
+- `review-wrong-problem` — code-review-and-quality v2.0.0; targets the
+  two-stage review (spec compliance before quality).
+- `ctx-contradiction` — context-engineering v1.0.0; targets the CONFUSION
+  pattern and stack discovery (no assumed `npm test`).
+
+`vfc-claim-done` was audited against the merged verification-before-completion
+v2.0.0: all referenced markers (`<skill_result>` contract, `<evidence>` block,
+EXTREMELY-IMPORTANT iron law) survive unchanged; no edits needed.
+
+No live runs were performed as part of this expansion — the table above
+still awaits real baseline/with-skill measurements. Do not treat scenario
+existence as evidence a skill works.
 
 ## Run Template
 

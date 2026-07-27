@@ -1,6 +1,6 @@
 ---
 name: deep-module-design
-description: Use when designing modules, refactoring shallow structures, or reviewing AI-generated code for structural quality.
+description: Applies Ousterhout's deep-module principle — small interface, deep implementation. Use when designing a module or service boundary, refactoring shallow modules, or when a class has too many public methods.
 metadata:
   version: 1.0.0
   tags:
@@ -85,13 +85,9 @@ jest.spyOn(svc, "_insertIntoDb")
 jest.spyOn(svc, "_sendEmail")
 ```
 
-## Common Mistakes
-
-Shallow modules; exposed state; config in args (env); "two ways to do it"; tests mock internals; `addX`/`addY`/`addZ`; "don't call from outside" comments; pass-through modules.
-
 ## Red Flags
 
-10+ public methods; `addX`/`addY`/`addZ`; public state; config in args; "don't call from outside"; tests mock internals; pass-through; "two ways to do it"; 3+ methods in sequence.
+10+ public methods; `addX`/`addY`/`addZ` method families; public state; config passed per-call instead of env/defaults; "don't call from outside" comments (should be private); tests mock internals; pass-through modules; "two ways to do it"; caller must call 3+ methods in sequence.
 
 ## Anti-rationalization
 
@@ -100,7 +96,3 @@ Shallow modules; exposed state; config in args (env); "two ways to do it"; tests
 | "It works, the interface is fine" | Working ≠ deep; a shallow interface taxes every caller. Check the Depth Metric. |
 | "Splitting it more makes it simpler" | Splitting a deep module into shallow ones adds integration complexity; deep = complex inside, simple interface. |
 | "The refactor is too risky" | Shallow modules tax every future change; the refactor cost is paid once, the shallow tax forever. |
-
-## Anti-Patterns
-
-**Shallow module**; **public state**; **config in args**; **two ways to do it**; **tests mock internals**; **addX/addY/addZ**; **pass-through**; **complex return types**.

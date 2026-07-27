@@ -1,11 +1,6 @@
 ---
 name: artifact-format
-description: 'ALWAYS load this skill at the start of any non-trivial task (>= 2 tool calls, >= 2 files modified, audits, plans,
-  reviews, behavior or policy changes, multi-step investigations, or any work the user may want to review later). Defines
-  the format and lifecycle for `.pi/artifacts/TODO.md`, `PLAN.md`, `PROGRESS.md`, `DECISIONS.md`. The first action of a non-trivial
-  task is to append a `### YYYY-MM-DD - <title>` block with `status: active | updated: <date>` to `.pi/artifacts/TODO.md`
-  (or PLAN/PROGRESS/DECISIONS.md if escalated). Skip only for single-line edits, trivial config values, or direct Q&A with
-  no durable output.'
+description: Defines the format and lifecycle of .pi/artifacts/TODO.md, PLAN.md, PROGRESS.md, and DECISIONS.md. Use when starting any non-trivial task, recording status, or deciding where an update belongs.
 metadata:
   version: 1.0.0
   tags:
@@ -45,7 +40,7 @@ Each task is a `### YYYY-MM-DD - <title>` block with a `status:` line:
 
 Status values: `active`, `done`, `abandoned`. Include `updated: YYYY-MM-DD` on every transition. Use `|` as the separator (greppable, not `·`).
 
-For `DECISIONS.md` use `### YYYY-MM-DD - ADR NNN: <title>` with a numbered counter, e.g. `### 2026-06-17 - ADR 001: <title>`. Read the file first; NNN is the next available integer.
+For `DECISIONS.md` use `### YYYY-MM-DD - ADR NNN: <title>` with a numbered counter, e.g. `### 2026-06-17 - ADR 001: <title>`. Read the file first; NNN is the next available integer. This file only defines the block format — the ADR content structure (context, decision, consequences, alternatives) is owned by the `documentation-and-adrs` skill.
 
 ## Operations
 

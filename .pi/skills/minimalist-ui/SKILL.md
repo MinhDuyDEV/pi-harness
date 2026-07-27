@@ -1,7 +1,10 @@
 ---
 name: minimalist-ui
-description: Use INSTEAD OF design-taste-frontend when user requests clean, editorial, or minimalist aesthetics. Warm monochrome
-  palette, typographic contrast, flat bento grids, muted pastels. No gradients, no heavy shadows.
+description: >-
+  Minimalist/editorial UI overlay replacing design-taste-frontend defaults: warm monochrome palette,
+  one font family, typographic contrast, flat bento grids, no gradients or heavy shadows.
+  User-invoked: load via /skill:minimalist-ui when the user asks for minimal, clean, editorial,
+  Apple-like, or Linear-like aesthetics on content-first products.
 metadata:
   version: 1.0.0
   tags:
@@ -111,14 +114,6 @@ Asymmetric grids. Wide main, narrow side. Different sizes. Section heights vary.
 
 Subtle, slow. 200-400ms. `ease-out`. No bounces. No springs. The motion is "this appeared", not "look at me".
 
-## Common Mistakes
-
-Too many colors; icon where text works; card with shadow + border + bg; rounded > 12px; gradient; neon; "playful" decoration; 3 font families; tight line-height; "make it pop" with size/weight; emoji as icon; glassmorphism; "premium" shadows.
-
 ## Red Flags
 
-3+ colors; 3+ font families; gradient; shadow > 0 1px 2px; rounded > 12px; icon for every label; tight line-height; emoji in UI; glassmorphism; dark mode by inverting; "make it pop"; small text.
-
-## Anti-Patterns
-
-**3+ colors**; **3+ font families**; **gradient**; **heavy shadow**; **rounded > 12px**; **icon for every label**; **tight line-height**; **emoji in UI**; **glassmorphism**; **"make it pop"**.
+3+ colors; 3+ font families; gradients; neon; shadow beyond `0 1px 2px`; rounded > 12px; card with shadow + border + bg; icon where text works; emoji in UI; glassmorphism; tight line-height; dark mode by inverting; small text; "make it pop" via size/weight; "playful" decoration; "premium" shadows.

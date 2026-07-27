@@ -1,7 +1,6 @@
 ---
 name: incremental-implementation
-description: Use when implementing any feature, refactor, or change touching more than one file, or when tempted to write
-  a large patch before testing.
+description: Ships work as small verified slices, each with a success check named before implementing. Use when implementing any change touching more than one file, or when tempted to write a large patch before testing.
 metadata:
   version: 1.0.0
   tags:
@@ -47,11 +46,7 @@ Can I name what changed and why in one sentence? Did I run the named verificatio
 
 ## Red Flags
 
-Large patch (>~100 lines) without intermediate test runs; "I'll add tests later" (there is no later — write the test now or don't write the code); refactor step adds behavior (split it out); step verification is "looks right" instead of a concrete command; multiple unrelated fixes in one commit (split or open a new TODO); `TODO(handle)` markers without `on-or-after <date>` (automatable cost lost).
-
-## Anti-Patterns
-
-Big-bang patch (write everything, test at the end); premature abstraction (DRYing two call sites when one is speculative); hero commit (15 files, 3 features, 1 PR); "verify by inspection" (read carefully, *believe* it works — run the check).
+Large patch (>~100 lines) without intermediate test runs; big-bang patch (write everything, test at the end); "I'll add tests later" (there is no later — write the test now or don't write the code); refactor step adds behavior (split it out); step verification is "looks right" instead of a concrete command ("verify by inspection" is belief, not evidence); premature abstraction (DRYing two call sites when one is speculative); hero commit (15 files, 3 features, 1 PR); `TODO(handle)` markers without `on-or-after <date>` (automatable cost lost).
 
 ## Anti-rationalization
 

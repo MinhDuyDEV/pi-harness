@@ -1,10 +1,8 @@
 ---
 name: prototype
-description: Use when the user wants to prototype, sanity-check a data model or state machine, mock up a UI, explore design
-  options, or says "prototype this", "let me play with it", "try a few designs".
+description: Builds throwaway prototypes that answer one question — a terminal harness for logic checks, or switchable UI variants on one route. Use when the user wants to prototype, play with variants, or test a direction.
 metadata:
   version: 1.0.0
-disable-model-invocation: true
 ---
 
 # Prototype

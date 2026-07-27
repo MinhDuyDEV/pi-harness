@@ -1,8 +1,10 @@
 ---
 name: design-taste-frontend
-description: Use when building any web UI as the BASE aesthetic layer to override default LLM design biases. Enforces strict
-  typography, color, spacing, and component architecture rules. Load BEFORE frontend-design when premium visual quality is
-  required.
+description: >-
+  Base aesthetic layer that overrides default LLM design biases with strict typography, color,
+  spacing, layout, and motion rules. User-invoked: load via /skill:design-taste-frontend when
+  a web UI needs disciplined visual quality; overlays like high-end-visual-design apply on top
+  of this base.
 metadata:
   version: 1.0.0
   tags:
@@ -75,14 +77,12 @@ Define each as a token. Don't freestyle at the call site.
 - **No bounces, no elastic.** Linear-ish curves feel more professional.
 - Respect `prefers-reduced-motion`. Disable for those users.
 
-## Anti-Patterns (LLM defaults)
-
-Centered everything; hero with abstract gradient; trendy colors (neon, cyberpunk, "AI purple", pastel); stock photos in placeholders; cards with shadow+borders+background; "Click here" / "Learn more" buttons; mismatched icons; animation on every interaction; glassmorphism/neumorphism/brutalism without intention.
-
 ## The 5-Second Test
 
 5 seconds → what's remembered? If "lots of stuff", failed. The answer: type, spacing, hierarchy. Nothing else.
 
 ## Red Flags
 
-3+ font families; pure black/white; inconsistent spacing scale; no focus states; buttons without clear hierarchy (all look the same); dark mode that inverts without thought; icons that don't match text; animation on every interaction; cards with 3+ visual treatments.
+LLM defaults to reject: centered everything; hero with abstract gradient; trendy colors (neon, cyberpunk, "AI purple", pastel rainbow); stock photos in placeholders; cards with shadow+border+background; "Click here" / "Learn more" buttons; glassmorphism/neumorphism/brutalism without intention; animation on every interaction.
+
+Quality failures: 3+ font families; pure black/white; inconsistent spacing scale; no focus states; buttons without clear hierarchy (all look the same); dark mode that inverts without thought; icons that don't match text; cards with 3+ visual treatments.

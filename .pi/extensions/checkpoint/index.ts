@@ -15,10 +15,12 @@
 import { readFile, writeFile, mkdir, readdir, stat, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_CHECKPOINT_CONFIG, type CheckpointConfig } from "./config.js";
-import { generateCheckpointContent } from "./subagent.js";
+import { generateCheckpointContent, type CheckpointContent } from "./subagent.js";
 
-function findPiDir(cwd: string): string | null {
+/** Walk upward from `cwd` (max 10 levels) to the nearest directory containing `.pi`. */
+export function findPiDir(cwd: string): string | null {
   let dir = cwd;
   for (let i = 0; i < 10; i++) {
     if (existsSync(join(dir, ".pi"))) return join(dir, ".pi");
@@ -29,8 +31,23 @@ function findPiDir(cwd: string): string | null {
   return null;
 }
 
-function getSessionId(ctx: any): string | null {
-  return ctx?.sessionId || ctx?.session_id || ctx?.id || null;
+/** Read one loosely-typed string field off an unknown context object. */
+function looseStringField(ctx: unknown, key: string): string | null {
+  if (typeof ctx !== "object" || ctx === null) return null;
+  const value = (ctx as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+/**
+ * Best-effort session id from an extension context. The harness does not
+ * expose a stable field name across versions, so probe the known spellings.
+ */
+export function getSessionId(ctx: unknown): string | null {
+  return (
+    looseStringField(ctx, "sessionId") ??
+    looseStringField(ctx, "session_id") ??
+    looseStringField(ctx, "id")
+  );
 }
 
 // ── Checkpoint I/O ─────────────────────────────────────────────────────────
@@ -41,10 +58,16 @@ async function ensureCheckpointDir(piDir: string, sessionId: string): Promise<st
   return dir;
 }
 
-interface CheckpointInfo {
+export interface CheckpointInfo {
   num: number;
   path: string;
   ctime: Date;
+}
+
+/** Checkpoint number from a `checkpoint-<n>.md` filename, or null. */
+export function parseCheckpointFilename(name: string): number | null {
+  const match = name.match(/^checkpoint-(\d+)\.md$/);
+  return match ? parseInt(match[1], 10) : null;
 }
 
 async function listCheckpoints(piDir: string, sessionId: string): Promise<CheckpointInfo[]> {
@@ -53,11 +76,11 @@ async function listCheckpoints(piDir: string, sessionId: string): Promise<Checkp
     const entries = await readdir(dir);
     const checkpoints: CheckpointInfo[] = [];
     for (const entry of entries) {
-      const match = entry.match(/^checkpoint-(\d+)\.md$/);
-      if (match) {
+      const num = parseCheckpointFilename(entry);
+      if (num !== null) {
         const fullPath = join(dir, entry);
         const s = await stat(fullPath);
-        checkpoints.push({ num: parseInt(match[1]), path: fullPath, ctime: s.ctime });
+        checkpoints.push({ num, path: fullPath, ctime: s.ctime });
       }
     }
     return checkpoints.sort((a, b) => b.num - a.num);
@@ -66,26 +89,14 @@ async function listCheckpoints(piDir: string, sessionId: string): Promise<Checkp
   }
 }
 
-async function writeCheckpoint(
-  config: CheckpointConfig,
-  piDir: string,
-  _ctx: any,
+/** Render the markdown body of a checkpoint file. Pure. */
+export function renderCheckpointMarkdown(
+  num: number,
+  writtenAt: string,
   sessionId: string,
-): Promise<string | null> {
-  const dir = await ensureCheckpointDir(piDir, sessionId);
-  const checkpoints = await listCheckpoints(piDir, sessionId);
-  const nextNum = checkpoints.length > 0 ? checkpoints[0].num + 1 : 1;
-
-  const now = new Date().toISOString();
-
-  // Read real data instead of ctx fields
-  const content = await generateCheckpointContent(piDir, sessionId);
-
-  const sections: string[] = [
-    `# Checkpoint #${nextNum}`,
-    `Written: ${now}`,
-    "",
-  ];
+  content: CheckpointContent,
+): string {
+  const sections: string[] = [`# Checkpoint #${num}`, `Written: ${writtenAt}`, ""];
 
   // Discoveries
   sections.push("## Discoveries");
@@ -120,15 +131,44 @@ async function writeCheckpoint(
   // Footer
   sections.push("## Session State");
   sections.push(`- Session: ${sessionId}`);
-  sections.push(`- Checkpoint #: ${nextNum}`);
+  sections.push(`- Checkpoint #: ${num}`);
+
+  return sections.join("\n");
+}
+
+async function writeCheckpoint(
+  config: CheckpointConfig,
+  piDir: string,
+  sessionId: string,
+): Promise<string | null> {
+  const dir = await ensureCheckpointDir(piDir, sessionId);
+  const checkpoints = await listCheckpoints(piDir, sessionId);
+  const nextNum = checkpoints.length > 0 ? checkpoints[0].num + 1 : 1;
+
+  const now = new Date().toISOString();
+
+  // Read real data instead of ctx fields
+  const content = await generateCheckpointContent(piDir, sessionId);
 
   const filePath = join(dir, `checkpoint-${nextNum}.md`);
-  await writeFile(filePath, sections.join("\n"), "utf-8");
+  await writeFile(filePath, renderCheckpointMarkdown(nextNum, now, sessionId, content), "utf-8");
 
   // FIFO eviction
   await pruneOldCheckpoints(config, piDir, sessionId);
 
   return filePath;
+}
+
+/**
+ * FIFO eviction decision: given checkpoints sorted newest-first, return the
+ * ones that exceed `maxPerSession` and should be deleted. Pure.
+ */
+export function selectCheckpointsToPrune<T>(
+  checkpoints: readonly T[],
+  maxPerSession: number,
+): T[] {
+  if (checkpoints.length <= maxPerSession) return [];
+  return checkpoints.slice(maxPerSession);
 }
 
 async function pruneOldCheckpoints(
@@ -137,9 +177,7 @@ async function pruneOldCheckpoints(
   sessionId: string,
 ): Promise<void> {
   const checkpoints = await listCheckpoints(piDir, sessionId);
-  if (checkpoints.length <= config.maxPerSession) return;
-  const toDelete = checkpoints.slice(config.maxPerSession);
-  for (const cp of toDelete) {
+  for (const cp of selectCheckpointsToPrune(checkpoints, config.maxPerSession)) {
     try {
       await unlink(cp.path);
     } catch {
@@ -176,6 +214,21 @@ async function loadLatestCheckpoint(piDir: string, sessionId: string): Promise<s
   }
 }
 
+/**
+ * Wrap checkpoint content (truncated to `rebuildBudget` characters) in the
+ * rebuild-context frame injected at session start. Pure.
+ */
+export function formatRebuildContext(checkpoint: string, rebuildBudget: number): string {
+  const truncated = checkpoint.slice(0, rebuildBudget);
+  return [
+    "\n## Prior Session Context (Checkpoint)",
+    "",
+    truncated,
+    "",
+    "Continue from where you left off.",
+  ].join("\n");
+}
+
 async function renderRebuildContext(
   config: CheckpointConfig,
   piDir: string,
@@ -183,19 +236,7 @@ async function renderRebuildContext(
 ): Promise<string | null> {
   const cp = await loadLatestCheckpoint(piDir, sessionId);
   if (!cp) return null;
-
-  const lines = cp.slice(0, config.rebuildBudget);
-  const parts: string[] = [];
-
-  parts.push(
-    "\n## Prior Session Context (Checkpoint)",
-    "",
-    lines,
-    "",
-    "Continue from where you left off.",
-  );
-
-  return parts.join("\n");
+  return formatRebuildContext(cp, config.rebuildBudget);
 }
 
 // ── Extension Entry Point ───────────────────────────────────────────────────
@@ -211,18 +252,18 @@ export async function getCheckpointRebuildContext(
   return renderRebuildContext(config, piDir, sessionId);
 }
 
-export default function (pi: any): void {
+export default function (pi: ExtensionAPI): void {
   const config = DEFAULT_CHECKPOINT_CONFIG;
   if (!config.enabled) return;
 
   // On session_before_compact: write checkpoint with real data
-  pi.on("session_before_compact", async (_event: any, ctx: any) => {
+  pi.on("session_before_compact", async (_event, ctx) => {
     if (!config.autoOnCompress) return;
     const piDir = findPiDir(ctx.cwd);
     if (!piDir) return;
     const sessionId = getSessionId(ctx);
     if (!sessionId) return;
-    const path = await writeCheckpoint(config, piDir, ctx, sessionId);
+    const path = await writeCheckpoint(config, piDir, sessionId);
     // The harness consumed everyone else's events but emitted none of its own
     // (audit roadmap 23); a written checkpoint is a durable fact other
     // extensions (DCP, learning) may correlate with.

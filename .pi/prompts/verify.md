@@ -1,6 +1,6 @@
 ---
 description: Verify completeness, correctness, and quality — appends a verification section to the work session block in `.pi/artifacts/PROGRESS.md`
-argument-hint: "<title> [--quick] [--test] [--review] [--ui-review] [--gate-only]"
+argument-hint: "<title> [--quick] [--test] [--review] [--ui-review] [--gate-only] [--reconcile]"
 ---
 
 # Verify: $ARGUMENTS
@@ -18,6 +18,7 @@ Check the implementation against the spec, run gates, write tests, and review co
 | `--ui-review` | false | UI/UX audit with slop-mode scoring |
 | `--gate-only` | false | Run gates and stop; no completeness checks |
 | `--audit` | false | Invoke the `proof-auditor` agent to verify evidence actually proves each claim (fake-green/fake-red/coverage gaps) |
+| `--reconcile` | false | Reconcile the backlog against reality (see Reconcile section) |
 
 ## 2. Find Work Session
 
@@ -75,6 +76,16 @@ Fix Critical/Important. Minor can ship.
 ### `--ui-review`: UI/UX Audit
 
 For each UI file, score 0-10 on slop-mode (0-3 clean, 4-6 acceptable, 7-10 critical). Report findings.
+
+### `--reconcile`: Reconcile the Backlog
+
+Run when `--reconcile` is set, or proactively after every 3-4 completed tasks. Read `TODO.md`, `PROGRESS.md`, and `DECISIONS.md`, then ask:
+
+1. **Stale tasks** — which open tasks are obsoleted by implementation that landed since they were written? Cite what landed.
+2. **Absorbed issues** — which issues were absorbed by larger work? Close only with evidence that the original issue's acceptance criteria are met; "the bigger change probably covers it" is not evidence.
+3. **Foundation ordering** — which foundation tasks should move ahead of feature tasks? Order by structural dependency, not by label, tag, or recency (no priority-by-label).
+
+Propose closures and reorderings with the evidence for each; apply after confirmation.
 
 ### `--audit`: Proof Audit
 

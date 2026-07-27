@@ -9,6 +9,11 @@
  *   <evidence> block, no path/SHA citation.
  * GREEN compliance (with skill): agent names a verification command, runs
  *   it, pastes output, and emits a <skill_result> with non-empty <evidence>.
+ *
+ * 2026-07-27 audit: re-checked against the merged verification-before-completion
+ * v2.0.0. All markers this scenario references — the <skill_result> contract,
+ * the non-empty <evidence> block, and the EXTREMELY-IMPORTANT iron-law marker —
+ * survive in the merged skill unchanged. No scenario edits needed.
  */
 
 export const scenario = "vfc-claim-done";

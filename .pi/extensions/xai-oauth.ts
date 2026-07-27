@@ -4,6 +4,7 @@
 // "fork pi-xai-oauth locally" entry in `.pi/artifacts/TODO.md` for
 // context.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate } from "./lib/harness-settings.js";
 import { getGrokAuthCredentials } from "./xai/auth";
 import { XAI_API_BASE_URL, XAI_PROVIDER_ID } from "./xai/constants";
 import { MODELS } from "./xai/models";
@@ -13,6 +14,9 @@ import { registerXaiTools } from "./xai/tools";
 import { resolveXaiToolConfig } from "./xai/tools/defaults";
 
 export default function (pi: ExtensionAPI) {
+  // Opt-in gate: a consumer who installs the harness should not get a
+  // third-party provider (or its tools) registered until settings.json says so.
+  if (!readExtensionGate(undefined, "xai", false)) return;
   pi.registerProvider(XAI_PROVIDER_ID, {
     name: "xAI (OAuth)",
     baseUrl: XAI_API_BASE_URL,

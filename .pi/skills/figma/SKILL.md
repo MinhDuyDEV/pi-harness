@@ -1,22 +1,24 @@
 ---
 name: figma
-description: Use when implementing UI from Figma designs, extracting design tokens, or downloading assets via Framelink MCP.
-  MUST load when user shares a Figma URL or references Figma files. Requires API token.
+description: >-
+  Fetches layout, styles, and image assets from Figma files through the Figma REST API and maps
+  them to design-system tokens. User-invoked: load via /skill:figma when implementing UI from a
+  shared Figma URL, extracting design tokens, or downloading assets. Requires a FIGMA_API_KEY
+  token.
 metadata:
   version: 1.0.0
   tags:
   - design
-  - mcp
   - integration
   dependencies: []
 disable-model-invocation: true
 ---
 
-# Figma Design Data (MCP)
+# Figma Design Data (REST API)
 
 ## When to Use
 
-Fetching layout, styles, or assets from a Figma file via MCP. Required when user shares a Figma URL or references a Figma file.
+Fetching layout, styles, or assets from a Figma file via the Figma REST API. Load when the user shares a Figma URL or references a Figma file.
 
 ## When NOT to Use
 
@@ -61,14 +63,6 @@ const tokens = {
 
 Map to your design system (e.g., CSS variables, Tailwind config, design tokens package). Don't hardcode Figma values.
 
-## Common Mistakes
-
-Fetching the entire file when you need one node (token waste); not setting `FIGMA_API_KEY` first; hardcoding Figma values in code instead of using extracted tokens; missing rate limits (60 requests/min); not handling 404 (file moved, private); using wrong node ID format; downloading full-res when you needed thumbnail; not storing the extracted tokens (re-fetching every run).
-
 ## Red Flags
 
-API key in code / logs; fetching whole file repeatedly; tokens hardcoded instead of in design system; no cache of extracted data; missing image format choice (always PNG?); ignoring rate limits; assuming token is public (it's not — needs scope); using stale data when design has changed.
-
-## Anti-Patterns
-
-**"Fetch the whole file"** (waste of tokens); **hardcoded Figma values** (defeats purpose of tokens); **no rate limit handling** (will 429); **one-shot fetch + implement** (no cache, repeated work); **manual transcription of design values** (error-prone, stale).
+API key in code or logs; not setting `FIGMA_API_KEY` first; fetching the whole file when one node is needed (token waste, and repeated fetches hit the 60 requests/min rate limit → 429); hardcoding Figma values instead of extracted tokens; manually transcribing design values (error-prone, stale); no cache of extracted data (re-fetching every run); unhandled 404 (file moved or private); wrong node ID format; full-res downloads when a thumbnail would do; using stale data after the design changed; assuming the token is public (it's not — it needs scope).

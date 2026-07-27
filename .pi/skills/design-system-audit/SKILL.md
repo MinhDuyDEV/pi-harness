@@ -1,7 +1,10 @@
 ---
 name: design-system-audit
-description: Use when auditing an existing design system for consistency — token audits, pattern analysis, visual comparison
-  against design specs. Load AFTER implementation to review, not during initial build.
+description: >-
+  Audits an existing design system for token coverage, raw-value drift, spec alignment, and
+  component consistency, reporting each breach with severity. User-invoked: load via
+  /skill:design-system-audit when reviewing an implemented design system against its spec or
+  Figma source, or for pre-launch visual QA.
 metadata:
   version: 2.0.0
   tags:
@@ -81,14 +84,6 @@ For each finding:
 
 Severity: BLOCKER, SHOULD-FIX, NIT.
 
-## Common Mistakes
-
-No token audit (misses the most common drift); audit from memory, not from the spec; "looks fine" without measuring; checking only one layer (tokens but not patterns); no severity; "I'll fix it later" (fix now); audit on outdated codebase; comparing against an old spec; missing dark mode; missing focus states; "the component works" (does it adhere to the system?).
-
 ## Red Flags
 
-Raw values where tokens exist; 5+ button variants; 30+ distinct spacing values; missing focus states; no dark mode (or dark mode just inverts); "looks fine" without measuring; spec and code diverge; missing states (hover, disabled, error); component in Figma ≠ component in code; no audit at all.
-
-## Anti-Patterns
-
-**No token audit**; **"looks fine"**; **one layer only**; **no severity**; **"fix later"**; **audit on outdated code**; **compare against old spec**; **missing dark mode**; **missing focus states**; **spec ≠ code**.
+No token audit at all (misses the most common drift); raw values where tokens exist; "looks fine" without measuring; auditing from memory instead of the spec; comparing against an old spec or outdated codebase; checking one layer only (tokens but not patterns); 5+ button variants; 30+ distinct spacing values; missing states (hover, disabled, error, focus); no dark mode, or dark mode that just inverts; findings without severity; "I'll fix it later" (fix now); "the component works" (does it adhere to the system?).

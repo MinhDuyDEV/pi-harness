@@ -1,7 +1,6 @@
 ---
 name: aislop
-description: Use when checking for AI-generated code slop — narrative comments, swallowed exceptions, console.log leftovers,
-  as any casts, thin wrappers, generic naming, and other patterns AI coding agents leave behind
+description: Detects AI-generated code slop — narrative comments, swallowed exceptions, console.log leftovers, as any casts, thin wrappers. Use when reviewing an AI-written diff before merge.
 metadata:
   version: 1.0.0
 ---
@@ -48,13 +47,9 @@ The code is handwritten; the slop is already cleaned up; one-line change that's 
 - Run your project's dead-code gate before merge (e.g. `npx @earendil-works/fallow dead-code`; in the pi-harness source checkout, `npm run quality:fallow`).
 - Don't approximate — each slop finding is a yes/no.
 
-## Common Mistakes
-
-Calling structural issues "slop" (it's design, use a different skill); opinion masquerading as slop check ("I don't like this" is not slop); flagging AI comments in private code (the user wrote them); "I'll clean it up later" (clean now); missing `as any` because it's in a deep file; missing `console.log` because it's in a test.
-
 ## Red Flags
 
-"Let me think about this" comment; `catch (e) {}`; `as any`; wrapper that does nothing; `helper.ts`; `console.log` left; dead code; TODO without owner; copy-paste block; unused import; "I'll clean later".
+"Let me think about this" comment; `catch (e) {}`; `as any`; wrapper that does nothing; `helper.ts`; `console.log` left; dead code; TODO without owner; copy-paste block; unused import; "I'll clean it up later" (clean now); calling structural/design issues "slop" (use a code-review skill); opinion masquerading as slop check ("I don't like this" is not slop); flagging narrative comments the user handwrote; missing `as any` because it's in a deep file; missing `console.log` because it's in a test.
 
 ## Anti-rationalization
 
@@ -63,7 +58,3 @@ Calling structural issues "slop" (it's design, use a different skill); opinion m
 | "It works, the slop is cosmetic" | The next agent reads narrative comments as intent + thin wrappers as API; cosmetic-now is structural debt later. |
 | "It's just one console.log / one as any" | One is the pattern — the checklist catches the first because the second is free once the first ships. |
 | "I wrote it, I know what it means" | The reader is the next session, not you; generic names mislead a fresh reader. |
-
-## Anti-Patterns
-
-**Opinions as slop** ("I don't like"); **narrative in private code**; **"clean later"**; **miss `as any`**; **miss `console.log`**; **call design "slop"** (use code-review skill).

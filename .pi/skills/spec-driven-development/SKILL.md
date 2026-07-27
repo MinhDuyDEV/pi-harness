@@ -1,7 +1,6 @@
 ---
 name: spec-driven-development
-description: Use when starting a new feature, significant change, product idea, or when requirements are ambiguous and need
-  a concrete specification before implementation.
+description: Turns ambiguous requirements into a locked spec — goal, non-goals, user stories, acceptance criteria. Use when starting a feature, when a request is "add X" with no details, or when work spans sessions.
 metadata:
   version: 1.0.0
   tags:
@@ -71,17 +70,9 @@ Goal + non-goals + acceptance criteria = the minimum spec.
 
 `spec-driven-development` is for WHAT. `planning-and-task-breakdown` is for HOW. Spec first, then plan.
 
-## Common Mistakes
-
-Spec after code (rewrite); spec too vague ("make it good"); spec too detailed (the spec IS the code, just write it); no non-goals (scope creep); no acceptance criteria (can't test); spec as a wishlist; spec never updated (drift); spec changed verbally (not in file).
-
 ## Red Flags
 
-No goal; no non-goals; no acceptance criteria; "make it good" (not specific); spec as wishlist; no open questions; spec changed verbally; spec vs code drift; no version; "I'll know it when I see it" (not a spec).
-
-## Self-Quiz
-
-Is the goal 1-2 sentences, observable, measurable? Are non-goals explicit? Are criteria checkable? Are open questions listed? Is the spec a single file, versioned? Is the test plan derived from criteria?
+Spec written after code; no goal, no non-goals (scope creep), or no acceptance criteria (can't test); "make it good" (not specific); spec as a wishlist; spec so detailed it IS the code (just write the code); no open questions listed; scope changed verbally instead of in the versioned spec file; spec vs code drift; "I'll know it when I see it" (not a spec).
 
 ## Anti-rationalization
 
@@ -90,7 +81,3 @@ Is the goal 1-2 sentences, observable, measurable? Are non-goals explicit? Are c
 | "I understand the feature, I'll build it" | Understanding ≠ specified; ambiguity in your head becomes wrong code. Write the spec first. |
 | "I'll refine the spec as I code" | Refining-while-coding is coding without a spec; the spec locks before code so changes are visible. |
 | "Non-goals can wait" | Non-goals defined late = invisible scope creep; list them now or the feature grows. |
-
-## Anti-Patterns
-
-**Spec after code**; **vague goal**; **no non-goals**; **no criteria**; **wishlist**; **no questions**; **verbal changes**; **drift**; **"I'll know it"**; **spec = the code**.

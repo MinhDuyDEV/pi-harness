@@ -1,6 +1,9 @@
 ---
 name: obsidian
-description: Use when working with Obsidian vault via MCP - read/write notes, search, tag management, and vault operations
+description: >-
+  Operates an Obsidian vault through the @mauricio.wolff/mcp-obsidian MCP server (read/write notes,
+  frontmatter, full-text search, tags). User-invoked: load via /skill:obsidian when the user asks to
+  read, create, organize, or search notes in their Obsidian vault.
 metadata:
   version: 1.0.0
   tags:
@@ -12,73 +15,37 @@ disable-model-invocation: true
 
 # Obsidian (MCP)
 
+Tools come from the `@mauricio.wolff/mcp-obsidian` server declared in this skill's `mcp.json`. It requires `OBSIDIAN_VAULT_PATH` pointing at the vault root. Paths in tool calls are vault-relative.
+
 ## When to Use
 
-Reading, writing, or searching notes in an Obsidian vault via MCP; managing tags; creating new notes; importing content; organizing the vault; using Obsidian as a knowledge base.
+The user's knowledge base is an Obsidian vault and they want notes read, written, searched, or reorganized.
 
 ## When NOT to Use
 
-Plain text files outside a vault (use regular file tools); "I'll just use Obsidian for this" when a file tool is faster; no Obsidian MCP available.
+Plain files outside a vault (use regular file tools); the Obsidian MCP server is not configured.
 
-## Core Operations
+## Tools
 
-| Action | Use |
+| Tool | Use |
 |---|---|
-| Read a note | `read_note` — by path, returns markdown |
-| Search notes | `search_notes` — full-text search |
-| Create note | `create_note` — path + content |
-| Update note | `update_note` — path + new content |
-| List notes in a folder | `list_notes` — by folder path |
-| Get tags | `get_tags` — all tags in the vault |
-| Add tag | `add_tag` — to a note |
-| Search by tag | `search_by_tag` — all notes with tag |
+| `read_note` / `read_multiple_notes` | Note content by path |
+| `get_frontmatter` / `get_notes_info` | Metadata without loading full content |
+| `list_directory` | Notes and folders under a path |
+| `write_note` | Create or overwrite a note |
+| `update_frontmatter` | Change metadata without touching the body |
+| `move_note` / `delete_note` | Relocate or remove (check backlinks first) |
+| `search_notes` | Full-text search across the vault |
+| `manage_tags` | Add, remove, or list tags |
 
-## Note Convention
+## Vault Conventions
 
-```markdown
-title: My Note
-tags: [project, reference]
-created: 2024-01-01
-aliases: [prod, main system]
-
-# My Note
-
-Content in markdown. Use wikilinks `[[Other Note]]` for cross-references.
-Use `#tags` for inline tags. Use frontmatter for metadata.
-```
-
-- One concept per note.
-- Wiki-links for cross-references.
-- Frontmatter for metadata.
-- Tags for categorization.
-- Folders for organization.
-
-## Common Patterns
-
-```markdown
-# Daily Note (YYYY-MM-DD)
-## What I did
-- Task 1
-- Task 2
-
-## What I learned
-- Insight 1
-- Insight 2
-
-## Open questions
-- Question 1
-```
-
-Use daily notes for session logs, project notes for persistent knowledge, reference notes for external documentation.
-
-## Common Mistakes
-
-One giant note (split it); no tags (can't find it); no frontmatter (missing metadata); broken wiki-links (typo); content in wrong folder; "I'll organize it later" (do it now); importing without categorization; no daily note for long sessions; duplication across notes; notes with no links (lonely notes); overwriting existing notes; using Obsidian for ephemeral content (use chat instead).
+- One concept per note; `[[wikilinks]]` for cross-references; frontmatter for metadata; tags for categorization.
+- **Search before writing.** Run `search_notes` first; extend the existing note instead of creating a duplicate.
+- **Read before overwriting.** `write_note` replaces content — read the note and merge, don't clobber.
+- Prefer `update_frontmatter` over rewriting the whole note for metadata-only changes.
+- Daily notes (`YYYY-MM-DD`) for session logs; project notes for persistent knowledge.
 
 ## Red Flags
 
-"Giant note with everything"; no tags; no frontmatter; broken links; wrong folder; "organize later"; no daily note; duplicate notes; lonely notes; overwrite without merge; ephemeral content in vault; unlinked references; "I'll remember the structure" (you won't).
-
-## Anti-Patterns
-
-**One giant note** (split); **no tags**; **no frontmatter**; **broken links**; **wrong folder**; **"organize later"**; **no daily note**; **duplicate notes**; **overwriting**; **ephemeral content**; **no links**.
+Writing without searching first (duplicates); `write_note` over an existing note without reading it (silent overwrite); `move_note` without fixing backlinks (broken wikilinks); ephemeral scratch content in the vault (use the conversation); one giant note instead of small linked notes.

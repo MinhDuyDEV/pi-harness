@@ -18,6 +18,17 @@ export interface HarnessSettings {
   superpi?: boolean;
   /** Append the personality block for openai-codex models. Default false. */
   gptPersonality?: boolean;
+  /**
+   * Per-extension gates: `{ "pi-harness": { "extensions": { "<key>": boolean } } }`.
+   * Provider extensions (deepseek, mimo, xai) default to OFF — a consumer who
+   * installs the harness should not get third-party model providers registered
+   * until they opt in. This repo's own settings.json turns them on.
+   *
+   * NOT gated here (future work, do not change without care): dcp, tui,
+   * checkpoint, rewind — those are core UX and flipping their default to off
+   * would break the current experience.
+   */
+  extensions?: Record<string, boolean>;
 }
 
 export function readHarnessSettings(cwd: string = process.cwd()): HarnessSettings {
@@ -33,8 +44,34 @@ export function readHarnessSettings(cwd: string = process.cwd()): HarnessSetting
       ...(typeof record.gptPersonality === "boolean"
         ? { gptPersonality: record.gptPersonality }
         : {}),
+      ...(record.extensions !== undefined ? { extensions: readGates(record.extensions) } : {}),
     };
   } catch {
     return {};
   }
+}
+
+function readGates(raw: unknown): Record<string, boolean> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const gates: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "boolean") gates[key] = value;
+  }
+  return gates;
+}
+
+/**
+ * Read the on/off gate for one extension key. `source` is either a project
+ * cwd (settings are read from `<cwd>/.pi/settings.json`; omit for
+ * `process.cwd()`) or an already-parsed {@link HarnessSettings}. A missing or
+ * non-boolean gate yields `defaultValue`.
+ */
+export function readExtensionGate(
+  source: string | HarnessSettings | undefined,
+  extensionKey: string,
+  defaultValue: boolean,
+): boolean {
+  const settings = typeof source === "object" ? source : readHarnessSettings(source);
+  const gate = settings.extensions?.[extensionKey];
+  return typeof gate === "boolean" ? gate : defaultValue;
 }

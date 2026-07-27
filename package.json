@@ -57,6 +57,8 @@
     "PROJECT.md",
     "skills-lock.json",
     "scripts",
+    "templates",
+    "docs",
     "tsconfig.json",
     "package.json",
     ".pi/DESIGN.md",

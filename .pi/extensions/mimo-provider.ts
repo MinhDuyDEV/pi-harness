@@ -16,6 +16,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate } from "./lib/harness-settings.js";
 
 const MIMO_BASE_URL = "https://api.xiaomimimo.com/v1";
 
@@ -143,6 +144,9 @@ const MIMO_MODELS = [
 ];
 
 export default function (pi: ExtensionAPI) {
+  // Opt-in gate: a consumer who installs the harness should not get a
+  // third-party provider registered until settings.json says so.
+  if (!readExtensionGate(undefined, "mimo", false)) return;
   pi.registerProvider("xiaomi-mimo", {
     name: "Xiaomi MiMo",
     baseUrl: MIMO_BASE_URL,

@@ -75,20 +75,96 @@ status: active | updated: 2026-06-23
   }
 });
 
-test("scanTodos treats empty brackets `- []` as an open todo", () => {
+test("scanTodos ignores non-canonical `- []` lines — pi-todo owns the format and does not parse them", () => {
+  // pi-todo's parser requires exactly one mark char inside the brackets, so
+  // `- []` is prose (a preserved note), not an item. The panel must agree with
+  // the owner instead of resurrecting the old second-parser drift.
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-empty-bracket-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
     mkdirSync(artifactsDir, { recursive: true });
     writeFileSync(
       join(artifactsDir, "TODO.md"),
-      "### 2026-06-29 - empty bracket regression\nstatus: active | updated: 2026-06-29\n\n- [] ship the widget\n",
+      "### 2026-06-29 - empty bracket\nstatus: active | updated: 2026-06-29\n\n- [] not an item\n- [ ] real item\n",
     );
     const state = scanTodos(dir);
     assert.equal(state.items.length, 1);
-    assert.equal(state.items[0].text, "ship the widget");
-    assert.equal(state.items[0].done, false);
-    assert.equal(state.items[0].blockTitle, "2026-06-29 - empty bracket regression");
+    assert.equal(state.items[0].text, "real item");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("scanTodos maps the canonical pi-todo marks: open = ' ', '/', '!'; closed = 'x', '-'", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-marks-"));
+  try {
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      `### 2026-07-27 - marks
+status: active | updated: 2026-07-27
+
+- [ ] pending item
+- [/] in progress item
+- [!] blocked item
+- [x] completed item
+- [-] abandoned item
+`,
+    );
+    const state = scanTodos(dir);
+    assert.deepEqual(
+      state.items.map((item) => ({ text: item.text, done: item.done })),
+      [
+        { text: "pending item", done: false },
+        { text: "in progress item", done: false },
+        { text: "blocked item", done: false },
+        { text: "completed item", done: true },
+        { text: "abandoned item", done: true },
+      ],
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("scanTodos shows item content verbatim — annotation parsing belongs to pi-todo", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-verbatim-"));
+  try {
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      "### 2026-07-27 - deps\nstatus: active\n\n- [ ] (#3) wire up token refresh [blocks #5]\n",
+    );
+    const state = scanTodos(dir);
+    assert.equal(state.items.length, 1);
+    assert.equal(state.items[0].text, "(#3) wire up token refresh [blocks #5]");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("scanTodos ignores preamble items and defaults a meta-less block to active", () => {
+  const dir = mkdtempSync(join(tmpdir(), "tui-todos-preamble-"));
+  try {
+    const artifactsDir = join(dir, ".pi", "artifacts");
+    mkdirSync(artifactsDir, { recursive: true });
+    writeFileSync(
+      join(artifactsDir, "TODO.md"),
+      `- [ ] stray preamble line (not an item)
+
+### no meta block
+
+- [ ] tracked item
+`,
+    );
+    const state = scanTodos(dir);
+    assert.equal(state.items.length, 1);
+    assert.equal(state.items[0].text, "tracked item");
+    assert.equal(state.items[0].blockTitle, "no meta block");
+    // pi-todo's parse default for a phase without a status line.
+    assert.equal(state.items[0].status, "active");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

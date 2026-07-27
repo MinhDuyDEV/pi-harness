@@ -1,6 +1,6 @@
 ---
 name: memory
-description: ALWAYS read durable project context from `.pi/MEMORY.md`; append learnings to it. File-based, on-demand, observable.
+description: Reads and appends durable project knowledge in .pi/MEMORY.md (file-based, on-demand, grep-friendly). Use when a task references prior work, the user says "before" or "last time", or a durable learning surfaces.
 ---
 
 # Memory
@@ -9,7 +9,7 @@ Durable project knowledge lives in `<cwd>/.pi/MEMORY.md`. Read it on demand when
 
 ## When to load
 
-**ALWAYS** at the start of any task that:
+Read it at the start of any task that:
 
 - involves a decision, design choice, or architectural call
 - references prior work, past sessions, or "what we did before"

@@ -27,26 +27,51 @@ function getSkillFrontmatter(skillDir: string): { name: string; description: str
 	const match = content.match(/^---\n([\s\S]*?)\n---/);
 	if (!match) throw new Error(`No frontmatter in ${skillMd}`);
 	const fm = match[1];
-	const nameMatch = fm.match(/^name:\s*(.+)$/m);
-	const descMatch = fm.match(/^description:\s*"?(.+?)"?\s*$/m);
-	if (!nameMatch || !descMatch) throw new Error(`Missing name/description in ${skillMd}`);
-	return {
-		name: nameMatch[1].trim().replace(/^['"]|['"]$/g, ""),
-		description: descMatch[1].trim().replace(/^['"]|['"]$/g, ""),
-	};
+	const lines = fm.split("\n");
+	let name = "";
+	let description = "";
+	for (let i = 0; i < lines.length; i++) {
+		const nameMatch = /^name:\s*(.+)$/.exec(lines[i]);
+		if (nameMatch) {
+			name = nameMatch[1].trim().replace(/^['"]|['"]$/g, "");
+			continue;
+		}
+		const descMatch = /^description:\s*(.*)$/.exec(lines[i]);
+		if (descMatch) {
+			// Handle plain scalars and YAML folded/literal block scalars (>- etc.):
+			// continuation lines are indented and folded with a single space.
+			const first = descMatch[1].trim();
+			const parts = first && !/^[>|][+-]?$/.test(first) ? [first] : [];
+			while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) {
+				parts.push(lines[++i].trim());
+			}
+			description = parts.join(" ").replace(/^['"]|['"]$/g, "");
+		}
+	}
+	if (!name || !description) throw new Error(`Missing name/description in ${skillMd}`);
+	return { name, description };
 }
 
 const allSkills = readdirSync(SKILLS_DIR)
 	.filter((entry) => statSync(join(SKILLS_DIR, entry)).isDirectory())
 	.map((entry) => getSkillFrontmatter(join(SKILLS_DIR, entry)));
 
-test("all skill descriptions start with an allowed prefix", () => {
+// Overhaul convention (§5): descriptions may lead with a third-person "what" sentence,
+// but must still contain an explicit trigger phrase ("Use when …" for visible skills,
+// "User-invoked" for hidden skills) so the model/user knows when to load them.
+const TRIGGER_RE = /\b(Use (this skill )?(when|before|after|during|INSTEAD OF)|User-invoked)\b/;
+
+test("all skill descriptions start with an allowed prefix or contain a trigger phrase", () => {
 	const offenders = allSkills.filter(
-		(s) => !ALLOWED_PREFIXES.some((p) => s.description.startsWith(p)),
+		(s) =>
+			!ALLOWED_PREFIXES.some((p) => s.description.startsWith(p)) &&
+			!TRIGGER_RE.test(s.description),
 	);
 	if (offenders.length > 0) {
 		const msg = offenders.map((s) => `  ${s.name}: "${s.description.slice(0, 80)}..."`).join("\n");
-		assert.fail(`${offenders.length} descriptions don't start with an allowed prefix:\n${msg}`);
+		assert.fail(
+			`${offenders.length} descriptions have neither an allowed prefix nor a trigger phrase (Use when …/User-invoked):\n${msg}`,
+		);
 	}
 });
 

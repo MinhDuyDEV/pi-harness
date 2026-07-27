@@ -6,6 +6,8 @@ The **session agent** is always the parent. Task agents match **OpenCode-style**
 
 Routing: `~/.pi/agent/APPEND_SYSTEM.md` (Delegation). Rules: `AGENTS.md` / project `.pi/AGENTS.md`.
 
+Models are **runtime-selected**: agent files carry no `model:` pin and inherit the session `defaultModel`. Only `thinking:` is tuned per agent.
+
 ## Agent file template
 
 ```yaml
@@ -15,6 +17,7 @@ description: >
 # proactive: true
 # hidden: true
 # readonly: true
+thinking: low
 tools:
   write: false
 ---
@@ -27,7 +30,7 @@ tools:
 | `description` | Yes — task tool catalog |
 | `tools` / `disallowed_tools` | Yes |
 | `hidden` / `proactive` / `readonly` | Yes |
-| `model`, `thinking` | Yes — passed to child `pi` |
+| `thinking` | Yes — passed to child `pi`; model inherits `defaultModel` |
 
 ## Task agents (`task` tool)
 
@@ -50,11 +53,23 @@ tools:
 | Does the evidence actually prove it's done? | `proof-auditor` |
 | Product from short prompt | Workflow-style orchestration with `task` |
 
-## Prompt template (parent → `task`)
+## Prompt contract (parent → `task`)
 
-Include: goal, non-goals, write/read policy, expected output, stop condition, verification recipe.
+Delegate a **governed outcome**, not a recipe:
+
+- **Outcome** — the end state that must be true, stated so a skeptic could check it.
+- **Frontier** — the questions the child is empowered to decide on its own.
+- **Locked decisions** — each with its rationale and an unlock condition (what evidence would reopen it).
+- **Acceptance** — evidence that would convince a skeptic; the child chooses HOW to produce it.
+- **Non-goals + write policy** — what must not change.
+
+Do not hand the agent a verification recipe or pre-named acceptance criteria unless genuinely locked.
 
 **Resume:** `task_id` / `conversation_id` from a prior run.
+
+## Answering a challenge
+
+A `blocked` + `<needs_decision>` result is not a failed task — answer the challenge or re-lock with better rationale before re-delegating; never re-issue the same brief unchanged.
 
 ## Proactive delegation
 
@@ -62,4 +77,13 @@ Include: goal, non-goals, write/read policy, expected output, stop condition, ve
 
 ## Final message XML
 
-Task agents end with `<result>`. Parent must verify artifacts — never ship on subagent summary alone.
+Task agents end with `<result>`. Parent must verify artifacts — never ship on a subagent summary alone.
+
+## Standalone profiles (`implementer`, `peer`)
+
+Deliberately orchestrator-free: their prompts never reference who delegated the work, so each file serves both as a `task` agent here and as an independent seat profile (e.g. under Herdr) unchanged. Neither is proactive — the parent grants a write scope (`implementer`) or requests an independent position (`peer`) explicitly.
+
+| Agent | Use for | Do not use when |
+|-------|---------|-----------------|
+| `implementer` | Sole owner of one write scope; governed outcome, blind pass, own proof, provenance-tagged evidence | Loosely-scoped research+edit errands (`general`); read-only questions |
+| `peer` | Read-only independent position on consequential uncertainty; may reframe the question; blind-first on request | Routine diff review (`reviewer`); in-repo mapping (`explore`) |

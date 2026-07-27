@@ -1,7 +1,10 @@
 ---
 name: cloudflare
-description: Use when deploying to or configuring ANY Cloudflare service — Workers, Pages, KV, D1, R2, AI, Tunnel, WAF. MUST
-  load before writing Cloudflare Workers code, wrangler configs, or infrastructure-as-code for Cloudflare.
+description: >-
+  Covers Cloudflare platform work — Workers (V8 isolates), wrangler config, KV/D1/R2/Queues bindings,
+  Pages, secrets — with per-service reference docs. User-invoked: load via /skill:cloudflare when
+  writing Workers code, editing wrangler.toml, choosing between KV/D1/R2, or configuring any
+  Cloudflare service.
 metadata:
   version: 1.0.0
   tags:
@@ -29,7 +32,7 @@ Writing Workers; configuring `wrangler.toml`; bindings (KV, D1, R2, Queues); Pag
 
 ## When NOT to Use
 
-Plain Node.js server (no CF); static without Workers; different platform.
+Plain Node.js server; static hosting without Workers; a different platform.
 
 ## Core Services
 
@@ -128,16 +131,23 @@ wrangler dev
 # local server with bindings simulated
 ```
 
-`--remote` for actual Cloudflare bindings. `--local` for fast iteration.
+`--remote` uses real Cloudflare bindings; `--local` is fastest.
 
-## Common Mistakes
+## References
 
-Node.js APIs (`fs`, `Buffer`, `child_process`); large bundles; secrets in toml; HTTP to own service; missing `compatibility_date`; KV for transactional data (use D1); D1 for hot cache (use KV); no `wrangler dev`.
+Per-service docs live in `references/<service>/` — each folder has `api.md`, `configuration.md`, `patterns.md`, `gotchas.md`. Read the matching folder before non-trivial work on a service.
+
+| Domain | Folders under `references/` |
+|---|---|
+| Compute | workers, durable-objects, workflows, containers, sandbox, cron-triggers, smart-placement, tail-workers, workers-for-platforms |
+| AI | workers-ai, ai-gateway, ai-search, agents-sdk, vectorize, browser-rendering |
+| Storage / data | kv, d1, r2, r2-sql, r2-data-catalog, do-storage, hyperdrive, queues, pipelines, analytics-engine |
+| Web delivery | pages, pages-functions, static-assets, snippets, cache-reserve, images, stream, zaraz, web-analytics |
+| Security | waf, ddos, bot-management, api-shield, turnstile, secrets-store |
+| Network | tunnel, spectrum, argo-smart-routing, network-interconnect, workers-vpc |
+| Email / realtime | email-routing, email-workers, realtime-sfu, realtimekit, turn |
+| Tooling / IaC | wrangler, c3, miniflare, workerd, terraform, pulumi, api, bindings, observability, workers-playground |
 
 ## Red Flags
 
-`import fs` / `Buffer`; bundle > 1MB; secrets in toml; `fetch('https://my-db.example.com')`; D1 for cache; KV for transactions.
-
-## Anti-Patterns
-
-**Node.js APIs**; **secrets in toml**; **HTTP to own service**; **huge bundle**; **D1 for cache**; **KV for transactions**; **missing `compatibility_date`**.
+Node.js APIs in Workers (`import fs`, `Buffer`, `child_process`); bundle > 1MB; secrets in `wrangler.toml`; HTTP fetch to your own service (`fetch('https://my-db.example.com')` — use a binding); missing `compatibility_date`; KV for transactional data (use D1); D1 for hot cache (use KV); shipping without `wrangler dev`.

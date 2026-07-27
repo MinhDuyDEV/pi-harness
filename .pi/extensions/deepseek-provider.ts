@@ -23,6 +23,7 @@
 
 import type { ProviderConfig, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { DEEPSEEK_BASE_URL, deepseekStreamSimple } from "./deepseek/stream.js";
+import { readExtensionGate } from "./lib/harness-settings.js";
 
 // Official pricing as of 2026-05-26: https://api-docs.deepseek.com/quick_start/pricing
 //
@@ -117,6 +118,9 @@ export interface DeepseekProviderApi {
 }
 
 export default function (pi: DeepseekProviderApi) {
+  // Opt-in gate: a consumer who installs the harness should not get a
+  // third-party provider registered until settings.json says so.
+  if (!readExtensionGate(undefined, "deepseek", false)) return;
   pi.registerProvider("deepseek", {
     name: "DeepSeek",
     baseUrl: DEEPSEEK_BASE_URL,

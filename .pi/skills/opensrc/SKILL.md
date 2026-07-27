@@ -1,8 +1,6 @@
 ---
 name: opensrc
-description: Use when you need to understand how a library works internally, debug dependency issues, or inspect package source
-  code beyond types and docs. Fetches source for npm, PyPI, crates.io packages and GitHub repos. Includes structured research
-  workflow for deep investigation.
+description: Fetches and investigates package source (npm, PyPI, crates.io, GitHub) with a question-driven workflow. Use when a library behaves unexpectedly, docs don't explain a behavior, or when planning a migration.
 metadata:
   version: 1.1.0
   tags:
@@ -47,18 +45,18 @@ Good docs and types answer; behavior is standard and obvious; "I just want to us
 | "When was X added?" | `git log` on the file |
 | "Known bug?" | GitHub issues |
 
-## Red Flags While Reading
+## Security Tells While Reading
 
 `eval`, `new Function` in unexpected places; `child_process.exec` with user input; `fs.writeFile` with untrusted paths; network calls to hardcoded domains; hidden side effects in `import` / `require`; deps on packages that don't exist.
 
-## Common Mistakes
+## References
 
-Reading source without a question (drift); assuming docs are right (verify); reading old version (check `package.json`); not running code while reading; stuck in dep hell (find boundary); "I don't need to look" (until it breaks); "docs say X" without verifying.
+- See [references/cli-usage.md](references/cli-usage.md) for the opensrc CLI commands and flags.
+- See [references/registry-support.md](references/registry-support.md) for npm/PyPI/crates.io/GitHub specifics.
+- See [references/source-structure.md](references/source-structure.md) for where fetched source lands and how packages are laid out.
+- See [references/example-workflow.md](references/example-workflow.md) for a worked end-to-end investigation.
+- See [references/analysis-tips.md](references/analysis-tips.md), [references/common-patterns.md](references/common-patterns.md), and [references/architecture.md](references/architecture.md) for reading strategies and tool internals; [references/anti-patterns.md](references/anti-patterns.md) and [references/further-reading.md](references/further-reading.md) for pitfalls and sources.
 
 ## Red Flags
 
-"I think it works like X" without reading; not checking the version; wrong package; not running a verification test; trusting README over code; "I don't need to read the source" (you do); "docs are out of date" (without checking); debugging without hypothesis.
-
-## Anti-Patterns
-
-**Trust the docs**; **skip the tests**; **read wrong version**; **read without a question**; **"I think it works"**; **drift into reading the whole codebase**.
+Reading source without a question (drift into reading the whole codebase); "I think it works like X" without reading; trusting docs/README over code ("docs say X" — verify); reading the wrong version (check `package.json` and the lockfile); not running a verification test while reading; debugging without a hypothesis; skipping the tests (they document intent); "I don't need to look" (until it breaks); stuck in dep hell (find the boundary).

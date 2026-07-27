@@ -1,7 +1,6 @@
 ---
 name: testing-anti-patterns
-description: Use when writing or changing tests, adding mocks, or tempted to add test-only methods to production code - prevents
-  testing mock behavior, production pollution with test-only methods, and mocking without understanding dependencies
+description: Catches tests that prove nothing — tautologies, mock-only assertions, test-only production methods. Use when writing or changing tests, adding mocks, or when a test would pass with the body deleted.
 metadata:
   version: 1.0.0
   tags:
@@ -84,13 +83,9 @@ jest.mock("../db")
 
 Mocks that hide too much test the wiring, not the behavior. Rule: if you can't explain what the real dep does, write a contract test against the real one first.
 
-## Common Mistakes
-
-Tautology tests; mock-only assertions; test-only methods; mocking the implementation; `jest.mock` for everything; "test passes" without checking; shared state; snapshot tests without intent; testing private methods; asserting call order without need.
-
 ## Red Flags
 
-Test passes when body is empty; test asserts only `toHaveBeenCalled`; `_method` in prod; `jest.mock` without scope; shared `beforeEach` mutation; tests depend on each other; snapshot of a snapshot; testing private via cast.
+Test passes when the function body is deleted (tautology); test asserts only `toHaveBeenCalled`; `_method` in production for tests; `jest.mock` blanketing a whole dependency without a contract test; shared `beforeEach` mutation; tests that depend on each other; snapshot tests without stated intent; testing private methods via casts; asserting call order without need.
 
 ## Anti-rationalization
 
@@ -99,7 +94,3 @@ Test passes when body is empty; test asserts only `toHaveBeenCalled`; `_method` 
 | "The mock returns what the real thing would" | You're testing the mock's promise, not real behavior; the test passes when the real code breaks. |
 | "I need this method for the test" | A test-only method in production pollutes production for tests; test through the real interface. |
 | "Tautology tests are better than none" | A tautology test gives false confidence + blocks real tests; delete it, write a real one. |
-
-## Anti-Patterns
-
-**Tautology**; **mock test**; **test-only method**; **mock everything**; **no contract**; **shared state**; **private testing**.

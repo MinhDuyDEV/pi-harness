@@ -85,6 +85,11 @@
   "showCacheMissNotices": true,
   "pi-harness": {
     "superpi": true,
-    "gptPersonality": true
+    "gptPersonality": true,
+    "extensions": {
+      "deepseek": true,
+      "mimo": true,
+      "xai": true
+    }
   }
 }

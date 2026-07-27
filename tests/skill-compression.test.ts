@@ -1,7 +1,7 @@
 // Skill compression tests — P3 (superpowers-inspired upgrades arc D)
 //
 // Contract: each "most-loaded" skill must be ≤ 600 words (body only, excluding
-// Raised from 500 → 600 to accommodate the anti-rationalization-table section (see skill-anatomy).
+// Raised from 500 → 600 to accommodate the anti-rationalization-table section (see writing-skills "Anatomy Spec").
 // YAML frontmatter) and must preserve the load-bearing compliance markers
 // (iron laws, red flags, anti-patterns, signature terms). The word count is
 // approximate — what matters is the spirit, not a strict CI battle over a few
@@ -15,6 +15,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { TARGET_WORD_CAP } from "../scripts/lib/skill-budget.mjs";
+
 const SKILLS_DIR = resolve(import.meta.dirname, "../.pi/skills");
 
 interface SkillSpec {
@@ -27,7 +29,7 @@ interface SkillSpec {
 const TARGETS: SkillSpec[] = [
   {
     name: "artifact-format",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: [
       "TODO.md",
       "PLAN.md",
@@ -39,17 +41,17 @@ const TARGETS: SkillSpec[] = [
   },
   {
     name: "brainstorming",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["YAGNI", "variant", "interview", "reference"],
   },
   {
     name: "planning-and-task-breakdown",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["most-likely-to-change", "mechanical", "plan", "spec"],
   },
   {
     name: "development-lifecycle",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: [
       "/create",
       "/plan",
@@ -65,303 +67,304 @@ const TARGETS: SkillSpec[] = [
   },
   {
     name: "writing-skills",
-    maxWords: 600,
-    markers: ["Iron Law", "RED", "GREEN", "REFACTOR", "baseline", "pressure"],
+    maxWords: TARGET_WORD_CAP,
+    markers: ["Iron Law", "RED", "GREEN", "REFACTOR", "baseline", "pressure", "anatomy", "700"],
   },
   {
     name: "code-review-and-quality",
-    maxWords: 600,
-    markers: ["scope", "delete", "Bloat", "review"],
+    maxWords: TARGET_WORD_CAP,
+    markers: ["scope", "delete", "Bloat", "review", "gate", "duplication", "blocker", "spec compliance"],
   },
   {
     name: "debugging-and-error-recovery",
-    maxWords: 600,
-    markers: ["territory", "Retry", "escalat", "fallback"],
-  },
-  {
-    name: "diagnose",
-    maxWords: 600,
-    markers: ["root cause", "trace", "instrument", "hypothesi"],
+    maxWords: TARGET_WORD_CAP,
+    markers: ["territory", "Retry", "escalat", "fallback", "red-capable", "feedback loop", "boundar", "hypothesi", "find-polluter", "regression"],
   },
   {
     name: "incremental-implementation",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["smallest", "RED", "GREEN", "verify"],
   },
   {
     name: "verification-before-completion",
-    maxWords: 600,
-    markers: ["evidence", "assertion", "verif", "claim"],
+    maxWords: TARGET_WORD_CAP,
+    markers: ["evidence", "assertion", "verif", "claim", "cap", "escalate", "iterat"],
   },
   // --- Batch 2: next 15 most-loaded (2026-07-04) ---
   {
     name: "test-driven-development",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["RED", "GREEN", "REFACTOR", "Iron Law", "failing test", "behavior"],
   },
   {
     name: "inference-service",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["queue", "circuit", "batching", "abort", "fallback"],
   },
   {
-    name: "opencode-ts-service",
-    maxWords: 600,
+    name: "effect-service-patterns",
+    maxWords: TARGET_WORD_CAP,
     markers: ["Tag", "Layer", "Effect", "errors as data", "any"],
   },
   {
     name: "design-taste-frontend",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["typography", "whitespace", "spacing", "scale"],
   },
   {
-    name: "opencode-ts-package",
-    maxWords: 600,
+    name: "ts-package-authoring",
+    maxWords: TARGET_WORD_CAP,
     markers: ["exports", "workspace", "peerDependencies", "barrel"],
   },
   {
     name: "typescript-coding-standards",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["any", "errors as data", "branded", "pure"],
   },
   {
     name: "effect-schema",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["Schema", "decodeUnknown", "branded", "TaggedError", "boundary"],
   },
   {
     name: "redesign-existing-projects",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["audit", "tokens", "component", "functionality"],
   },
   {
     name: "effect-http-api",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["HttpApi", "endpoint", "schema", "error", "status"],
   },
   {
     name: "swiftui-expert-skill",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["State", "Observable", "view", "state", "NavigationStack"],
   },
   {
     name: "high-end-visual-design",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["typography", "restraint", "real", "premium", "agency"],
   },
   {
     name: "playwright",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["locator", "role", "wait", "test", "user"],
   },
   {
     name: "customize-pi",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["settings", "model", "context", "extension", "skill"],
   },
   {
     name: "security-and-hardening",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["boundary", "authn", "authz", "secrets", "bcrypt", "rate limit"],
   },
   {
     name: "testing-anti-patterns",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["tautology", "mock", "seam", "behavior", "production"],
   },
   // --- Batch 3: next 12 most-loaded (2026-07-04) ---
   {
     name: "figma",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["FIGMA_API_KEY", "node_id", "tokens", "fetch"],
   },
   {
     name: "fallow",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["dead", "dupes", "health", "format json", "evidence"],
   },
   {
     name: "code-cleanup",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["lock behavior", "simplify", "delete", "verify", "scope"],
   },
   {
-    name: "quality-loop",
-    maxWords: 600,
-    markers: ["iterate", "cap", "gate", "fix", "escalate"],
-  },
-  {
-    name: "root-cause-tracing",
-    maxWords: 600,
-    markers: ["trace backward", "boundary", "hypothesis", "symptom", "regression test"],
-  },
-  {
     name: "documentation-and-adrs",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["ADR", "context", "consequences", "alternatives", "doc rot"],
   },
   {
     name: "deprecation-and-migration",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["deprecate", "migration", "codemod", "changelog", "major"],
   },
   {
     name: "api-and-interface-design",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["contract", "version", "idempotency", "error", "schema"],
   },
   {
     name: "ci-cd-and-automation",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["PR", "cache", "secret", "matrix", "deploy"],
   },
   {
     name: "defense-in-depth",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["boundary", "validate", "schema", "trust", "constraints"],
   },
   {
     name: "performance-optimization",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["measure", "baseline", "bottleneck", "Core Web Vitals", "algorithmic"],
   },
   {
     name: "opensrc",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["source", "verify", "version", "test", "hypothesis"],
   },
   // --- Batch 4: next 12 most-loaded (2026-07-04) ---
   {
     name: "ast-grep",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["pattern", "ast-grep", "structural", "rule", "rewrite"],
   },
   {
     name: "deep-module-design",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["interface", "deep", "shallow", "module", "test seam"],
   },
   {
     name: "swift-concurrency",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["actor", "Sendable", "Task", "isolation", "MainActor"],
   },
   {
     name: "frontend-design",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["shadcn", "server component", "use client", "Tailwind", "shadcn/ui"],
   },
   {
     name: "pdf-extract",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["pdfplumber", "scanned", "table", "OCR", "vision model"],
   },
   {
     name: "minimalist-ui",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["whitespace", "monochrome", "bento", "rounded", "minimal"],
   },
   {
     name: "industrial-brutalist-ui",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["mono", "border-radius", "hairline", "system chrome", "brutalist"],
   },
   {
     name: "cloudflare",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["wrangler", "V8 isolate", "binding", "D1", "compatibility_date"],
   },
   {
     name: "improve-codebase-architecture",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["refactor", "baseline", "smell", "strangler", "measure"],
   },
   {
     name: "using-git-worktrees",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["worktree", "branch", "sibling", "prune", "isolation"],
   },
   {
-    name: "agent-code-quality-gate",
-    maxWords: 600,
-    markers: ["gate", "scope", "duplication", "verification", "blocker"],
-  },
-  {
     name: "spec-driven-development",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["spec", "goal", "non-goals", "criteria", "interview"],
   },
   // --- Batch 5: next 12 most-loaded (2026-07-04) ---
   {
     name: "grill-me",
-    maxWords: 600,
-    markers: ["grill", "assumption", "question", "plan", "hole"],
+    maxWords: TARGET_WORD_CAP,
+    markers: ["grill", "assumption", "question", "plan", "hole", "glossary", "ADR", "CONTEXT.md"],
   },
   {
     name: "react-best-practices",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["server component", "useEffect", "bundle", "React.memo", "code-split"],
   },
   {
     name: "design-system-audit",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["token", "audit", "spec", "component", "breach"],
   },
   {
     name: "mockup-to-code",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["design", "token", "component", "validate", "spec"],
   },
   {
     name: "resend",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["React Email", "templates", "inbound", "webhook", "send"],
   },
   {
-    name: "browser-tools",
-    maxWords: 600,
-    markers: ["browser", "Chrome", "macOS", "screenshot", "cookies"],
-  },
-  {
     name: "superpi",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["skill", "Pi", "routing", "optional", "available"],
   },
   {
     name: "obsidian",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["note", "tag", "vault", "frontmatter", "MCP"],
   },
   {
     name: "browser-testing-with-devtools",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["browser", "DOM", "console", "network", "screenshot"],
   },
   {
     name: "accessibility-audit",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["WCAG", "contrast", "keyboard", "focus", "label"],
   },
   {
     name: "aislop",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["narrative", "console.log", "as any", "wrapper", "slop"],
   },
   {
     name: "core-data-expert",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["fetch", "predicate", "migration", "merge", "batch"],
   },
-  // --- Batch 6: final 2 (2026-07-04) ---
-  {
-    name: "stitch",
-    maxWords: 600,
-    markers: ["Stitch", "generate", "screen", "MCP"],
-  },
+  // --- Batch 6: final (2026-07-04) ---
   {
     name: "diagnostics",
-    maxWords: 600,
+    maxWords: TARGET_WORD_CAP,
     markers: ["diagnostics", "scope", "fallow", "typecheck", "lint"],
+  },
+  // --- Batch 7: overhaul additions — new + merged skills (2026-07-27) ---
+  {
+    name: "context-engineering",
+    maxWords: TARGET_WORD_CAP,
+    markers: ["CONFUSION:", "starvation", "flooding", "attention budget", "package.json"],
+  },
+  {
+    name: "observability-and-instrumentation",
+    maxWords: TARGET_WORD_CAP,
+    markers: ["rate, errors, duration", "correlation", "cardinality", "hot loop", "p95"],
+  },
+  {
+    name: "domain-modeling",
+    maxWords: TARGET_WORD_CAP,
+    markers: ["ubiquitous", "CONTEXT.md", "glossary", "aggregate", "value object"],
+  },
+  {
+    name: "create-design-md",
+    maxWords: TARGET_WORD_CAP,
+    markers: ["normative", "observational", "token schema", "quality gate", "evidence"],
+  },
+  {
+    name: "fixing-motion-performance",
+    maxWords: TARGET_WORD_CAP,
+    markers: ["compositor", "transform", "opacity", "will-change", "layout"],
+  },
+  {
+    name: "supabase",
+    maxWords: TARGET_WORD_CAP,
+    markers: ["SUPABASE_ACCESS_TOKEN", "RLS", "rules/", "read_only", "get_advisors"],
   },
 ];
 

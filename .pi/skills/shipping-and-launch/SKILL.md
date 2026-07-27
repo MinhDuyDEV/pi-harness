@@ -1,6 +1,6 @@
 ---
 name: shipping-and-launch
-description: Use when preparing to merge, deploy, release, or declare a development branch complete.
+description: Pre-ship gate for merges, deploys, and releases — verification evidence, phantom-completion checks, rollback planning. Use when the user says ship, merge, deploy, release, or finish, or before creating a PR.
 metadata:
   version: 1.0.0
   tags:
@@ -93,7 +93,4 @@ Core principle: do not ship work that cannot be verified, explained, or rolled b
 </skill_result>
 ```
 
-
-## Consolidated Branch Completion
-
-`finishing-a-development-branch` was removed as a separate optional skill. Keep merge/PR/cleanup choices, release handoff, rollback planning, and completion evidence in this canonical shipping workflow.
+This is the canonical branch-completion workflow: merge/PR/cleanup choices, release handoff, rollback planning, and completion evidence all live here.

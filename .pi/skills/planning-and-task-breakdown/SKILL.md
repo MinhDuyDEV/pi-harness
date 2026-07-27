@@ -1,6 +1,6 @@
 ---
 name: planning-and-task-breakdown
-description: Use when a feature/change has a spec or clear goal and needs an executable implementation plan.
+description: Turns a spec into an ordered plan of independently verifiable slices with verification commands. Use when work spans multiple files, sessions, or workers, or when a subagent needs an executable plan.
 metadata:
   version: 1.0.0
   tags:

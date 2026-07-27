@@ -1,6 +1,6 @@
 ---
 name: doubt-driven-development
-description: 'Use when a non-trivial decision, design, or claim needs to survive scrutiny before code is written or before work is declared done — runs a fresh-context adversarial review that attacks the strongest version of the plan and hunts for the failure modes confidence hides. Distinct from grill-me (user-driven Q&A) and code-review (post-change audit): this is pre-decision doubt, in a fresh frame.'
+description: Runs a fresh-context adversarial review attacking the strongest version of a plan or claim. Use before writing code for a non-trivial design or fix, or before declaring work done.
 ---
 
 # Doubt-driven development

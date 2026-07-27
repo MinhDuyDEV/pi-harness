@@ -1,7 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Use when the user wants to improve architecture, find refactoring opportunities, consolidate tightly-coupled
-  modules, or make a codebase more testable and AI-navigable.
+description: Behavior-preserving architecture refactoring — risk-ordered ladder, code-smell table, strangler fig. Use when modules are tightly coupled, tests are hard to write, or one change touches many files.
 metadata:
   version: 1.0.0
 ---
@@ -79,14 +78,14 @@ For larger refactors:
 3. **Remove old path.** Once 100% on new.
 4. **One piece at a time.** Module by module.
 
-## Common Mistakes
+## References
 
-Refactor without tests; big-bang rewrite; "perfect is the enemy" → over-polish; rename without target; refactor + feature in one PR; no measurement.
+- See [LANGUAGE.md](LANGUAGE.md) for the shared vocabulary (module, interface, seam, adapter, leverage) — use these terms exactly.
+- See [DEEPENING.md](DEEPENING.md) for deepening a cluster of shallow modules safely, by dependency category.
+- See [INTERFACE-DESIGN.md](INTERFACE-DESIGN.md) for the design-it-twice parallel sub-agent pattern when exploring alternative interfaces.
+- See [HTML-REPORT.md](HTML-REPORT.md) for rendering an architectural review as a self-contained HTML report.
+- ADR format is owned by `documentation-and-adrs`; CONTEXT.md format by `grill-me` (each under `references/`).
 
 ## Red Flags
 
-Refactor without tests; no baseline; "I think this is better" (no metric); "rewrite it"; multiple axes; refactor + feature; tests skipped; "moved it, better" (no proof).
-
-## Anti-Patterns
-
-**Refactor without tests**; **no baseline**; **"rewrite"**; **multiple axes**; **refactor + feature**; **"I think"**; **"moved it"**; **one PR, many changes**.
+Refactoring without tests; no baseline measurement; "I think this is better" (no metric); jumping to rewrite; multiple axes in one PR; refactor mixed with feature work; "perfect is the enemy" over-polish; rename without a target vocabulary; "moved it, so it's better" (no proof).

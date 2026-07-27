@@ -1,6 +1,10 @@
 ---
 name: brave-search
-description: Use when an explicit Brave Search API workflow is requested and no host-provided web search tool is available.
+description: >-
+  Runs web search and page-content fetches through the Brave Search API using vendored Node scripts
+  (requires BRAVE_API_KEY and a one-time dependency install). User-invoked: load via
+  /skill:brave-search when no host-provided web search or fetch tool is available and a Brave Search
+  workflow is explicitly needed.
 disable-model-invocation: true
 metadata:
   category: optional-integration

@@ -2,6 +2,8 @@
 import { resolve, relative, join } from "node:path";
 import { existsSync, readFileSync } from "node:fs";
 
+import { MAX_VISIBLE_SKILLS, MAX_DESCRIPTION_CHARS } from "./skill-budget.mjs";
+
 function formatDiagnostic(diagnostic) {
   if (typeof diagnostic === "string") return diagnostic;
   const location = diagnostic.path ? `${diagnostic.path}: ` : "";
@@ -19,7 +21,7 @@ export function assertResourcesLoad(loader, { root }) {
     0,
   );
 
-  if (modelVisibleSkills.length > 40 || visibleDescriptionCharacters > 8_000) {
+  if (modelVisibleSkills.length > MAX_VISIBLE_SKILLS || visibleDescriptionCharacters > MAX_DESCRIPTION_CHARS) {
     throw new Error(
       `skill prompt budget exceeded: ${modelVisibleSkills.length} skills / ${visibleDescriptionCharacters} characters`,
     );

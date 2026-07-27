@@ -1,7 +1,6 @@
 ---
 name: defense-in-depth
-description: Use when invalid data causes failures deep in execution, requiring validation at multiple system layers - validates
-  at every layer data passes through to make bugs structurally impossible
+description: Layered validation making invalid data structurally impossible at every trust boundary. Use when invalid data fails deep in the stack, or when deciding which layers must validate.
 metadata:
   version: 1.0.0
   tags:
@@ -71,14 +70,6 @@ Anything from outside the type system (network, queue, file, env, DB) gets valid
 
 The cost of re-validating is real but small compared to the cost of corrupt data.
 
-## Common Mistakes
-
-Validation only at network (deep code trusts the type, gets garbage); validation only at DB (bad UX); `as any` to skip; "we trust this source" (sources change); validation scattered; validation in business logic; no validation for env vars or queue messages.
-
-## Red Flags
-
-`as any` near boundary; validation only at network; "we trust this source"; no validation for env / queue; validation in middle of function (should be at boundary); try/catch for validation (errors are data); no DB constraints; "the type system catches it" (catches what you typed, not what user sent).
-
 ## Anti-rationalization
 
 | Shortcut the model reaches for | Why it fails here |
@@ -87,6 +78,6 @@ Validation only at network (deep code trusts the type, gets garbage); validation
 | "The caller already checks it" | Callers change; your layer's contract is its own validation, not the caller's memory. |
 | "Validating twice is redundant" | Redundancy is the point — each layer makes the next bug structurally impossible. |
 
-## Anti-Patterns
+## Red Flags
 
-**Validation only at network**; **validation only at DB**; **`as any` to skip**; **no env validation**; **validation in business logic**; **try/catch for validation**; **"we trust this"**; **no DB constraints**.
+`as any` near a boundary; validation only at network (deep code trusts the type, gets garbage); validation only at DB (bad UX); "we trust this source" (sources change); no validation for env vars or queue messages; validation scattered or buried mid-function instead of at the boundary; try/catch for validation (errors are data); no DB constraints; "the type system catches it" (it catches what you typed, not what the user sent).

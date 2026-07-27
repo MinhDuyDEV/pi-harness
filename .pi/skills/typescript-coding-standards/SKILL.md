@@ -1,7 +1,6 @@
 ---
 name: typescript-coding-standards
-description: Use when writing, refactoring, or reviewing TypeScript code that needs strong domain modeling, typed errors,
-  schema parsing, safe adapters, test seams, or maintainable module boundaries.
+description: TypeScript standards for domain-heavy code — branded types, discriminated unions, errors as data, pure core with adapters. Use when writing or reviewing TypeScript that models a domain or parses input.
 metadata:
   version: 1.0.0
   tags:
@@ -105,14 +104,6 @@ Business code depends on `UserRepo`, not `pg`. Tests use in-memory `UserRepo`.
 - No circular deps. If A imports B, B does not import A.
 - Index files are minimal — only the public surface.
 
-## Common Mistakes
-
-`any`; `throw` for domain; raw errors in `Promise<T>`; `console.log` / `Date.now` in business logic; `JSON.parse` deep in stack; tests that mock what they test; types that mirror DB schema; stringly-typed enums; global state; `as` casts.
-
 ## Red Flags
 
-`any` in production; untyped `JSON.parse`; `try/catch` around `await`; `Date.now()` in logic; `console.log` left; `data: any`; circular imports; tests that don't test.
-
-## Anti-Patterns
-
-**"Just a string"** (no branded type); **"errors are exceptions"**; **"types later"**; **"test with mock"** (test seam); **"any to unblock"**; **"utils.ts"**.
+`any` in production ("any to unblock"); `throw` for domain errors; untyped `JSON.parse` or `req.body` reaching the core; `Date.now()` / `console.log` inside business logic; `as` casts to silence the checker; "just a string" where a branded type belongs; types that mirror the DB schema instead of the domain; stringly-typed enums; global state; circular imports; grab-bag `utils.ts`; tests that mock the thing they claim to test.

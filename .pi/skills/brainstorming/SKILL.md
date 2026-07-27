@@ -1,8 +1,6 @@
 ---
 name: brainstorming
-description: Use when creating or developing, before writing code or implementation plans - refines rough ideas into fully-formed
-  designs through collaborative questioning, alternative exploration, and incremental validation. Don't use during clear 'mechanical'
-  processes
+description: Refines rough ideas into approved designs through unknown classification, cheap variants, and questioning. Use before writing code when a request is vague or design-heavy, or when several approaches exist.
 metadata:
   version: 1.1.0
   tags:
@@ -25,7 +23,7 @@ Do not write code, draft an implementation plan, or invoke `incremental-implemen
 
 ## When NOT to Use
 
-- Bug fixes with known root cause → `diagnose`.
+- Bug fixes with known root cause → `debugging-and-error-recovery`.
 - Mechanical refactor with a clear spec → `incremental-implementation`.
 - Trivial one-liner or config value.
 

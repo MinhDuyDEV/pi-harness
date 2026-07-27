@@ -1,7 +1,9 @@
 ---
 name: polar
-description: Use when implementing payment flows, subscriptions, license keys, or customer portals with Polar. MUST load before
-  writing any checkout, monetization, or billing code using Polar platform.
+description: >-
+  Polar billing integration via @polar-sh/sdk — checkout sessions, subscriptions, license key
+  validation, and signed webhook handling. User-invoked: load via /skill:polar when implementing
+  payments, monetization, license keys, or customer portals on the Polar platform.
 metadata:
   version: 1.0.0
   tags:
@@ -15,27 +17,11 @@ disable-model-invocation: true
 
 ## When to Use
 
-- When implementing Polar checkout, subscriptions, or license key flows.
+Implementing Polar checkout, subscriptions, license keys, customer portals, or payment webhooks.
 
 ## When NOT to Use
 
-- When payments are handled by a different platform.
-
-
-## What I Do
-
-- Guide implementation of Polar checkout and payments
-- Help with subscription management and billing
-- Assist with license key validation
-- Set up webhook handlers for payment events
-
-## When to Use Me
-
-- Implementing checkout flow for a product
-- Adding subscription billing to an app
-- Setting up license key validation
-- Building a customer portal
-- Handling payment webhooks
+Payments handled by a different platform (Stripe, Paddle, Lemon Squeezy).
 
 ## Quick Start
 
@@ -48,7 +34,7 @@ import { Polar } from "@polar-sh/sdk";
 
 const polar = new Polar({
   accessToken: process.env.POLAR_ACCESS_TOKEN!,
-  server: "production", // or "sandbox"
+  server: "sandbox", // "production" only after the flow is verified end to end
 });
 ```
 
@@ -63,6 +49,8 @@ const polar = new Polar({
 | `polar.customers.*`     | Customer management               |
 | `polar.licenseKeys.*`   | Issue and validate licenses       |
 
+This table is orientation only — verify current method signatures against the [API docs](https://docs.polar.sh/api-reference) before writing code; SDK surfaces drift.
+
 ## Environment Variables
 
 | Variable               | Description                     |
@@ -72,33 +60,28 @@ const polar = new Polar({
 
 ## Common Patterns
 
-### Create Checkout
-
 ```typescript
+// Create checkout, then redirect to checkout.url
 const checkout = await polar.checkouts.create({
   productId: "prod_xxx",
   successUrl: "https://myapp.com/success",
 });
-// Redirect to checkout.url
-```
 
-### Validate License Key
-
-```typescript
+// Validate a license key
 const result = await polar.licenseKeys.validate({
   key: "XXXX-XXXX-XXXX-XXXX",
   organizationId: "org_xxx",
 });
-```
 
-### Handle Webhook
-
-```typescript
+// Handle a webhook — signature check is mandatory
 import { validateEvent } from "@polar-sh/sdk/webhooks";
-
 const event = validateEvent(body, signature, process.env.POLAR_WEBHOOK_SECRET!);
 // event.type: "subscription.created", "order.created", etc.
 ```
+
+## Red Flags
+
+Granting entitlements from the client's success redirect instead of a verified webhook event; skipping `validateEvent` signature verification; developing against production instead of sandbox; hardcoded access tokens (env vars only); trusting the API table above over current docs for exact signatures.
 
 ## Links
 

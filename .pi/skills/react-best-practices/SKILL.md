@@ -1,14 +1,12 @@
 ---
 name: react-best-practices
-description: MUST load when writing, reviewing, or refactoring React/Next.js code for performance. Covers Vercel Engineering
-  patterns — components, data fetching, bundle optimization, server components. Critical for any Next.js performance work.
+description: React and Next.js performance patterns — server components by default, colocated data fetching, code-splitting. Use when writing or reviewing React code, especially "use client" sprawl or useEffect misuse.
 metadata:
   version: 1.0.0
   tags:
   - ui
   - code-quality
   dependencies: []
-disable-model-invocation: true
 ---
 
 # React Best Practices
@@ -80,14 +78,15 @@ const { data, error } = useSWR("/api/data", fetcher)
 - Profile with React DevTools before optimizing.
 - Avoid inline handlers that break `React.memo`.
 
-## Common Mistakes
+## Full Rule Set
 
-`"use client"` everywhere; `useEffect` for derived state; prop drilling 5+ levels; no code-splitting; `React.memo` without measuring; inline handlers; `useCallback` everywhere; importing the whole library instead of the module; `useEffect` + `setState` pattern; async in `useEffect` without cleanup; not using `Suspense` boundaries.
+This SKILL.md is the summary of a 40+ rule guide maintained in this directory:
+
+- `rules/` — one file per rule, grouped by prefix: `async-*` (waterfalls), `bundle-*`, `server-*`, `client-*`, `rerender-*`, `rendering-*`, `js-*`, `advanced-*`.
+- `AGENTS.md` — the compiled, prioritized guide with full examples and impact notes.
+
+For any non-trivial performance question, read the matching `rules/<area>-*.md` file (or `AGENTS.md` for the prioritized whole) instead of guessing.
 
 ## Red Flags
 
-`"use client"` at top of every file; `useEffect` for state; prop drilling 5+; no code-split; `React.memo` everywhere (measure first); inline handlers; `import { everything }`; `useEffect` + `setState`; `async` in `useEffect` without cleanup; missing `Suspense`; bundle > 200KB per page.
-
-## Anti-Patterns
-
-**`"use client"` everywhere**; **`useEffect` for derived**; **prop drilling**; **no code-split**; **`React.memo` everywhere**; **`useCallback` everywhere**; **whole-library import**; **`useEffect` + `setState`**; **no `Suspense`**.
+`"use client"` at the top of every file; `useEffect` for derived state; prop drilling 5+ levels; no code-splitting; `React.memo` or `useCallback` everywhere without measuring; inline handlers that break `React.memo`; whole-library imports (`import { x } from "big-lib"` via barrel files); `useEffect` + `setState` pattern; `async` in `useEffect` without cleanup; missing `Suspense` boundaries; bundle > 200KB per page.

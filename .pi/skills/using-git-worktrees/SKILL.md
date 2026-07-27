@@ -1,7 +1,6 @@
 ---
 name: using-git-worktrees
-description: Use when starting feature work that needs isolation from current workspace or before executing implementation
-  plans - creates isolated git worktrees with smart directory selection and safety verification
+description: Git worktree workflow — isolated sibling working copies per branch, PR review in detached worktrees, cleanup via prune. Use when work needs isolation, or when testing a PR without disrupting the working copy.
 metadata:
   version: 1.0.0
   tags:
@@ -78,14 +77,6 @@ Before creating a worktree:
 - **Is the target directory empty?** Don't overwrite.
 - **Is the path absolute?** `git worktree add` requires absolute paths in some configs.
 
-## Common Mistakes
-
-Creating a worktree inside the repo (nested paths confuse `pwd`); trying to check out the same branch in two worktrees (refused); leaving dead worktrees around (prune them); pushing to the wrong branch (you have two now); not committing before switching (lost work, not in stash); "I created a worktree for a 5-line fix" (overhead); forgetting which directory you're in (the worktree problem).
-
 ## Red Flags
 
-Worktree inside the repo; same branch in two worktrees; dead worktrees not pruned; "I lost my changes" (didn't commit before switching); "which directory am I in?"; pushing to wrong branch; "I have 5 worktrees" (prune, focus); worktree for one-line fix.
-
-## Anti-Patterns
-
-**Nested worktrees** (sibling); **same branch twice**; **dead worktrees** (prune); **uncommitted switch** (lost work); **"which dir"** (single-purpose worktree, finish or prune); **worktree for one-liner**; **5 worktrees** (focus, prune).
+Worktree nested inside the repo (use a sibling directory — nested paths confuse `pwd`); same branch checked out in two worktrees (git refuses); dead worktrees never pruned; switching without committing (lost work is not in stash); pushing to the wrong branch (you have two now); "which directory am I in?" confusion (keep worktrees single-purpose — finish or prune); a worktree for a one-line fix (overhead); five worktrees accumulating (prune, focus).

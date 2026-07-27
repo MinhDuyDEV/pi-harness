@@ -15,7 +15,6 @@ Two tracks for improving code without adding features:
 Load these available skills using the current session's skill-loading instructions. If no dedicated loader is exposed, read each skill's listed `SKILL.md` file.
 
 - skill: `debugging-and-error-recovery`
-- skill: `root-cause-tracing`
 - skill: `verification-before-completion`
 - skill: `code-cleanup`
 - skill: `deep-module-design`

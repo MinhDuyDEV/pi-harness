@@ -1,7 +1,10 @@
 ---
 name: high-end-visual-design
-description: Use INSTEAD OF design-taste-frontend when user explicitly requests premium, agency-quality, or luxury visual
-  design. Defines exact fonts, spacing, shadows, and animations that make websites feel expensive. Blocks cheap AI defaults.
+description: >-
+  Premium, agency-grade visual design rules — editorial type pairings, restrained color,
+  generous spacing, spring-physics motion, real photography. User-invoked: load via
+  /skill:high-end-visual-design when the user explicitly asks for premium, luxury, or
+  agency-quality visuals; applies on top of the design-taste-frontend base.
 metadata:
   version: 1.0.0
   tags:
@@ -24,7 +27,7 @@ disable-model-invocation: true
 
 ## Typography (Editorial)
 
-- **Display**: a serif or display sans (Editorial New, Migra, GT Sectra, Migra, Fraunces) for hero
+- **Display**: a serif or display sans (Editorial New, Migra, GT Sectra, Fraunces) for hero
 - **Body**: a clean grotesque (Söhne, Inter, GT America) for body
 - **Mono**: a real mono (Berkeley Mono, JetBrains Mono) for code
 - Sizes: 14-16 body, 18-20 subhead, 24-32 section, 48-96 hero, 120+ display
@@ -70,14 +73,12 @@ disable-model-invocation: true
 - Error states with character (illustrated, helpful, not apologetic)
 - Empty states that teach (illustration + CTA)
 
-## Anti-Patterns (LLM premium defaults)
-
-Centered everything; gold/silver gradients; glassmorphism; "AI" purple/blue; abstract gradient hero; stock laptops; "tap to learn more"; 3-line testimonials; 20-logo "trusted by"; "we are passionate"; lorem ipsum; missing focus.
-
 ## The "Agency" Test
 
 If you showed this to a creative director at a top agency, would they say "nice work" or "I've seen this 100 times"? Aim for "nice work" — meaning the design has a perspective, not just a template.
 
 ## Red Flags
 
-System fonts in production; "AI purple" accent; abstract gradient hero; stock photos; bounce animations; emoji in copy; "trusted by" with fake logos; "we are passionate"; "tap to learn more"; lorem ipsum anywhere; multiple accent colors; missing focus states; pure black/white.
+LLM premium defaults to reject: centered everything; gold/silver gradients; glassmorphism; "AI" purple/blue accents; abstract-gradient hero; stock laptops and stock people; 20-logo "trusted by" walls (or fake logos); "we are passionate"; "tap to learn more"; 3-line testimonials; lorem ipsum anywhere.
+
+Quality failures: system fonts in production; bounce animations; emoji in copy; multiple accent colors; missing focus states; pure black/white.

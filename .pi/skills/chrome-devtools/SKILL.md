@@ -1,7 +1,10 @@
 ---
 name: chrome-devtools
-description: Use when debugging web apps in Chrome — performance profiling, network inspection, DOM debugging, or console
-  automation. MUST load before any Chrome DevTools-based debugging session.
+description: >-
+  Drives a live Chrome page over the DevTools Protocol via the chrome-devtools MCP server — snapshot,
+  click, fill, evaluate_script, screenshots. User-invoked: load via /skill:chrome-devtools when
+  debugging or inspecting a live Chrome session; prefer the playwright skill for cross-browser or
+  repeatable scripted automation.
 metadata:
   version: 1.0.0
   tags:
@@ -45,22 +48,17 @@ disable-model-invocation: true
 
 ## Quick Start
 
+Typical call sequence (arguments shown as JSON):
+
 ```
-# Get page structure with element UIDs
-skill_mcp(skill_name="chrome-devtools", tool_name="take_snapshot")
-
-# Navigate to URL
-skill_mcp(skill_name="chrome-devtools", tool_name="navigate_page", arguments='{"type": "url", "url": "https://example.com"}')
-
-# Click element (use UID from snapshot)
-skill_mcp(skill_name="chrome-devtools", tool_name="click", arguments='{"uid": "e123"}')
-
-# Fill input field
-skill_mcp(skill_name="chrome-devtools", tool_name="fill", arguments='{"uid": "e456", "value": "hello"}')
-
-# Take screenshot
-skill_mcp(skill_name="chrome-devtools", tool_name="take_screenshot")
+take_snapshot                                              # page structure with element UIDs
+navigate_page   {"type": "url", "url": "https://example.com"}
+click           {"uid": "e123"}                            # UID from the snapshot
+fill            {"uid": "e456", "value": "hello"}
+take_screenshot
 ```
+
+See `mcp.json` in this skill's directory for the server command (`chrome-devtools-mcp`) and the `includeTools` filter.
 
 ## Tips
 
@@ -71,11 +69,12 @@ skill_mcp(skill_name="chrome-devtools", tool_name="take_screenshot")
 
 ## vs Playwright
 
-| Feature             | chrome-devtools      | playwright         |
-| ------------------- | -------------------- | ------------------ |
-| Browser support     | Chrome only          | Chrome, FF, WebKit |
-| Performance tracing | ✅ (full MCP has it) | ❌                 |
-| Network inspection  | ✅ (full MCP has it) | ❌                 |
-| Cross-browser       | ❌                   | ✅                 |
+| Feature | chrome-devtools | playwright |
+| --- | --- | --- |
+| Browser support | Chrome only | Chromium, Firefox, WebKit |
+| Best for | Live inspection of a running Chrome session | Repeatable scripted flows, cross-browser tests |
+| Network inspection / tracing | Yes (full MCP toolset) | Yes (request interception, trace viewer) |
 
-> **Note**: This skill loads 11 essential tools. For full 26+ tools (performance, network, console), modify `mcp.json` to remove `includeTools` filter.
+Both cover network inspection and tracing — choose by workflow, not by feature: ad-hoc debugging here, durable automation in `playwright`.
+
+> **Note**: This skill loads 11 essential tools. For the full 26+ tools (performance, network, console), modify `mcp.json` to remove the `includeTools` filter.

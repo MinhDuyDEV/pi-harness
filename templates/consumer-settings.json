@@ -1,0 +1,43 @@
+{
+  "packages": [
+    "npm:@minhduydev/pi-subagents@0.8.0",
+    "npm:@minhduydev/pi-todo@0.3.0",
+    "npm:@minhduydev/pi-learning@0.3.0"
+  ],
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "provider": {
+      "maxRetryDelayMs": 60000
+    }
+  },
+  "pi-learning": {
+    "enabled": true,
+    "mode": "auto-safe",
+    "autoActivate": true,
+    "autoActivation": {
+      "enabled": true,
+      "allowedKinds": [
+        "pattern",
+        "discovery"
+      ],
+      "minEvidenceTrust": "verified-command"
+    },
+    "retrieval": {
+      "maxItems": 3,
+      "maxItemChars": 400,
+      "maxTotalChars": 1200
+    }
+  },
+  "pi-todo": {
+    "enabled": true,
+    "widget": true,
+    "reminderTurns": 6
+  }
+}

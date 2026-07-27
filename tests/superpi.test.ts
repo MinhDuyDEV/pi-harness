@@ -6,7 +6,8 @@ import superpiExtension, {
 	firstNonCompactionSummaryIndex,
 	getBootstrapSkillPath,
 } from "../.pi/extensions/superpi.ts";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 test("getBootstrapSkillPath resolves to an existing skill file", () => {
 	// Regression: the bootstrap skill path must point at .pi/skills, not a
@@ -18,6 +19,39 @@ test("getBootstrapSkillPath resolves to an existing skill file", () => {
 		`expected path under .pi/skills, got ${path}`,
 	);
 	assert.equal(existsSync(path), true, `bootstrap skill file not found: ${path}`);
+});
+
+test("router table stays in sync", () => {
+	// The superpi bootstrap contains a routing table (markdown table rows whose
+	// cells reference skills as backticked names). Every referenced skill must
+	// exist on disk, otherwise the injected router sends the model to skills
+	// that cannot be loaded.
+	const skillPath = getBootstrapSkillPath();
+	const skillsDir = dirname(dirname(skillPath));
+	const content = readFileSync(skillPath, "utf8");
+
+	const tableRows = content
+		.split("\n")
+		.filter((line) => line.trimStart().startsWith("|") && !/^\|[\s|:-]*\|$/.test(line.trim()));
+	assert.ok(tableRows.length >= 2, "expected a routing table in superpi/SKILL.md");
+
+	const routedSkills = new Set<string>();
+	for (const row of tableRows) {
+		for (const match of row.matchAll(/`([a-z0-9][a-z0-9-]*)`/g)) {
+			routedSkills.add(match[1]);
+		}
+	}
+	assert.ok(
+		routedSkills.size >= 5,
+		`expected the routing table to reference at least 5 skills, found ${routedSkills.size} — did the table format change?`,
+	);
+
+	for (const name of routedSkills) {
+		assert.ok(
+			existsSync(join(skillsDir, name, "SKILL.md")),
+			`routing table references "${name}" but .pi/skills/${name}/SKILL.md does not exist`,
+		);
+	}
 });
 
 test("stripFrontmatter removes YAML frontmatter", () => {

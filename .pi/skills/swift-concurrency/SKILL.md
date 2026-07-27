@@ -1,8 +1,10 @@
 ---
 name: swift-concurrency
-description: Use when developers mention Swift Concurrency, async/await, actors, or tasks; say "use Swift Concurrency" or
-  "modern concurrency patterns"; report data races or thread safety issues; need to migrate to Swift 6; refactor closures
-  to async/await; or hit concurrency-related linter warnings (async_without_await, Sendable/actor isolation, MainActor lint).
+description: >-
+  Swift Concurrency patterns: async/await adoption, actor isolation, Sendable conformance, structured tasks, and
+  Swift 6 migration. User-invoked: load via /skill:swift-concurrency when facing data races or thread-safety bugs,
+  Sendable or actor-isolation compiler errors, MainActor warnings, async_without_await lints, or closure-to-async
+  refactors.
 metadata:
   version: 1.0.0
   tags:
@@ -69,13 +71,9 @@ class MutableState: @unchecked Sendable { /* AVOID */ }  // last resort
 
 If not `Sendable`, you probably have a data race.
 
-## Common Mistakes
+## References
 
-`Task { }` in `View.body` (use `.task`); `Task { }` capturing self; `await` on main for network (blocks UI); closures outliving parent; `@unchecked Sendable` (lying to compiler); mixed `DispatchQueue` + async; ignoring `Sendable` warnings.
-
-## Red Flags
-
-`Task { }` in `View.body`; capturing self; sync `URLSession` in async; `@unchecked Sendable` to silence; mixed `DispatchQueue` + async; "I checked" (no race analysis); `Task.detached` everywhere; no cancellation handling; `await` on main for I/O.
+Deep dives in `references/`: `async-await-basics.md`, `tasks.md`, `actors.md`, `sendable.md`, `threading.md`, `memory-management.md`, `async-sequences.md`, `async-algorithms.md`, `migration.md` (Swift 6), `testing.md`, `performance.md`, `linting.md`, `core-data.md`, `glossary.md`. Load the file matching the problem before answering hard isolation or migration questions.
 
 ## Common Patterns
 
@@ -100,6 +98,6 @@ let result = try await (a, b)
 }
 ```
 
-## Anti-Patterns
+## Red Flags
 
-**`Task { }` in `View.body`** (`.task`); **`Task { }` capturing self**; **sync I/O in async**; **`@unchecked Sendable` to silence**; **mixed `DispatchQueue` + async**; **"I checked"** (no analysis); **`Task.detached` everywhere**; **`try?` to silence**.
+`Task { }` in `View.body` (use `.task`); `Task { }` capturing self; sync `URLSession` wrapping in async code; `await` on the main actor for network/IO (blocks UI); `@unchecked Sendable` to silence the compiler; ignoring `Sendable` warnings; mixed `DispatchQueue` + async; closures outliving their parent; "I checked, it's safe" without race analysis; `Task.detached` everywhere; no cancellation handling; `try?` to silence errors.

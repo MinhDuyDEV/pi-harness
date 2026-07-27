@@ -1,9 +1,6 @@
 ---
 name: inference-service
-description: Use when building, reviewing, or debugging inference service backends in TypeScript/JavaScript — covers request
-  ingestion architecture, batching strategies, semantic caching, SSE streaming, circuit breakers, fallback chains, rate limiting,
-  GPU observability, and graceful degradation. MUST load before designing inference service architecture or writing any inference-serving
-  code.
+description: Architecture patterns for TypeScript/JavaScript inference-serving backends — queue-based ingestion, engine-side batching, semantic caching, SSE streaming with cancel, circuit breakers, and fallback chains. User-invoked; load via /skill:inference-service when designing, reviewing, or debugging an LLM-serving backend such as vLLM, TGI, or llama.cpp behind Node.
 metadata:
   version: 1.0.0
 disable-model-invocation: true
@@ -48,7 +45,7 @@ Let the engine do it. Configure `max_num_seqs` / `max_batch_size` on the engine.
 
 ## Semantic Caching
 
-Embed prompts (small embedding model, e.g., `all-MiniLM-L6-v2`). Cache key = `(model_id, embedding)`. Threshold 0.95+ for hit. Avoid hashing identical prompts — paraphrases deserve the same cache slot.
+Embed prompts (small embedding model, e.g., `all-MiniLM-L6-v2`). Cache key = `(model_id, embedding)`. Start the similarity threshold high (~0.95) and tune against real traffic — validate hits manually before loosening. Avoid hashing identical prompts — paraphrases deserve the same cache slot.
 
 ## Streaming: SSE with Cancel
 
@@ -59,8 +56,8 @@ Embed prompts (small embedding model, e.g., `all-MiniLM-L6-v2`). Cache key = `(m
 
 ## Error Handling: Circuit Breaker
 
-- 3 consecutive 5xx → OPEN
-- Half-open after 30s, single probe
+- Consecutive 5xx (e.g., 3) → OPEN; tune thresholds per service
+- Half-open after a cooldown (e.g., 30s), single probe
 - On OPEN: 503 + `Retry-After`, fast
 - DO NOT try-catch and retry the same call repeatedly
 
@@ -71,14 +68,6 @@ Embed prompts (small embedding model, e.g., `all-MiniLM-L6-v2`). Cache key = `(m
 - Cache miss → static fallback message + queue for async followup
 - Never return 500 when a fallback is available
 
-## Common Mistakes
-
-Embedding model in Node.js; client-side batching; hash-based cache; no circuit breaker; no abort handling; no graceful shutdown; global rate limit; missing spans; cold-start optimism.
-
 ## Red Flags
 
-Synchronous model calls; no queue; one retry on 5xx; streaming without backpressure; OOM on long contexts; crashes mid-stream without recovery; gateway-only rate limit; observability "later"; queue length not monitored.
-
-## Anti-Patterns
-
-"Single-process for simplicity" (loses all inflight on crash); "retry on timeout" (without backoff = thundering herd); "hash prompt for cache" (paraphrase-misses); "no abort handling" (zombie connections); "we'll add observability later" (you won't).
+Model embedded in Node.js; synchronous model calls; no queue ("single process for simplicity" loses all inflight on crash); client-side batching; hash-based cache (paraphrase misses); no circuit breaker — retrying timeouts without backoff is a thundering herd; streaming without backpressure or abort handling (zombie connections); crashes mid-stream without recovery; no graceful shutdown; gateway-only/global rate limit; queue length not monitored; "we'll add observability later" (you won't); cold-start optimism.

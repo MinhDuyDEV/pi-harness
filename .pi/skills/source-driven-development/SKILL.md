@@ -1,7 +1,6 @@
 ---
 name: source-driven-development
-description: Use when using unfamiliar libraries, external APIs, framework behavior, or current ecosystem guidance and need
-  to ground decisions in official docs, source code, and cited references.
+description: Grounds external-library and API decisions in authoritative sources with citations or explicit unverified markers. Use when adopting an unfamiliar library, or when an error suggests external API misuse.
 metadata:
   version: 1.0.0
   tags:
@@ -35,12 +34,13 @@ Core principle: cite the source for non-trivial external API decisions, or mark 
 
 ## Source Hierarchy
 
-1. Official docs, specs, release notes.
-2. Maintained source code and examples.
-3. Maintainer-authored articles.
-4. Community posts only when higher sources are absent.
+1. Local code, tests, and lockfiles — what the project actually does today.
+2. Official docs, specs, release notes.
+3. Maintained source code and examples from the library itself.
+4. Maintainer-authored articles.
+5. Community posts only when higher sources are absent — cite with dates and caveats.
 
-Higher-ranked sources win on conflicts.
+Higher-ranked sources win on conflicts. For deep source dives into a dependency's repository, use the `opensrc` skill as a tool-specific companion.
 
 ## Workflow
 
@@ -88,19 +88,3 @@ Higher-ranked sources win on conflicts.
   <risks>Unverified claims, stale docs, conflicting sources, or none</risks>
 </skill_result>
 ```
-
-
-## Consolidated Research Workflow
-
-This is the canonical active source-grounding skill. It absorbs deep-research and source-code-research for normal work. Use opensrc, context7, or gemini-large-context as tool-specific companions only when the source demands them.
-
-Evidence hierarchy:
-1. local code and tests;
-2. official docs and source;
-3. maintained examples from reputable repos;
-4. blog posts or issues with dates and caveats.
-
-
-## Removed Optional Companion
-
-`v1-run` was removed as an optional package-health skill. Use source-grounded package evaluation, official advisories, lockfile inspection, and package-manager audit commands instead.

@@ -1,8 +1,6 @@
 ---
 name: fallow
-description: Use when analyzing code quality, finding dead code, detecting duplication, assessing complexity, checking blast
-  radius, or cleaning up a TS/JS codebase — Fallow provides deterministic static analysis (dead code, dupes, health) and optional
-  runtime intelligence.
+description: Deterministic static analysis for TS/JS via the Fallow CLI — dead code, duplication, complexity, blast radius. Use when cleaning a codebase, hunting dead code or dupes, or verifying generated code added no waste.
 metadata:
   version: 1.0.0
   tags:
@@ -57,11 +55,11 @@ fallow report --format json
 {
   "dead": {
     "files": ["src/legacy/foo.ts"],
-    "exports": [{" file": "...", "name": "bar", "used": false }],
+    "exports": [{ "file": "...", "name": "bar", "used": false }],
     "deps": ["lodash.debounce"]
   },
   "dupes": {
-    "blocks": [{" files": ["a.ts", "b.ts"], "lines": 12, "hash": "..." }]
+    "blocks": [{ "files": ["a.ts", "b.ts"], "lines": 12, "hash": "..." }]
   },
   "health": {
     "files": [{
@@ -84,14 +82,6 @@ Read the JSON. Cite the files and line counts. Don't paraphrase — the numbers 
 4. **Clean up.** If new dead code, delete. If new dupes, extract. If complexity spike, split.
 5. **Verify.** Run typecheck + tests + the diff didn't grow unrelated changes.
 
-## Common Mistakes
-
-Reading summary without JSON (loses precision); running fallow but not acting on output; treating "low dead code %" as the goal (the goal is fewer bugs); not setting baseline; "delete this unused export" without checking who imports it (might be a public API); running on a 5k LOC project and trying to clean everything at once.
-
 ## Red Flags
 
-"Code quality" claim without Fallow output; Fallow ignored because "we know it's bad"; dead code deleted without checking consumers; "we'll clean up later" (later never comes); no baseline = no diff = no signal; running once and never again; treating fallow output as a checklist instead of evidence.
-
-## Anti-Patterns
-
-**"I know it's bad"** (run Fallow); **"small project, no need"** (even small projects have dead code); **"delete all dead"** (check public API first); **"summary is enough"** (JSON is the contract); **"fallow said so"** (Fallow is evidence, not authority — use judgment).
+"Code quality" claims without Fallow output; skipping the run because "we know it's bad" (run Fallow); "small project, no need" (even small projects have dead code); reading the summary instead of the JSON (the JSON is the contract); no baseline = no diff = no signal; running once and never again; deleting "unused" exports without checking consumers (might be a public API); treating low-dead-code % as the goal (the goal is fewer bugs); trying to clean a whole project at once; "fallow said so" — Fallow is evidence, not authority; use judgment.

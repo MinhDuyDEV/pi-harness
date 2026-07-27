@@ -1,14 +1,12 @@
 ---
 name: performance-optimization
-description: Use when profiling, optimizing, or adding performance budgets to applications — covers measure-first workflow,
-  Core Web Vitals, common anti-patterns, and performance regression prevention
+description: Measure-first performance work — numeric target, profile, fix one bottleneck, re-measure. Use when Core Web Vitals fail, p99 latency is high, users report slowness, or a perf task arrives without a number.
 metadata:
   version: 1.0.0
   tags:
   - performance
   - code-quality
   dependencies: []
-disable-model-invocation: true
 ---
 
 # Performance Optimization
@@ -71,17 +69,9 @@ N+1 queries (use joins or batch); sync I/O in async path; no caching; pool too s
 | DB | `EXPLAIN ANALYZE`, pg_stat_statements |
 | General | flame graphs, OpenTelemetry |
 
-## Anti-Patterns
-
-Premature optimization (no measurement); micro-optimization (0.1% gain); wrong layer (3 days on CSS, real issue is 3MB JS); cache everything (cache has cost); speculative complexity ("1M users?"); perf without correctness; big-bang rewrite ("we'll rewrite in Rust" rarely ships).
-
-## Common Mistakes
-
-No measurement; "I think this is slow" (no); no baseline; multiple changes at once; cache invalidation bugs; rewriting to dodge profiling; ignoring algorithmic; breaking correctness; no regression test.
-
 ## Red Flags
 
-"I think X is slow" (measure first); no baseline; change without re-measuring; perf that breaks tests; micro-opt while N² is there; "rewrite in Rust"; perf claim without number; "I added caching" without key + invalidation; no regression test.
+No measurement ("I think X is slow" — profile first); no baseline; multiple changes at once; change without re-measuring; micro-optimization (0.1% gain) while an algorithmic O(n²) sits there; wrong layer (3 days on CSS when the real issue is 3MB of JS); "I added caching" without key + invalidation (cache has cost); speculative complexity ("what if 1M users?"); perf that breaks correctness or tests; big-bang "rewrite in Rust" (rarely ships); perf claim without a number; no regression test.
 
 ## Self-Quiz
 
