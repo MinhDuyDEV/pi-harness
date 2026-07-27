@@ -13,6 +13,11 @@ metadata:
 
 # TypeScript Coding Standards
 
+> Migration: this skill now owns the former `ts-package-authoring` workflow.
+> Read `references/package-authoring.md` for package layout, exports,
+> workspaces, peer dependencies, and publish checks. See
+> `../superpi/MIGRATIONS.md`.
+
 ## Iron Laws
 
 <EXTREMELY-IMPORTANT>

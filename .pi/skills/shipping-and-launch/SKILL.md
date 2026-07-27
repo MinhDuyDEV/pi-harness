@@ -14,6 +14,10 @@ metadata:
 
 # Shipping & Launch
 
+> Migration: this skill now owns the former `git-workflow-and-versioning`
+> workflow. Read `references/git-hygiene.md` for atomic commits, scoped staging,
+> versioning, and rollback evidence. See `../superpi/MIGRATIONS.md`.
+
 ## Overview
 
 Shipping should be boring because risk was removed earlier. The ship phase verifies readiness, documents what changed, and makes rollback possible.

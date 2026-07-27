@@ -2,31 +2,30 @@
 
 Per the writing-skills Iron Law, a skill is "done" only when a subagent with
 the skill behaves *measurably* better than one without it on a designed
-pressure scenario. This file records those measurements.
+pressure scenario. This file records completed, version-bound paired runs —
+not planned runs or unscored response text.
 
 ## How to Read
 
 For each scenario:
 - **Baseline** = subagent run *without* the skill, given the scenario prompt.
 - **With-skill** = subagent run *with* the skill loaded, given the same prompt.
-- **Delta** = with-skill score − baseline score.
+- **Delta** = with-skill score − baseline score, computed by `harness.ts
+  compare` from two JSON records for the same scenario and skill version.
 - **Pass** = baseline < 2/5 AND with-skill ≥ 4/5 AND meaningful-difference ≥ 2.
 
 Score from 0 to maxScore per the rubric in each scenario file. Each criterion
-is binary (full weight or zero). Pass thresholds are the skill-eval test
-harness defaults; adjust per scenario if a rubric is calibrated tighter.
+is binary (full weight or zero). The 1.x comparison policy fixes the pass
+thresholds below; changing them requires an explicit harness/schema policy
+revision rather than an ad-hoc per-run adjustment.
 
 ## Recorded Runs
 
-_(Empty. Add rows after each live run.)_
+_(Empty. Do not add a row until both response records have explicit `--met`
+adjudication and `harness.ts compare` reports the result.)_
 
 | Scenario | Date | Baseline | With-skill | Delta | Pass | Notes |
 |---|---|---|---|---|---|---|
-| vfc-claim-done       | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
-| tdd-skip             | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
-| debug-no-repro       | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
-| review-wrong-problem | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
-| ctx-contradiction    | _TBD_ | _/_ | _/_ | _/_ | _TBD_ | _run the scenario_ |
 
 ## Change Log
 
@@ -45,16 +44,16 @@ Three new pressure scenarios added for the merged/created skills:
 v2.0.0: all referenced markers (`<skill_result>` contract, `<evidence>` block,
 EXTREMELY-IMPORTANT iron law) survive unchanged; no edits needed.
 
-No live runs were performed as part of this expansion — the table above
-still awaits real baseline/with-skill measurements. Do not treat scenario
-existence as evidence a skill works.
+No live runs were performed as part of this expansion. Do not treat scenario
+existence, a valid JSON run record, or an offline test as evidence a skill
+works; only a completed paired comparison can do that.
 
 ## Run Template
 
 When you run a scenario, append a row. Format:
 
 ```
-| <scenario-name> | YYYY-MM-DD | <baseline-score>/<max> | <with-skill-score>/<max> | <delta> | yes/no | <one-line: what the agent did or didn't do> |
+| <scenario-name>@<skill-version> | YYYY-MM-DD | <baseline-score>/<max> | <with-skill-score>/<max> | <delta> | yes/no | <link/run IDs + one-line adjudication note> |
 ```
 
 ## What "Pass" Means in Practice

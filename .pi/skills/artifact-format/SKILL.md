@@ -79,7 +79,7 @@ Artifacts are owned by the parent agent. Subagents (`task`) return proposed bloc
 
 A work session is a multi-phase task that goes through `/create`, `/plan`, `/ship`, `/verify` (and optionally `/research`). Each slash command updates the same `### YYYY-MM-DD - <title>` block across the relevant canonical files. Sub-content within a block uses H4 (`#### Spec`, `#### Plan`, `#### Run Report`, etc.).
 
-See `skills/development-lifecycle/SKILL.md` for the work session lifecycle and the slash command → file mapping.
+See `superpi` for lifecycle routing and the slash command → file mapping.
 
 ## Anti-rationalization
 

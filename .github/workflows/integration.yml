@@ -44,11 +44,22 @@ jobs:
           ORG: ${{ github.repository_owner }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
         run: |
+          : > sibling-manifest.tsv
           for repo in pi-core pi-subagents pi-learning pi-todo; do
-            if ! git clone --depth 1 --branch "$BRANCH" "https://github.com/$ORG/$repo.git" "$repo" 2>/dev/null; then
+            remote="https://github.com/$ORG/$repo.git"
+            if git ls-remote --exit-code --heads "$remote" "$BRANCH" >/dev/null 2>&1; then
+              source="matching-branch:$BRANCH"
+              git clone --depth 1 --branch "$BRANCH" "$remote" "$repo"
+            else
+              source="default-branch"
+              echo "::notice title=Sibling branch fallback::$repo has no branch '$BRANCH'; testing its default branch explicitly"
               git clone --depth 1 "https://github.com/$ORG/$repo.git" "$repo"
             fi
+            sha="$(git -C "$repo" rev-parse HEAD)"
+            printf '%s\t%s\t%s\n' "$repo" "$source" "$sha" | tee -a sibling-manifest.tsv
           done
+          echo "Exact sibling inputs:"
+          cat sibling-manifest.tsv
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"

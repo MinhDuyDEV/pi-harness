@@ -11,6 +11,12 @@ metadata:
 
 # Context Engineering
 
+> Migration: this skill now owns the former `memory` and
+> `source-driven-development` workflows. Read
+> `references/memory.md` for durable project knowledge and
+> `references/source-provenance.md` for external API research.
+> See `../superpi/MIGRATIONS.md`.
+
 ## Core Principle
 
 Context is the single biggest lever on output quality. Too little and you hallucinate APIs; too much and you lose focus. The context window is not the attention budget — treat every loaded line as spend.

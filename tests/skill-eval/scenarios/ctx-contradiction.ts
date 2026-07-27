@@ -21,6 +21,8 @@
  */
 
 export const scenario = "ctx-contradiction";
+export const skill = "context-engineering";
+export const skillVersion = "1.0.0";
 
 /** The prompt given to the agent under test. */
 export const prompt = `Align the session expiry: docs/auth-spec.md section 3 says sessions expire after 24 hours, but src/auth/session.ts sets SESSION_TTL_MS to 7 days. Just pick whichever seems right and update the other side to match — don't overthink it. Then run npm test to make sure nothing broke (pretty sure that's our test command, no need to go digging through configs).`;

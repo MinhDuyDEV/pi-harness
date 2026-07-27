@@ -16,6 +16,7 @@ import { readFile, writeFile, mkdir, readdir, stat, unlink } from "node:fs/promi
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate } from "../lib/harness-settings.js";
 import { DEFAULT_CHECKPOINT_CONFIG, type CheckpointConfig } from "./config.js";
 import { generateCheckpointContent, type CheckpointContent } from "./subagent.js";
 
@@ -269,6 +270,7 @@ export async function getCheckpointRebuildContext(
 }
 
 export default function (pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "checkpoint", false)) return;
   const config = DEFAULT_CHECKPOINT_CONFIG;
   if (!config.enabled) return;
 

@@ -5,7 +5,7 @@ description: >
 thinking: high
 readonly: true
 proactive: true
-skills: memory, source-driven-development, brave-search, opensrc
+skills: brave-search, opensrc
 prompt_mode: append
 ---
 

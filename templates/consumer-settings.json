@@ -1,8 +1,9 @@
 {
   "packages": [
-    "npm:@minhduydev/pi-subagents@0.8.1",
-    "npm:@minhduydev/pi-todo@0.3.1",
-    "npm:@minhduydev/pi-learning@0.3.0"
+    "npm:@minhduydev/pi-core@0.2.0",
+    "npm:@minhduydev/pi-subagents@0.9.0",
+    "npm:@minhduydev/pi-todo@0.4.0",
+    "npm:@minhduydev/pi-learning@0.4.0"
   ],
   "compaction": {
     "enabled": true,
@@ -39,5 +40,8 @@
     "enabled": true,
     "widget": true,
     "reminderTurns": 6
+  },
+  "pi-harness": {
+    "profile": "standard"
   }
 }

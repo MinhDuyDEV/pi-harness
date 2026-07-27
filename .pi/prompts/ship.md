@@ -13,7 +13,7 @@ Implement the work session plan.
 | --- | --- | --- |
 | `<title>` | required | Work session title (must exist in `TODO.md`) |
 | `--quick` | false | Skip the post-step verification per step |
-| `--no-verify` | false | Skip the final gate run (typecheck, lint, test) |
+| `--no-verify` | false | Skip the final repository-defined gate run |
 | `--dry-run` | false | Show the planned file changes without writing them |
 
 ## 2. Find Work Session
@@ -40,7 +40,15 @@ Execute the steps in order. For each step:
 
 ## 5. Final Gates (skip with `--no-verify`)
 
-Run the project's gates: `npm run typecheck`, `npm run lint`, `npm test`. If any fail, stop and report.
+Discover the project's authoritative gates from the nearest project
+instructions, checked-in wrappers, build/package manifests, lockfiles, and CI.
+Prefer one repository aggregate check when available; otherwise choose the
+smallest build/type, lint/static, and test commands supported by evidence in
+the repo. Apply `scripts/lib/discover-gates.mjs` semantics: a checked-in wrapper
+wins, conflicting lockfiles are a blocker, and no package runner is guessed.
+Do not assume npm or even a JavaScript project. Record the exact
+command, cwd, exit status, and discovery source. If any required gate fails,
+stop and report.
 
 ## 6. Self-Review
 
@@ -80,7 +88,7 @@ status: done | updated: YYYY-MM-DD
 
 #### Run Report
 - Steps: N/M done
-- Gates: typecheck PASS, lint PASS, test PASS
+- Gates: `<exact discovered command>` PASS/FAIL/SKIPPED (repeat per gate)
 - Files changed: <list, or "see git diff">
 
 #### Review
@@ -95,7 +103,7 @@ If the block already exists (continuation), merge — keep earlier content, appe
 
 Report:
 1. Status: done / blocked
-2. Gates: typecheck / lint / test (PASS / FAIL with details)
+2. Gates: exact discovered commands (PASS / FAIL / SKIPPED with details)
 3. Review findings by severity
 4. Files changed (count + list, or `git diff --stat`)
 5. Anchor: `PROGRESS.md#YYYY-MM-DD--<slug>`

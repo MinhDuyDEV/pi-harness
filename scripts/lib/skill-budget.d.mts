@@ -4,3 +4,4 @@ export const HARD_WORD_CAP: number;
 export const TARGET_WORD_CAP: number;
 export const MAX_VISIBLE_SKILLS: number;
 export const MAX_DESCRIPTION_CHARS: number;
+export const MIN_DESCRIPTION_HEADROOM: number;

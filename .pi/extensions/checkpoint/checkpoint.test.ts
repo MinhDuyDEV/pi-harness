@@ -25,7 +25,8 @@ import {
   selectCheckpointsToPrune,
 } from "./index.ts";
 import {
-  parseActiveBlocks,
+  parseCanonicalArtifactBlocks,
+  projectCanonicalBlocks,
   summarizeActiveTasks,
   type CheckpointContent,
   type ParsedBlock,
@@ -202,25 +203,31 @@ test("formatRebuildContext frames the checkpoint and truncates to budget", () =>
   assert.ok(framed.trimEnd().endsWith("Continue from where you left off."));
 });
 
-// ── parseActiveBlocks ───────────────────────────────────────────────────────
+// ── canonical artifact parser projection ────────────────────────────────────
 
-test("parseActiveBlocks splits on ### headings and reads status + checkboxes", () => {
-  const blocks = parseActiveBlocks(
-    [
-      "# Top-level ignored",
-      "### Task One",
-      "status: active",
-      "- [ ] first step",
-      "- [x] second step",
-      "* [X] third step",
-      "### Task Two",
-      "status: done",
-      "Some context line",
-    ].join("\n"),
-  );
+test("projectCanonicalBlocks uses the pi-todo document without reparsing Markdown", () => {
+  const blocks = projectCanonicalBlocks({
+    phases: [
+      {
+        title: "Task One",
+        date: "2026-07-27",
+        status: "active",
+        body: [
+          { type: "item", item: { content: "first step", status: "pending" } },
+          { type: "item", item: { content: "second step", status: "completed" } },
+          { type: "item", item: { content: "third step", status: "abandoned" } },
+        ],
+      },
+      {
+        title: "Task Two",
+        status: "done",
+        body: [{ type: "note", text: "Some context line" }],
+      },
+    ],
+  });
 
   assert.equal(blocks.length, 2);
-  assert.equal(blocks[0].title, "Task One");
+  assert.equal(blocks[0].title, "2026-07-27 - Task One");
   assert.equal(blocks[0].status, "active");
   assert.deepEqual(blocks[0].checkboxes, [
     { text: "first step", done: false },
@@ -232,32 +239,42 @@ test("parseActiveBlocks splits on ### headings and reads status + checkboxes", (
   assert.deepEqual(blocks[1].firstContentLines, ["Some context line"]);
 });
 
-test("parseActiveBlocks ignores unknown status values and pre-heading lines", () => {
-  const blocks = parseActiveBlocks(
+test("parseCanonicalArtifactBlocks delegates to the public pi-todo parser", async () => {
+  const blocks = await parseCanonicalArtifactBlocks(
     ["- [ ] orphan checkbox before any heading", "### Task", "status: bogus", "- [ ] step"].join(
       "\n",
     ),
   );
 
+  assert.ok(blocks);
   assert.equal(blocks.length, 1);
-  assert.equal(blocks[0].status, null);
+  assert.equal(blocks[0].status, "active");
   assert.equal(blocks[0].checkboxes.length, 1);
 });
 
-test("parseActiveBlocks captures at most 5 content lines, none after checkboxes", () => {
-  const lines = ["### Task"];
-  for (let i = 1; i <= 7; i++) lines.push(`content line ${i}`);
-  lines.push("- [ ] a checkbox");
-  lines.push("content after checkbox");
-  const [block] = parseActiveBlocks(lines.join("\n"));
+test("projectCanonicalBlocks captures at most 5 notes and none after items", () => {
+  const [block] = projectCanonicalBlocks({
+    phases: [{
+      title: "Task",
+      status: "active",
+      body: [
+        ...Array.from({ length: 7 }, (_, index) => ({
+          type: "note" as const,
+          text: `content line ${index + 1}`,
+        })),
+        { type: "item" as const, item: { content: "a checkbox", status: "pending" as const } },
+        { type: "note" as const, text: "content after checkbox" },
+      ],
+    }],
+  });
 
   assert.equal(block.firstContentLines.length, 5);
   assert.equal(block.firstContentLines[4], "content line 5");
   assert.ok(!block.firstContentLines.includes("content after checkbox"));
 });
 
-test("parseActiveBlocks returns no blocks for empty input", () => {
-  assert.deepEqual(parseActiveBlocks(""), []);
+test("parseCanonicalArtifactBlocks returns no blocks for empty input", async () => {
+  assert.deepEqual(await parseCanonicalArtifactBlocks(""), []);
 });
 
 // ── summarizeActiveTasks ────────────────────────────────────────────────────

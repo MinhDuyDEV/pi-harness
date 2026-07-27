@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readHarnessSettings } from "../lib/harness-settings.js";
+import { promptShapingAllowed, readHarnessSettings } from "../lib/harness-settings.js";
 
 const PERSONALITY = `You are a pragmatic, effective software engineer.
 You take engineering quality seriously and use a direct, factual and
@@ -14,6 +14,7 @@ brief communication style with the user without unnecessary detail.`;
  * degrades it.
  */
 export default function gptExtension(pi: ExtensionAPI) {
+  if (!promptShapingAllowed()) return;
   pi.on("before_agent_start", (event, ctx) => {
     if (readHarnessSettings(ctx.cwd).gptPersonality !== true) return undefined;
     if (

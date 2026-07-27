@@ -17,7 +17,7 @@ Initialize project setup. Run once per project.
 Load these available skills using the current session's skill-loading instructions. If no dedicated loader is exposed, read each skill's listed `SKILL.md` file.
 
 - skill: `brainstorming`
-- skill: `git-workflow-and-versioning`
+- skill: `shipping-and-launch`
 - skill: `verification-before-completion`
 
 ## Idempotency Rules
@@ -130,11 +130,11 @@ Write detected values to `.pi/memory/project/tech-stack.md`:
 - **Database:** [database/ORM]
 - **State Management:** [tool]
 - **Testing:** [framework vX]
-- **Build:** `npm run build`
-- **Test:** `npm test`
-- **Lint:** `npm run lint`
-- **Typecheck:** `npm run typecheck`
-- **Dev:** `npm run dev`
+- **Build:** `<validated command or "not configured">`
+- **Test:** `<validated command or "not configured">`
+- **Lint:** `<validated command or "not configured">`
+- **Typecheck:** `<validated command or "not configured">`
+- **Dev:** `<validated command or "not configured">`
 ```
 
 ### Phase 5: Set Git Conventions

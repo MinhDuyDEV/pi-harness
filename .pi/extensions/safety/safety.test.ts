@@ -167,11 +167,17 @@ function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 async function testConfirmationAllowsConfirmRules(): Promise<void> {
 	const t = "confirmed confirm-level rules are allowed";
 	let handler: Function | undefined;
+	const blockers: unknown[] = [];
 	const fakePi = {
 		on(event: string, next: Function) {
 			if (event === "tool_call") handler = next;
 		},
 		registerCommand() {},
+		events: {
+			emit(channel: string, payload: unknown) {
+				if (channel === "herdr:blocked") blockers.push(payload);
+			},
+		},
 	};
 	safetyExtension(fakePi as never);
 	const result = await handler?.({
@@ -181,6 +187,10 @@ async function testConfirmationAllowsConfirmRules(): Promise<void> {
 		input: { command: "git add ." },
 	}, { ui: { confirm: () => true } });
 	assert.equal(result, undefined, t);
+	assert.deepEqual(blockers, [
+		{ active: true, blockerId: "safety:warn-git-add-dot", label: "Safety confirmation" },
+		{ active: false, blockerId: "safety:warn-git-add-dot", label: "Safety confirmation" },
+	], t + ": prompt exposes and clears a real Herdr blocker");
 }
 
 async function testDisabledRulesPosture(): Promise<void> {

@@ -1,90 +1,114 @@
-/**
- * Static tests for the skill-eval harness.
- *
- * Validates that every scenario file exports the required shape (scenario,
- * prompt, expectedFailure, expectedCompliance, rubric), that the rubric
- * weights sum to a meaningful total, and that the harness loads cleanly.
- *
- * Live scoring (with-skill vs baseline) is human-judgment and recorded in
- * results.md. The point of these tests is to catch the harness itself
- * regressing, not to score individual scenarios.
- */
-
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCENARIOS, score, scoreWithCriteria, compare } from "./harness.ts";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  EVAL_SCHEMA_VERSION,
+  SCENARIOS,
+  compareRuns,
+  scoreWithCriteria,
+  type ScoredRun,
+} from "./harness.ts";
 
-test("harness loads at least 2 scenarios", () => {
-  assert.ok(
-    Object.keys(SCENARIOS).length >= 2,
-    `Expected ≥2 scenarios, found ${Object.keys(SCENARIOS).length}: ${Object.keys(SCENARIOS).join(", ")}`,
-  );
+test("harness loads five versioned scenarios", () => {
+  assert.equal(Object.keys(SCENARIOS).length, 5);
 });
 
-for (const [name, s] of Object.entries(SCENARIOS)) {
-  test(`scenario "${name}" has all required exports`, () => {
-    assert.ok(s.scenario === name, `scenario name mismatch: ${s.scenario} vs ${name}`);
-    assert.ok(s.prompt.length > 50, "prompt must be substantive (>50 chars)");
-    assert.ok(s.expectedFailure.length > 50, "expectedFailure must be substantive");
-    assert.ok(s.expectedCompliance.length > 50, "expectedCompliance must be substantive");
-    assert.ok(s.rubric.maxScore > 0, "rubric.maxScore must be > 0");
-    assert.ok(s.rubric.criteria.length >= 3, "rubric must have ≥3 criteria");
+for (const [name, scenario] of Object.entries(SCENARIOS)) {
+  test(`scenario ${name} has a complete, versioned rubric`, () => {
+    assert.equal(scenario.scenario, name);
+    assert.match(scenario.skill, /^[a-z0-9][a-z0-9-]*$/);
+    assert.match(scenario.skillVersion, /^\d+\.\d+\.\d+$/);
+    assert.ok(scenario.prompt.length > 50);
+    assert.ok(scenario.expectedFailure.length > 50);
+    assert.ok(scenario.expectedCompliance.length > 50);
+    assert.equal(scenario.rubric.criteria.reduce((total, criterion) => total + criterion.weight, 0), scenario.rubric.maxScore);
+    assert.ok(scenario.rubric.criteria.length >= 3);
   });
 
-  test(`scenario "${name}" rubric weights sum to maxScore`, () => {
-    const sum = s.rubric.criteria.reduce((acc, c) => acc + c.weight, 0);
-    assert.equal(
-      sum,
-      s.rubric.maxScore,
-      `rubric weights (${sum}) must equal maxScore (${s.rubric.maxScore})`,
-    );
-  });
-
-  test(`scenario "${name}" rubric criteria have non-empty pass descriptions`, () => {
-    for (const c of s.rubric.criteria) {
-      assert.ok(c.pass.length > 20, `criterion "${c.name}" pass description too short`);
-      assert.ok(c.weight > 0, `criterion "${c.name}" weight must be > 0`);
-    }
-  });
-
-  test(`scenario "${name}" score() returns a valid shape`, () => {
-    const result = score("sample response", s);
-    assert.equal(result.max, s.rubric.maxScore);
-    assert.equal(result.details.length, s.rubric.criteria.length);
-    for (const d of result.details) {
-      assert.equal(typeof d.met, "boolean");
-    }
-  });
-
-  test(`scenario "${name}" explicit criterion scoring is auditable`, () => {
-    const first = s.rubric.criteria[0]!;
-    const result = scoreWithCriteria("response", s, [first.name]);
-    assert.equal(result.details[0]?.met, true);
-    assert.equal(result.score, first.weight);
-  });
-
-  test(`scenario "${name}" compare() returns a meaningful-difference indicator`, () => {
-    const c = compare(name, "no skill response", "with skill response");
-    assert.ok(c !== null);
-    assert.equal(c.scenario, name);
-    assert.equal(typeof c.meaningfulDifference, "boolean");
+  test(`scenario ${name} rejects missing, duplicate, and unknown adjudication`, () => {
+    assert.throws(() => scoreWithCriteria("", scenario, []), /empty response/);
+    const first = scenario.rubric.criteria[0]!.name;
+    assert.throws(() => scoreWithCriteria("response", scenario, [first, first]), /twice/);
+    assert.throws(() => scoreWithCriteria("response", scenario, ["not-a-criterion"]), /Unknown criterion/);
   });
 }
 
-test("harness covers the core skills (vfc, tdd, debug, review, ctx)", () => {
-  const names = Object.keys(SCENARIOS);
-  // Naming convention: <skill-or-abbrev>-<pressure>
-  const expected: Array<[string, string]> = [
-    ["vfc-", "verification-before-completion"],
-    ["tdd-", "test-driven-development"],
-    ["debug-", "debugging-and-error-recovery"],
-    ["review-", "code-review-and-quality"],
-    ["ctx-", "context-engineering"],
-  ];
-  for (const [prefix, skill] of expected) {
-    assert.ok(
-      names.some((n) => n.startsWith(prefix)),
-      `Expected a ${skill} scenario (prefix "${prefix}"); have: ${names.join(", ")}`,
+test("comparison is deterministic and bound to the same scenario and skill version", () => {
+  const scenario = SCENARIOS["vfc-claim-done"]!;
+  const root = mkdtempSync(join(tmpdir(), "skill-eval-"));
+  const baselineFile = join(root, "baseline.txt");
+  const withSkillFile = join(root, "with-skill.txt");
+  const baselineResponse = "baseline response";
+  const withSkillResponse = "with skill response";
+  writeFileSync(baselineFile, baselineResponse, "utf8");
+  writeFileSync(withSkillFile, withSkillResponse, "utf8");
+  const baseline: ScoredRun = {
+    schemaVersion: EVAL_SCHEMA_VERSION,
+    scenario: scenario.scenario,
+    skill: scenario.skill,
+    skillVersion: scenario.skillVersion,
+    condition: "baseline",
+    responseFile: baselineFile,
+    responseSha256: createHash("sha256").update(baselineResponse).digest("hex"),
+    recordedAt: "2026-07-27T00:00:00.000Z",
+    metCriteria: [],
+    score: scoreWithCriteria("baseline response", scenario, []),
+  };
+  const withSkill: ScoredRun = {
+    ...baseline,
+    condition: "with-skill",
+    responseFile: withSkillFile,
+    responseSha256: createHash("sha256").update(withSkillResponse).digest("hex"),
+    metCriteria: scenario.rubric.criteria.map((criterion) => criterion.name),
+    score: scoreWithCriteria("with skill response", scenario, scenario.rubric.criteria.map((criterion) => criterion.name)),
+  };
+  try {
+    assert.deepEqual(compareRuns(baseline, withSkill), {
+      scenario: scenario.scenario,
+      skill: scenario.skill,
+      skillVersion: scenario.skillVersion,
+      baselineScore: 0,
+      withSkillScore: scenario.rubric.maxScore,
+      max: scenario.rubric.maxScore,
+      delta: scenario.rubric.maxScore,
+      meaningfulDifference: true,
+      passes: true,
+    });
+    assert.throws(() => compareRuns(baseline, { ...withSkill, skillVersion: "999.0.0" }), /skillVersion/);
+    assert.throws(
+      () => compareRuns(baseline, {
+        ...withSkill,
+        score: { ...withSkill.score, score: withSkill.score.score - 1 },
+      }),
+      /does not match its versioned rubric/,
     );
+    assert.throws(
+      () => compareRuns(
+        { ...baseline, recordedAt: "2026-07-27T00:00:01.000Z" },
+        withSkill,
+      ),
+      /Baseline must be recorded before/,
+    );
+
+    writeFileSync(withSkillFile, "tampered after recording", "utf8");
+    assert.throws(() => compareRuns(baseline, withSkill), /SHA-256|digest/i);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("harness covers the core skills", () => {
+  assert.deepEqual(
+    new Set(Object.values(SCENARIOS).map((scenario) => scenario.skill)),
+    new Set([
+      "verification-before-completion",
+      "test-driven-development",
+      "debugging-and-error-recovery",
+      "code-review-and-quality",
+      "context-engineering",
+    ]),
+  );
 });

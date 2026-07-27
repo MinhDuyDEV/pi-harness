@@ -98,6 +98,7 @@ function fakeCtx(options: FakeCtxOptions = {}): unknown {
 
 interface FakeServer {
   received: Array<{
+    jsonrpc: "2.0";
     id: string;
     method: string;
     params: Record<string, unknown>;
@@ -106,8 +107,12 @@ interface FakeServer {
   close(): Promise<void>;
 }
 
+type FakeResponder =
+  | boolean
+  | ((request: FakeServer["received"][number]) => Array<Record<string, unknown>>);
+
 /** Line-delimited JSON server. respond=false simulates a hung Herdr daemon. */
-function startFakeServer(socketPath: string, respond: boolean): Promise<FakeServer> {
+function startFakeServer(socketPath: string, respond: FakeResponder): Promise<FakeServer> {
   const received: FakeServer["received"] = [];
   const state = { connections: 0 };
   const server = net.createServer((connection) => {
@@ -119,8 +124,15 @@ function startFakeServer(socketPath: string, respond: boolean): Promise<FakeServ
       while ((newline = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, newline).trim();
         buffer = buffer.slice(newline + 1);
-        if (line.length > 0) received.push(JSON.parse(line));
-        if (respond) connection.write('{"ok":true}\n');
+        if (line.length === 0) continue;
+        const request = JSON.parse(line) as FakeServer["received"][number];
+        received.push(request);
+        const responses = respond === true
+          ? [{ jsonrpc: "2.0", id: request.id, result: { ok: true } }]
+          : typeof respond === "function" ? respond(request) : [];
+        for (const response of responses) {
+          connection.write(`${JSON.stringify(response)}\n`);
+        }
       }
     });
     connection.on("error", () => {});
@@ -159,7 +171,7 @@ function sleep(ms: number): Promise<void> {
 // Env plumbing
 // ---------------------------------------------------------------------------
 
-const ENV_KEYS = ["HERDR_ENV", "HERDR_SOCKET_PATH", "HERDR_PANE_ID"] as const;
+const ENV_KEYS = ["HERDR_ENV", "HERDR_SOCKET_PATH", "HERDR_PANE_ID", "PI_HARNESS_SEAT_ROLE"] as const;
 let savedEnv: Record<string, string | undefined> = {};
 let workDir: string;
 
@@ -258,6 +270,7 @@ describe("herdr-state reporting", () => {
     await waitFor(() => server.received.length >= 2);
 
     const [sessionReport, initialState] = server.received;
+    assert.equal(sessionReport.jsonrpc, "2.0");
     assert.equal(sessionReport.method, "pane.report_agent_session");
     assert.equal(sessionReport.params.pane_id, "pane-7");
     assert.equal(sessionReport.params.source, "pi-harness:herdr-state");
@@ -391,6 +404,56 @@ describe("herdr-state reporting", () => {
 
     await server.close();
   });
+
+  it("reports an explicit interactive co-worker seat with its real role", async () => {
+    const socketPath = join(workDir, "herdr.sock");
+    const server = await startFakeServer(socketPath, true);
+    enableHerdrEnv(socketPath);
+    process.env.PI_HARNESS_SEAT_ROLE = "peer";
+    const fake = createFakePi();
+    herdrState(fake.api);
+
+    await fake.emit("session_start", { reason: "startup" }, fakeCtx({
+      hasUI: true,
+      idle: true,
+      sessionFile: join(workDir, "peer.jsonl"),
+    }));
+    await waitFor(() => server.received.length >= 2);
+    assert.equal(server.received[0].params.role, "herdr-peer");
+    await server.close();
+  });
+
+  it("deduplicates blockers by id and releases the seat only on process quit", async () => {
+    const socketPath = join(workDir, "herdr.sock");
+    const server = await startFakeServer(socketPath, true);
+    enableHerdrEnv(socketPath);
+    const fake = createFakePi();
+    herdrState(fake.api);
+    const ctx = fakeCtx({ idle: true, sessionFile: join(workDir, "root.jsonl") });
+    await fake.emit("session_start", { reason: "startup" }, ctx);
+    await waitFor(() => server.received.length >= 2);
+
+    fake.emitBus("herdr:blocked", {});
+    fake.emitBus("herdr:blocked", { active: "yes", blockerId: "bad" });
+    fake.emitBus("herdr:blocked", { active: true, blockerId: "", label: "bad" });
+    await sleep(100);
+    assert.equal(server.received.length, 2, "malformed blocker events must be ignored");
+
+    fake.emitBus("herdr:blocked", { active: true, blockerId: "decision-1", label: "Choose an option" });
+    fake.emitBus("herdr:blocked", { active: true, blockerId: "decision-1", label: "Choose an option" });
+    await waitFor(() => server.received.length >= 3);
+    assert.equal(server.received[2].params.state, "blocked");
+    fake.emitBus("herdr:blocked", { active: false, blockerId: "decision-1" });
+    await waitFor(() => server.received.length >= 4);
+    assert.equal(server.received[3].params.state, "idle");
+
+    await fake.emit("session_shutdown", { reason: "resume" }, ctx);
+    await sleep(100);
+    assert.equal(server.received.some((request) => request.method === "pane.release_agent"), false);
+    await fake.emit("session_shutdown", { reason: "quit" }, ctx);
+    await waitFor(() => server.received.some((request) => request.method === "pane.release_agent"));
+    await server.close();
+  });
 });
 
 describe("herdr-state failure discipline", () => {
@@ -436,6 +499,28 @@ describe("herdr-state failure discipline", () => {
     assert.equal(server.received[0].method, "pane.report_agent_session");
     assert.equal(server.received[1].method, "pane.report_agent");
 
+    await server.close();
+  });
+
+  it("ignores malformed and wrong-id replies until a correlated JSON-RPC ACK arrives", async () => {
+    const socketPath = join(workDir, "herdr.sock");
+    const server = await startFakeServer(socketPath, (request) => [
+      { ok: true },
+      { jsonrpc: "2.0", id: `${request.id}-wrong`, result: { ok: true } },
+      { jsonrpc: "2.0", id: request.id, result: { ok: true } },
+    ]);
+    enableHerdrEnv(socketPath);
+    const fake = createFakePi();
+    herdrState(fake.api);
+
+    await fake.emit(
+      "session_start",
+      { reason: "startup" },
+      fakeCtx({ idle: true, sessionFile: join(workDir, "s.jsonl") }),
+    );
+    await waitFor(() => server.received.length >= 2);
+    assert.equal(server.received[0].jsonrpc, "2.0");
+    assert.equal(server.received[1].jsonrpc, "2.0");
     await server.close();
   });
 });

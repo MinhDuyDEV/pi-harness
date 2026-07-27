@@ -12,7 +12,6 @@ metadata:
   - mcp
   - testing
   dependencies: []
-disable-model-invocation: true
 ---
 
 # Playwright (Automated Browser Testing)
@@ -49,6 +48,8 @@ npx playwright show-report
 Prefer CLI over MCP for token efficiency. Use MCP (see `mcp.json`) only for: complex exploration, error screenshots, or when the test environment is too dynamic to script.
 
 See [references/agent-browser-cli.md](references/agent-browser-cli.md) for the agent-browser CLI alternative to Playwright MCP.
+See `references/browser-devtools.md` for live Chrome routing and runtime
+evidence when static Playwright assertions are not enough.
 
 ## Locator Strategy
 

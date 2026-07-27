@@ -45,12 +45,20 @@ Number of steps should match the size of the work. Don't pad with ceremony steps
 
 ## 5. Foundation Gate
 
-Before finalizing the plan, answer each in one line:
+Before finalizing the plan, answer each in one line and classify the verdict as
+`sound`, `repair-first`, or `accepted-risk`:
 
 - Is the current foundation sound for this change, or does it need work first?
 - Is each constraint real (verified against code/requirements) or an inherited habit?
 - Does any step compensate for a foundation flaw? That is a balloon (see `.pi/ANTI_PATTERNS.md`) — plan the foundation fix instead.
 - Should foundation work be sequenced as the first steps? If yes, reorder before confirming.
+
+Persist this plan-stage verdict with
+`workflow_state action=record_foundation` and a new immutable record id such as
+`<date>-<title>-plan-foundation-r1`. Evidence factual constraints; label
+preferences as preferences. Record the returned id and digest in the
+`#### Foundation Verdict` subsection. If the tool is unavailable, report that
+the typed checkpoint is missing rather than treating prose as equivalent.
 
 ## 6. Confirm (skip with `--quick`)
 
@@ -61,6 +69,8 @@ Show the plan and confirm.
 ### `.pi/artifacts/PLAN.md`
 
 Add a `#### Plan` subsection (and `#### Phases` if `--split`) to the work session block. If the block doesn't exist yet, create it with the Spec carried over.
+Add or replace `#### Foundation Verdict` with verdict, rationale, evidence,
+constraint classifications, and the immutable workflow record id/digest.
 
 ### `.pi/artifacts/TODO.md`
 

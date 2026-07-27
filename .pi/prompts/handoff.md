@@ -20,7 +20,7 @@ Read `.pi/artifacts/{TODO,PROGRESS,DECISIONS}.md` and `.pi/MEMORY.md` for curren
 
 ## 3. Write the handoff
 
-Append to `.pi/artifacts/HANDOFF.md` (create if absent) a 12-field context pack. Empty fields stay in with "none" — an absent field is indistinguishable from a forgotten one.
+Append to `.pi/artifacts/HANDOFF.md` (create if absent) a 14-field context pack. Empty fields stay in with "none" — an absent field is indistinguishable from a forgotten one.
 
 ```
 ## <title> — <date> — handoff to <receiver>
@@ -74,8 +74,17 @@ Append to `.pi/artifacts/HANDOFF.md` (create if absent) a 12-field context pack.
 - The receiver could start from "Next step" alone without re-reading the whole session.
 - Open decisions are separated from closed ones; constraints are separated from preferences.
 - Write scope is explicit — the receiver knows what they must not touch.
-- All 12 fields are present (use "none" rather than omitting).
+- All 14 fields are present (use "none" rather than omitting).
 
-## 5. Report
+## 5. Persist typed handoff
+
+Call `workflow_state action=record_handoff` with the same fourteen semantic
+sections. Arrays may contain `"none"` when the Markdown section is empty.
+Use an immutable record id such as `<date>-<title>-handoff-r1`; an edited
+handoff needs a new revision. Record the returned id and digest in
+`HANDOFF.md`. If the tool is unavailable, report that typed replay/automation
+state was not persisted.
+
+## 6. Report
 
 Tell the user the handoff path + the one-line next step, and (if `--to agent`) the `task` invocation that would resume it.

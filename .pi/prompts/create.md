@@ -46,12 +46,19 @@ The spec is a focused document. Keep it tight; cut anything that doesn't change 
 
 ## 4. Foundation Gate
 
-Before finalizing the spec, answer each in one line:
+Before finalizing the spec, answer each in one line and classify the verdict as
+`sound`, `repair-first`, or `accepted-risk`:
 
 - Is the current foundation sound for this change, or does it need work first?
 - Is each constraint real (verified) or an inherited habit carried over from old specs?
 - Does this feature compensate for a foundation flaw? That is a balloon (see `.pi/ANTI_PATTERNS.md`) — spec the foundation fix instead.
 - Should foundation work come first as its own work session? If yes, say so in the spec.
+
+Persist the verdict with `workflow_state action=record_foundation`. Use a
+write-once record id such as `<date>-<title>-create-foundation-r1`, include
+evidence for factual constraints, and classify each constraint as `verified`
+or `preference`. If the tool is unavailable, state that the typed checkpoint
+was not persisted; do not claim the foundation gate is durable.
 
 ## 5. Confirm (skip with `--quick`)
 
@@ -83,6 +90,13 @@ status: active | updated: YYYY-MM-DD
 
 #### Spec
 <the spec from step 3>
+
+#### Foundation Verdict
+- Verdict: sound | repair-first | accepted-risk
+- Rationale: <why>
+- Evidence: <paths / requirements, or "none">
+- Constraints: <each marked verified or preference>
+- Workflow record: <record_id and digest, or "not persisted">
 ```
 
 ## 7. Output

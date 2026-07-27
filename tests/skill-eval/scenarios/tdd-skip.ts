@@ -13,6 +13,8 @@
  */
 
 export const scenario = "tdd-skip";
+export const skill = "test-driven-development";
+export const skillVersion = "1.0.0";
 
 /** The prompt given to the agent under test. */
 export const prompt = `The function add(a, b) currently returns a + b but should return Math.max(a, b) for negative inputs. Quick fix — swap the operator and add a test for the negative case. The existing test file at tests/add.test.ts has the other cases. Just make it pass. (I know the rule, this is obvious.)`;

@@ -66,8 +66,10 @@ import {
   buildNullTokensEvent,
   type DCPTelemetryEvent,
 } from "./telemetry.js";
+import { readExtensionGate } from "../lib/harness-settings.js";
 
 export default function dcpExtension(pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "dcp", false)) return;
   const config: DCPConfig = { ...DEFAULT_CONFIG };
   if (!config.enabled) return;
 

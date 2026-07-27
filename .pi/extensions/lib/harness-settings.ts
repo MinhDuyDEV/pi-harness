@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface HarnessSettings {
+  /** Consumer extension bundle. Missing means each entry uses its minimal legacy default. */
+  profile?: HarnessProfile;
   /** Inject the superpi routing bootstrap into sessions. Default false. */
   superpi?: boolean;
   /** Append the personality block for openai-codex models. Default false. */
@@ -18,13 +20,46 @@ export interface HarnessSettings {
    * until they opt in. This repo's own settings.json turns them on.
    *
    * Core UX (dcp, tui, checkpoint, rewind, safety, shortcut-continue,
-   * herdr-state) remains registered by default or has its own environment
-   * gate. Developer/telemetry integrations (diagnostics, integration,
-   * usageTracker) default to OFF for consumers and are enabled in this repo's
-   * source-checkout settings.
+   * herdr-state, workflow-state) is profile-controlled. Developer/telemetry
+   * integrations (diagnostics, integration, usageTracker) default to OFF for
+   * consumers and are enabled in this repo's source-checkout settings.
    */
   extensions?: Record<string, boolean>;
 }
+
+export type HarnessProfile = "minimal" | "standard" | "full";
+export type HarnessSeatRole = "root" | "implementer" | "peer" | "unknown";
+
+const PROFILES = new Set<HarnessProfile>(["minimal", "standard", "full"]);
+const PROFILE_EXTENSIONS: Record<HarnessProfile, ReadonlySet<string>> = {
+  minimal: new Set(["safety", "herdrState"]),
+  standard: new Set([
+    "safety",
+    "herdrState",
+    "shortcutContinue",
+    "checkpoint",
+    "rewind",
+    "learningCoordinator",
+    "workflowState",
+  ]),
+  full: new Set([
+    "safety",
+    "herdrState",
+    "shortcutContinue",
+    "checkpoint",
+    "rewind",
+    "learningCoordinator",
+    "workflowState",
+    "dcp",
+    "tui",
+    "tps",
+    "diagnostics",
+    "integration",
+    "usageTracker",
+  ]),
+};
+const PROVIDER_KEYS = new Set(["deepseek", "mimo", "xai"]);
+const WORKER_SAFE_EXTENSIONS = new Set(["safety", "herdrState"]);
 
 export function readHarnessSettings(cwd: string = process.cwd()): HarnessSettings {
   try {
@@ -35,6 +70,9 @@ export function readHarnessSettings(cwd: string = process.cwd()): HarnessSetting
     if (!block || typeof block !== "object" || Array.isArray(block)) return {};
     const record = block as Record<string, unknown>;
     return {
+      ...(typeof record.profile === "string" && PROFILES.has(record.profile as HarnessProfile)
+        ? { profile: record.profile as HarnessProfile }
+        : {}),
       ...(typeof record.superpi === "boolean" ? { superpi: record.superpi } : {}),
       ...(typeof record.gptPersonality === "boolean"
         ? { gptPersonality: record.gptPersonality }
@@ -67,6 +105,26 @@ export function readExtensionGate(
   defaultValue: boolean,
 ): boolean {
   const settings = typeof source === "object" ? source : readHarnessSettings(source);
+  const seatRole = readHarnessSeatRole();
+  if (seatRole !== "root" && !WORKER_SAFE_EXTENSIONS.has(extensionKey)) return false;
   const gate = settings.extensions?.[extensionKey];
-  return typeof gate === "boolean" ? gate : defaultValue;
+  if (typeof gate === "boolean") return gate;
+  if (PROVIDER_KEYS.has(extensionKey)) return false;
+  if (settings.profile) return PROFILE_EXTENSIONS[settings.profile].has(extensionKey);
+  return defaultValue;
+}
+
+/**
+ * Explicit seat role for a Herdr co-worker. Unknown values fail closed to a
+ * worker-restricted role; absence preserves the ordinary interactive root.
+ */
+export function readHarnessSeatRole(): HarnessSeatRole {
+  const value = process.env.PI_HARNESS_SEAT_ROLE;
+  if (value === undefined || value === "" || value === "root") return "root";
+  if (value === "implementer" || value === "peer") return value;
+  return "unknown";
+}
+
+export function promptShapingAllowed(): boolean {
+  return readHarnessSeatRole() === "root";
 }

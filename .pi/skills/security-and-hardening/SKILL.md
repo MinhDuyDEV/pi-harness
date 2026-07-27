@@ -11,6 +11,12 @@ metadata:
 
 # Security & Hardening
 
+> Migration: this skill now owns the former `defense-in-depth` workflow. See
+> `../superpi/MIGRATIONS.md`. Read `references/layered-validation.md` for the
+> boundary map, validation matrix, and five defense patterns.
+
+For exploit-focused review, load `references/security-review-playbook.md`.
+
 ## Iron Laws
 
 <EXTREMELY-IMPORTANT>

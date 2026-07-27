@@ -6,9 +6,8 @@
  * extension speaks Herdr's pane protocol: newline-delimited JSON-RPC requests
  * over the unix socket at HERDR_SOCKET_PATH.
  *
- * Methods used (per the canonical Herdr integrations — the opencode plugin at
- * /tmp/pi-review/herdr-agent-state-reference.js and Herdr's own pi integration
- * v6 in ~/.pi/agent/extensions/herdr-agent-state.ts):
+ * Methods used (per the canonical Herdr OpenCode and Pi v6 integrations
+ * audited for this release):
  *   - "pane.report_agent_session" { agent_session_path | agent_session_id,
  *     session_start_source? }
  *   - "pane.report_agent" { state: "working" | "blocked" | "idle", message? }
@@ -60,6 +59,7 @@
 
 import net from "node:net";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate, readHarnessSeatRole, type HarnessSeatRole } from "../lib/harness-settings.js";
 
 const SOURCE = "pi-harness:herdr-state";
 const AGENT = "pi";
@@ -106,6 +106,7 @@ function sendRequest(config: HerdrConfig, request: Record<string, unknown>): Pro
     }
 
     let done = false;
+    let responseBuffer = "";
     let timer: ReturnType<typeof setTimeout> | undefined;
     const finish = () => {
       if (done) return;
@@ -122,7 +123,28 @@ function sendRequest(config: HerdrConfig, request: Record<string, unknown>): Pro
         finish();
       }
     });
-    socket.on("data", finish);
+    socket.on("data", (chunk) => {
+      responseBuffer += chunk.toString("utf8");
+      let newline: number;
+      while ((newline = responseBuffer.indexOf("\n")) >= 0) {
+        const line = responseBuffer.slice(0, newline).trim();
+        responseBuffer = responseBuffer.slice(newline + 1);
+        if (!line) continue;
+        try {
+          const response = JSON.parse(line) as Record<string, unknown>;
+          if (
+            response.jsonrpc === "2.0" &&
+            response.id === request.id &&
+            (Object.hasOwn(response, "result") || Object.hasOwn(response, "error"))
+          ) {
+            finish();
+            return;
+          }
+        } catch {
+          // Ignore malformed frames; only a correlated JSON-RPC response ACKs.
+        }
+      }
+    });
     socket.on("error", finish);
     socket.on("end", finish);
     socket.on("close", finish);
@@ -132,26 +154,52 @@ function sendRequest(config: HerdrConfig, request: Record<string, unknown>): Pro
 }
 
 interface BlockedBusPayload {
-  active?: boolean;
+  active: boolean;
   label?: string;
+  blockerId?: string;
 }
 
-function parseBlockedPayload(data: unknown): BlockedBusPayload {
-  if (!data || typeof data !== "object") return {};
+function parseBlockedPayload(data: unknown): BlockedBusPayload | undefined {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return undefined;
   const record = data as Record<string, unknown>;
+  if (typeof record.active !== "boolean") return undefined;
+  if (
+    record.label !== undefined &&
+    (typeof record.label !== "string" || record.label.length === 0 || record.label.length > 512)
+  ) {
+    return undefined;
+  }
+  if (
+    record.blockerId !== undefined &&
+    (typeof record.blockerId !== "string" ||
+      record.blockerId.length === 0 ||
+      record.blockerId.length > 256)
+  ) {
+    return undefined;
+  }
   return {
-    active: typeof record.active === "boolean" ? record.active : undefined,
-    label: typeof record.label === "string" ? record.label : undefined,
+    active: record.active,
+    label: record.label as string | undefined,
+    blockerId: record.blockerId as string | undefined,
   };
 }
 
+function roleLabel(role: HarnessSeatRole): string {
+  if (role === "root") return "interactive-root";
+  if (role === "implementer" || role === "peer") return `herdr-${role}`;
+  return "unknown-seat";
+}
+
 export default function herdrState(pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "herdrState", true)) return;
   const maybeConfig = readConfig();
   if (!maybeConfig) {
     // Not running under a Herdr pane: register nothing, log nothing.
     return;
   }
   const config: HerdrConfig = maybeConfig;
+  const seatRole = readHarnessSeatRole();
+  if (seatRole === "unknown") return;
 
   let sessionPath: string | undefined;
   let sessionId: string | undefined;
@@ -185,6 +233,7 @@ export default function herdrState(pi: ExtensionAPI): void {
   function enqueue(method: string, params: Record<string, unknown>): void {
     const seq = nextReportSeq();
     sendQueue.push({
+      jsonrpc: "2.0",
       id: `${SOURCE}:${seq}`,
       method,
       params: {
@@ -211,15 +260,19 @@ export default function herdrState(pi: ExtensionAPI): void {
     }
   }
 
-  let rootSession = false;
+  let reportingSession = false;
   let agentActive = false;
-  let blockedCount = 0;
-  let blockedLabel: string | undefined;
+  let anonymousBlockedCount = 0;
+  let anonymousBlockedLabel: string | undefined;
+  const blockers = new Map<string, string | undefined>();
   let lastState: AgentState | undefined;
   let lastMessage: string | undefined;
 
   function desiredState(): { state: AgentState; message?: string } {
-    if (blockedCount > 0) return { state: "blocked", message: blockedLabel };
+    if (anonymousBlockedCount > 0 || blockers.size > 0) {
+      const message = [...blockers.values()].find((label) => label !== undefined) ?? anonymousBlockedLabel;
+      return { state: "blocked", message };
+    }
     if (agentActive) return { state: "working" };
     return { state: "idle" };
   }
@@ -239,7 +292,7 @@ export default function herdrState(pi: ExtensionAPI): void {
     if (!ref) return;
     const params: Record<string, unknown> = {
       ...ref,
-      role: "interactive-root",
+      role: roleLabel(seatRole),
     };
     if (ctx.model) {
       params.model = ctx.model.provider ? `${ctx.model.provider}/${ctx.model.id}` : ctx.model.id;
@@ -259,10 +312,10 @@ export default function herdrState(pi: ExtensionAPI): void {
   }
 
   pi.on("session_start", async (event, ctx) => {
-    // Root filter: only the interactive pane process reports. Headless
-    // subagent pi processes (print/JSON mode) have hasUI === false.
+    // Every reporting seat is an interactive Herdr pane. Ordinary headless
+    // task children have no explicit seat role and cannot clobber pane state.
     if (ctx.hasUI !== true) return;
-    rootSession = true;
+    reportingSession = true;
     updateSessionRef(ctx);
     reportSession(ctx, event.reason);
     // A /reload can swap this extension mid-run without another agent_start.
@@ -271,7 +324,7 @@ export default function herdrState(pi: ExtensionAPI): void {
   });
 
   pi.on("agent_start", async (_event, ctx) => {
-    if (!rootSession) return;
+    if (!reportingSession) return;
     updateSessionRef(ctx);
     reportSession(ctx);
     agentActive = true;
@@ -279,13 +332,13 @@ export default function herdrState(pi: ExtensionAPI): void {
   });
 
   pi.on("tool_execution_start", async (_event, _ctx) => {
-    if (!rootSession) return;
+    if (!reportingSession) return;
     agentActive = true;
     publishState();
   });
 
   pi.on("session_before_compact", async (_event, ctx) => {
-    if (!rootSession) return;
+    if (!reportingSession) return;
     updateSessionRef(ctx);
     agentActive = true;
     reportSession(ctx, "before-compact");
@@ -294,30 +347,36 @@ export default function herdrState(pi: ExtensionAPI): void {
 
   pi.on("agent_settled", async (_event, ctx) => {
     // agent_end is NOT idle: Pi may auto-retry/compact/continue afterwards.
-    if (!rootSession || ctx.isIdle() !== true) return;
+    if (!reportingSession || ctx.isIdle() !== true) return;
     agentActive = false;
     publishState();
   });
 
-  pi.on("session_shutdown", async (_event, ctx) => {
-    if (!rootSession) return;
-    updateSessionRef(ctx);
-    agentActive = false;
-    reportSession(ctx, "shutdown");
-    publishState(true);
+  pi.on("session_shutdown", async (event) => {
+    if (!reportingSession) return;
+    // /reload, /new, /resume and /fork replace the extension runtime while the
+    // pane remains occupied. Only process quit is a terminal seat transition.
+    if ((event as { reason?: unknown }).reason === "quit") {
+      enqueue("pane.release_agent", {});
+      reportingSession = false;
+    }
   });
 
   // Blocking prompts (permission gates, ask-user dialogs) surface through the
   // shared extension bus — the convention Herdr's own pi integration defines.
   pi.events.on("herdr:blocked", (data: unknown) => {
-    if (!rootSession) return;
+    if (!reportingSession) return;
     const payload = parseBlockedPayload(data);
-    if (payload.active === true) {
-      blockedCount += 1;
-      blockedLabel = payload.label;
+    if (!payload) return;
+    if (payload.blockerId) {
+      if (payload.active === true) blockers.set(payload.blockerId, payload.label);
+      else blockers.delete(payload.blockerId);
+    } else if (payload.active === true) {
+      anonymousBlockedCount += 1;
+      anonymousBlockedLabel = payload.label;
     } else {
-      blockedCount = Math.max(0, blockedCount - 1);
-      if (blockedCount === 0) blockedLabel = undefined;
+      anonymousBlockedCount = Math.max(0, anonymousBlockedCount - 1);
+      if (anonymousBlockedCount === 0) anonymousBlockedLabel = undefined;
     }
     publishState();
   });

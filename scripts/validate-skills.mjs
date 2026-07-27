@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { HARD_WORD_CAP } from "./lib/skill-budget.mjs";
+import { HARD_WORD_CAP, MAX_DESCRIPTION_CHARS, MAX_VISIBLE_SKILLS } from "./lib/skill-budget.mjs";
 
 const root = ".pi/skills";
 const errors = [];
@@ -31,6 +31,22 @@ function parseFrontmatter(path) {
     }
   }
   return { text, body: text.slice(end + 4), values };
+}
+
+function descriptionFromFrontmatter(text) {
+  const header = text.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
+  const lines = header.split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^description:\s*(.*)$/.exec(lines[index]);
+    if (!match) continue;
+    const first = match[1].trim();
+    const parts = first && !/^[>|][+-]?$/.test(first) ? [first] : [];
+    while (index + 1 < lines.length && /^\s+\S/.test(lines[index + 1])) {
+      parts.push(lines[++index].trim());
+    }
+    return parts.join(" ").replace(/^['"]|['"]$/g, "");
+  }
+  return "";
 }
 
 /** Recursively list every file under `dir`, skipping node_modules and .DS_Store. Returns paths relative to `dir`, sorted. */
@@ -69,9 +85,19 @@ for (const directory of readdirSync(root, { withFileTypes: true }).filter((entry
   }
   const parsed = parseFrontmatter(path);
   const name = parsed.values.get("name")?.replace(/^['"]|['"]$/g, "");
-  const description = parsed.values.get("description") ?? "";
+  const description = descriptionFromFrontmatter(parsed.text);
+  const hidden = /^true$/i.test(parsed.values.get("disable-model-invocation") ?? "");
   if (!name) errors.push(`${path}: missing name`);
   if (!description.trim()) errors.push(`${path}: missing description`);
+  if (hidden && !/\bUser-invoked\b/.test(description)) {
+    errors.push(`${path}: hidden skills must use an explicit "User-invoked" description`);
+  }
+  if (hidden && !description.includes(`/skill:${directory.name}`)) {
+    errors.push(`${path}: hidden skills must name /skill:${directory.name} in their description`);
+  }
+  if (!hidden && /\bUser-invoked\b/.test(description)) {
+    errors.push(`${path}: model-visible skills must not describe themselves as user-invoked only`);
+  }
   if (name && name !== directory.name) errors.push(`${path}: name ${name} does not match directory ${directory.name}`);
   if (parsed.body.trim().split(/\s+/).filter(Boolean).length > HARD_WORD_CAP) {
     errors.push(`${path}: body exceeds ${HARD_WORD_CAP} words; compress or split the skill`);
@@ -79,6 +105,21 @@ for (const directory of readdirSync(root, { withFileTypes: true }).filter((entry
   const files = {};
   for (const rel of listSkillFiles(skillDir)) files[rel] = sha256(join(skillDir, rel));
   skills.push({ name: directory.name, path, files });
+}
+
+const visibleSkills = skills.filter((skill) => {
+  const parsed = parseFrontmatter(skill.path);
+  return !/^true$/i.test(parsed.values.get("disable-model-invocation") ?? "");
+});
+const visibleDescriptionCharacters = visibleSkills.reduce(
+  (total, skill) => total + descriptionFromFrontmatter(readFileSync(skill.path, "utf8")).length,
+  0,
+);
+if (visibleSkills.length > MAX_VISIBLE_SKILLS) {
+  errors.push(`model-visible skills ${visibleSkills.length} exceed budget ${MAX_VISIBLE_SKILLS}`);
+}
+if (visibleDescriptionCharacters > MAX_DESCRIPTION_CHARS) {
+  errors.push(`model-visible description characters ${visibleDescriptionCharacters} exceed budget ${MAX_DESCRIPTION_CHARS}`);
 }
 
 const names = new Set();

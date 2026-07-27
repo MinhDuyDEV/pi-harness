@@ -3,8 +3,8 @@ name: effect-schema
 description: >-
   Effect Schema patterns for domain types — Schema.Struct vs Schema.Class, branded primitives,
   Schema.TaggedError domain errors, boundary decoding with decodeUnknown, filters,
-  transformations, and JSON Schema generation. Use when defining validation schemas, typed
-  errors, or branded IDs in an Effect codebase, or when replacing Zod.
+  transformations, and JSON Schema generation. User-invoked; load via /skill:effect-schema when
+  defining validation schemas, typed errors, branded IDs, or replacing Zod in an Effect codebase.
 metadata:
   version: 1.0.0
 disable-model-invocation: true

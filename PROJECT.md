@@ -35,6 +35,9 @@ npm run test:all
 ```
 
 Use `npm run test:extensions` for extension-only iteration and `npm run test:skills` for root skill/context tests. Some extension tests require Bun because they use `bun:test`.
+`npm run quality` includes the deterministic full-project debt ratchet described
+in `docs/quality-ratchet.md`; changed-file analysis is additional focused
+feedback, not the regression baseline.
 
 ## Change policy
 

@@ -15,7 +15,20 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import deepseekProvider from "../deepseek-provider.js";
 import mimoProvider from "../mimo-provider.js";
 import xaiOauth from "../xai-oauth.js";
-import { readExtensionGate, readHarnessSettings } from "./harness-settings.js";
+import checkpoint from "../checkpoint/index.js";
+import dcp from "../dcp/index.js";
+import learningCoordinator from "../learning-coordinator/index.js";
+import rewind from "../rewind/index.js";
+import shortcutContinue from "../shortcut-continue.js";
+import tps from "../tps.js";
+import tui from "../tui/index.js";
+import workflowState from "../workflow-state/index.js";
+import {
+  promptShapingAllowed,
+  readExtensionGate,
+  readHarnessSeatRole,
+  readHarnessSettings,
+} from "./harness-settings.js";
 
 function projectWithSettings(settings: unknown): string {
   const cwd = mkdtempSync(join(tmpdir(), "harness-settings-"));
@@ -75,17 +88,80 @@ test("readExtensionGate: settings can turn a gate on or explicitly off", () => {
   );
 });
 
-test("readExtensionGate: non-boolean gate values fall back to the default", () => {
+test("readExtensionGate: providers remain opt-in when a malformed value would otherwise inherit true", () => {
   inProject({ "pi-harness": { extensions: { deepseek: "on", mimo: 1 } } }, (cwd) => {
     assert.equal(readExtensionGate(cwd, "deepseek", false), false);
-    assert.equal(readExtensionGate(cwd, "mimo", true), true);
+    assert.equal(readExtensionGate(cwd, "mimo", true), false);
   });
 });
 
 test("readExtensionGate: accepts already-parsed settings as the source", () => {
   assert.equal(readExtensionGate({ extensions: { xai: true } }, "xai", false), true);
   assert.equal(readExtensionGate({ extensions: {} }, "xai", false), false);
-  assert.equal(readExtensionGate({}, "xai", true), true);
+  assert.equal(readExtensionGate({}, "xai", true), false);
+});
+
+test("profiles provide minimal, standard and full consumer bundles without enabling providers", () => {
+  assert.equal(readExtensionGate({ profile: "minimal" }, "safety", false), true);
+  assert.equal(readExtensionGate({ profile: "minimal" }, "dcp", true), false);
+  assert.equal(readExtensionGate({ profile: "standard" }, "checkpoint", false), true);
+  assert.equal(readExtensionGate({ profile: "standard" }, "workflowState", false), true);
+  assert.equal(readExtensionGate({ profile: "standard" }, "tui", true), false);
+  assert.equal(readExtensionGate({ profile: "full" }, "tui", false), true);
+  assert.equal(readExtensionGate({ profile: "full" }, "deepseek", true), false);
+  assert.equal(
+    readExtensionGate({ profile: "minimal", extensions: { dcp: true } }, "dcp", false),
+    true,
+    "an explicit per-key setting overrides the profile",
+  );
+});
+
+test("worker seat mode disables prompt shaping and all write-heavy extensions", () => {
+  const previous = process.env.PI_HARNESS_SEAT_ROLE;
+  try {
+    process.env.PI_HARNESS_SEAT_ROLE = "implementer";
+    assert.equal(readHarnessSeatRole(), "implementer");
+    assert.equal(promptShapingAllowed(), false);
+    assert.equal(readExtensionGate({ profile: "full" }, "dcp", true), false);
+    assert.equal(readExtensionGate({ extensions: { tui: true } }, "tui", true), false);
+    assert.equal(readExtensionGate({ profile: "minimal" }, "safety", false), true);
+    assert.equal(readExtensionGate({ profile: "minimal" }, "herdrState", false), true);
+
+    process.env.PI_HARNESS_SEAT_ROLE = "typo";
+    assert.equal(readHarnessSeatRole(), "unknown");
+    assert.equal(readExtensionGate({ profile: "full" }, "checkpoint", true), false);
+  } finally {
+    if (previous === undefined) delete process.env.PI_HARNESS_SEAT_ROLE;
+    else process.env.PI_HARNESS_SEAT_ROLE = previous;
+  }
+});
+
+test("minimal profile entries return before touching disabled extension APIs", () => {
+  inProjectCwd({ "pi-harness": { profile: "minimal" } }, () => {
+    for (const entry of [
+      checkpoint,
+      dcp,
+      learningCoordinator,
+      rewind,
+      shortcutContinue,
+      tps,
+      tui,
+      workflowState,
+    ]) {
+      const accesses: PropertyKey[] = [];
+      const disabledPi = new Proxy(
+        {},
+        {
+          get(_target, property) {
+            accesses.push(property);
+            throw new Error(`disabled extension touched pi.${String(property)}`);
+          },
+        },
+      ) as ExtensionAPI;
+      assert.doesNotThrow(() => entry(disabledPi as never));
+      assert.deepEqual(accesses, []);
+    }
+  });
 });
 
 // --- Entry-level: the three provider extensions honor the gate ---

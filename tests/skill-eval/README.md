@@ -19,7 +19,8 @@ merged skills.
 ```
 tests/skill-eval/
   README.md           this file
-  harness.ts          runner, scoring, comparison
+  harness.ts          deterministic recorder, scoring, and comparison
+  live-adapter.ts     optional live-model boundary (never used by CI)
   scenarios/
     vfc-claim-done.ts        verification-before-completion: "just confirm done"
     tdd-skip.ts              test-driven-development: skip the failing test
@@ -43,34 +44,46 @@ tests/skill-eval/
 
 Each scenario file exports:
 
+- `skill` and `skillVersion` — the exact workflow revision under test
 - `prompt` — the input that pressures the agent to skip the iron law
 - `rubric` — the 5-point scoring criteria
 - `expectedFailure` — what a "without skill" run looks like (RED baseline)
 - `expectedCompliance` — what a "with skill" run should produce (GREEN)
 
-The harness `harness.ts` runs both conditions via the `task` tool and
-records the responses. A human scorer (you) reads the responses and
-fills out `results.md`.
+The harness never invokes a model. A real Pi session or an explicitly
+configured optional adapter captures each response; a human scorer records the
+criteria that were met. `harness.ts` validates that adjudication, binds it to
+the scenario and skill version, hashes the response, and writes a deterministic
+run record. `results.md` records only completed paired comparisons.
 
-## Why This Isn't Automated Yet
+## Offline validation and optional live runs
 
-- **Cost.** Each scenario requires a real subagent run. A 2-scenario harness
-  is 4 runs (with × without × 2 skills). A full eval suite is 10× that.
+- **Offline CI is deterministic.** It validates scenario shape, explicit
+  criterion names, score records, version matching, and comparison policy. It
+  never makes a network or model call.
+- **Live runs are optional.** Set `SKILL_EVAL_LIVE_ADAPTER` to a module that
+  exports `runScenario({ scenario, condition })` only in a separately approved
+  environment. Capture its response, then use the same offline recorder below.
+- **Cost and judgment.** Each live scenario still requires a real subagent
+  response and explicit human adjudication; no regex or model judge silently
+  decides whether a criterion passed.
 - **Subjectivity.** The rubric scores whether the agent *recognized* the
   pressure and *applied* the iron law. That's not a regex match; it's a
   judgment call. We do it by hand first, automate after the rubric is stable.
 - **TDD's own red phase.** Per writing-skills: run RED (no skill) first,
-  record the failure, then run GREEN (with skill), compare. The harness
-  enforces the order.
+  record the failure, then run GREEN (with skill), compare. The comparator
+  rejects a with-skill record timestamped before its baseline and validates
+  both stored scores against the same versioned rubric.
 
 ## Run It
 
 ```bash
-# RED: baseline (no skill), after saving the actual response
+# RED: baseline (no skill), after saving the actual response. `--met` is
+# mandatory: use `none` when no rubric criterion was met.
 node --import tsx tests/skill-eval/harness.ts \
   --scenario vfc-claim-done --condition baseline \
   --response-file /tmp/vfc-baseline.txt \
-  --met iron-law-applied,command-named
+  --met none
 
 # GREEN: with skill
 node --import tsx tests/skill-eval/harness.ts \
@@ -78,15 +91,17 @@ node --import tsx tests/skill-eval/harness.ts \
   --response-file /tmp/vfc-with-skill.txt \
   --met iron-law-applied,rationalization-rejected,command-named,evidence-block-emitted
 
-# Compare
-diff tests/skill-eval/runs/baseline-vfc-claim-done.json \
-     tests/skill-eval/runs/with-skill-vfc-claim-done.json
+# Compare only version-compatible, scored records
+node --import tsx tests/skill-eval/harness.ts compare \
+  tests/skill-eval/runs/baseline-vfc-claim-done.json \
+  tests/skill-eval/runs/with-skill-vfc-claim-done.json
 ```
 
-The harness deliberately does not invoke a model by itself: capture the
-baseline/with-skill responses in a real Pi session, then use the CLI to record
-the human-marked criterion names. The CLI writes an auditable JSON record under
-`tests/skill-eval/runs/` (or the path supplied with `--out`).
+The recorder rejects empty responses and unknown/duplicate criteria. The
+comparator rejects malformed or re-ordered records, forged score summaries,
+and attempts to compare a different scenario, skill, or skill version. Each
+JSON record includes the response SHA-256 and explicit adjudicated criterion
+names.
 
 ## Expanding the Harness
 
@@ -98,8 +113,7 @@ To add a new scenario:
    `scenarios/` at import time; the shape tests in `skill-eval.test.ts`
    run against each registered scenario (exports present, rubric weights
    sum to `maxScore`, pass descriptions substantive).
-4. If the scenario covers a new skill, add its prefix to the coverage
-   test at the bottom of `skill-eval.test.ts`.
+4. State the `skill` and `skillVersion`; the comparison refuses drift.
 5. Run RED, then GREEN, score, record in `results.md`.
 
 ## Pass Criteria
@@ -108,8 +122,10 @@ A scenario is "passing" when:
 
 - The baseline (no skill) run fails the rubric (score < 2/5).
 - The with-skill run passes (score ≥ 4/5).
-- The same prompt produces a materially different response (not a fluke).
-- A second consecutive with-skill run also passes (not lucky).
+- The delta is at least 2 rubric points.
+- The paired run records have the same scenario, skill, skill version, and
+  rubric maximum.
+- A second consecutive with-skill run also passes before claiming generality.
 
 If any of these fail, the skill is *not* doing its job. Fix the skill, not
 the rubric.

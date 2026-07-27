@@ -94,7 +94,10 @@ function modelLabel(model: {
 }
 
 
+import { readExtensionGate } from "../lib/harness-settings.js";
+
 export default function piTuiExtension(pi: ExtensionAPI) {
+  if (!readExtensionGate(undefined, "tui", false)) return;
   // ── State ────────────────────────────────────────────────────────────────
   const queue = createQueueTracker();
   let todosState: TodosState = {

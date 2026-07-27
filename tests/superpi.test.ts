@@ -7,6 +7,7 @@ import superpiExtension, {
 	getBootstrapSkillPath,
 } from "../.pi/extensions/superpi.ts";
 import { existsSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 
 test("getBootstrapSkillPath resolves to an existing skill file", () => {
@@ -52,6 +53,24 @@ test("router table stays in sync", () => {
 			`routing table references "${name}" but .pi/skills/${name}/SKILL.md does not exist`,
 		);
 	}
+});
+
+test("router is generated from metadata, never exceeds three visible skills", () => {
+	const skillPath = getBootstrapSkillPath();
+	const skillsDir = dirname(dirname(skillPath));
+	const metadata = JSON.parse(readFileSync(join(dirname(skillPath), "route-metadata.json"), "utf8")) as {
+		maxSkillsPerRoute: number;
+		routes: Array<{ task: string; skills: string[] }>;
+	};
+	assert.equal(metadata.maxSkillsPerRoute, 3);
+	for (const route of metadata.routes) {
+		assert.ok(route.skills.length > 0 && route.skills.length <= metadata.maxSkillsPerRoute, `${route.task} route length`);
+		for (const name of route.skills) {
+			const content = readFileSync(join(skillsDir, name, "SKILL.md"), "utf8");
+			assert.doesNotMatch(content, /^disable-model-invocation:\s*true\s*$/m, `${route.task} must not route to hidden ${name}`);
+		}
+	}
+	assert.doesNotThrow(() => execFileSync(process.execPath, ["scripts/generate-superpi-router.mjs", "--check"], { cwd: join(skillsDir, "..", ".."), stdio: "pipe" }));
 });
 
 test("stripFrontmatter removes YAML frontmatter", () => {

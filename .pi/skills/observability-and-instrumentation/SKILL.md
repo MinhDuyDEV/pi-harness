@@ -13,11 +13,14 @@ metadata:
 
 ## Core Principle
 
-Code you can't observe is code you can't operate. Instrument while building the feature — the costliest time to discover missing telemetry is during the incident.
+Code you can't observe is code you can't operate. Instrument while building.
+
+For performance, read `references/performance.md` and require a numeric
+baseline plus re-measurement.
 
 ## When to Use
 
-Any production-bound feature; new endpoints, background jobs, retries, queues, external integrations; after an incident where diagnosis lacked data; reviewing a PR that adds I/O. NOT for live debugging (`debugging-and-error-recovery`) or performance tuning (`performance-optimization`).
+Any production-bound feature; new endpoints, background jobs, retries, queues, external integrations; after an incident where diagnosis lacked data; reviewing a PR that adds I/O. NOT for live debugging (`debugging-and-error-recovery`) or motion-specific rendering work (`fixing-motion-performance`).
 
 ## Start With Questions
 

@@ -11,6 +11,13 @@ metadata:
 
 # Frontend Design (React + Tailwind + shadcn)
 
+> Migration: this skill now owns the former `accessibility-audit`,
+> `design-system-audit`, `mockup-to-code`, and `redesign-existing-projects`
+> workflows. Read `references/shadcn/accessibility.md`,
+> `references/design-system-audit.md`, `references/mockup-to-code.md`, or
+> `references/redesign-existing.md` for those audits and translation workflows.
+> See `../superpi/MIGRATIONS.md`.
+
 ## Iron Laws
 
 <EXTREMELY-IMPORTANT>

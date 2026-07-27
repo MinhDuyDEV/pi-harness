@@ -33,6 +33,9 @@ const VALID_BASE = [
   "README.md",
   "LICENSE",
   "AGENTS.md",
+  "docs/quality-ratchet.md",
+  "docs/workflow-state.md",
+  "quality/aislop-debt-baseline.json",
   "skills-lock.json",
   ".pi/settings.json",
   ".pi/skills/debugging-and-error-recovery/SKILL.md",
@@ -43,8 +46,12 @@ const VALID_BASE = [
   "scripts/init-consumer.mjs",
   "scripts/lib/package-payload.mjs",
   "scripts/lib/prompt-policy.mjs",
+  "scripts/lib/quality-ratchet.mjs",
   "scripts/lib/resource-smoke.mjs",
   "scripts/lib/skill-budget.mjs",
+  "scripts/lib/suite-pins.mjs",
+  "scripts/registry-preflight.mjs",
+  "scripts/quality-ratchet.mjs",
   "scripts/release-check.mjs",
   "scripts/smoke-packed-resources.mjs",
   "scripts/smoke-resources.mjs",
@@ -67,7 +74,7 @@ test("settings pin portable exact Auto-safe package sources", () => {
   // drift this suite exists to prevent (audit H-E) — the assertion broke on
   // every legitimate pin bump and would have been "fixed" by copying whatever
   // the file said. Each sibling must be pinned via npm to one EXACT version.
-  for (const name of ["pi-learning", "pi-subagents", "pi-todo"]) {
+  for (const name of ["pi-core", "pi-learning", "pi-subagents", "pi-todo"]) {
     const pins = (settings.packages ?? []).filter((entry) =>
       entry.includes(`@minhduydev/${name}@`),
     );
@@ -232,7 +239,8 @@ test("package metadata follows Pi's portable package conventions", () => {
       `${name} must pin the verified Pi host range`,
     );
   }
-  assert.equal(manifest.scripts?.prepublishOnly, "npm run release:check");
+  assert.equal(manifest.scripts?.prepublishOnly, "npm run release:check:registry");
+  assert.equal(manifest.scripts?.["release:check"], "npm run release:check:local");
   assert.match(manifest.scripts?.["pack:check"] ?? "", /validate:package-payload/);
 });
 

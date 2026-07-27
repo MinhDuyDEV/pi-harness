@@ -12,6 +12,11 @@ metadata:
 
 # Deep Module Design
 
+> Migration: this skill now owns the former `api-and-interface-design`
+> workflow. Read `references/api-interface-design.md` for contract-first
+> schemas, versioning, errors, and retry compatibility. See
+> `../superpi/MIGRATIONS.md`.
+
 ## Iron Laws
 
 <EXTREMELY-IMPORTANT>

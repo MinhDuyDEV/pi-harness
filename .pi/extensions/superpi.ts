@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readHarnessSettings } from "./lib/harness-settings.js";
+import { promptShapingAllowed, readHarnessSettings } from "./lib/harness-settings.js";
 
 const EXTREMELY_IMPORTANT_MARKER = "<EXTREMELY-IMPORTANT>";
 const BOOTSTRAP_MARKER = "pi-harness:superpi bootstrap";
@@ -73,6 +73,7 @@ ${EXTREMELY_IMPORTANT_MARKER}`;
 }
 
 export default function superpiExtension(pi: ExtensionAPI) {
+	if (!promptShapingAllowed()) return;
 	let injectBootstrap = true;
 
 	pi.on("resources_discover", async () => ({

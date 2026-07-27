@@ -3,7 +3,7 @@
 ## Self-Contained Skill
 
 ```
-defense-in-depth/
+security-and-hardening/
   SKILL.md    # Everything inline
 ```
 

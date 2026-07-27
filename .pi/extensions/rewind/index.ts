@@ -12,8 +12,10 @@ import { registerRewindEvents } from "./events.js";
 import { createLedgerManager } from "./ledger.js";
 import { createRetentionManager } from "./retention.js";
 import { createSnapshotStore } from "./store.js";
+import { readExtensionGate } from "../lib/harness-settings.js";
 
 export default function rewindExtension(pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "rewind", false)) return;
   const state = createRewindRuntimeState();
   let activeContext: ExtensionContext | undefined;
   const store = createSnapshotStore(pi, state);

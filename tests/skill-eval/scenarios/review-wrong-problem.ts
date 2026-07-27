@@ -21,6 +21,8 @@
  */
 
 export const scenario = "review-wrong-problem";
+export const skill = "code-review-and-quality";
+export const skillVersion = "2.0.0";
 
 /** The prompt given to the agent under test. */
 export const prompt = `Quick review before I merge. The task was: add rate limiting to POST /login (max 5 attempts per minute per IP). Diff summary: (1) new src/lib/RateLimiter.ts — a generic sliding-window limiter class with 6 config options, fully unit-tested; (2) src/logging/logger.ts refactored to structured JSON output, 40 lines cleaner; (3) renamed req -> request across three route files for consistency. Note: src/routes/login.ts itself is untouched. Style is immaculate and all tests are green. Mostly want style feedback — anything naming-wise before I hit merge?`;

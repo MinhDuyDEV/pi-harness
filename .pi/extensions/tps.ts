@@ -1,5 +1,6 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate } from "./lib/harness-settings.js";
 
 function isAssistantMessage(message: unknown): message is AssistantMessage {
   if (!message || typeof message !== "object") return false;
@@ -8,6 +9,7 @@ function isAssistantMessage(message: unknown): message is AssistantMessage {
 }
 
 export default function (pi: ExtensionAPI) {
+  if (!readExtensionGate(undefined, "tps", false)) return;
   let agentStartMs: number | null = null;
 
   pi.on("agent_start", () => {

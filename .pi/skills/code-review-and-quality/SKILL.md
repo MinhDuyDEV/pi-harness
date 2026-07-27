@@ -52,13 +52,15 @@ For AI-generated code, post-refactor, or suspected scope creep. Output a **delet
 | TS / JS with Effect | Typed errors, no `any` (`typescript-coding-standards`) |
 | React / Next.js | Server components, bundle discipline (`react-best-practices`) |
 | UI | Base aesthetic rules (`design-taste-frontend`) |
-| Performance | Measure before optimizing (`performance-optimization`) |
-| Security | Validate at every layer (`defense-in-depth`) |
+| Performance | Measure signals (`observability-and-instrumentation`) |
+| Security | Validate at every layer (`security-and-hardening`) |
 
 ## Requesting and Receiving Review
 
-- **Requesting:** state the problem, the approach, and the verification command with its output.
-- **Receiving:** treat `[blocker]`s as claims to verify, not orders — push back with evidence if the reviewer is wrong, fix if right. Never resubmit without re-running the gate.
+- **Requesting:** use `references/requesting-review.md` for scope, risk, evidence,
+  commit range, and a concrete reviewer ask.
+- **Receiving:** use `references/receiving-review.md` to classify feedback,
+  reproduce claims, and disagree or defer with evidence.
 - **Reviewing others/subagents:** read the diff, not the self-report. Self-reported success is the failure mode review exists to catch.
 
 ## Anti-rationalization

@@ -17,6 +17,7 @@ import {
   makeContextRequestPayload,
   makeLearningClaim,
   makeProofVerifiedPayload,
+  parseContextRequest,
 } from "@minhduydev/pi-subagents/events";
 import { createOrchestrationReplayPort } from "@minhduydev/pi-subagents/replay";
 
@@ -101,9 +102,18 @@ const claim = makeLearningClaim({
   applicability: "parser changes",
   support: { mode: "task-outcome", evidenceRefs: [{ kind: "evidence-receipt", ref: "receipt-1", digest: tagged("9") }] },
 });
-const context = makeContextRequestPayload("task-1", "general", "description only", "corr-1", [claim], {
-  projectId: "project-1", trustEpoch: "trust-1", sessionGeneration: "session-1",
-});
+const context = makeContextRequestPayload(
+  "task-1",
+  "general",
+  "description only",
+  "corr-1",
+  [claim],
+);
+assert.deepEqual(
+  parseContextRequest(context),
+  context,
+  "the packed producer must emit a context request accepted by the packed parser",
+);
 assert.equal(context.learningClaims[0].claimId, claim.claimId);
 const proof = makeProofVerifiedPayload("task-final", true, [], [], "corr-1", {
   requestDigest: context.requestDigest,

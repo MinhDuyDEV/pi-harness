@@ -23,57 +23,78 @@ export interface ParsedBlock {
   firstContentLines: string[];
 }
 
+interface ParsedTodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
+}
+
+interface ParsedTodoPhase {
+  title: string;
+  date?: string;
+  status: "active" | "done" | "abandoned";
+  body: Array<{ type: "item"; item: ParsedTodoItem } | { type: "note"; text: string }>;
+}
+
+interface ParsedTodoDocument {
+  phases: ParsedTodoPhase[];
+}
+
+interface TodoMarkdownModule {
+  parseMarkdown(markdown: string): ParsedTodoDocument;
+}
+
+const TODO_MARKDOWN_SUBPATH = "@minhduydev/pi-todo/markdown";
+let parserPromise: Promise<TodoMarkdownModule | null> | undefined;
+
 /**
- * Parse a canonical artifact file (TODO.md / PROGRESS.md) into blocks keyed
- * by `### <title>` headings. Returns blocks in file order. Each block carries
- * its status (from the `status:` line, if present), its checkboxes, and the
- * first few content lines under the heading for context. Pure.
+ * Load the one canonical artifact Markdown parser. pi-todo is optional for a
+ * minimal harness consumer, so absence is explicit rather than falling back to
+ * a second regex grammar that can drift.
  */
-export function parseActiveBlocks(content: string): ParsedBlock[] {
-  const blocks: ParsedBlock[] = [];
-  let current: ParsedBlock | null = null;
-  let inCheckboxSection = false;
+export function loadCanonicalArtifactParser(): Promise<TodoMarkdownModule | null> {
+  parserPromise ??= import(TODO_MARKDOWN_SUBPATH)
+    .then((module) => (typeof module.parseMarkdown === "function" ? module : null))
+    .catch(() => null);
+  return parserPromise;
+}
 
-  for (const line of content.split("\n")) {
-    const heading = line.match(/^###\s+(.+?)\s*$/);
-    if (heading) {
-      if (current) blocks.push(current);
-      current = {
-        title: heading[1],
-        status: null,
-        checkboxes: [],
-        firstContentLines: [],
-      };
-      inCheckboxSection = false;
-      continue;
-    }
-
-    if (!current) continue;
-
-    const statusMatch = line.match(/^status:\s*(\w+)/);
-    if (statusMatch) {
-      const v = statusMatch[1].toLowerCase();
-      if (v === "active" || v === "done" || v === "abandoned") {
-        current.status = v;
+/** Project a pi-todo parsed document into the checkpoint's bounded view. */
+export function projectCanonicalBlocks(document: ParsedTodoDocument): ParsedBlock[] {
+  return document.phases.map((phase) => {
+    const checkboxes: ParsedBlock["checkboxes"] = [];
+    const firstContentLines: string[] = [];
+    let sawItem = false;
+    for (const entry of phase.body) {
+      if (entry.type === "item") {
+        sawItem = true;
+        checkboxes.push({
+          text: entry.item.content,
+          done:
+            entry.item.status === "completed" ||
+            entry.item.status === "abandoned",
+        });
+      } else if (
+        !sawItem &&
+        firstContentLines.length < 5 &&
+        entry.text.trim().length > 0
+      ) {
+        firstContentLines.push(entry.text);
       }
-      continue;
     }
+    return {
+      title: phase.date ? `${phase.date} - ${phase.title}` : phase.title,
+      status: phase.status,
+      checkboxes,
+      firstContentLines,
+    };
+  });
+}
 
-    const checkbox = line.match(/^[-*]\s*\[([ xX])\]\s*(.+)$/);
-    if (checkbox) {
-      current.checkboxes.push({ text: checkbox[2].trim(), done: checkbox[1].toLowerCase() === "x" });
-      inCheckboxSection = true;
-      continue;
-    }
-
-    // Capture the first few non-checkbox content lines (#### Run Report etc.)
-    if (!inCheckboxSection && current.firstContentLines.length < 5 && line.trim().length > 0) {
-      current.firstContentLines.push(line);
-    }
-  }
-
-  if (current) blocks.push(current);
-  return blocks;
+export async function parseCanonicalArtifactBlocks(
+  content: string,
+): Promise<ParsedBlock[] | null> {
+  const parser = await loadCanonicalArtifactParser();
+  return parser ? projectCanonicalBlocks(parser.parseMarkdown(content)) : null;
 }
 
 export interface CheckpointContent {
@@ -158,13 +179,16 @@ export async function generateCheckpointContent(
     const progressPath = join(artifactsDir, "PROGRESS.md");
 
     const todoBlocks = existsSync(todoPath)
-      ? parseActiveBlocks(readFileSync(todoPath, "utf-8"))
+      ? await parseCanonicalArtifactBlocks(readFileSync(todoPath, "utf-8"))
       : [];
     const progressBlocks = existsSync(progressPath)
-      ? parseActiveBlocks(readFileSync(progressPath, "utf-8"))
+      ? await parseCanonicalArtifactBlocks(readFileSync(progressPath, "utf-8"))
       : [];
 
-    result.activeTasks = summarizeActiveTasks(todoBlocks, progressBlocks);
+    result.activeTasks =
+      todoBlocks === null || progressBlocks === null
+        ? "(install @minhduydev/pi-todo to parse canonical artifacts)"
+        : summarizeActiveTasks(todoBlocks, progressBlocks);
   } catch {
     result.activeTasks = "(unable to read artifacts)";
   }

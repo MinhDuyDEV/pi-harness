@@ -5,6 +5,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { join, resolve } from "node:path";
+import { readSuitePins } from "./lib/suite-pins.mjs";
 
 const root = new URL("..", import.meta.url);
 const directory = await mkdtemp(join(tmpdir(), "pi-harness-phase5-packed-"));
@@ -35,18 +36,16 @@ function packSibling(name: string): string {
   return join(directory, tarball);
 }
 
-const settings = JSON.parse(await readFile(new URL(".pi/settings.json", root), "utf8")) as {
-  packages?: string[];
-};
+const pins = readSuitePins(fileURLToPath(new URL(".pi/settings.json", root)));
 const packageSpecs = process.env.PI_E2E_SIBLINGS === "local"
   ? ["pi-core", "pi-learning", "pi-subagents", "pi-todo"].map(packSibling)
   : process.env.PI_PHASE5_PACKAGE_SPECS
     ? process.env.PI_PHASE5_PACKAGE_SPECS.split(",").filter(Boolean)
     : [
-        process.env.PI_CORE_SPEC ?? "@minhduydev/pi-core@0.1.0",
-        ...(settings.packages ?? [])
-          .filter((entry) => /@minhduydev\/pi-(?:learning|todo|subagents)@/.test(entry))
-          .map((entry) => entry.replace(/^npm:/, "")),
+        process.env.PI_CORE_SPEC ?? pins["@minhduydev/pi-core"].spec,
+        pins["@minhduydev/pi-learning"].spec,
+        pins["@minhduydev/pi-subagents"].spec,
+        pins["@minhduydev/pi-todo"].spec,
       ];
 assert.ok(packageSpecs.length >= 3, "expected the Phase 5 package pins");
 

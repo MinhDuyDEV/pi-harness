@@ -15,7 +15,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { TARGET_WORD_CAP } from "../scripts/lib/skill-budget.mjs";
+import {
+  MAX_DESCRIPTION_CHARS,
+  MAX_VISIBLE_SKILLS,
+  MIN_DESCRIPTION_HEADROOM,
+  TARGET_WORD_CAP,
+} from "../scripts/lib/skill-budget.mjs";
 
 const SKILLS_DIR = resolve(import.meta.dirname, "../.pi/skills");
 
@@ -48,22 +53,6 @@ const TARGETS: SkillSpec[] = [
     name: "planning-and-task-breakdown",
     maxWords: TARGET_WORD_CAP,
     markers: ["most-likely-to-change", "mechanical", "plan", "spec"],
-  },
-  {
-    name: "development-lifecycle",
-    maxWords: TARGET_WORD_CAP,
-    markers: [
-      "/create",
-      "/plan",
-      "/ship",
-      "/verify",
-      "/research",
-      "TODO.md",
-      "PLAN.md",
-      "PROGRESS.md",
-      "DECISIONS.md",
-      "### YYYY-MM-DD",
-    ],
   },
   {
     name: "writing-skills",
@@ -112,11 +101,6 @@ const TARGETS: SkillSpec[] = [
     markers: ["typography", "whitespace", "spacing", "scale"],
   },
   {
-    name: "ts-package-authoring",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["exports", "workspace", "peerDependencies", "barrel"],
-  },
-  {
     name: "typescript-coding-standards",
     maxWords: TARGET_WORD_CAP,
     markers: ["any", "errors as data", "branded", "pure"],
@@ -125,11 +109,6 @@ const TARGETS: SkillSpec[] = [
     name: "effect-schema",
     maxWords: TARGET_WORD_CAP,
     markers: ["Schema", "decodeUnknown", "branded", "TaggedError", "boundary"],
-  },
-  {
-    name: "redesign-existing-projects",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["audit", "tokens", "component", "functionality"],
   },
   {
     name: "effect-http-api",
@@ -193,24 +172,9 @@ const TARGETS: SkillSpec[] = [
     markers: ["deprecate", "migration", "codemod", "changelog", "major"],
   },
   {
-    name: "api-and-interface-design",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["contract", "version", "idempotency", "error", "schema"],
-  },
-  {
     name: "ci-cd-and-automation",
     maxWords: TARGET_WORD_CAP,
     markers: ["PR", "cache", "secret", "matrix", "deploy"],
-  },
-  {
-    name: "defense-in-depth",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["boundary", "validate", "schema", "trust", "constraints"],
-  },
-  {
-    name: "performance-optimization",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["measure", "baseline", "bottleneck", "Core Web Vitals", "algorithmic"],
   },
   {
     name: "opensrc",
@@ -285,16 +249,6 @@ const TARGETS: SkillSpec[] = [
     markers: ["server component", "useEffect", "bundle", "React.memo", "code-split"],
   },
   {
-    name: "design-system-audit",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["token", "audit", "spec", "component", "breach"],
-  },
-  {
-    name: "mockup-to-code",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["design", "token", "component", "validate", "spec"],
-  },
-  {
     name: "resend",
     maxWords: TARGET_WORD_CAP,
     markers: ["React Email", "templates", "inbound", "webhook", "send"],
@@ -308,16 +262,6 @@ const TARGETS: SkillSpec[] = [
     name: "obsidian",
     maxWords: TARGET_WORD_CAP,
     markers: ["note", "tag", "vault", "frontmatter", "MCP"],
-  },
-  {
-    name: "browser-testing-with-devtools",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["browser", "DOM", "console", "network", "screenshot"],
-  },
-  {
-    name: "accessibility-audit",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["WCAG", "contrast", "keyboard", "focus", "label"],
   },
   {
     name: "aislop",
@@ -389,6 +333,21 @@ async function readBody(skillPath: string): Promise<string> {
   return text.toLowerCase();
 }
 
+function descriptionFromFrontmatter(frontmatter: string): string {
+  const lines = frontmatter.split("\n");
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = /^description:\s*(.*)$/.exec(lines[index]);
+    if (!match) continue;
+    const first = match[1].trim();
+    const parts = first && !/^[>|][+-]?$/.test(first) ? [first] : [];
+    while (index + 1 < lines.length && /^\s+\S/.test(lines[index + 1])) {
+      parts.push(lines[++index].trim());
+    }
+    return parts.join(" ").replace(/^['"]|['"]$/g, "");
+  }
+  return "";
+}
+
 for (const spec of TARGETS) {
   test(`skill compression: ${spec.name} ≤ ${spec.maxWords} words`, async () => {
     const path = resolve(SKILLS_DIR, spec.name, "SKILL.md");
@@ -410,3 +369,23 @@ for (const spec of TARGETS) {
     }
   });
 }
+
+test("model-visible skill catalog keeps count and description headroom", async () => {
+  const entries = await Promise.all(
+    (await (await import("node:fs/promises")).readdir(SKILLS_DIR, { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const text = await readFile(resolve(SKILLS_DIR, entry.name, "SKILL.md"), "utf8");
+        const frontmatter = text.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
+        const description = descriptionFromFrontmatter(frontmatter);
+        return { hidden: /^disable-model-invocation:\s*true\s*$/m.test(frontmatter), description };
+      }),
+  );
+  const visible = entries.filter((entry) => !entry.hidden);
+  const chars = visible.reduce((total, entry) => total + entry.description.length, 0);
+  assert.ok(visible.length < MAX_VISIBLE_SKILLS, `need a visible-skill slot: ${visible.length}/${MAX_VISIBLE_SKILLS}`);
+  assert.ok(
+    chars <= MAX_DESCRIPTION_CHARS - MIN_DESCRIPTION_HEADROOM,
+    `need ${MIN_DESCRIPTION_HEADROOM} description characters of headroom: ${chars}/${MAX_DESCRIPTION_CHARS}`,
+  );
+});

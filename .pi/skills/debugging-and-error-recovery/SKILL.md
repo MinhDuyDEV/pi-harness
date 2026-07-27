@@ -20,7 +20,7 @@ metadata:
 
 ## When to Use
 
-Test, lint, typecheck, build, or runtime failure; a reported bug or unexpected behavior; a previous fix did not hold. NOT for feature work with no failure signal (`incremental-implementation`) or pure research (`source-driven-development`).
+Test, lint, typecheck, build, or runtime failure; a reported bug or unexpected behavior; a previous fix did not hold. NOT for feature work with no failure signal (`incremental-implementation`) or evidence/source mapping without a failure (`context-engineering`).
 
 ## Workflow
 

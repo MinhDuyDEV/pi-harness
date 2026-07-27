@@ -130,3 +130,26 @@ Always visible:
 - [ ] Respects reduced motion
 - [ ] Works at 200% zoom
 - [ ] Skip links provided
+
+## Manual WCAG AA Audit
+
+Automated scanners are a prefilter, not proof. Audit every relevant route,
+viewport, and loading/empty/error/success state:
+
+1. Tab through every control; verify logical order, no keyboard trap, Escape
+   behavior, and a visible focus indicator.
+2. Measure contrast from actual tokens: 4.5:1 for body text and 3:1 for large
+   text.
+3. Exercise VoiceOver or NVDA; confirm landmarks, headings, names, roles,
+   values, and state changes are understandable.
+4. Verify every form field has a real label and every error identifies and
+   announces its field.
+5. Verify icon controls have an accessible name; decorative images are hidden
+   and meaningful images have useful alt text.
+6. Verify skip navigation, live regions, reduced motion, reflow/zoom, and
+   dynamic loading/error announcements.
+
+Record browser/device, automated scan output, keyboard path, screen-reader
+observations, screenshots where useful, finding severity, fix, and retest
+evidence. A component library's accessibility claim does not replace testing
+the composed application.

@@ -11,8 +11,11 @@ export const HARD_WORD_CAP = 700;
 /** Compression target for SKILL.md bodies; the compression tests enforce this. */
 export const TARGET_WORD_CAP = 600;
 
-/** Maximum number of model-visible skills (no disable-model-invocation). */
-export const MAX_VISIBLE_SKILLS = 40;
+/** Maximum model-visible skills. Keep one slot free for an intentional addition. */
+export const MAX_VISIBLE_SKILLS = 36;
 
 /** Combined description-character budget across all model-visible skills. */
-export const MAX_DESCRIPTION_CHARS = 8000;
+export const MAX_DESCRIPTION_CHARS = 7500;
+
+/** Minimum reserved description budget, asserted by the skill catalog test. */
+export const MIN_DESCRIPTION_HEADROOM = 400;

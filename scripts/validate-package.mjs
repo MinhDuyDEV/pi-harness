@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, globSync, readFileSync } from "node:fs";
+import { parseSuitePins } from "./lib/suite-pins.mjs";
 
 const errors = [];
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
@@ -71,6 +72,11 @@ if (packageJson.engines?.node !== ">=22.19.0") errors.push("package.json must de
 if (packageJson.packageManager !== "npm@11.12.1") errors.push("package.json must declare npm@11.12.1 as the package manager");
 
 const settings = JSON.parse(readFileSync(".pi/settings.json", "utf8"));
+try {
+  parseSuitePins(settings);
+} catch (error) {
+  errors.push(`suite package pins are invalid: ${error instanceof Error ? error.message : String(error)}`);
+}
 for (const key of ["extensions", "skills", "prompts", "themes"]) {
   if (key in settings) errors.push(`.pi/settings.json should rely on convention discovery instead of project ${key} paths`);
 }

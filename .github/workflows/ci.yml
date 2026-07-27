@@ -46,7 +46,7 @@ jobs:
             base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
           fi
           echo "base=$base" >> "$GITHUB_OUTPUT"
-      - run: npm run release:check
+      - run: npm run release:check:local
       - run: node .github/scripts/run-aislop-changes.mjs
         env:
           AISLOP_BASE: ${{ steps.changes.outputs.base }}

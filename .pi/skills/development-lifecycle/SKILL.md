@@ -1,88 +1,50 @@
 ---
 name: development-lifecycle
-description: Maps the session lifecycle commands — /create, /plan, /ship, /verify, /research — onto the artifact files in .pi/artifacts/. Use when starting, planning, shipping, or verifying a session.
+description: >-
+  Maps /create, /plan, /ship, /verify, and /research to the canonical
+  .pi/artifacts files for a multi-step work session. User-invoked: load via
+  /skill:development-lifecycle when managing session artifacts.
 metadata:
-  version: 2.0.0
+  version: 2.1.0
   tags:
   - workflow
   - artifacts
   - planning
   - work-sessions
+disable-model-invocation: true
 ---
 
-# Development Lifecycle
+# Development lifecycle
 
-## The 4 Canonical Artifact Files
+This is a user-invoked artifact lifecycle skill, not a generic routing alias.
+Use it when a session needs durable planning and handoff artifacts.
 
-At `.pi/artifacts/`, maintained in the working copy:
+## Canonical files
 
-| File | Purpose | Use when |
+| File | Purpose | Touch when |
 |---|---|---|
-| `TODO.md` | Live task list per session / day | >=2 tool calls OR >=2 files OR multi-step work |
-| `PLAN.md` | Long-form spec, slice ordering, open questions | New feature, breaking change, ambiguous spec |
-| `PROGRESS.md` | Per-iteration log: tried, failed, learned | Long-running investigation or build |
-| `DECISIONS.md` | ADRs (Architecture Decision Records) | Real trade-off between two or more viable options |
+| `.pi/artifacts/TODO.md` | live task list | two or more tool calls/files or multi-step work |
+| `.pi/artifacts/PLAN.md` | scope, slices, open questions | new feature, breaking change, ambiguous request |
+| `.pi/artifacts/PROGRESS.md` | tried, failed, learned | long investigation/build |
+| `.pi/artifacts/DECISIONS.md` | trade-offs/ADRs | two or more viable designs |
 
-**Entry format (TODO.md, PROGRESS.md):** `### YYYY-MM-DD - <title>` followed by `status: active | done | abandoned | updated: <date>`.
+`TODO.md` and `PROGRESS.md` entries use
+`### YYYY-MM-DD - <title>` plus `status: active|done|abandoned` and an update
+date. `artifact-format` owns the detailed grammar.
 
-The full file spec and entry grammar are owned by the `artifact-format` skill — this skill only decides when each file is touched.
+## Hooks
 
-## Slash Commands (Lifecycle Hooks)
+- `/create <idea>` creates `PLAN.md` and `TODO.md`.
+- `/plan` resumes the plan.
+- `/ship` runs verification and release hardening.
+- `/verify` is the mandatory evidence gate before claiming done.
+- `/research` records exploration in `PROGRESS.md` and feeds `/plan` or `/create`.
 
-- `/create <idea>` — turn a rough idea into a `PLAN.md` and `TODO.md`. Loaded from `brainstorming` + `spec-driven-development`.
-- `/plan` — open / resume the current plan. Loaded from `planning-and-task-breakdown`.
-- `/ship` — pre-merge hardening: tests, lint, types, format. Loaded from `shipping-and-launch`.
-- `/verify` — claim-completion evidence gate. Loaded from `verification-before-completion`.
-- `/research` — exploratory investigation; lives in `PROGRESS.md`. Loaded from `spec-driven-development`.
+Update `TODO.md` before the first implementation edit. Do not silently skip a
+phase; record why. Keep progress findings in `PROGRESS.md`, decisions in
+`DECISIONS.md`, and never put secrets in these artifacts.
 
-## Workflow
+## Result
 
-```
-   /create  ──>  /plan  ──>  implement  ──>  /ship  ──>  /verify
-      │            │           │              │           │
-   PLAN.md      TODO.md      artifacts    tests/lint    evidence
-   TODO.md      updates      PROGRESS.md  green        claim holds
-```
-
-**`/research` is sideways** — it feeds `/plan` or `/create`, not the linear path.
-
-## When to Use Each Phase
-
-| Phase | Trigger | Skip if |
-|---|---|---|
-| `/create` | New feature / product / PRD | Trivial one-liner |
-| `/plan` | Multi-file change, ambiguous spec | Single known file, clear spec |
-| `/ship` | Before merge / commit | No code change this session |
-| `/verify` | Before "done" claim, always | Never skip |
-| `/research` | Open-ended question, no answer path | The answer is in the code or docs already |
-
-## Lifecycle Rules
-
-1. **No silent skipping** — if you skip a phase, name it in the response ("skipped /plan: single-file fix with clear spec"). This becomes the audit trail.
-2. **Update TODO.md first, then code** — append the entry before the first edit. Re-reading it on resume gives you the state.
-3. **PROGRESS.md = investigation log** — failed attempts and "what I tried" go here, not in chat.
-4. **DECISIONS.md is for trade-offs, not choices** — if there's only one viable option, it goes in PLAN.md as a fact, not an ADR.
-5. **/verify is non-negotiable** — every "done" claim cites evidence.
-
-## Tool integration
-
-When the `todo` tool is available (the `pi-todo` extension is pinned), lifecycle commands prefer it for TODO.md mutations: `/ship` and `/verify` use `todo start "<step>"` / `todo done "<step>"` per step and `todo done "<title>"` to close the phase. `/create` and `/plan` still bulk-write the markdown directly (pi-todo's file watcher reconciles external edits). `PLAN.md` / `PROGRESS.md` / `DECISIONS.md` have no `todo` tool — edit them in place.
-
-## Red Flags
-
-- TODO.md has no `### YYYY-MM-DD - <title>` entries — likely stale or skipped.
-- PROGRESS.md empty on a multi-hour task — context loss on resume.
-- DECISIONS.md used as a dumping ground for any choice — noise, not signal.
-- "Done" claim without `/verify` evidence — common regression.
-
-## Skill Result Contract
-
-```xml
-<skill_result>
-  <skill>development-lifecycle</skill>
-  <status>success|partial|blocked|failure</status>
-  <evidence>Phase(s) used named, artifact files updated, /verify evidence cited</evidence>
-  <artifacts>TODO.md / PLAN.md / PROGRESS.md / DECISIONS.md paths touched</artifacts>
-  <risks>Skipped phases, stale entries, or none</risks>
-</skill_result>
-```
+Report phases used, artifact paths touched, verification evidence, skipped
+phases, and residual risk. A “done” claim without `/verify` evidence is invalid.

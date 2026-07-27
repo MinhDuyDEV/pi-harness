@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { assertPiCoreProtocolVersion } from "@minhduydev/pi-core";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { EventBusPort } from "./delivery.js";
+import { readExtensionGate } from "../lib/harness-settings.js";
 import { replayPortToSink } from "./public-replay.js";
 import { loadProducerReplayPorts } from "./source-ports.js";
 import {
@@ -34,6 +35,7 @@ function emitAtLeastOnce(pi: ExtensionAPI, event: string, payload: unknown): voi
 }
 
 export default function register(pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "learningCoordinator", false)) return;
   // Two pi-core copies with different canonicalization rules would recreate
   // the digest divergence the shared package exists to end.
   assertPiCoreProtocolVersion(1);

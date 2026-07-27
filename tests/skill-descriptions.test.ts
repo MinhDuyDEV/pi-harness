@@ -21,7 +21,7 @@ const ALLOWED_PREFIXES = [
 	"Don't ",
 ];
 
-function getSkillFrontmatter(skillDir: string): { name: string; description: string } {
+function getSkillFrontmatter(skillDir: string): { name: string; description: string; hidden: boolean } {
 	const skillMd = join(skillDir, "SKILL.md");
 	const content = readFileSync(skillMd, "utf8");
 	const match = content.match(/^---\n([\s\S]*?)\n---/);
@@ -30,12 +30,14 @@ function getSkillFrontmatter(skillDir: string): { name: string; description: str
 	const lines = fm.split("\n");
 	let name = "";
 	let description = "";
+	let hidden = false;
 	for (let i = 0; i < lines.length; i++) {
 		const nameMatch = /^name:\s*(.+)$/.exec(lines[i]);
 		if (nameMatch) {
 			name = nameMatch[1].trim().replace(/^['"]|['"]$/g, "");
 			continue;
 		}
+		if (/^disable-model-invocation:\s*true\s*$/.test(lines[i])) hidden = true;
 		const descMatch = /^description:\s*(.*)$/.exec(lines[i]);
 		if (descMatch) {
 			// Handle plain scalars and YAML folded/literal block scalars (>- etc.):
@@ -49,7 +51,7 @@ function getSkillFrontmatter(skillDir: string): { name: string; description: str
 		}
 	}
 	if (!name || !description) throw new Error(`Missing name/description in ${skillMd}`);
-	return { name, description };
+	return { name, description, hidden };
 }
 
 const allSkills = readdirSync(SKILLS_DIR)
@@ -73,6 +75,26 @@ test("all skill descriptions start with an allowed prefix or contain a trigger p
 			`${offenders.length} descriptions have neither an allowed prefix nor a trigger phrase (Use when …/User-invoked):\n${msg}`,
 		);
 	}
+});
+
+test("hidden skills are explicitly user-invoked and visible skills are not", () => {
+	const hiddenWithoutManualTrigger = allSkills.filter(
+		(skill) => skill.hidden && (!/\bUser-invoked\b/.test(skill.description) || !skill.description.includes(`/skill:${skill.name}`)),
+	);
+	assert.deepEqual(
+		hiddenWithoutManualTrigger,
+		[],
+		`hidden skills must disclose their manual route:\n${hiddenWithoutManualTrigger.map((skill) => `  ${skill.name}: ${skill.description}`).join("\n")}`,
+	);
+
+	const visibleWithFalseNegative = allSkills.filter(
+		(skill) => !skill.hidden && /\bUser-invoked\b/.test(skill.description),
+	);
+	assert.deepEqual(
+		visibleWithFalseNegative,
+		[],
+		`model-visible skills must not claim they are manual-only:\n${visibleWithFalseNegative.map((skill) => `  ${skill.name}: ${skill.description}`).join("\n")}`,
+	);
 });
 
 test("no skill description exceeds 500 characters (except well-known large skills)", () => {

@@ -34,6 +34,7 @@ import { evaluate } from "./evaluate.js";
 import type { RuleSet, Verdict } from "./types.js";
 import { defaultRules } from "./rules/presets.js";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate } from "../lib/harness-settings.js";
 
 /**
  * Durable audit trail. The in-memory ring holds 500 entries and dies with the
@@ -85,16 +86,24 @@ function formatVerdict(verdict: Verdict): string {
 
 function confirmVerdict(
 	message: string,
+	blockerId: string,
+	pi: ExtensionAPI,
 	ctx?: ExtensionContext,
 ): BlockResult | undefined | Promise<BlockResult | undefined> {
 	const confirm = ctx?.ui?.confirm;
 	if (typeof confirm !== "function") {
 		return makeBlockResult(`${message}\n\nNo confirmation UI available; blocked by default.`);
 	}
-	return Promise.resolve(confirm("Safety confirmation", message)).then((ok) => ok ? undefined : makeBlockResult(message));
+	try { pi.events.emit("herdr:blocked", { active: true, blockerId, label: "Safety confirmation" }); } catch {}
+	return Promise.resolve(confirm("Safety confirmation", message))
+		.then((ok) => ok ? undefined : makeBlockResult(message))
+		.finally(() => {
+			try { pi.events.emit("herdr:blocked", { active: false, blockerId, label: "Safety confirmation" }); } catch {}
+		});
 }
 
 export default function safetyExtension(pi: ExtensionAPI): void {
+	if (!readExtensionGate(undefined, "safety", true)) return;
 	const cwd = process.cwd();
 	const audit = new AuditLog();
 	// PI_SAFETY_AUDIT_DIR relocates the durable audit (tests point it at a temp
@@ -217,7 +226,7 @@ export default function safetyExtension(pi: ExtensionAPI): void {
 
 		const message = formatVerdict(verdict);
 		if (verdict.kind === "block") return makeBlockResult(message);
-		if (verdict.kind === "confirm") return confirmVerdict(`${message}\n\nProceed?`, hookCtx);
+		if (verdict.kind === "confirm") return confirmVerdict(`${message}\n\nProceed?`, `safety:${verdict.ruleId}`, pi, hookCtx);
 	});
 
 	// 5. Unified /safety command

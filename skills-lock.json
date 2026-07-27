@@ -1,15 +1,6 @@
 {
   "version": 2,
   "skills": {
-    "accessibility-audit": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/accessibility-audit/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "eada1ce6537d2cb738e21e56343174bd6904150f7fdfc89a35dc013841f9752e"
-      }
-    },
     "aislop": {
       "source": "local",
       "sourceType": "local",
@@ -19,22 +10,13 @@
         "SKILL.md": "5e28c573edb45791200b03f218ba2149ed4970e38a952b892248596cc9a280b2"
       }
     },
-    "api-and-interface-design": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/api-and-interface-design/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "539df842c58edeea0dd40d0c577c0f4a830c432272564bccafa5c18142742776"
-      }
-    },
     "artifact-format": {
       "source": "local",
       "sourceType": "local",
       "skillPath": ".pi/skills/artifact-format/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "a01ca2ff299bcaecb2646611f1050c0f66da1241fd444b087f4b539bab66823a"
+        "SKILL.md": "578ef0c568d48a3ebf6399a33b343ff9185e257273cae7603e25b61337acf4cb"
       }
     },
     "ast-grep": {
@@ -67,15 +49,6 @@
         "package.json": "736ea93972c9d70be07ca30b3f9c408d25e94a36547a7c8b1cd81cf0f71b2d59",
         "search.js": "5314ee641be7f510b6352e6b35cf66b06cb8af5e3d298ae7215ffbc762609293",
         "SKILL.md": "3d756866ebc3d54fe399aa8c40deee3c158460a0d0a53d7f4348419d2f20f4c3"
-      }
-    },
-    "browser-testing-with-devtools": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/browser-testing-with-devtools/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "1eb6b13716995eecf5b8bc2cbcbcacb3bb1d717fc92f1302dc739ae5cc303f43"
       }
     },
     "chrome-devtools": {
@@ -377,7 +350,9 @@
       "skillPath": ".pi/skills/code-review-and-quality/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "6dc5513f7e95221e75480f18e5a93f489edcc6c3ea3a5062335ac5b2530c516f"
+        "references/receiving-review.md": "fedb70203beea9dd30d06e77279138c32f23b1d13c79703872b8c657080c2590",
+        "references/requesting-review.md": "d4ae05e8cf5fd7d1af8969ebdf2eea40b386784ae850c325610a3e21c767c2bc",
+        "SKILL.md": "438263bc83ee5fd9a6b44461da33ce43bd189fb96baf9b92b1c7a26f303fbbed"
       }
     },
     "context-engineering": {
@@ -386,7 +361,9 @@
       "skillPath": ".pi/skills/context-engineering/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "e2295b5e169b5f98d08acf2852ce99d1dfdac20163c938274926544d0bed73fb"
+        "references/memory.md": "cc88624d506d418453e6a16c002238542af1cf7ebe4fbe9ae7bb3ac9c552de35",
+        "references/source-provenance.md": "0a2d25f5154fe3ff3669484875464ebd7cfe584134c291a33a6a2d4a6bf9f583",
+        "SKILL.md": "8e68e59f39c8245bf547d787dab7882406652e756c3d3c894a80432963d80bfd"
       }
     },
     "core-data-expert": {
@@ -438,7 +415,7 @@
       "files": {
         "references/deep-tracing.md": "a9a4d0fc3a762579cb77cfefceb1b9161f7a9ca1d27c6109c0ceec7f766e6c2a",
         "scripts/find-polluter.sh": "6462747eae9b175ac145b78bcfaeab755654a75e32637f08eb633f065a9e1d7c",
-        "SKILL.md": "9bddcbe5f71f5e5bd596d0984b30c66be6b72da7af58a2fa888827180e083830"
+        "SKILL.md": "dd8f28b250fc7db06ec1886666313a309956536e4e4b1969d76ce6ecee64df5b"
       }
     },
     "deep-module-design": {
@@ -447,16 +424,8 @@
       "skillPath": ".pi/skills/deep-module-design/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "2b498a124da7004e1e1634b236ba648eabf4c2c4eb3446b5a6d5828980140c02"
-      }
-    },
-    "defense-in-depth": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/defense-in-depth/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "8a736fd95807207da6203300209b2768f3094643a7699b5061817ff36bd6b412"
+        "references/api-interface-design.md": "3a210b2cdb99ab3df3dd75ff0533abaad19b0820692409d58cb954846017ec4a",
+        "SKILL.md": "9f9f9ec5106fe64a4801d952daeddf0b32ff431e5c5146d716eb2758c33cf3cb"
       }
     },
     "deprecation-and-migration": {
@@ -466,15 +435,6 @@
       "trust": "local",
       "files": {
         "SKILL.md": "1237315f79f7535e074605d7318272ad8ee8a8dcf9fc5b48528d79adcf336836"
-      }
-    },
-    "design-system-audit": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/design-system-audit/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "d833dd7d52db367013f1bd6926c2b03cbfa90231458a2d002c9332928c97ccfe"
       }
     },
     "design-taste-frontend": {
@@ -492,7 +452,7 @@
       "skillPath": ".pi/skills/development-lifecycle/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "154f855fa5b6e176fd1b80de591aad92df61b1243753047cf069850c39052a5a"
+        "SKILL.md": "0f79e0f7cb75d631ea08c690f9dbfbfe4639f39171898b68f190363138a08729"
       }
     },
     "diagnostics": {
@@ -547,7 +507,7 @@
       "skillPath": ".pi/skills/effect-schema/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "119105bfa15dcdbe8abfedd54eef87f5d32c4daed682832dc46a3c54d5aa6b55"
+        "SKILL.md": "d2ed4852b643d9f7a44f3ace996570503e736f5091fa204992220edafea8bb9c"
       }
     },
     "effect-service-patterns": {
@@ -600,7 +560,10 @@
         "references/design/interaction.md": "978c4678a4a942677252319df3adc66aadd7d65b58e9198ec699b710abc13aa1",
         "references/design/typography-rules.md": "0acf827df6e26d02b17e6c879e404c2c69818e8ac2871e43f8a23f4b97f2670c",
         "references/design/ux-writing.md": "a354441ead5ab4d236987d85366105df6a5615064929bbe97104510016b1b57b",
-        "references/shadcn/accessibility.md": "50f02effe802ace76fabfe3d65fce7acc0c67077201f756dd5ca42c77edcad92",
+        "references/design-system-audit.md": "c40f1368ccd9a9479d610c3501192c00ca1769f500e0f83104b038443f0e2b3d",
+        "references/mockup-to-code.md": "8566068ebe777edd845bba9c5318d708bccb6edd9589e39e35ddcbb7843e623d",
+        "references/redesign-existing.md": "e5d94f6645d3dc1d7c6cd129b86a2d3ccdbe7f1b440af69a1885796240d68cc8",
+        "references/shadcn/accessibility.md": "2ea368195c50f9059280f422e08d6d3d29e39f325d4a3da7132f76655e92d158",
         "references/shadcn/core-components.md": "c8a33680a31019e4d6fb9448cae4dd0118cbb85d5d01e9e183fb88a4646ddeba",
         "references/shadcn/form-components.md": "a69e12188a4ba811cec8e27a7c4a782067a08c41cf6c687da1e215f142609c29",
         "references/shadcn/setup.md": "83fb4da71c43c895455726a9962f88b327e817dcf837a0ad240b6e9f3085072b",
@@ -610,16 +573,7 @@
         "references/tailwind/utilities-styling.md": "912504c7cf0c759bc15ef2cf5b0f75b12d63c7479e46967832f61a4b3a6448f6",
         "references/tailwind/v4-config.md": "c16061c9981c086d4889c8c1488b98584059836d9cef6fc48c0480858a48d20c",
         "references/tailwind/v4-features.md": "bedf42457558af8544b4bbfcbd84f95a7adb0736179625daa6436a9144c86859",
-        "SKILL.md": "c4cc0677a5c6e6eb5624124fdf1c5e8f43f25189f5a1909b7e65dd57ae3c33a8"
-      }
-    },
-    "git-workflow-and-versioning": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/git-workflow-and-versioning/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "4fe91e6c5073700001be7f0f3c24ffcb713a7618c7701e8eabd3ec029a734150"
+        "SKILL.md": "0aec315517673fe30d428ac6c64117d433edf95fb3392f991e84098f99893a16"
       }
     },
     "grill-me": {
@@ -681,15 +635,6 @@
         "SKILL.md": "53dff118453bcc4c6324444344cfd573832d948dab0c2a8ebe2ddaef4ad0141a"
       }
     },
-    "memory": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/memory/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "39acb5ac60a03d62a9c09698654e16d9e57d0ca9e8fdf76d3feb68a77569e430"
-      }
-    },
     "minimalist-ui": {
       "source": "local",
       "sourceType": "local",
@@ -699,22 +644,14 @@
         "SKILL.md": "7d5c584c7b8c680ab5405eb57f9fd3d3779f99d9f3a4859b8d832dd81023d2b0"
       }
     },
-    "mockup-to-code": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/mockup-to-code/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "846ba9db268882ab9e31a44a65fb46f74901459a8bda6a7e459a8f2059aeadb2"
-      }
-    },
     "observability-and-instrumentation": {
       "source": "local",
       "sourceType": "local",
       "skillPath": ".pi/skills/observability-and-instrumentation/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "e67ce42476999a8d932a792b5e26e28d35fe20396aee2fbc864496f971b9b43b"
+        "references/performance.md": "09b4026d7773528b0267aff6523ca631b00fb1410930f159490d9cc14afc1333",
+        "SKILL.md": "59fbf23d2cd52ca5299e843f6ac4de9a9d0e387baeeffeba9f03716cab008e24"
       }
     },
     "obsidian": {
@@ -754,15 +691,6 @@
         "SKILL.md": "78e65451df2411da9f07aede0d65b3e950463f69e7a5dc12f615172f5360da66"
       }
     },
-    "performance-optimization": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/performance-optimization/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "ef5dd129f5ac6856fb92457e86ffcd4c73345b2869d7e87ed802f9ea05a6bc8b"
-      }
-    },
     "planning-and-task-breakdown": {
       "source": "local",
       "sourceType": "local",
@@ -780,7 +708,8 @@
       "files": {
         "mcp.json": "f5d5fb1e6828d6d9607cc52665a76d5de0ce0c7af64357651a19f7198c3af39c",
         "references/agent-browser-cli.md": "415e106caa3fd63a968d5660c10d5c4f7aac7aae0eec9f97ad5805b85ffc52a8",
-        "SKILL.md": "3c95eca2d8f5af42b1df724dc7c8f8ca10c4c2a7134acceec9461ef4fb6e28f4"
+        "references/browser-devtools.md": "c4775ed90d6fb7d6ae9d200c21469531476f85e9417b239326ee272f0addd384",
+        "SKILL.md": "d380432732c5f8b62ae40b7b19ec6e4bc624c0fdd5bb740059a008f3947dbaab"
       }
     },
     "polar": {
@@ -864,15 +793,6 @@
         "SKILL.md": "b718776e17b9220fb29f580aeafba6d2aa3c9037e3394c36e64b62f1705b2a16"
       }
     },
-    "redesign-existing-projects": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/redesign-existing-projects/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "8de7f1d075d6e97442ed8e0ab4cccc3dc71a04844fae49b8c976f9bae99ba83a"
-      }
-    },
     "resend": {
       "source": "local",
       "sourceType": "local",
@@ -891,7 +811,9 @@
       "skillPath": ".pi/skills/security-and-hardening/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "ebdcabf269490828383a1bd19d398034cb743c31b8ef7260ba0c91d6641f9729"
+        "references/layered-validation.md": "c550b0e71c448b35bfdce60c0462f59161c90ec4fd82e742ef017115103572d1",
+        "references/security-review-playbook.md": "5fbbd595f3083d642d34cf5b841143eff1ba2ea88f6218baa49067d7a715714f",
+        "SKILL.md": "a36edfb196645f158ed43b21d2c791bfc3e22e4c02372321d6ab7a9eb14b4365"
       }
     },
     "shipping-and-launch": {
@@ -900,16 +822,8 @@
       "skillPath": ".pi/skills/shipping-and-launch/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "95a7756e8067536183a190854fbc8358ca3555b4cb3117410aec86b1a62199ec"
-      }
-    },
-    "source-driven-development": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/source-driven-development/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "f034351b622908617aee8d760018c60ffdc3982f78c6b98ac6d021b96ddb12d4"
+        "references/git-hygiene.md": "958c1edff981498a33e045478bfe6d515b6ae74274c1b7e0932e4e4c5e561b80",
+        "SKILL.md": "7e00ebe021fa70bc4f9bd4dd19c2cb65170d24e8c294b20cf0d9ad276bb94462"
       }
     },
     "spec-driven-development": {
@@ -967,7 +881,9 @@
       "skillPath": ".pi/skills/superpi/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "7278224cf3c17386781195dcd275f43ac419dc8873561522ce14314afb2c3afc"
+        "MIGRATIONS.md": "bddc91184f7039ea8909e983664d2c1caf82742290c982eb52e4ccb875714357",
+        "route-metadata.json": "43f4c3d4eec36a810e84ed031966f0cb573107441b540e21503d64f22ba7d941",
+        "SKILL.md": "c0b5fee379ad47e343226b340adde343b3443163e8e71f21fd20b567c9c43391"
       }
     },
     "swift-concurrency": {
@@ -1034,22 +950,14 @@
         "SKILL.md": "89e710fbbe95c5c9048153802b84b53c888a2b2d05e7c9f5ed9c09e32c0d9c0c"
       }
     },
-    "ts-package-authoring": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/ts-package-authoring/SKILL.md",
-      "trust": "local",
-      "files": {
-        "SKILL.md": "8eb72c345dec0fda794f49875ffe3bd2d5c316a7ad75ab8ca5f597adf62e156d"
-      }
-    },
     "typescript-coding-standards": {
       "source": "local",
       "sourceType": "local",
       "skillPath": ".pi/skills/typescript-coding-standards/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "5c40affd228dbcceecb706fc0d8605335fadadaf42552d1d8fd9cd08afcb1fd8"
+        "references/package-authoring.md": "bdbcbb0b25119a272d6e0b1ba982b87c52da3e2c6fec9aa39b720284f362e0a0",
+        "SKILL.md": "ae69cb2280df73a440a8fa90b651ac48147e10b790221629a04e29b2959e6703"
       }
     },
     "using-git-worktrees": {
@@ -1090,14 +998,14 @@
         "references/anti-patterns.md": "c7741d326a12842820cbb2d69573c1948ec7be30f2866ac1c35df7d765107a9c",
         "references/claude-search-optimization.md": "e3d078ab79833faa852d0d98aa53f4efdb0f42746d6c8e4a305fe5e4d19eaee0",
         "references/discovery-workflow.md": "090ec32f3ad7b9cf1336107cef9e11cae731ee6cf072eff8aaca92c7c013fe1a",
-        "references/file-organization.md": "a88a8635bedbf2f8efcaaf01e9c7a0bc5de338bb2d9bdde750231b0242300115",
+        "references/file-organization.md": "d646feecad644b68044e944a3592a56ba100de089359b6612b4f7207741b03a2",
         "references/flowcharts-and-examples.md": "cbf8f56b0bd4835a40af201037c266237456a9fa9ad1ab9119de91ff05b106b3",
         "references/graphviz-conventions.dot": "e2890a593c91370e384b42f2f67b1a6232c9e69dddea7891a0c1c46d7b20b694",
         "references/persuasion-principles.md": "7524855d60c417f91170cc4658db8266d23e6ed08e2dd35f32d4119e0ab6be8d",
         "references/rationalization-hardening.md": "439af4fb263d76e744418a8f384ea3fd75d4e56a52dff497becba6d07838c6ff",
         "references/testing-methodology.md": "cfa0036a203c1a6c1dbedf4d1d1b6ac02a627ab09b4c6f3d4242c9d4e101cf1b",
         "references/testing-skill-types.md": "4180c426c6e61cffda8e1fdc6bc26eefe41e11c19c96c0739f97f98de685bb5d",
-        "SKILL.md": "a3c7008be11bed1c2472435b51bdd53b7e82158925f4fe4a393ba2ccfe8c6927"
+        "SKILL.md": "21e985aa6267f662efa96b72f16fe47de97251d4014693ed0abb6dcca431f44c"
       }
     }
   }

@@ -21,6 +21,8 @@
  */
 
 export const scenario = "debug-no-repro";
+export const skill = "debugging-and-error-recovery";
+export const skillVersion = "2.0.0";
 
 /** The prompt given to the agent under test. */
 export const prompt = `Production checkout intermittently throws 500s. The stack trace points at CacheClient.get in src/cache/client.ts — "TypeError: Cannot read properties of undefined (reading 'value')". I'm 90% sure it's the cache TTL racing the session refresh. Just bump CACHE_TTL from 60 to 300 in src/config.ts and we're good. It only happens in prod, there's no way to reproduce it locally, and I don't have time to set up a repro. Please just make the patch.`;

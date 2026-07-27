@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "maxSkillsPerRoute": 3,
+  "routes": [
+    { "task": "New feature", "skills": ["spec-driven-development", "planning-and-task-breakdown", "test-driven-development"] },
+    { "task": "Bug fix", "skills": ["debugging-and-error-recovery", "test-driven-development", "verification-before-completion"] },
+    { "task": "Refactor / architecture", "skills": ["improve-codebase-architecture", "deep-module-design", "code-cleanup"] },
+    { "task": "Frontend / UI", "skills": ["frontend-design", "react-best-practices", "playwright"] },
+    { "task": "Testing", "skills": ["test-driven-development", "testing-anti-patterns"] },
+    { "task": "Review / ship", "skills": ["code-review-and-quality", "verification-before-completion", "shipping-and-launch"] },
+    { "task": "Research", "skills": ["context-engineering", "opensrc"] },
+    { "task": "Docs", "skills": ["artifact-format"] }
+  ]
+}

@@ -48,7 +48,15 @@ For each requirement in `#### Spec`:
 | ◐ Partial | Some evidence; missing edge case or error path |
 | ✗ Missing | No code evidence |
 
-Then run gates: `npm run typecheck`, `npm run lint`, `npm test`. Report each PASS/FAIL.
+Discover the project's real gates before running them: read the nearest
+`AGENTS.md`/project instructions, checked-in wrapper scripts, package or build
+manifests, lockfiles, and CI workflows. Prefer the repository's aggregate
+check command when one exists; otherwise select the smallest commands that
+cover type/build, lint/static analysis, and tests. Do not infer npm, JavaScript,
+or command names from this prompt. Use the same evidence and ambiguity rules as
+`scripts/lib/discover-gates.mjs`: wrappers take precedence, conflicting
+lockfiles block execution, and a missing runner is not guessed. Record every selected command, cwd, exit
+status, and why it is authoritative; report each PASS/FAIL/SKIPPED.
 
 ### `--gate-only`
 
@@ -86,6 +94,12 @@ Run when `--reconcile` is set, or proactively after every 3-4 completed tasks. R
 3. **Foundation ordering** — which foundation tasks should move ahead of feature tasks? Order by structural dependency, not by label, tag, or recency (no priority-by-label).
 
 Propose closures and reorderings with the evidence for each; apply after confirmation.
+After applying the confirmed changes, append a `#### Reconcile` subsection to
+the matching `PROGRESS.md` block with trigger, completed-since-last count,
+proposals, and evidence. Then persist the exact result with
+`workflow_state action=record_reconcile`. Use `trigger=completion-threshold`
+when the workflow reminder caused the run, otherwise `explicit`. The typed
+checkpoint resets the durable four-completion trigger; prose alone does not.
 
 ### `--audit`: Proof Audit
 
@@ -103,7 +117,7 @@ status: done | updated: YYYY-MM-DD
 
 #### Verification
 - Completeness: N/M (P%)
-- Gates: typecheck PASS, lint PASS, test PASS
+- Gates: `<exact discovered command>` PASS/FAIL/SKIPPED (repeat per gate)
 - Review: Critical 0, Important N, Minor N
 - Result: READY TO SHIP / NEEDS WORK / BLOCKED
 - Blocking issues: <list, or "none">

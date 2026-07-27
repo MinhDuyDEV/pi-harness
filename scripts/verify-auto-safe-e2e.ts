@@ -9,6 +9,8 @@ import {
   makeContextRequestPayload,
   makeProofVerifiedPayload,
 } from "@minhduydev/pi-core";
+import { readSuitePins } from "./lib/suite-pins.mjs";
+import { learningContextResponse, waitForBinding } from "./lib/auto-safe-e2e-helpers.ts";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 
@@ -32,17 +34,12 @@ function pinnedSiblingSpecs(packDestination: string): string[] {
       packSibling(name, packDestination),
     );
   }
-  const settings = JSON.parse(readFileSync(join(REPO_ROOT, ".pi", "settings.json"), "utf8")) as {
-    packages?: string[];
-  };
-  const specs = (settings.packages ?? [])
-    .filter((entry) => /@minhduydev\/pi-(?:learning|todo|subagents)@/.test(entry))
-    .map((entry) => entry.replace(/^npm:/, ""));
-  assert.equal(
-    specs.length,
-    3,
-    ".pi/settings.json must pin exactly pi-learning, pi-subagents and pi-todo",
-  );
+  const pins = readSuitePins(join(REPO_ROOT, ".pi", "settings.json"));
+  const specs = [
+    pins["@minhduydev/pi-learning"].spec,
+    pins["@minhduydev/pi-subagents"].spec,
+    pins["@minhduydev/pi-todo"].spec,
+  ];
   const overrides: Record<string, string | undefined> = {
     "pi-learning": process.env.PI_LEARNING_SPEC,
     "pi-subagents": process.env.PI_SUBAGENTS_SPEC,
@@ -79,7 +76,7 @@ function packSibling(name: string, packDestination: string): string {
 /** pi-core is the shared contract layer; the coordinator imports it at runtime. */
 function piCoreSpec(packDestination: string): string {
   if (process.env.PI_E2E_SIBLINGS === "local") return packSibling("pi-core", packDestination);
-  return process.env.PI_CORE_SPEC ?? "@minhduydev/pi-core@0.1.0";
+  return process.env.PI_CORE_SPEC ?? readSuitePins(join(REPO_ROOT, ".pi", "settings.json"))["@minhduydev/pi-core"].spec;
 }
 const LEARNING_OBSERVATION_EVENT = "pi-learning:observation:v1";
 const SUBAGENT_CONTEXT_REQUEST_EVENT = "pi-subagents:v1:context-request";
@@ -268,11 +265,13 @@ async function emitProof(runtime: Runtime, id: string, description: string, opti
   evidenceDigests?: string[];
 }): Promise<void> {
   const contextRequest = request(id, description);
+  const correlationId = `correlation-${id}`;
+  // pi-learning announces the binding on `context-served` only after its async
+  // retrieval settles; the coordinator records it and consumes it when the
+  // proof arrives. Await that binding before emitting the proof. An untrusted
+  // project never serves, so the helper races a short timeout instead of hanging.
   await runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
-  // Settle the serve: pi-learning emits `context-served` (the binding the
-  // coordinator needs) inside the response promise, exactly as the real
-  // producer awaits the response before proceeding.
-  await (contextRequest as { response?: Promise<unknown> }).response;
+  await waitForBinding(runtime.events, correlationId);
   await runtime.events.emit(
     SUBAGENT_PROOF_EVENT,
     proof(
@@ -330,9 +329,7 @@ async function positiveAndContext(consumer: Consumer, root: string): Promise<voi
   // the phrase the learned statement actually contains.
   const contextRequest = request("context", "focused alpha verification");
   runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
-  // The response container holds a promise; the real consumer awaits it
-  // (`await Promise.resolve(contextRequest.response)` in pi-subagents).
-  const response = (await contextRequest.response) as LearningContext | undefined;
+  const response = await learningContextResponse(runtime.events, "correlation-context");
   assert.equal(response?.version, 1, `context response=${JSON.stringify(response)}`);
   assert.equal(response?.facts.length, 1);
   assert.equal(response?.facts[0]?.confidence, "high");
@@ -396,9 +393,7 @@ async function idempotencyBoundsAndFailOpen(consumer: Consumer, root: string): P
   assert.ok(result);
   const contextRequest = request("bounds-context", "theta");
   runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
-  const response = (await contextRequest.response) as LearningContext & {
-    usageReceipts?: unknown[];
-  };
+  const response = await learningContextResponse(runtime.events, "correlation-bounds-context");
   assert.ok(response);
   assert.ok(response.facts.length <= 3);
   // Bound what the config bounds: the fact payload (retrieval.maxTotalChars =

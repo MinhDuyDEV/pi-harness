@@ -58,3 +58,6 @@ tests/skill-eval/runs/
 # Local tool caches and temp dirs
 .fallow/
 .quality-scan-temp*/
+
+# Local agent harness state
+.omc/
