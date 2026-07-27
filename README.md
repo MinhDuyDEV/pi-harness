@@ -21,6 +21,17 @@ Restart Pi after installation. Pi discovers the package manifest resources:
 - `.pi/prompts/`
 - `.pi/themes/`
 
+For a clean consumer setup, bootstrap only the portable settings and artifact
+ignore file with the package CLI:
+
+```bash
+npx --package @minhduydev/pi-harness pi-harness-init ./my-repo
+```
+
+The command never overwrites an existing `.pi/settings.json`; it prints a
+merge suggestion instead. It intentionally does not copy this repository's
+personal theme, editor, provider, or agent preferences.
+
 Pi package discovery does **not** automatically apply this repository's root `AGENTS.md`, `.pi/settings.json`, or `.pi/agents/` directory. Those files configure and document the source-checkout profile:
 
 - Run `/init` in a consuming repository to create or update that repository's own `AGENTS.md` from observed facts.

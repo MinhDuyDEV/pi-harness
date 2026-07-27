@@ -1,14 +1,7 @@
 /**
- * Reader for the harness's own settings block in `.pi/settings.json`:
- * `{ "pi-harness": { ...flags } }`.
- *
- * Prompt-shaping extensions (superpi bootstrap, gpt-personality) are gated
- * through here as OPT-IN. They used to be on by default with at most an env
- * opt-out, while README/DESIGN promised the harness "never injects policy
- * into a consumer's system prompt" (audit H-A, H-B) — the docs described the
- * intended default, the code shipped the opposite. The harness's own
- * settings.json turns them on for this repo; a consumer who installs the
- * package gets no prompt injection until they say so.
+ * Reader for `{ "pi-harness": { ...flags } }` in `.pi/settings.json`.
+ * Prompt-shaping and developer-only extensions are opt-in for consumers; the
+ * source-checkout profile enables the features used to maintain this package.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -24,9 +17,11 @@ export interface HarnessSettings {
    * installs the harness should not get third-party model providers registered
    * until they opt in. This repo's own settings.json turns them on.
    *
-   * NOT gated here (future work, do not change without care): dcp, tui,
-   * checkpoint, rewind — those are core UX and flipping their default to off
-   * would break the current experience.
+   * Core UX (dcp, tui, checkpoint, rewind, safety, shortcut-continue,
+   * herdr-state) remains registered by default or has its own environment
+   * gate. Developer/telemetry integrations (diagnostics, integration,
+   * usageTracker) default to OFF for consumers and are enabled in this repo's
+   * source-checkout settings.
    */
   extensions?: Record<string, boolean>;
 }

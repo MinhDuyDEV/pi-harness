@@ -38,12 +38,28 @@ function looseStringField(ctx: unknown, key: string): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+/** Read the SDK-owned session manager id without coupling callers to a context shape. */
+function sessionManagerId(ctx: unknown): string | null {
+  if (typeof ctx !== "object" || ctx === null) return null;
+  const manager = (ctx as Record<string, unknown>).sessionManager;
+  if (typeof manager !== "object" || manager === null) return null;
+  const getter = (manager as Record<string, unknown>).getSessionId;
+  if (typeof getter !== "function") return null;
+  try {
+    const value = (getter as () => unknown).call(manager);
+    return typeof value === "string" && value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Best-effort session id from an extension context. The harness does not
  * expose a stable field name across versions, so probe the known spellings.
  */
 export function getSessionId(ctx: unknown): string | null {
   return (
+    sessionManagerId(ctx) ??
     looseStringField(ctx, "sessionId") ??
     looseStringField(ctx, "session_id") ??
     looseStringField(ctx, "id")

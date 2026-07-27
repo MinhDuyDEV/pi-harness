@@ -1,7 +1,10 @@
 {
   "name": "@minhduydev/pi-harness",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": false,
+  "bin": {
+    "pi-harness-init": "./scripts/init-consumer.mjs"
+  },
   "description": "A portable Pi Coding Agent package with curated extensions, skills, prompts, and themes.",
   "type": "module",
   "engines": {
@@ -110,6 +113,7 @@
     "@earendil-works/pi-coding-agent": "0.81.1",
     "@earendil-works/pi-tui": "0.81.1",
     "@minhduydev/pi-core": "file:../pi-core",
+    "@minhduydev/pi-todo": "file:../pi-todo",
     "@types/node": "^24.0.0",
     "aislop": "0.13.1",
     "bun-types": "1.3.10",

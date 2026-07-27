@@ -7,34 +7,12 @@ import { dirname, join } from "node:path";
  * TODO.md display projection for the TUI sidebar / below-editor widget.
  *
  * ── Ownership boundary (audit H5) ───────────────────────────────────────────
- * `@minhduydev/pi-todo` (pinned as `npm:@minhduydev/pi-todo@0.3.0` in
- * `.pi/settings.json`) is the SINGLE owner and parser of the canonical
- * `.pi/artifacts/TODO.md` format. This module is NOT a second parser — it is a
- * read-only display projection that recognizes only the three line shapes
- * pi-todo's serializer emits:
- *
- *   ### [YYYY-MM-DD - ]<title>          → phase heading (used verbatim as block title)
- *   status: <s>[ | updated: <date>]     → phase status (active | done | abandoned)
- *   <indent><bullet> [<mark>] <content> → item; mark ∈ { " ", "/", "!", "x", "X", "-" }
- *
- * Item marks map to a single open/closed bit: open = pending(" ") /
- * in_progress("/") / blocked("!"); closed = completed("x"/"X") / abandoned("-").
- * Everything pi-todo treats as structure beyond that is deliberately NOT
- * re-implemented here and must not creep back in:
- *   - no `- []` empty-bracket or oh-my-pi alias (`- > `, `- ~ `) forms —
- *     pi-todo's parser rejects/normalizes those, so displaying them would make
- *     the panel disagree with the owner;
- *   - no `(#id)` / `[blocks …]` / `[blocked by …]` / `(note: …)` annotation
- *     parsing — item content is shown verbatim;
- *   - no ref resolution, no mutation, no write path.
- *
- * Why not just import pi-todo? v0.3.0's `exports` map exposes only ".",
- * "./core", "./events" and "./replay"; the parser (`parseMarkdown` in
- * `dist/markdown.js`) is not reachable through any public subpath, so a
- * dynamic optional-peer import (the learning-coordinator/source-ports.ts
- * pattern) has no public API to call. When pi-todo ships a parse export
- * (e.g. a "./markdown" subpath re-exporting `parseMarkdown`), replace
- * `readCanonicalItems` with that import and delete the regexes below.
+ * `@minhduydev/pi-todo` is the SINGLE owner and parser of the canonical
+ * `.pi/artifacts/TODO.md` format. This module only projects the parsed document
+ * into the TUI's smaller display shape. The parser is loaded lazily because
+ * pi-todo is an optional peer of the harness; when it is absent, the panel
+ * reports that the parser is unavailable instead of silently inventing a
+ * second grammar.
  */
 
 export interface TodoItem {
@@ -49,6 +27,34 @@ export interface TodosState {
   items: TodoItem[];
   sourceFile: string | null;
   sourceCount: number;
+  parserAvailable?: boolean;
+}
+
+interface ParsedTodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed" | "abandoned" | "blocked";
+}
+
+interface ParsedTodoPhase {
+  title: string;
+  date?: string;
+  status: "active" | "done" | "abandoned";
+  body: Array<{ type: "item"; item: ParsedTodoItem } | { type: "note"; text: string }>;
+}
+
+interface TodoMarkdownModule {
+  parseMarkdown(markdown: string): { phases: ParsedTodoPhase[] };
+}
+
+const TODO_MARKDOWN_SUBPATH = "@minhduydev/pi-todo/markdown";
+let parserPromise: Promise<TodoMarkdownModule | null> | undefined;
+
+/** Load the canonical parser once, without making the optional peer mandatory. */
+export function loadTodoParser(): Promise<TodoMarkdownModule | null> {
+  parserPromise ??= import(TODO_MARKDOWN_SUBPATH)
+    .then((module) => (typeof module.parseMarkdown === "function" ? module : null))
+    .catch(() => null);
+  return parserPromise;
 }
 
 /**
@@ -69,23 +75,35 @@ export function findCanonicalTodo(cwd: string): string | null {
   }
 }
 
-/** `### <title>` — mirrors pi-todo's heading test (`/^#{3}\s+\S/`). */
-const HEADING_RE = /^###\s+(\S.*?)\s*$/;
-/** Canonical meta line: `status: <s>` or `status: <s> | updated: <date>`. */
-const META_RE = /^status:\s*(\w+)\s*(?:\|\s*updated:\s*\S+\s*)?$/i;
-/** Canonical item line — the exact checkbox shape pi-todo emits. */
-const ITEM_RE = /^\s*[-*+]\s+\[([ xX/\-!])\]\s*(.*)$/;
+function phaseTitle(phase: ParsedTodoPhase): string {
+  return phase.date ? `${phase.date} - ${phase.title}` : phase.title;
+}
 
-const PHASE_STATUSES = new Set(["active", "done", "abandoned"]);
-/** Marks whose item is closed: completed ("x"/"X") or abandoned ("-"). */
-const CLOSED_MARKS = new Set(["x", "X", "-"]);
+/** Project the canonical pi-todo document into the TUI shape. */
+function projectParsedDocument(
+  filePath: string,
+  document: { phases: ParsedTodoPhase[] },
+): TodoItem[] {
+  const items: TodoItem[] = [];
+  for (const phase of document.phases) {
+    for (const entry of phase.body) {
+      if (entry.type !== "item") continue;
+      items.push({
+        text: entry.item.content,
+        done: entry.item.status === "completed" || entry.item.status === "abandoned",
+        blockTitle: phaseTitle(phase),
+        status: phase.status,
+        sourceFile: filePath,
+      });
+    }
+  }
+  return items;
+}
 
-/**
- * Minimal reader for the canonical serialized format (see boundary note
- * above). Lines before the first heading are preamble (never items); a block
- * without a meta line defaults to "active", matching pi-todo's parse default.
- */
-function readCanonicalItems(filePath: string): TodoItem[] {
+async function readCanonicalItems(
+  filePath: string,
+  parser: TodoMarkdownModule,
+): Promise<TodoItem[]> {
   let content: string;
   try {
     content = readFileSync(filePath, "utf-8");
@@ -93,47 +111,24 @@ function readCanonicalItems(filePath: string): TodoItem[] {
     return [];
   }
 
-  const items: TodoItem[] = [];
-  let blockTitle: string | null = null;
-  let blockStatus: TodoItem["status"] = null;
-
-  for (const line of content.split(/\r?\n/)) {
-    const heading = line.match(HEADING_RE);
-    if (heading) {
-      blockTitle = heading[1];
-      blockStatus = "active";
-      continue;
-    }
-    if (blockTitle === null) continue; // preamble
-
-    const meta = line.match(META_RE);
-    if (meta) {
-      const value = meta[1].toLowerCase();
-      if (PHASE_STATUSES.has(value)) blockStatus = value as TodoItem["status"];
-      continue;
-    }
-
-    const item = line.match(ITEM_RE);
-    if (item) {
-      items.push({
-        text: item[2].trim(),
-        done: CLOSED_MARKS.has(item[1]),
-        blockTitle,
-        status: blockStatus,
-        sourceFile: filePath,
-      });
-    }
-  }
-
-  return items;
+  return projectParsedDocument(filePath, parser.parseMarkdown(content));
 }
 
-export function scanTodos(cwd: string): TodosState {
+export async function scanTodos(cwd: string): Promise<TodosState> {
   const file = findCanonicalTodo(cwd);
   if (!file) {
-    return { items: [], sourceFile: null, sourceCount: 0 };
+    return { items: [], sourceFile: null, sourceCount: 0, parserAvailable: true };
   }
-  return { items: readCanonicalItems(file), sourceFile: file, sourceCount: 1 };
+  const parser = await loadTodoParser();
+  if (!parser) {
+    return { items: [], sourceFile: file, sourceCount: 0, parserAvailable: false };
+  }
+  return {
+    items: await readCanonicalItems(file, parser),
+    sourceFile: file,
+    sourceCount: 1,
+    parserAvailable: true,
+  };
 }
 
 export function hasOpenTodos(state: TodosState): boolean {
@@ -145,6 +140,10 @@ export function renderTodosWidget(state: TodosState, _tui: TUI, theme: Theme): T
 
   if (state.sourceFile === null) {
     return new Text(theme.fg("muted", "TODOs — No .pi/artifacts/TODO.md found"), 1, 0);
+  }
+
+  if (state.parserAvailable === false) {
+    return new Text(theme.fg("warning", "TODOs — install @minhduydev/pi-todo to parse TODO.md"), 1, 0);
   }
 
   if (!hasOpenTodos(state)) {

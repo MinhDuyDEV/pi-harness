@@ -10,7 +10,7 @@
  * See README.md for the full rationale and how to run a scenario.
  */
 
-import { readdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,28 +54,36 @@ async function loadScenarios(): Promise<void> {
 }
 
 /**
- * Score a response against a rubric. Returns the achieved score and a list
- * of criterion results. Each criterion is binary (0 or weight); the
- * `pass` string is the human-judgment description used in the README,
- * not parsed by the scorer.
+ * Score a response with explicit human-marked criterion names. The rubric is
+ * intentionally not guessed from prose: the evaluator supplies `metCriteria`
+ * after reading the response, so recorded scores remain auditable.
  */
-export function score(response: string, scenario: Scenario): {
+export function scoreWithCriteria(
+  response: string,
+  scenario: Scenario,
+  metCriteria: readonly string[] = [],
+): {
   score: number;
   max: number;
   details: Array<{ criterion: string; weight: number; met: boolean }>;
 } {
-  // This is a placeholder for the static check. Live scoring is human-judgment
-  // against the rubric criteria. The static scorer only verifies the shape
-  // is parseable; a real scoring run is documented in results.md.
+  const met = new Set(metCriteria);
+  const details = scenario.rubric.criteria.map((criterion) => ({
+    criterion: criterion.name,
+    weight: criterion.weight,
+    met: met.has(criterion.name),
+  }));
   return {
-    score: 0,
+    score: details.reduce((total, detail) => total + (detail.met ? detail.weight : 0), 0),
     max: scenario.rubric.maxScore,
-    details: scenario.rubric.criteria.map((c) => ({
-      criterion: c.name,
-      weight: c.weight,
-      met: false,
-    })),
+    details,
   };
+}
+
+/** Backwards-compatible shape check: no criteria means an unscored response. */
+export function score(response: string, scenario: Scenario) {
+  void response;
+  return scoreWithCriteria(response, scenario);
 }
 
 /** Compare baseline vs with-skill responses. */
@@ -105,5 +113,68 @@ export function compare(
   };
 }
 
+interface CliOptions {
+  scenario: string;
+  condition: "baseline" | "with-skill";
+  responseFile: string;
+  outFile?: string;
+  metCriteria: string[];
+}
+
+function parseCliArgs(argv: string[]): CliOptions {
+  const values = new Map<string, string>();
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]!;
+    if (!arg.startsWith("--")) throw new Error(`Unexpected argument: ${arg}`);
+    const [key, inline] = arg.slice(2).split("=", 2);
+    const value = inline ?? argv[++index];
+    if (!value) throw new Error(`Missing value for --${key}`);
+    values.set(key, value);
+  }
+  const scenario = values.get("scenario");
+  const condition = values.get("condition");
+  const responseFile = values.get("response-file");
+  if (!scenario || !responseFile || (condition !== "baseline" && condition !== "with-skill")) {
+    throw new Error(
+      "Usage: harness.ts --scenario <name> --condition baseline|with-skill --response-file <path> [--met <criterion,...>] [--out <path>]",
+    );
+  }
+  return {
+    scenario,
+    condition,
+    responseFile,
+    outFile: values.get("out"),
+    metCriteria: (values.get("met") ?? "").split(",").map((value) => value.trim()).filter(Boolean),
+  };
+}
+
+async function runCli(argv: string[]): Promise<void> {
+  const options = parseCliArgs(argv);
+  const scenario = SCENARIOS[options.scenario];
+  if (!scenario) throw new Error(`Unknown scenario: ${options.scenario}`);
+  const response = await readFile(resolve(options.responseFile), "utf8");
+  const result = scoreWithCriteria(response, scenario, options.metCriteria);
+  const record = {
+    scenario: options.scenario,
+    condition: options.condition,
+    responseFile: resolve(options.responseFile),
+    recordedAt: new Date().toISOString(),
+    score: result,
+  };
+  const outFile = options.outFile
+    ? resolve(options.outFile)
+    : resolve(__dirname, "runs", `${options.condition}-${options.scenario}.json`);
+  await mkdir(dirname(outFile), { recursive: true });
+  await writeFile(outFile, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  console.log(JSON.stringify({ ...record, outFile }, null, 2));
+}
+
 // Bootstrap: load all scenarios on import.
 await loadScenarios();
+
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
+  await runCli(process.argv.slice(2)).catch((error: unknown) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+  });
+}

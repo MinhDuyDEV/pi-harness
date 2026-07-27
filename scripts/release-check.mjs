@@ -12,8 +12,8 @@
  *   4. npm audit                — security audit (all deps, not --omit=dev)
  *   5. validate:package-payload — deterministic packed-manifest contract
  *                                  (npm pack --dry-run --json --ignore-scripts)
- *   6. smoke:packed             — clean-consumer native Pi resource load from the
- *                                  reconstructed package (npm pack --ignore-scripts)
+ *   6. smoke:packed             — clean-consumer native Pi resource load from an
+ *                                  installed tarball with its required runtime peer
  *
  * No recursion: package steps use `--ignore-scripts`, and this script never invokes
  * `npm publish`/`npm pack` without that flag, so `prepack`/`prepublishOnly`

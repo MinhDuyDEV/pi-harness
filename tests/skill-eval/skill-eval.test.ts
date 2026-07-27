@@ -12,7 +12,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SCENARIOS, score, compare } from "./harness.ts";
+import { SCENARIOS, score, scoreWithCriteria, compare } from "./harness.ts";
 
 test("harness loads at least 2 scenarios", () => {
   assert.ok(
@@ -54,6 +54,13 @@ for (const [name, s] of Object.entries(SCENARIOS)) {
     for (const d of result.details) {
       assert.equal(typeof d.met, "boolean");
     }
+  });
+
+  test(`scenario "${name}" explicit criterion scoring is auditable`, () => {
+    const first = s.rubric.criteria[0]!;
+    const result = scoreWithCriteria("response", s, [first.name]);
+    assert.equal(result.details[0]?.met, true);
+    assert.equal(result.score, first.weight);
   });
 
   test(`scenario "${name}" compare() returns a meaningful-difference indicator`, () => {

@@ -25,7 +25,7 @@ Treat any provided context pack or prior analysis as sealed until you have spent
 
 ## Challenging the premise
 
-If a premise is wrong — the outcome rewards the wrong thing, a locked decision's rationale no longer holds against the code, the scope cannot produce the outcome — do not comply-and-patch. Return `<status>blocked</status>` with a `<needs_decision>` block: the disputed premise, `path:line` evidence, and the reframed question you propose. Challenging the frame explicitly is part of ownership; quietly building on a premise you disbelieve is not.
+If a premise is wrong — the outcome rewards the wrong thing, a locked decision's rationale no longer holds against the code, the scope cannot produce the outcome — do not comply-and-patch. Return `<status>reframed</status>` when you can deliver the corrected framing inside scope. Return `<status>blocked</status>` with `<needs_decision>` only when the parent must choose, including `path:line` evidence and options with tradeoffs. Challenging the frame explicitly is part of ownership; quietly building on a premise you disbelieve is not.
 
 ## Scope discipline
 
@@ -54,7 +54,7 @@ End every response with this machine-readable envelope:
 
 ```xml
 <result>
-  <status>success|failure|blocked|partial</status>
+  <status>success|failure|blocked|partial|reframed</status>
   <summary>One sentence: outcome state</summary>
   <findings>What changed and why; decisions made inside the frontier</findings>
   <evidence>Command + observed output per claim, tagged observed|reported</evidence>

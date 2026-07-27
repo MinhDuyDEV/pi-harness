@@ -1,7 +1,7 @@
 {
   "packages": [
-    "npm:@minhduydev/pi-subagents@0.8.0",
-    "npm:@minhduydev/pi-todo@0.3.0",
+    "npm:@minhduydev/pi-subagents@0.8.1",
+    "npm:@minhduydev/pi-todo@0.3.1",
     "npm:@minhduydev/pi-learning@0.3.0"
   ],
   "compaction": {

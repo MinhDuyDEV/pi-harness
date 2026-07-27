@@ -66,20 +66,27 @@ fills out `results.md`.
 ## Run It
 
 ```bash
-# RED: baseline (no skill)
-node --import tsx tests/skill-eval/harness.ts --scenario vfc-claim-done --condition baseline
+# RED: baseline (no skill), after saving the actual response
+node --import tsx tests/skill-eval/harness.ts \
+  --scenario vfc-claim-done --condition baseline \
+  --response-file /tmp/vfc-baseline.txt \
+  --met iron-law-applied,command-named
 
 # GREEN: with skill
-node --import tsx tests/skill-eval/harness.ts --scenario vfc-claim-done --condition with-skill
+node --import tsx tests/skill-eval/harness.ts \
+  --scenario vfc-claim-done --condition with-skill \
+  --response-file /tmp/vfc-with-skill.txt \
+  --met iron-law-applied,rationalization-rejected,command-named,evidence-block-emitted
 
 # Compare
 diff tests/skill-eval/runs/baseline-vfc-claim-done.json \
      tests/skill-eval/runs/with-skill-vfc-claim-done.json
 ```
 
-(Actually exercising the harness requires the `task` tool to be wired up
-in a real pi session. The static `prompt` + `rubric` + `expectedFailure`
-export is what the test file validates.)
+The harness deliberately does not invoke a model by itself: capture the
+baseline/with-skill responses in a real Pi session, then use the CLI to record
+the human-marked criterion names. The CLI writes an auditable JSON record under
+`tests/skill-eval/runs/` (or the path supplied with `--out`).
 
 ## Expanding the Harness
 

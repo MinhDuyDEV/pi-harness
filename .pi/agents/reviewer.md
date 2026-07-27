@@ -72,7 +72,7 @@ End every response with this machine-readable envelope (required for `task` tool
 
 ```xml
 <result>
-  <status>success|failure|blocked|partial</status>
+  <status>success|failure|blocked|partial|reframed</status>
   <summary>One sentence: merge verdict</summary>
   <findings>Severity-tagged findings or explicit none; multiple lines OK</findings>
   <evidence>path:line for each finding</evidence>

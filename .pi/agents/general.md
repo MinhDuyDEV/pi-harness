@@ -33,7 +33,7 @@ Before reading any provided context pack, spend a short blind pass forming your 
 
 If the brief's framing contradicts repo reality — a wrong premise, acceptance criteria that reward the wrong thing, or a locked decision whose rationale no longer holds — do not comply-and-patch. Return `<status>blocked</status>` and include a `<needs_decision>` block stating: the disputed premise, `path:line` evidence, and the reframed question you propose. Challenging scope explicitly is your job; expanding scope silently is still forbidden.
 
-Note: current runtimes parse only `success|failure|blocked|partial`; newer runtimes may additionally accept `reframed`. Until then, `blocked` plus `<needs_decision>` is the portable encoding.
+If you can deliver a corrected framing inside scope, return `<status>reframed</status>` and explain it. Use `<status>blocked</status>` plus `<needs_decision>` only when the parent must choose.
 
 ## Rules
 

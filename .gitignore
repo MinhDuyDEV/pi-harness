@@ -46,6 +46,9 @@ pnpm-debug.log*
 .pi/extensions/herdr-agent-state.ts
 .pi/themes/*.local.json
 
+# Skill evaluation response records
+tests/skill-eval/runs/
+
 # Database state
 *.db
 *.db-shm

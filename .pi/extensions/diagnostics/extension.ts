@@ -9,6 +9,7 @@ import {
 import { diagnosticsParamsSchema, resolveParams } from "./params.ts";
 import { runFullDiagnostics } from "./run.ts";
 import { renderDiagnosticsCall, renderDiagnosticsResult } from "./tool-render.ts";
+import { readExtensionGate } from "../lib/harness-settings.js";
 
 const PROMPT_GUIDELINES = [
   "After TS/JS edits, rely on auto-injected language diagnostics when errors appear; call diagnostics with scope=changed before claiming work is done on TS/JS.",
@@ -18,6 +19,7 @@ const PROMPT_GUIDELINES = [
 ];
 
 export default function (pi: ExtensionAPI) {
+  if (!readExtensionGate(undefined, "diagnostics", false)) return;
   pi.registerTool({
     name: "diagnostics",
     label: "Diagnostics",

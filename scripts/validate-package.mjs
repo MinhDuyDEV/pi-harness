@@ -17,7 +17,12 @@ for (const path of packageJson.files ?? []) {
   if (!existsSync(path)) errors.push(`package.json files entry does not exist: ${path}`);
 }
 
-if (packageJson.bin) errors.push("package.json must not expose the removed pi-harness CLI");
+if (packageJson.bin) {
+  const entries = Object.entries(packageJson.bin);
+  if (entries.length !== 1 || entries[0]?.[0] !== "pi-harness-init" || entries[0]?.[1] !== "./scripts/init-consumer.mjs") {
+    errors.push("package.json may expose only the portable pi-harness-init consumer bootstrap");
+  }
+}
 if (packageJson.scripts?.postinstall) errors.push("package.json must not run a nested postinstall install");
 // Recursive, not just the top of .pi/extensions: a nested package.json with
 // its own `pi.extensions` (e.g. rewind/) ships inside the payload and can

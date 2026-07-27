@@ -16,6 +16,7 @@ import {
   assertPiCoreProtocolVersion,
 } from "@minhduydev/pi-core";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { readExtensionGate } from "../lib/harness-settings.js";
 
 /**
  * Which sibling versions this harness release is verified against.
@@ -134,6 +135,7 @@ export function integrationReport(cwd: string): PackageStatus[] {
 }
 
 export default function integrationExtension(pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "integration", false)) return;
   assertPiCoreProtocolVersion(1);
 
   pi.registerCommand("integration", {
@@ -162,9 +164,7 @@ export default function integrationExtension(pi: ExtensionAPI): void {
     },
   });
 
-  // Preflight once per session: version drift is exactly the failure mode
-  // that used to be invisible until someone noticed learning had not recorded
-  // anything for weeks.
+  // Report installed sibling versions outside the verified compatibility matrix.
   pi.on("session_start", (_event, context) => {
     const broken = integrationReport(context.cwd).filter((status) => !status.ok);
     const missingOnly = broken.every((status) => status.installed === undefined);

@@ -234,10 +234,26 @@ export default function herdrState(pi: ExtensionAPI): void {
     enqueue("pane.report_agent", params);
   }
 
-  function reportSession(sessionStartSource?: string): void {
+  function reportSession(ctx: ExtensionContext, sessionStartSource?: string): void {
     const ref = sessionRef();
     if (!ref) return;
-    const params: Record<string, unknown> = { ...ref };
+    const params: Record<string, unknown> = {
+      ...ref,
+      role: "interactive-root",
+    };
+    if (ctx.model) {
+      params.model = ctx.model.provider ? `${ctx.model.provider}/${ctx.model.id}` : ctx.model.id;
+    }
+    try {
+      const usage = ctx.getContextUsage();
+      if (usage) {
+        if (usage.tokens !== null) params.context_tokens = usage.tokens;
+        params.context_window = usage.contextWindow;
+        if (usage.percent !== null) params.context_percent = usage.percent;
+      }
+    } catch {
+      // Metadata is advisory; reporting the session ref remains best effort.
+    }
     if (sessionStartSource) params.session_start_source = sessionStartSource;
     enqueue("pane.report_agent_session", params);
   }
@@ -248,7 +264,7 @@ export default function herdrState(pi: ExtensionAPI): void {
     if (ctx.hasUI !== true) return;
     rootSession = true;
     updateSessionRef(ctx);
-    reportSession(event.reason);
+    reportSession(ctx, event.reason);
     // A /reload can swap this extension mid-run without another agent_start.
     agentActive = ctx.isIdle() === false;
     publishState(true);
@@ -257,7 +273,7 @@ export default function herdrState(pi: ExtensionAPI): void {
   pi.on("agent_start", async (_event, ctx) => {
     if (!rootSession) return;
     updateSessionRef(ctx);
-    reportSession();
+    reportSession(ctx);
     agentActive = true;
     publishState();
   });
@@ -268,11 +284,27 @@ export default function herdrState(pi: ExtensionAPI): void {
     publishState();
   });
 
+  pi.on("session_before_compact", async (_event, ctx) => {
+    if (!rootSession) return;
+    updateSessionRef(ctx);
+    agentActive = true;
+    reportSession(ctx, "before-compact");
+    publishState();
+  });
+
   pi.on("agent_settled", async (_event, ctx) => {
     // agent_end is NOT idle: Pi may auto-retry/compact/continue afterwards.
     if (!rootSession || ctx.isIdle() !== true) return;
     agentActive = false;
     publishState();
+  });
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    if (!rootSession) return;
+    updateSessionRef(ctx);
+    agentActive = false;
+    reportSession(ctx, "shutdown");
+    publishState(true);
   });
 
   // Blocking prompts (permission gates, ask-user dialogs) surface through the

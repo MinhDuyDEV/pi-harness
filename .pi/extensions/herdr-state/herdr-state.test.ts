@@ -79,6 +79,8 @@ interface FakeCtxOptions {
   idle?: boolean;
   sessionFile?: string | undefined;
   sessionId?: string;
+  model?: { provider?: string; id: string };
+  usage?: { tokens: number | null; contextWindow: number; percent: number | null };
 }
 
 function fakeCtx(options: FakeCtxOptions = {}): unknown {
@@ -89,6 +91,8 @@ function fakeCtx(options: FakeCtxOptions = {}): unknown {
       getSessionFile: () => options.sessionFile,
       getSessionId: () => options.sessionId ?? "ses_test",
     },
+    model: options.model,
+    getContextUsage: () => options.usage,
   };
 }
 
@@ -218,7 +222,14 @@ describe("herdr-state activation gate", () => {
     herdrState(fake.api);
     assert.deepEqual(
       [...fake.registeredEvents].sort(),
-      ["agent_settled", "agent_start", "session_start", "tool_execution_start"].sort(),
+      [
+        "agent_settled",
+        "agent_start",
+        "session_before_compact",
+        "session_shutdown",
+        "session_start",
+        "tool_execution_start",
+      ].sort(),
     );
     assert.deepEqual(fake.busChannels, ["herdr:blocked"]);
   });
@@ -234,7 +245,12 @@ describe("herdr-state reporting", () => {
     herdrState(fake.api);
 
     const sessionFile = join(workDir, "session.jsonl");
-    const busyCtx = fakeCtx({ idle: false, sessionFile });
+    const busyCtx = fakeCtx({
+      idle: false,
+      sessionFile,
+      model: { provider: "openai", id: "gpt-test" },
+      usage: { tokens: 1234, contextWindow: 8000, percent: 15.425 },
+    });
     const idleCtx = fakeCtx({ idle: true, sessionFile });
 
     // Interactive root session starts mid-run (isIdle false -> working).
@@ -249,6 +265,10 @@ describe("herdr-state reporting", () => {
     assert.equal(sessionReport.params.session_start_source, "startup");
     assert.equal(sessionReport.params.agent_session_path, sessionFile);
     assert.equal(sessionReport.params.agent_session_id, undefined);
+    assert.equal(sessionReport.params.role, "interactive-root");
+    assert.equal(sessionReport.params.model, "openai/gpt-test");
+    assert.equal(sessionReport.params.context_tokens, 1234);
+    assert.equal(sessionReport.params.context_window, 8000);
 
     assert.equal(initialState.method, "pane.report_agent");
     assert.equal(initialState.params.state, "working");
@@ -266,23 +286,28 @@ describe("herdr-state reporting", () => {
     assert.equal(server.received[3].method, "pane.report_agent");
     assert.equal(server.received[3].params.state, "working");
 
+    await fake.emit("session_before_compact", {}, busyCtx);
+    await waitFor(() => server.received.length >= 5);
+    assert.equal(server.received[4].method, "pane.report_agent_session");
+    assert.equal(server.received[4].params.session_start_source, "before-compact");
+
     // Duplicate working signal is deduplicated (no extra report).
     await fake.emit("tool_execution_start", { toolName: "read" }, busyCtx);
     await sleep(150);
-    assert.equal(server.received.length, 4, "duplicate state must not re-report");
+    assert.equal(server.received.length, 5, "duplicate state must not re-report");
 
     // Blocking prompt (permission gate / ask-user) -> blocked with label.
     fake.emitBus("herdr:blocked", { active: true, label: "Permission required" });
-    await waitFor(() => server.received.length >= 5);
-    assert.equal(server.received[4].method, "pane.report_agent");
-    assert.equal(server.received[4].params.state, "blocked");
-    assert.equal(server.received[4].params.message, "Permission required");
+    await waitFor(() => server.received.length >= 6);
+    assert.equal(server.received[5].method, "pane.report_agent");
+    assert.equal(server.received[5].params.state, "blocked");
+    assert.equal(server.received[5].params.message, "Permission required");
 
     // Prompt answered -> back to working (agent still active).
     fake.emitBus("herdr:blocked", { active: false });
-    await waitFor(() => server.received.length >= 6);
-    assert.equal(server.received[5].method, "pane.report_agent");
-    assert.equal(server.received[5].params.state, "working");
+    await waitFor(() => server.received.length >= 7);
+    assert.equal(server.received[6].method, "pane.report_agent");
+    assert.equal(server.received[6].params.state, "working");
 
     // seq strictly increasing across every request, in order.
     const seqs = server.received.map((request) => request.params.seq as number);

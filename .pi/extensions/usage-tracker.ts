@@ -17,8 +17,10 @@ import {
   getUsageDatabase,
   recordUsage,
 } from "./usage/storage.js";
+import { readExtensionGate } from "./lib/harness-settings.js";
 
 export default function usageTrackerExtension(pi: ExtensionAPI): void {
+  if (!readExtensionGate(undefined, "usageTracker", false)) return;
   try {
     getUsageDatabase();
   } catch (error) {

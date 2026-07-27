@@ -34,6 +34,11 @@ test("consumer settings template parses and stays minimal", () => {
   }
 });
 
+test("package exposes the consumer bootstrap as a CLI", () => {
+  const pkg = JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8"));
+  assert.equal(pkg.bin?.["pi-harness-init"], "./scripts/init-consumer.mjs");
+});
+
 test("--dry-run writes no files", () => {
   const target = makeTargetDir();
   try {

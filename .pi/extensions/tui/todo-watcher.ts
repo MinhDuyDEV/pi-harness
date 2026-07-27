@@ -5,12 +5,12 @@ import { findCanonicalTodo } from "./todos-panel.js";
 
 export interface TodoFileWatcher {
   watch(cwd: string, ctx: ExtensionContext): void;
-  refresh(cwd: string, source: string, ctx: ExtensionContext): void;
+  refresh(cwd: string, source: string, ctx: ExtensionContext): Promise<void>;
   dispose(): void;
 }
 
 export function createTodoFileWatcher(
-  refreshTodos: (cwd: string) => number,
+  refreshTodos: (cwd: string) => Promise<number>,
   scheduleRefresh: (ctx: ExtensionContext) => void,
 ): TodoFileWatcher {
   let watcher: FSWatcher | null = null;
@@ -24,8 +24,8 @@ export function createTodoFileWatcher(
     debounce = null;
   };
 
-  const refresh = (cwd: string, source: string, ctx: ExtensionContext): void => {
-    const openCount = refreshTodos(cwd);
+  const refresh = async (cwd: string, source: string, ctx: ExtensionContext): Promise<void> => {
+    const openCount = await refreshTodos(cwd);
     if (openCount === lastOpenCount) return;
     lastOpenCount = openCount;
     try {
@@ -46,7 +46,7 @@ export function createTodoFileWatcher(
         if (debounce) clearTimeout(debounce);
         debounce = setTimeout(() => {
           debounce = null;
-          refresh(cwd, "file-watch", ctx);
+          void refresh(cwd, "file-watch", ctx);
           scheduleRefresh(ctx);
         }, 100);
       });

@@ -56,7 +56,7 @@ End every response with this machine-readable envelope:
 
 ```xml
 <result>
-  <status>success|failure|blocked|partial</status>
+  <status>success|failure|blocked|partial|reframed</status>
   <summary>One sentence: position taken (or question reframed)</summary>
   <findings>Position and key reasoning; per-finding confidence; multiple lines OK</findings>
   <evidence>path:line and sources for every fact</evidence>

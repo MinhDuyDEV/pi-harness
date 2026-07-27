@@ -9,7 +9,7 @@
  */
 
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import test from "node:test";
 import os from "node:os";
 import path from "node:path";
@@ -30,6 +30,8 @@ import {
   type CheckpointContent,
   type ParsedBlock,
 } from "./subagent.ts";
+
+import checkpointExtension from "./index.ts";
 
 function emptyContent(overrides: Partial<CheckpointContent> = {}): CheckpointContent {
   return {
@@ -60,9 +62,47 @@ test("default config is enabled with sane limits", () => {
 // ── getSessionId ────────────────────────────────────────────────────────────
 
 test("getSessionId probes known field spellings in order", () => {
+  assert.equal(
+    getSessionId({ sessionManager: { getSessionId: () => "sdk-session" }, sessionId: "legacy" }),
+    "sdk-session",
+  );
   assert.equal(getSessionId({ sessionId: "a", session_id: "b", id: "c" }), "a");
   assert.equal(getSessionId({ session_id: "b", id: "c" }), "b");
   assert.equal(getSessionId({ id: "c" }), "c");
+});
+
+test("checkpoint event uses the SDK session manager and writes a durable file", async () => {
+  const tmp = await makeTempDir();
+  try {
+    await mkdir(path.join(tmp, ".pi"), { recursive: true });
+    const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => unknown>>();
+    const emitted: Array<{ type: string; payload: unknown }> = [];
+    const mock = {
+      on(event: string, handler: (event: unknown, ctx: unknown) => unknown) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+      events: { emit(type: string, payload: unknown) { emitted.push({ type, payload }); } },
+    };
+
+    checkpointExtension(mock as any);
+    const handler = handlers.get("session_before_compact")?.[0];
+    assert.ok(handler, "checkpoint handler should be registered");
+    await handler({}, {
+      cwd: tmp,
+      sessionManager: { getSessionId: () => "sdk-session" },
+    });
+
+    const files = await readdir(path.join(tmp, ".pi", "checkpoints", "sdk-session"));
+    assert.deepEqual(files, ["checkpoint-1.md"]);
+    const content = await readFile(
+      path.join(tmp, ".pi", "checkpoints", "sdk-session", "checkpoint-1.md"),
+      "utf8",
+    );
+    assert.match(content, /Session: sdk-session/);
+    assert.equal(emitted[0]?.type, "pi-harness:checkpoint:written:v1");
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
 });
 
 test("getSessionId returns null for missing, empty, or non-string ids", () => {

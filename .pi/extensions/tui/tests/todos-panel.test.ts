@@ -44,7 +44,7 @@ test("findCanonicalTodo walks up to locate the canonical TODO.md", () => {
   }
 });
 
-test("scanTodos finds the canonical TODO.md from the project root", () => {
+test("scanTodos finds the canonical TODO.md from the project root", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-root-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
@@ -59,7 +59,7 @@ status: active | updated: 2026-06-23
 `,
     );
 
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
 
         assert.equal(state.sourceFile, join(dir, ".pi", "artifacts", "TODO.md"));
     assert.equal(state.sourceCount, 1);
@@ -75,7 +75,7 @@ status: active | updated: 2026-06-23
   }
 });
 
-test("scanTodos ignores non-canonical `- []` lines — pi-todo owns the format and does not parse them", () => {
+test("scanTodos ignores non-canonical `- []` lines — pi-todo owns the format and does not parse them", async () => {
   // pi-todo's parser requires exactly one mark char inside the brackets, so
   // `- []` is prose (a preserved note), not an item. The panel must agree with
   // the owner instead of resurrecting the old second-parser drift.
@@ -87,7 +87,7 @@ test("scanTodos ignores non-canonical `- []` lines — pi-todo owns the format a
       join(artifactsDir, "TODO.md"),
       "### 2026-06-29 - empty bracket\nstatus: active | updated: 2026-06-29\n\n- [] not an item\n- [ ] real item\n",
     );
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
     assert.equal(state.items.length, 1);
     assert.equal(state.items[0].text, "real item");
   } finally {
@@ -95,7 +95,7 @@ test("scanTodos ignores non-canonical `- []` lines — pi-todo owns the format a
   }
 });
 
-test("scanTodos maps the canonical pi-todo marks: open = ' ', '/', '!'; closed = 'x', '-'", () => {
+test("scanTodos maps the canonical pi-todo marks: open = ' ', '/', '!'; closed = 'x', '-'", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-marks-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
@@ -112,7 +112,7 @@ status: active | updated: 2026-07-27
 - [-] abandoned item
 `,
     );
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
     assert.deepEqual(
       state.items.map((item) => ({ text: item.text, done: item.done })),
       [
@@ -128,7 +128,7 @@ status: active | updated: 2026-07-27
   }
 });
 
-test("scanTodos shows item content verbatim — annotation parsing belongs to pi-todo", () => {
+test("scanTodos projects canonical item content — annotations remain parser-owned", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-verbatim-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
@@ -137,15 +137,15 @@ test("scanTodos shows item content verbatim — annotation parsing belongs to pi
       join(artifactsDir, "TODO.md"),
       "### 2026-07-27 - deps\nstatus: active\n\n- [ ] (#3) wire up token refresh [blocks #5]\n",
     );
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
     assert.equal(state.items.length, 1);
-    assert.equal(state.items[0].text, "(#3) wire up token refresh [blocks #5]");
+    assert.equal(state.items[0].text, "wire up token refresh");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("scanTodos ignores preamble items and defaults a meta-less block to active", () => {
+test("scanTodos ignores preamble items and defaults a meta-less block to active", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-preamble-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
@@ -159,7 +159,7 @@ test("scanTodos ignores preamble items and defaults a meta-less block to active"
 - [ ] tracked item
 `,
     );
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
     assert.equal(state.items.length, 1);
     assert.equal(state.items[0].text, "tracked item");
     assert.equal(state.items[0].blockTitle, "no meta block");
@@ -170,7 +170,7 @@ test("scanTodos ignores preamble items and defaults a meta-less block to active"
   }
 });
 
-test("scanTodos parses multiple blocks with different statuses", () => {
+test("scanTodos parses multiple blocks with different statuses", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-multi-block-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
@@ -189,7 +189,7 @@ status: done | updated: 2026-06-22
 `,
     );
 
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
 
     assert.equal(state.items.length, 2);
     assert.deepEqual(
@@ -204,7 +204,7 @@ status: done | updated: 2026-06-22
   }
 });
 
-test("scanTodos walks up to find TODO.md when launched in a subdirectory", () => {
+test("scanTodos walks up to find TODO.md when launched in a subdirectory", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-walkup-"));
   try {
     const artifactsDir = join(dir, ".pi", "artifacts");
@@ -219,7 +219,7 @@ status: active | updated: 2026-06-23
     );
 
     const deep = join(artifactsDir, "nested", "deeper");
-    const state = scanTodos(deep);
+    const state = await scanTodos(deep);
 
     assert.equal(state.sourceFile, join(dir, ".pi", "artifacts", "TODO.md"));
     assert.equal(state.sourceCount, 1);
@@ -230,10 +230,10 @@ status: active | updated: 2026-06-23
   }
 });
 
-test("scanTodos returns empty state when no TODO.md is found", () => {
+test("scanTodos returns empty state when no TODO.md is found", async () => {
   const dir = mkdtempSync(join(tmpdir(), "tui-todos-empty-"));
   try {
-    const state = scanTodos(dir);
+    const state = await scanTodos(dir);
     assert.equal(state.sourceFile, null);
     assert.equal(state.sourceCount, 0);
     assert.deepEqual(state.items, []);

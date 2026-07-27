@@ -97,7 +97,12 @@ function modelLabel(model: {
 export default function piTuiExtension(pi: ExtensionAPI) {
   // ── State ────────────────────────────────────────────────────────────────
   const queue = createQueueTracker();
-      let todosState: TodosState = { items: [], sourceFile: null, sourceCount: 0 };
+  let todosState: TodosState = {
+    items: [],
+    sourceFile: null,
+    sourceCount: 0,
+    parserAvailable: true,
+  };
   const footer = createDefaultFooterState();
   const sidebar = createDefaultSidebarState();
   let piTuiSettings: PiTuiSettings = {};
@@ -107,8 +112,8 @@ export default function piTuiExtension(pi: ExtensionAPI) {
   let progressKeepalive: ReturnType<typeof setInterval> | null = null;
   let turnStartTime = 0;
   const todoFileWatcher = createTodoFileWatcher(
-    (cwd) => {
-      refreshTodos(cwd);
+    async (cwd) => {
+      await refreshTodos(cwd);
       return todosState.items.filter((item) => !item.done).length;
     },
     (ctx) => scheduleRefresh(ctx),
@@ -206,8 +211,8 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     }, delayMs);
   }
 
-  function refreshTodos(cwd: string) {
-    todosState = scanTodos(cwd);
+  async function refreshTodos(cwd: string): Promise<void> {
+    todosState = await scanTodos(cwd);
   }
 
   function restoreUsageFromBranch(ctx: ExtensionContext) {
@@ -281,7 +286,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
 
     restoreUsageFromBranch(ctx);
 
-    refreshTodos(ctx.cwd);
+    await refreshTodos(ctx.cwd);
     // Set up the file watcher so out-of-band edits (vim, sed, any tool
     // that doesn't match the path check below) still refresh the panel.
     todoFileWatcher.watch(ctx.cwd, ctx);
@@ -371,7 +376,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       scheduleRefresh(ctx);
     }
 
-    // TODO ownership gate (audit §4, roadmap 24): when another todo package
+    // Todo ownership: when another todo package
     // owns the region (`piTui.todosWidget: false`, as this harness ships with
     // @minhduydev/pi-todo enabled), the TUI must not ALSO inject a todo nudge —
     // two cadences firing at once was an active duplication, and pi-todo's
@@ -782,7 +787,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
     if (isWriteToolResult(event) || isEditToolResult(event)) {
       const path = typeof event.input.path === "string" ? event.input.path : "";
       if (path.toLowerCase().includes("todo.md")) {
-        todoFileWatcher.refresh(
+        await todoFileWatcher.refresh(
           ctx.cwd,
           isEditToolResult(event) ? "edit" : "write",
           ctx,
@@ -794,7 +799,7 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       // Catches anything with "todo.md" (case-insensitive) in the command.
       const cmd = typeof event.input.command === "string" ? event.input.command : "";
       if (cmd.toLowerCase().includes("todo.md")) {
-        todoFileWatcher.refresh(ctx.cwd, "bash", ctx);
+        await todoFileWatcher.refresh(ctx.cwd, "bash", ctx);
         scheduleRefresh(ctx);
       }
     }
