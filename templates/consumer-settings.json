@@ -3,7 +3,8 @@
     "npm:@minhduydev/pi-core@0.2.0",
     "npm:@minhduydev/pi-subagents@0.10.1",
     "npm:@minhduydev/pi-todo@0.4.0",
-    "npm:@minhduydev/pi-learning@0.4.0"
+    "npm:@minhduydev/pi-learning@0.4.0",
+    "npm:@heyhuynhgiabuu/pi-search@0.3.0"
   ],
   "pi-learning": {
     "enabled": true,
@@ -22,7 +23,7 @@
   },
   "pi-todo": {
     "enabled": true,
-    "widget": true,
+    "widget": false,
     "reminderTurns": 6
   },
   "compaction": {
@@ -47,7 +48,7 @@
   "piTui": {
     "todosWidget": false,
     "fixedEditor": {
-      "enabled": true
+      "enabled": false
     }
   },
   "pi-harness": {
@@ -63,7 +64,7 @@
       "learningCoordinator": true,
       "workflowState": true,
       "dcp": true,
-      "tui": true,
+      "tui": false,
       "tps": true,
       "diagnostics": true,
       "integration": true,

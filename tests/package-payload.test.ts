@@ -82,7 +82,7 @@ function withBase(extra: string[]): string[] {
   return [...VALID_BASE, ...extra];
 }
 
-test("settings pin portable exact Auto-safe package sources", () => {
+test("settings pin portable exact package sources", () => {
   const settings = JSON.parse(readFileSync(resolve(REPO_ROOT, ".pi/settings.json"), "utf8")) as {
     packages?: string[];
   };
@@ -101,6 +101,15 @@ test("settings pin portable exact Auto-safe package sources", () => {
       `${name} is pinned to an exact npm version`,
     );
   }
+  const searchPins = (settings.packages ?? []).filter((entry) =>
+    entry.includes("@heyhuynhgiabuu/pi-search@"),
+  );
+  assert.equal(searchPins.length, 1, "exactly one pin for pi-search");
+  assert.match(
+    searchPins[0],
+    /^npm:@heyhuynhgiabuu\/pi-search@\d+\.\d+\.\d+$/,
+    "pi-search is pinned to an exact npm version",
+  );
   assert.equal(settings.packages?.some((entry) => entry.startsWith("local:../pi-")), false);
 });
 

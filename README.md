@@ -76,7 +76,7 @@ observed project context.
 
 ## Source-checkout profile
 
-When this repository is used directly, `.pi/settings.json` provides a pinned project profile for task delegation, diagnostics, source lookup, and web/documentation tools. Optional packages remain optional at runtime: prompts and policies must degrade explicitly when a tool is unavailable.
+When this repository is used directly, `.pi/settings.json` provides a pinned project profile for task delegation, diagnostics, source lookup, and web/documentation tools. The Full profile pins `@heyhuynhgiabuu/pi-search`, which supplies `websearch`, `codesearch`, `context7`, `deepwiki`, `web_fetch`, `get_fetch_content`, and optional Firecrawl tools. Search works without an API key through Exa MCP; `EXA_API_KEY`, `BRAVE_API_KEY`, and `FIRECRAWL_API_KEY` enable their corresponding optional providers. Optional packages remain optional at runtime: prompts and policies must degrade explicitly when a tool is unavailable.
 
 Context ownership is intentionally layered:
 
