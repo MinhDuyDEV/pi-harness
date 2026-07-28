@@ -5,7 +5,7 @@ description: >
   itself, runs its own proof, and reports provenance-tagged evidence.
   NOT for read-only questions (explore/scout), diff verdicts (reviewer), or loosely-scoped
   research-plus-edit errands (general).
-model: openai-codex/gpt-5.6-sol
+model: ollama-cloud/glm-5.2
 thinking: high
 prompt_mode: append
 ---
