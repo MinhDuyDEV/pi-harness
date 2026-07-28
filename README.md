@@ -74,27 +74,6 @@ inspect the consumer repository and create or refresh that project's own
 `AGENTS.md`. `pi-harness-init` owns portable harness resources; `/init` owns
 observed project context.
 
-## srcwalk integration
-
-The package requires [srcwalk](https://github.com/sting8k/srcwalk) for structural code navigation and ships a `srcwalk` skill with the version-matched workflow. Install the CLI before starting Pi; pi-harness does not download binaries during package installation or startup, so bootstrap remains deterministic.
-
-Install it once in the consumer environment, or invoke it through `npx`:
-
-```bash
-npm install -g srcwalk
-srcwalk guide
-```
-
-The skill routes repository orientation, symbol discovery, exact reads, caller/callee tracing, dependency and blast-radius checks, and Git review packets through srcwalk. It preserves `rg` and ordinary shell tools for regex/pure-text work and operations srcwalk does not support. srcwalk output is source evidence rather than runtime proof; tests and project checks remain authoritative.
-
-The integration is version-resilient: the skill requires the current intent-first command family (`>=1.0.0`) and delegates detailed routing to the installed binary's version-matched `srcwalk guide`, avoiding a vendored or stale command reference.
-
-## Snap Edit integration
-
-The Full profile enables a Pi 0.81.1-compatible port of [pi-snap-edit](https://github.com/sting8k/pi-snap-edit) 4.2.2. It provides guarded, atomic `quick_edit` and `target_edit` tools and replaces the active built-in `edit`/`substitute_edit` tools at session start. Full consumer initialization manages this gate as enabled so every initialized agent gets the same editing contract; rerunning init restores that managed value.
-
-The upstream npm package currently peers on Pi `^0.78.0`, so pi-harness does not force-install it into the 0.81.1 runtime. The vendored source and its single TypeBox import adaptation are documented in [`.pi/extensions/snap-edit/README.md`](.pi/extensions/snap-edit/README.md).
-
 ## Source-checkout profile
 
 When this repository is used directly, `.pi/settings.json` provides a pinned project profile for task delegation, diagnostics, source lookup, and web/documentation tools. The Full profile pins `@heyhuynhgiabuu/pi-search`, which supplies `websearch`, `codesearch`, `context7`, `deepwiki`, `web_fetch`, `get_fetch_content`, and optional Firecrawl tools. Search works without an API key through Exa MCP; `EXA_API_KEY`, `BRAVE_API_KEY`, and `FIRECRAWL_API_KEY` enable their corresponding optional providers. Optional packages remain optional at runtime: prompts and policies must degrade explicitly when a tool is unavailable.
@@ -151,11 +130,11 @@ release scripts runs `npm publish`.
 
 The owner-controlled publish order is:
 
-1. `@minhduydev/pi-core@0.2.0`
-2. `@minhduydev/pi-subagents@0.10.1`
-3. `@minhduydev/pi-learning@0.4.0`
-4. `@minhduydev/pi-todo@0.4.0`
-5. `@minhduydev/pi-harness@2.1.0`
+1. [`@minhduydev/pi-core@0.2.0`](https://www.npmjs.com/package/@minhduydev/pi-core/v/0.2.0)
+2. [`@minhduydev/pi-subagents@0.10.1`](https://www.npmjs.com/package/@minhduydev/pi-subagents/v/0.10.1)
+3. [`@minhduydev/pi-learning@0.4.0`](https://www.npmjs.com/package/@minhduydev/pi-learning/v/0.4.0)
+4. [`@minhduydev/pi-todo@0.4.0`](https://www.npmjs.com/package/@minhduydev/pi-todo/v/0.4.0)
+5. [`@minhduydev/pi-harness@2.1.0`](https://www.npmjs.com/package/@minhduydev/pi-harness/v/2.1.0)
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:
