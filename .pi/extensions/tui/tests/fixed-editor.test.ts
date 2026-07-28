@@ -56,18 +56,23 @@ function makeCompositor(options: {
   rootRender?: (width: number, terminal: FakeTerminal) => string[];
   hasOverlay?: boolean;
   isStreaming?: boolean;
+  editorLines?: (compositor: any) => string[];
+  doRender?: (tui: any) => void;
 } = {}) {
   const terminal = new FakeTerminal();
   terminal.setRows(options.rows ?? 6);
   let listener: ((data: string) => unknown) | undefined;
   let requestRenderCount = 0;
+  let compositor: any;
   const rootLines = options.rootLines ?? Array.from({ length: 20 }, (_, i) => `root-${i}`);
   const clusterLines = options.clusterLines ?? ["editor"];
   const tui: any = {
     terminal,
     hasOverlay: () => options.hasOverlay ?? false,
     render: (width: number) => options.rootRender?.(width, terminal) ?? rootLines,
-    doRender() {},
+    doRender() {
+      options.doRender?.(tui);
+    },
     requestRender() {
       requestRenderCount++;
     },
@@ -78,8 +83,8 @@ function makeCompositor(options: {
       };
     },
   };
-  const compositor = new FixedEditorCompositor(tui, terminal, {
-    getEditorLines: () => clusterLines,
+  compositor = new FixedEditorCompositor(tui, terminal, {
+    getEditorLines: () => options.editorLines?.(compositor) ?? clusterLines,
     getRenderStateKey: () => clusterLines.join("\n") + "|" + (options.sidebarLines ?? []).join("\n"),
     getSidebarWidth: () => typeof options.sidebarWidth === "function" ? options.sidebarWidth() : options.sidebarWidth ?? 0,
     getSidebarLines: (_width: number, height: number) => (options.sidebarLines ?? []).slice(0, height),
@@ -168,6 +173,69 @@ test("cluster repaint fires on every render pass (no time throttle, recomputatio
     "every doRender paints the cluster from cache — no throttle skip, no footer flashing",
   );
 
+  fixture.compositor.dispose();
+});
+
+test("renderable synchronization cannot invalidate the active fixed-cluster frame", async () => {
+  let content = "old editor";
+  let invalidateDuringClusterRender = false;
+  const fixture = makeCompositor({
+    rows: 5,
+    editorLines: (compositor) => {
+      const lines = [content];
+      if (invalidateDuringClusterRender) {
+        invalidateDuringClusterRender = false;
+        content = "new editor";
+        compositor.invalidateCluster();
+      }
+      return lines;
+    },
+    doRender: (tui) => tui.render(40),
+  });
+
+  fixture.tui.render(40);
+  fixture.compositor.invalidateCluster();
+  invalidateDuringClusterRender = true;
+  fixture.terminal.writes.length = 0;
+  fixture.tui.doRender();
+  await Promise.resolve();
+
+  const repaint = fixture.terminal.writes.at(-1) ?? "";
+  assert.ok(repaint.includes("new editor"), "a render-pass invalidation must not leave the cached cluster stale");
+  assert.doesNotMatch(repaint, /old editor/, "the deferred invalidation must be applied before the next repaint");
+  fixture.compositor.dispose();
+});
+
+test("same-turn fixed-cluster repaint requests coalesce", async () => {
+  const fixture = makeCompositor({ rows: 5 });
+  fixture.terminal.writes.length = 0;
+
+  fixture.compositor.requestRepaint();
+  fixture.compositor.requestRepaint();
+  fixture.compositor.requestRepaint();
+  await Promise.resolve();
+
+  assert.equal(fixture.terminal.writes.length, 1, "one synchronized repaint is emitted for a same-turn burst");
+  fixture.compositor.dispose();
+});
+
+test("streaming fixed-cluster content stays fresh across render passes", () => {
+  let content = "stream-1";
+  const fixture = makeCompositor({
+    rows: 5,
+    isStreaming: true,
+    editorLines: () => [content],
+    doRender: (tui) => tui.render(40),
+  });
+
+  fixture.tui.doRender();
+  content = "stream-2";
+  fixture.terminal.writes.length = 0;
+  fixture.tui.doRender();
+
+  const repaint = fixture.terminal.writes.join("");
+  assert.ok(repaint.includes("stream-2"), "streaming cluster content is refreshed on the next render pass");
+  assert.doesNotMatch(repaint, /stream-1/, "the previous streaming cluster frame is not reused");
   fixture.compositor.dispose();
 });
 
@@ -456,7 +524,7 @@ test("right-click context menu repeatedly restores selected text to clipboard br
   fixture.compositor.dispose();
 });
 
-test("right sidebar reserves terminal columns beside scrollable chat", () => {
+test("right sidebar reserves terminal columns beside scrollable chat", async () => {
   const fixture = makeCompositor({
     rows: 5,
     rootLines: ["alpha", "bravo", "charlie"],
@@ -467,6 +535,7 @@ test("right sidebar reserves terminal columns beside scrollable chat", () => {
 
   const rendered = fixture.tui.render(40);
   fixture.compositor.requestRepaint();
+  await Promise.resolve();
   const writes = fixture.terminal.writes.join("");
 
   assert.ok(rendered[0].includes("alpha"), "main chat still renders on the left");
@@ -476,7 +545,7 @@ test("right sidebar reserves terminal columns beside scrollable chat", () => {
   fixture.compositor.dispose();
 });
 
-test("right sidebar exposes reduced terminal columns while rendering the main pane", () => {
+test("right sidebar exposes reduced terminal columns while rendering the main pane", async () => {
   const fixture = makeCompositor({
     rows: 5,
     clusterLines: ["editor"],
@@ -487,6 +556,7 @@ test("right sidebar exposes reduced terminal columns while rendering the main pa
 
   const rendered = fixture.tui.render(40);
   fixture.compositor.requestRepaint();
+  await Promise.resolve();
   const writes = fixture.terminal.writes.join("");
 
   assert.ok(rendered[0].includes("width=28 columns=28"), "main renderers see the reduced main-pane width and terminal columns");
@@ -539,7 +609,7 @@ test("right sidebar also constrains overlay renderers to the main pane", () => {
 });
 
 
-test("streaming repaint refreshes the full sidebar instead of only fixed editor rows", () => {
+test("streaming repaint refreshes the full sidebar instead of only fixed editor rows", async () => {
   const sidebarLines = ["old top", "old todo", "old git", "old filler", "old bottom"];
   const fixture = makeCompositor({
     rows: 5,
@@ -554,6 +624,7 @@ test("streaming repaint refreshes the full sidebar instead of only fixed editor 
   sidebarLines.splice(0, sidebarLines.length, "new top", "new todo", "new git", "new filler", "new bottom");
   fixture.compositor.invalidateCluster();
   fixture.compositor.requestRepaint();
+  await Promise.resolve();
   const repaint = fixture.terminal.writes.join("");
 
   assert.ok(repaint.includes("new top"), "top sidebar rows repaint during streaming updates");
@@ -563,7 +634,7 @@ test("streaming repaint refreshes the full sidebar instead of only fixed editor 
 });
 
 
-test("sidebar toggle off repaints the main pane across the released columns", () => {
+test("sidebar toggle off repaints the main pane across the released columns", async () => {
   let sidebarWidth = 12;
   const sidebarLines = ["side top", "side todo", "side git", "side filler", "side bottom"];
   const fixture = makeCompositor({
@@ -579,6 +650,7 @@ test("sidebar toggle off repaints the main pane across the released columns", ()
   sidebarWidth = 0;
   fixture.compositor.invalidateCluster();
   fixture.compositor.requestRepaint();
+  await Promise.resolve();
   const repaint = fixture.terminal.writes.join("");
 
   assert.ok(repaint.includes("root-a"), "main pane rows repaint after sidebar is hidden");

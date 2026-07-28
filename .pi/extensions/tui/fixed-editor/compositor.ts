@@ -152,6 +152,7 @@ export class FixedEditorCompositor {
   private cachedWidth = 0;
   private cachedRawRows = 0;
   private renderPassCluster: { width: number; rawRows: number; cluster: FixedClusterOutput } | null = null;
+  private invalidationPending = false;
 
   // Root frame cache for streaming throttle
   private cachedRootFrame: RootFrameCache | null = null;
@@ -160,6 +161,8 @@ export class FixedEditorCompositor {
   private painting = false;
   private renderPassActive = false;
   private renderingCluster = false;
+  private repaintFlushQueued = false;
+  private repaintDeferred = false;
   private checkingOverlay = false;
   /** Tracks physical terminal rows so cluster height churn does not full-clear. */
   private heightStabilize: HeightStabilizeState = createHeightStabilizeState();
@@ -212,6 +215,10 @@ export class FixedEditorCompositor {
         onDoRender: () => {
           this.renderPassActive = true;
           this.renderPassCluster = null;
+          // A render pass is the atomic boundary for the fixed cluster. Rebuild
+          // it once per pass so streaming editor/footer content cannot remain
+          // trapped in the previous pass's cache.
+          this.cachedCluster = null;
           try {
             // Slash autocomplete / selectors grow the bottom cluster → onRows shrinks.
             // pi-tui treats that as a physical resize and full-clears (2J/3J) = black flash.
@@ -237,6 +244,7 @@ export class FixedEditorCompositor {
           } finally {
             this.renderPassActive = false;
             this.renderPassCluster = null;
+            this.flushDeferredInvalidation();
           }
         },
       });
@@ -363,14 +371,47 @@ export class FixedEditorCompositor {
   }
 
   invalidateCluster(): void {
-    this.cachedCluster = null;
+    if (this.renderPassActive || this.renderingCluster || this.painting) {
+      this.invalidationPending = true;
+      return;
+    }
+    this.clearCachedFrames();
   }
 
   /** Standalone repaint — called after layout/sidebar/selection updates. */
   requestRepaint(): void {
-    if (this.disposed || this.painting || this.hasVisibleOverlay()) return;
-    const width = Math.max(1, this.terminal.columns || 80);
-    this.repaintScrollableViewport(width);
+    if (this.disposed || this.hasVisibleOverlay()) return;
+    this.repaintDeferred = true;
+    if (this.repaintFlushQueued) return;
+
+    this.queueRepaintFlush();
+  }
+
+  private clearCachedFrames(): void {
+    this.cachedCluster = null;
+    this.invalidationPending = false;
+  }
+
+  private flushDeferredInvalidation(): void {
+    if (!this.invalidationPending || this.renderPassActive || this.renderingCluster || this.painting) return;
+    this.clearCachedFrames();
+    this.requestRepaint();
+  }
+
+  private queueRepaintFlush(): void {
+    if (this.repaintFlushQueued) return;
+    this.repaintFlushQueued = true;
+    queueMicrotask(() => {
+      this.repaintFlushQueued = false;
+      if (!this.repaintDeferred || this.disposed || this.hasVisibleOverlay()) return;
+      if (this.painting || this.renderPassActive || this.renderingCluster) {
+        this.queueRepaintFlush();
+        return;
+      }
+      this.repaintDeferred = false;
+      const width = Math.max(1, this.terminal.columns || 80);
+      this.repaintScrollableViewport(width);
+    });
   }
 
   // ── Private helpers for selection (delegates to selection-state) ────────────
@@ -547,6 +588,7 @@ export class FixedEditorCompositor {
       return this.cachedCluster;
     } finally {
       this.renderingCluster = false;
+      this.flushDeferredInvalidation();
     }
   }
 

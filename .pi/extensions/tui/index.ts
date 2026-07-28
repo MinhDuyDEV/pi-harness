@@ -740,17 +740,14 @@ export default function piTuiExtension(pi: ExtensionAPI) {
       },
       getEditorText: () => currentEditor?.getText() ?? "",
       getStatusLines: (width: number) => {
-        syncFixedRenderables(false);
         const lines = renderHiddenLines(fixedStatusContainer, width, true);
         const pad = workingStatusSpacerLines(piTuiSettings.workingPaddingTop ?? 1);
         return pad.length > 0 ? [...pad, ...lines] : lines;
       },
       getAboveWidgetLines: (width: number) => {
-        syncFixedRenderables(false);
         return [...renderHiddenLines(fixedQueueContainer, width), ...renderHiddenLines(fixedWidgetContainerAbove, width)];
       },
       getBelowWidgetLines: (width: number) => {
-        syncFixedRenderables(false);
         return renderHiddenLines(fixedWidgetContainerBelow, width);
       },
       getFooterLines: (width: number) => renderHiddenLines(fixedFooterContainer, width, true),
