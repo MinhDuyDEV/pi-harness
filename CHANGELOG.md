@@ -4,6 +4,20 @@ All notable changes to `@minhduydev/pi-harness` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-07-28
+
+### Added
+
+- Added the exact `@sting8k/pi-srcwalk@1.2.8` companion package and a version-resilient srcwalk skill.
+- Added a global srcwalk-first navigation rule to the parent runtime policy and all seven standalone agent profiles.
+- Added a Pi 0.81.1-compatible port of `pi-snap-edit@4.2.2` with guarded atomic `quick_edit` and `target_edit` tools.
+- Added focused coverage for tool registration, active-tool replacement, valid guarded edits, atomic rejection, target replacement, and read-output line numbering.
+
+### Changed
+
+- Full-profile initialization now enables Snap Edit as a managed extension gate, replacing active `edit`/`substitute_edit` with `quick_edit`/`target_edit`.
+- Documented upstream provenance, the single TypeBox import adaptation, re-vendoring steps, and the required external srcwalk installation.
+
 ## [2.0.0] - 2026-07-28
 
 A breaking consumer-bootstrap release: `pi-harness-init` now has one Full contract and materializes the complete portable harness policy/resources into each consumer repository with exact project-local package pins and lock-aware upgrades.

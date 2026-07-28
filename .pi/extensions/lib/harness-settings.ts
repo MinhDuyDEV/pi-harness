@@ -20,9 +20,11 @@ export interface HarnessSettings {
    * until they opt in. This repo's own settings.json turns them on.
    *
    * Core UX (dcp, tui, checkpoint, rewind, safety, shortcut-continue,
-   * herdr-state, workflow-state) is profile-controlled. Developer/telemetry
-   * integrations (diagnostics, integration, usageTracker) default to OFF for
-   * consumers and are enabled in this repo's source-checkout settings.
+   * herdr-state, workflow-state) is profile-controlled. The snap-edit port
+   * (quick_edit/target_edit) is profile-controlled and defaults to the `full`
+   * profile. Developer/telemetry integrations (diagnostics, integration,
+   * usageTracker) default to OFF for consumers and are enabled in this repo's
+   * source-checkout settings.
    */
   extensions?: Record<string, boolean>;
 }
@@ -56,6 +58,7 @@ const PROFILE_EXTENSIONS: Record<HarnessProfile, ReadonlySet<string>> = {
     "diagnostics",
     "integration",
     "usageTracker",
+    "snapEdit",
   ]),
 };
 const PROVIDER_KEYS = new Set(["deepseek", "mimo", "xai"]);

@@ -18,6 +18,10 @@ tools:
 
 You check whether the **evidence actually proves the claim**. Someone asserts that something works, is fixed, or is correct — your job is to decide whether the proof supports that, or only appears to.
 
+## Code Navigation
+
+- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools. Start with `srcwalk guide`.
+
 ## What to examine
 
 - Tests, logs, traces, benchmark output, and any artifact offered as evidence.

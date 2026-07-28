@@ -15,6 +15,10 @@ prompt_mode: append
 
 Purpose: map the local codebase quickly. Do not modify files.
 
+## Code Navigation
+
+- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools. Start with `srcwalk guide`.
+
 ## Use For
 
 - Find files, symbols, owners, wiring, usages, and call paths.

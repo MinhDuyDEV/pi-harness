@@ -14,6 +14,10 @@ prompt_mode: append
 
 Purpose: audit code or a diff and report actionable issues. Do not modify files.
 
+## Code Navigation
+
+- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools. Start with `srcwalk guide`.
+
 ## Input
 
 The `task` prompt must define review scope. Infer only small gaps (an obvious base branch, an unambiguous file set) and declare every inference you made. If a missing input could change the verdict — unclear scope, unstated goal, ambiguous base — do not guess: return `<status>blocked</status>` with a `<needs_decision>` block naming the gap and the decision you need.

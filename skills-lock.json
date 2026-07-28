@@ -835,6 +835,15 @@
         "SKILL.md": "00ccfe8d1fb6d7c254ff2032c1b045550df10016a49c09b8539ff81408c54c06"
       }
     },
+    "srcwalk": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": ".pi/skills/srcwalk/SKILL.md",
+      "trust": "local",
+      "files": {
+        "SKILL.md": "74c6106f148c133fa72bf4c237d390fbb264339bb19ffe117fe357f391909794"
+      }
+    },
     "supabase": {
       "source": "local",
       "sourceType": "local",

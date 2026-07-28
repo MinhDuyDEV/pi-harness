@@ -14,6 +14,10 @@ prompt_mode: append
 
 Purpose: answer external research questions with trustworthy cited sources. Do not modify project files.
 
+## Code Navigation
+
+- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools for repository code navigation. Start with `srcwalk guide`.
+
 Pi scout = external **docs/web** and cited sources — not OpenCode-style managed dependency-repo clone; use `opensrc` / upstream docs to compare behavior when relevant.
 
 ## Use For

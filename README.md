@@ -2,12 +2,12 @@
 
 `pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## What's new in 2.0.0
+## What's new in 2.1.0
 
-- New **`workflow-state`** extension: durable foundation verdicts, reconcile checkpoints, and complete handoffs validated by `@minhduydev/pi-core`, with a reconcile trigger (CAS consume, completion threshold, inter-process file lock) and a multi-process contention fixture.
-- **Skill consolidation**: 12 source skills merged into natural-named reference sets (see `.pi/skills/superpi/MIGRATIONS.md`).
-- New release tooling: `quality-ratchet`, `suite-pins`, `registry-preflight`, `discover-gates`; new docs (`docs/workflow-state.md`, `docs/harness-profiles.md`, `docs/quality-ratchet.md`).
-- Integration matrix and suite pins moved to the 0.2.0 / 0.9.0 / 0.4.0 / 0.4.0 release. See `CHANGELOG.md`.
+- Global srcwalk-first navigation policy for the parent session and every standalone subagent.
+- Exact `@sting8k/pi-srcwalk@1.2.8` integration with the installed binary's version-matched guide.
+- Pi 0.81.1-compatible Snap Edit port with guarded atomic `quick_edit` and `target_edit` tools.
+- Full-profile activation, read-output line numbering, focused regression coverage, and documented upstream provenance.
 
 ## Requirements
 
@@ -21,7 +21,7 @@ One command installs the complete project-local **Full** harness contract; no
 separate global or manual `pi install` is required:
 
 ```bash
-npx --yes --package @minhduydev/pi-harness@2.0.0 pi-harness-init ./my-repo
+npx --yes --package @minhduydev/pi-harness@2.1.0 pi-harness-init ./my-repo
 ```
 
 The bootstrap writes exact project package pins for the executing harness and
@@ -47,7 +47,7 @@ rerun performs no content or timestamp writes. Preview a first install or
 upgrade with:
 
 ```bash
-npx --yes --package @minhduydev/pi-harness@2.0.0 pi-harness-init --dry-run ./my-repo
+npx --yes --package @minhduydev/pi-harness@2.1.0 pi-harness-init --dry-run ./my-repo
 ```
 
 To upgrade, change only the exact harness version in the `npx` command and run
@@ -73,6 +73,27 @@ Pi's `/init` has a distinct role: run it after bootstrap when you want Pi to
 inspect the consumer repository and create or refresh that project's own
 `AGENTS.md`. `pi-harness-init` owns portable harness resources; `/init` owns
 observed project context.
+
+## srcwalk integration
+
+The package requires [srcwalk](https://github.com/sting8k/srcwalk) for structural code navigation and ships a `srcwalk` skill with the version-matched workflow. Install the CLI before starting Pi; pi-harness does not download binaries during package installation or startup, so bootstrap remains deterministic.
+
+Install it once in the consumer environment, or invoke it through `npx`:
+
+```bash
+npm install -g srcwalk
+srcwalk guide
+```
+
+The skill routes repository orientation, symbol discovery, exact reads, caller/callee tracing, dependency and blast-radius checks, and Git review packets through srcwalk. It preserves `rg` and ordinary shell tools for regex/pure-text work and operations srcwalk does not support. srcwalk output is source evidence rather than runtime proof; tests and project checks remain authoritative.
+
+The integration is version-resilient: the skill requires the current intent-first command family (`>=1.0.0`) and delegates detailed routing to the installed binary's version-matched `srcwalk guide`, avoiding a vendored or stale command reference.
+
+## Snap Edit integration
+
+The Full profile enables a Pi 0.81.1-compatible port of [pi-snap-edit](https://github.com/sting8k/pi-snap-edit) 4.2.2. It provides guarded, atomic `quick_edit` and `target_edit` tools and replaces the active built-in `edit`/`substitute_edit` tools at session start. Full consumer initialization manages this gate as enabled so every initialized agent gets the same editing contract; rerunning init restores that managed value.
+
+The upstream npm package currently peers on Pi `^0.78.0`, so pi-harness does not force-install it into the 0.81.1 runtime. The vendored source and its single TypeBox import adaptation are documented in [`.pi/extensions/snap-edit/README.md`](.pi/extensions/snap-edit/README.md).
 
 ## Source-checkout profile
 
@@ -134,7 +155,7 @@ The owner-controlled publish order is:
 2. `@minhduydev/pi-subagents@0.10.1`
 3. `@minhduydev/pi-learning@0.4.0`
 4. `@minhduydev/pi-todo@0.4.0`
-5. `@minhduydev/pi-harness@2.0.0`
+5. `@minhduydev/pi-harness@2.1.0`
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:

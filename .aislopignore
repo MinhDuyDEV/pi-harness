@@ -1,3 +1,23 @@
 # Optional vendored Node packages have their own package.json/lock and audit gate.
 .pi/skills/brave-search/*.js
 .pi/skills/browser-tools/*.js
+
+# snap-edit is a verbatim vendored port of sting8k/pi-snap-edit@4.2.2 (see
+# .pi/extensions/snap-edit/README.md). Only the harness-owned index.ts wrapper
+# and index.test.ts stay under the aislop gate; the upstream routines below
+# are tracked verbatim and intentionally excluded from the project ratchet.
+.pi/extensions/snap-edit/extension.ts
+.pi/extensions/snap-edit/schemas.ts
+.pi/extensions/snap-edit/quick-edit.ts
+.pi/extensions/snap-edit/target-edit.ts
+.pi/extensions/snap-edit/fuzzy.ts
+.pi/extensions/snap-edit/match-helpers.ts
+.pi/extensions/snap-edit/substitute-edit.ts
+.pi/extensions/snap-edit/edit-error.ts
+.pi/extensions/snap-edit/render.ts
+.pi/extensions/snap-edit/read-hook.ts
+.pi/extensions/snap-edit/file-stat.ts
+.pi/extensions/snap-edit/diff.ts
+.pi/extensions/snap-edit/anchors.ts
+.pi/extensions/snap-edit/text.ts
+.pi/extensions/snap-edit/active-tools.ts

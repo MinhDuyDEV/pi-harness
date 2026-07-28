@@ -1,0 +1,155 @@
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { keyHint, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import os from "node:os";
+import path from "node:path";
+import { preferQuickEditTools } from "./active-tools.js";
+import { getFileStatSnapshot } from "./file-stat.js";
+import { applyQuickEdits } from "./quick-edit.js";
+import { color, renderQuickEditOutput, summarizeQuickEditOutput } from "./render.js";
+import { QuickEditParams, TargetEditParams } from "./schemas.js";
+import { numberReadText } from "./read-hook.js";
+import { applyTargetEdits } from "./target-edit.js";
+export { formatHash, hashLines, lineHash } from "./anchors.js";
+export { preferQuickEditTools } from "./active-tools.js";
+export {
+  parseSnapEditError,
+  SnapEditError,
+  SNAP_EDIT_ERROR_MARKER,
+  type EditErrorCode,
+  type EditFailure,
+  type EditFailureCandidate,
+} from "./edit-error.js";
+export { getFileStatSnapshot } from "./file-stat.js";
+export { applyQuickEdits } from "./quick-edit.js";
+export type { Edit, Substitution, TargetEditOp } from "./schemas.js";
+export { summarizeQuickEditOutput } from "./render.js";
+export { splitLines } from "./text.js";
+export { applySubstituteEdits } from "./substitute-edit.js";
+export { numberReadText } from "./read-hook.js";
+export { applyTargetEdits } from "./target-edit.js";
+
+
+function resolvePath(cwd: string, inputPath: string): string {
+  if (inputPath === "~") return os.homedir();
+  if (inputPath.startsWith("~/")) return path.join(os.homedir(), inputPath.slice(2));
+  return path.isAbsolute(inputPath) ? inputPath : path.resolve(cwd, inputPath);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export default function (pi: ExtensionAPI) {
+
+  pi.registerTool({
+    name: "quick_edit",
+    label: "quick-edit",
+    description:
+      "Edit a file by 1-indexed line number or inclusive line range. Requires expectedStartLine for each edit (except start=\"eof\") to guard against stale line content. Atomic: any invalid edit rejects the whole batch. Failures include a machine-readable --- snap-edit-error --- JSON block with error_code and optional suggested retry fields.",
+    promptSnippet: "Edit files by line number with expectedStartLine guard",
+    promptGuidelines: [
+      "Use start/end as 1-indexed line numbers from the current file snapshot. Prefer start=\"eof\" to append at end of file.",
+      'For an EOF append, send exactly { start: "eof", lines: [...] }. Never include end, expectedStartLine, or other guard fields.',
+      "Always provide expectedStartLine with the current content of the start line (not required for start=\"eof\").",
+      "Default guard matching is exact. When indentation is uncertain, set whitespace=\"indent_tolerant\" (trim guards + preserveIndent) or expectedStartLineMatch=\"trim\".",
+      "For multi-line ranges, prefer expectedEndLine and/or expectedLineCount guards in addition to expectedStartLine.",
+      `Omit end for a single-line replacement. Use lines: [] to delete a line or range. Use lines: [""] for one blank line.`,
+      "expectedStartLine only checks the start line unless expectedEndLine/expectedLineCount are set; it does not detect line shifts from insertions/deletions above.",
+      "On failure, read the --- snap-edit-error --- JSON block for error_code, candidates, and suggested retry fields.",
+      "Batch edits are snapshot-based, not sequential; do not renumber later edits after earlier insert/delete ops.",
+      "Batch multiple independent ranges in one call; overlapping ranges are rejected atomically.",
+    ],
+    parameters: QuickEditParams,
+
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      const absolutePath = resolvePath(ctx.cwd, params.path);
+      const text = await withFileMutationQueue(absolutePath, () => applyQuickEdits(absolutePath, params.edits));
+      return { content: [{ type: "text" as const, text }], details: undefined };
+    },
+
+    renderResult(result, { expanded, isPartial }, theme) {
+      if (isPartial) return new Text(`${color(theme, "dim", "↳")} ${color(theme, "muted", "applying quick-edit...")}`, 0, 0);
+
+      const text = result.content?.filter((c) => c.type === "text").map((c) => c.text).join("\n") ?? "";
+      if ((result as any).isError) return new Text(color(theme, "error", text.trim() || "quick-edit failed"), 0, 0);
+
+      const summary = summarizeQuickEditOutput(text);
+      const stats = summary.hasDiff
+        ? ` ${color(theme, "success", `+${summary.additions}`)} ${color(theme, "error", `-${summary.removals}`)}`
+        : "";
+      const hint = !expanded && text ? ` ${color(theme, "muted", `(${keyHint("app.tools.expand", "to expand")})`)}` : "";
+      const header = `${color(theme, "dim", "↳")} ${color(theme, "success", "quick-edit applied")}${stats}${hint}`;
+
+      if (!expanded || !text) return new Text(header, 0, 0);
+      return new Text(`${header}\n${renderQuickEditOutput(theme, text)}`, 0, 0);
+    },
+  });
+
+  pi.registerTool({
+    name: "target_edit",
+    label: "target-edit",
+    description:
+      "Edit by finding exact target text, then use replace/delete or insert_before/insert_after. Atomic: any invalid operation rejects the whole batch. Failures include a machine-readable --- snap-edit-error --- JSON block with error_code and optional suggested retry fields.",
+    promptSnippet: "Edit by exact target text with line or range selectors",
+    promptGuidelines: [
+      "Use target_edit when you know an exact marker/text but line numbers are inconvenient.",
+      "Use exact literal target text only; no regex. Use \\n for multi-line targets and replacements. Set matchMode=trim when indentation or trailing whitespace may differ: trim matches whole lines after trimming, preserves original indentation, and strips replacement leading/trailing whitespace.",
+      "Use line for a single occurrence, range for every occurrence inside an inclusive line range, both to scope a range and verify one occurrence intersects the line, or neither if the target is unique in the file.",
+      "For inserts, use insert_before or insert_after with the line where target appears.",
+      "On failure, read the --- snap-edit-error --- JSON block for error_code, candidates, and suggested retry fields.",
+      "Batch operations are ordered in memory and written atomically only after all operations validate.",
+    ],
+    parameters: TargetEditParams,
+
+    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+      const absolutePath = resolvePath(ctx.cwd, params.path);
+      const text = await withFileMutationQueue(absolutePath, () => applyTargetEdits(absolutePath, params.ops));
+      return { content: [{ type: "text" as const, text }], details: undefined };
+    },
+
+    renderResult(result, { expanded, isPartial }, theme) {
+      if (isPartial) return new Text(`${color(theme, "dim", "↳")} ${color(theme, "muted", "applying target-edit...")}`, 0, 0);
+
+      const text = result.content?.filter((c) => c.type === "text").map((c) => c.text).join("\n") ?? "";
+      if ((result as any).isError) return new Text(color(theme, "error", text.trim() || "target-edit failed"), 0, 0);
+
+      const summary = summarizeQuickEditOutput(text);
+      const stats = summary.hasDiff
+        ? ` ${color(theme, "success", `+${summary.additions}`)} ${color(theme, "error", `-${summary.removals}`)}`
+        : "";
+      const hint = !expanded && text ? ` ${color(theme, "muted", `(${keyHint("app.tools.expand", "to expand")})`)}` : "";
+      const header = `${color(theme, "dim", "↳")} ${color(theme, "success", "target-edit applied")}${stats}${hint}`;
+
+      if (!expanded || !text) return new Text(header, 0, 0);
+      return new Text(`${header}\n${renderQuickEditOutput(theme, text)}`, 0, 0);
+    },
+  });
+
+  pi.on("tool_result", async (event) => {
+    try {
+      if (event.toolName !== "read" || event.isError) return;
+      if (event.content.some((part) => part.type === "image")) return;
+      if (!isRecord(event.input) || typeof event.input.path !== "string") return;
+
+      const absolutePath = resolvePath(process.cwd(), event.input.path);
+      const { lineCount } = await getFileStatSnapshot(absolutePath);
+      const startLine = typeof event.input.offset === "number" && Number.isFinite(event.input.offset)
+        ? Math.max(1, Math.floor(event.input.offset))
+        : 1;
+      return {
+        content: event.content.map((part) =>
+          part.type === "text" ? { ...part, text: numberReadText(part.text, { startLine, totalLineCount: lineCount }) } : part,
+        ),
+      };
+    } catch {}
+  });
+
+  pi.on("session_start", () => {
+    const activeTools = pi.getActiveTools();
+    const preferredTools = preferQuickEditTools(activeTools);
+    if (preferredTools.join("\0") !== activeTools.join("\0")) {
+      pi.setActiveTools(preferredTools);
+    }
+  });
+}
