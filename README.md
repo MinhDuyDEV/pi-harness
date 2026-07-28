@@ -2,7 +2,7 @@
 
 `pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## What's new in 1.2.0
+## What's new in 2.0.0
 
 - New **`workflow-state`** extension: durable foundation verdicts, reconcile checkpoints, and complete handoffs validated by `@minhduydev/pi-core`, with a reconcile trigger (CAS consume, completion threshold, inter-process file lock) and a multi-process contention fixture.
 - **Skill consolidation**: 12 source skills merged into natural-named reference sets (see `.pi/skills/superpi/MIGRATIONS.md`).
@@ -15,39 +15,64 @@
 - npm `>=11.12.1`
 - Pi Coding Agent `0.81.1` (tested against Pi 0.81.1; the package uses the active host's Pi packages through peer dependencies)
 
-## Install as a Pi package
+## Bootstrap a consumer repository
+
+One command installs the complete project-local **Full** harness contract; no
+separate global or manual `pi install` is required:
 
 ```bash
-pi install npm:@minhduydev/pi-harness@1.2.0
+npx --yes --package @minhduydev/pi-harness@2.0.0 pi-harness-init ./my-repo
 ```
 
-Restart Pi after installation. Pi discovers the package manifest resources:
+The bootstrap writes exact project package pins for the executing harness and
+its companion packages, portable Full settings, all seven canonical agent
+profiles, the complete `.pi/templates/` tree, `.pi/ANTI_PATTERNS.md`, and a
+sentinel-managed harness region in `.pi/APPEND_SYSTEM.md`. It also adds a
+sentinel-managed runtime-state block to the existing `.gitignore` without
+ignoring trackable settings, agents, policy, or templates. The auditable
+`.pi/pi-harness.lock.json` records the harness version, exact package suite,
+and hashes of every harness-owned file or region.
 
-- `.pi/extensions/`
-- `.pi/skills/`
-- `.pi/prompts/`
-- `.pi/themes/`
+The initializer does not choose a provider, model, theme, or credentials, and
+it does not install optional system tools. Full settings enable the portable
+provider adapters, but they do not require credentials at startup; credentials
+are needed only when that provider is selected. Loaded integrations report
+missing optional tools through `/integration` rather than making startup
+depend on them.
 
-For a clean consumer setup, bootstrap only the portable settings and artifact
-ignore file with the package CLI:
+### Rerun, preview, and upgrade
+
+Use the same exact-version command for first install and reruns. An unchanged
+rerun performs no content or timestamp writes. Preview a first install or
+upgrade with:
 
 ```bash
-npx --package @minhduydev/pi-harness@1.2.0 pi-harness-init ./my-repo
+npx --yes --package @minhduydev/pi-harness@2.0.0 pi-harness-init --dry-run ./my-repo
 ```
 
-The command deep-merges only missing portable settings and array entries into
-an existing valid `.pi/settings.json`; consumer-owned values win, and rerunning
-is idempotent. Existing agent profiles are never overwritten, and only missing
-canonical profiles are copied. Use `--no-agents` when the consuming repository
-owns its entire roster. The template never adds personal theme, editor,
-provider, or model preferences.
+To upgrade, change only the exact harness version in the `npx` command and run
+it again. Files and managed regions still matching the hashes in the lock are
+updated safely; consumer packages and settings outside the harness-owned keys
+remain. Consumer prose before or after the APPEND policy sentinels is always
+preserved.
 
-Pi package discovery does **not** automatically apply this repository's root `AGENTS.md`, `.pi/settings.json`, or `.pi/agents/` directory. The bootstrap explicitly scaffolds `.pi/agents/` because `pi-subagents` discovers project-local profiles rather than package resources:
+If a managed file or region differs from its recorded hash, init exits
+non-zero, reports every conflict, and changes nothing. Review the new packaged
+resource, then either merge it manually and update by rerunning, restore the
+recorded content, or delete that one managed file so init can recreate it. Do
+not edit lock hashes to bypass conflict detection.
 
-- Run `/init` in a consuming repository to create or update that repository's own `AGENTS.md` from observed facts.
-- The delegated task runtime comes from `@minhduydev/pi-subagents`; canonical profiles come from the bootstrap and remain consumer-owned after creation.
-- Existing profiles are never overwritten. Adapt or delete any role the consuming repository does not need.
-- Never copy provider credentials, personal model defaults, caches, `.pi/MEMORY.md`, or `.pi/artifacts/`.
+Pi package discovery loads the pinned package's extensions, skills, prompts,
+and themes. Project-local materialization is still required because
+`pi-subagents` discovers consumer agent profiles locally and templates are
+repository assets. Bootstrap intentionally does **not** copy root `AGENTS.md`,
+`PROJECT.md`, `.pi/README.md`, `.pi/DESIGN.md`, `.pi/MEMORY.md`, credentials,
+hooks, or generated runtime state.
+
+Pi's `/init` has a distinct role: run it after bootstrap when you want Pi to
+inspect the consumer repository and create or refresh that project's own
+`AGENTS.md`. `pi-harness-init` owns portable harness resources; `/init` owns
+observed project context.
 
 ## Source-checkout profile
 
@@ -74,7 +99,7 @@ Context ownership is intentionally layered:
 - `/ship` — perform final review and repository-defined gates.
 - `/handoff` — write and persist a fourteen-section transfer contract.
 
-The standard profile also enables typed workflow state: foundation verdicts,
+The Full profile also enables typed workflow state: foundation verdicts,
 backlog reconciliation checkpoints, and complete handoffs are validated by
 `@minhduydev/pi-core` and stored as immutable digest-bound records. A durable
 reconciliation reminder becomes due after four completed TODO items. See
@@ -106,10 +131,10 @@ release scripts runs `npm publish`.
 The owner-controlled publish order is:
 
 1. `@minhduydev/pi-core@0.2.0`
-2. `@minhduydev/pi-subagents@0.9.0`
+2. `@minhduydev/pi-subagents@0.10.1`
 3. `@minhduydev/pi-learning@0.4.0`
 4. `@minhduydev/pi-todo@0.4.0`
-5. `@minhduydev/pi-harness@1.2.0`
+5. `@minhduydev/pi-harness@2.0.0`
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:

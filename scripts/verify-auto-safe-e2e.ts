@@ -367,7 +367,19 @@ async function idempotencyBoundsAndFailOpen(consumer: Consumer, root: string): P
   const unsubscribe = runtime.events.on(LEARNING_OBSERVATION_EVENT, () => {
     throw new Error("synthetic listener failure");
   });
-  await emitProof(runtime, "fail-open", "Phi verification remains available after listener failure");
+  const eventErrors: string[] = [];
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => eventErrors.push(args.map(String).join(" "));
+  try {
+    await emitProof(runtime, "fail-open", "Phi verification remains available after listener failure");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  } finally {
+    console.error = originalConsoleError;
+  }
+  assert.ok(
+    eventErrors.some((message) => message.includes("Event handler error (pi-learning:observation:v1)")),
+    `fail-open listener errors should be observable: ${JSON.stringify(eventErrors)}`,
+  );
   const failOpenResult = await injected(runtime, "phi verification");
   assert.ok(failOpenResult, `throwing listeners must not block durable learning; ledger=${learningEvents(root)}`);
   unsubscribe();

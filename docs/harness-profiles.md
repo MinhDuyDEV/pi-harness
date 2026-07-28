@@ -1,53 +1,61 @@
-# Harness profiles and seat roles
+# Full harness consumer contract
 
-`pi-harness` loads extension modules as package resources, then each entry
-checks the consumer-owned `.pi/settings.json` before registering hooks, tools,
-providers, or UI. The bootstrap writes the `standard` profile; the source
-checkout uses `full`.
+`pi-harness-init` has one supported capability mode: **Full**. It does not scaffold minimal or standard consumers, and it does not expose an option that omits agents, policy, templates, or other required resources.
 
-| Profile | Enabled extension keys |
-|---|---|
-| `minimal` | `safety`, `herdrState` |
-| `standard` | minimal + `shortcutContinue`, `checkpoint`, `rewind`, `learningCoordinator`, `workflowState` |
-| `full` | standard + `dcp`, `tui`, `tps`, `diagnostics`, `integration`, `usageTracker` |
+A successful init materializes the project-local policy and managed resources, writes exact package pins, and sets `pi-harness.profile` to `full`. Re-running init repairs stale Full-owned gates while preserving consumer-owned provider, model, theme, secret, and unrelated package settings.
 
-Per-extension booleans under `pi-harness.extensions` override the selected
-profile. Provider registrations (`deepseek`, `mimo`, `xai`) are a deliberate
-exception: they remain off in every profile and require an explicit `true`.
-Prompt-shaping entries use the separate `pi-harness.superpi` and
-`pi-harness.gptPersonality` booleans.
+## Full runtime surface
 
-```json
-{
-  "pi-harness": {
-    "profile": "standard",
-    "superpi": false,
-    "gptPersonality": false,
-    "extensions": {
-      "checkpoint": false,
-      "deepseek": true
-    }
-  }
-}
-```
+The Full profile enables the complete harness workflow surface:
 
-When the same package is used by independent Herdr seats, set
-`PI_HARNESS_SEAT_ROLE` explicitly:
+- Herdr state and safety controls
+- shortcut and rewind
+- checkpoints and DCP
+- diagnostics and integration hooks
+- learning coordination and workflow state
+- TUI, TPS, and usage tracking
+- SuperPi and GPT personality prompt shaping
+- packaged extensions, skills, prompts, themes, agents, and artifact templates
 
-- `root` (or an absent variable) is the interactive supervising seat.
-- `implementer` and `peer` are worker seats. They retain only `safety` and
-  `herdrState`; prompt shaping and fan-out-capable/write-heavy harness
-  extensions stay off even if a profile or per-key setting enables them.
-- Any other non-empty value is an unknown seat and fails closed to the worker
-  restriction; `herdrState` itself declines to report an unknown role.
+Provider adapters for DeepSeek, Mimo, and xAI are registered by the portable Full settings. Init does not set a global default provider/model or install credentials; canonical agent seats intentionally carry explicit model pins so delegation is reproducible. Network access occurs only when a consumer chooses and invokes a credentialed provider.
 
-The role variable is intentionally explicit because Herdr's public pane env
-does not expose authoritative role metadata to extensions. A room launcher
-that passes `--role implementer` or `--role peer` must also export the matching
-`PI_HARNESS_SEAT_ROLE`; the harness never guesses from a pane label.
+The implementation may retain internal profile parsing for compatibility with existing settings, but it is not a second bootstrap contract: the next `pi-harness-init` run converges managed settings back to Full.
 
-Outside Herdr, `herdrState` registers nothing unless `HERDR_ENV=1`,
-`HERDR_SOCKET_PATH`, and `HERDR_PANE_ID` are all present. Its socket attempts
-are bounded and fail-silent. Current Herdr's report API accepts
-`working|blocked|idle`; a process quit uses `pane.release_agent`. The harness
-does not invent unsupported `done/stopped/error` wire states.
+## Project-local policy
+
+Pi packages discover extensions, skills, prompts, and themes from the package manifest. Project policy and support files are therefore materialized separately into the consumer repository:
+
+- `.pi/APPEND_SYSTEM.md` with a sentinel-managed harness region
+- `.pi/ANTI_PATTERNS.md`
+- `.pi/agents/*.md`
+- `.pi/templates/*`
+- `.pi/pi-harness.lock.json`
+- managed runtime-state entries in root `.gitignore`
+
+Consumer prose outside the managed APPEND_SYSTEM region remains untouched. Modified managed files are never overwritten without a matching lock baseline; init reports an explicit conflict instead.
+
+## Agent seat selection
+
+Agent roles are capability envelopes with an explicit canonical model seat. Canonical profiles do not pin credentials or a global provider; their model pins make delegation reproducible across consumer repositories.
+
+Use these routing defaults:
+
+1. **Explorer** — repository discovery and evidence gathering.
+2. **Implementer** — focused production changes after scope and contracts are known.
+3. **Reviewer** — independent correctness and maintainability review.
+4. **Proof auditor** — adversarial evidence validation for high-risk claims.
+5. **Peer / General / Scout** — synthesis, broad investigation, or lightweight reconnaissance as their profile contracts describe.
+
+Runtime orchestration selects the available model. Consumers remain free to customize their own agent files; once customized, lock-aware upgrades preserve them and report drift instead of silently replacing them.
+
+## Performance contract
+
+Full is the capability baseline, not a request to run every expensive operation eagerly. Extensions must remain lazy where possible:
+
+- no credential or network requirement at startup;
+- diagnostics and external tools run only when invoked;
+- provider adapters do not select themselves;
+- the anti-pattern catalog stays out of the always-on system prompt;
+- repeated init performs no writes when bytes already match.
+
+Clean packed-consumer smoke tests compare the initialized consumer with the package resource contract before release.

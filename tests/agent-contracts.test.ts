@@ -11,11 +11,11 @@ const agents = [
 	"reviewer",
 	"scout",
 ] as const;
-// Keys Pi accepts in agent frontmatter. `model` is intentionally NOT listed:
-// models are runtime-selected — agents inherit the session defaultModel and
-// only `thinking` may be tuned per agent.
+// Keys Pi accepts in agent frontmatter. Canonical harness agents intentionally
+// pin models so delegation is reproducible across consumer repositories.
 const supportedKeys = new Set([
 	"description",
+	"model",
 	"thinking",
 	"readonly",
 	"proactive",
@@ -45,10 +45,7 @@ for (const name of agents) {
 			assert.ok(supportedKeys.has(key), `unsupported ${name} key: ${key}`);
 		}
 		assert.ok(values.get("description"), `${name} needs a description`);
-		assert.ok(
-			!values.has("model"),
-			`${name} must not pin a model — models are runtime-selected (defaultModel)`,
-		);
+		assert.ok(values.get("model"), `${name} must pin a canonical model`);
 	});
 }
 

@@ -105,19 +105,6 @@ function createPackedUpstream(delegatedTaskId) {
   };
 }
 
-function readPackedDurableRun(consumerDirectory, delegatedTaskId) {
-  const runStore = join(
-    consumerDirectory,
-    ".pi",
-    "artifacts",
-    "tasks",
-    "orchestration",
-    "runs.json",
-  );
-  const runs = JSON.parse(readFileSync(runStore, "utf8")).runs;
-  return runs.find((run) => run.taskId === delegatedTaskId);
-}
-
 async function runPackedDelegationSmoke(consumerDirectory) {
   const subagentsRoot = join(
     consumerDirectory,
@@ -131,6 +118,18 @@ async function runPackedDelegationSmoke(consumerDirectory) {
   const delegatedTaskId = "packed-smoke-delegation";
   const { api, lifecycleHandlers, tools } = createPackedRuntimeHarness();
   runtime.createTaskRuntime(createPackedUpstream(delegatedTaskId))(api);
+  const runtimeContext = {
+    cwd: consumerDirectory,
+    hasUI: false,
+    ui: {
+      notify() {},
+      setStatus() {},
+      setWidget() {},
+    },
+  };
+  for (const handler of lifecycleHandlers.get("session_start") ?? []) {
+    await handler({}, runtimeContext);
+  }
   const task = tools.get("task");
   assert.ok(task, "installed pi-subagents must register the delegated task tool");
   const result = await task.execute(
@@ -147,9 +146,8 @@ async function runPackedDelegationSmoke(consumerDirectory) {
   );
   assert.equal(result.isError, undefined, "minimal packed delegation must succeed");
 
-  const durable = readPackedDurableRun(consumerDirectory, delegatedTaskId);
-  assert.equal(durable?.executionPhase, "completed");
-  assert.equal(durable?.reportedOutcome, "success");
+  assert.equal(result.details?.taskId, delegatedTaskId);
+  assert.match(result.content?.[0]?.text ?? "", /packed delegated task completed/i);
 
   for (const handler of lifecycleHandlers.get("session_shutdown") ?? []) {
     await handler();
@@ -204,9 +202,57 @@ try {
     stdio: "inherit",
   });
   const agentDir = join(consumerRoot, ".pi", "agents");
-  for (const profile of ["general", "implementer", "peer", "reviewer", "proof-auditor"]) {
-    assert.ok(existsSync(join(agentDir, `${profile}.md`)), `bootstrap must install ${profile}.md`);
+  for (const profile of ["explore", "general", "implementer", "peer", "proof-auditor", "reviewer", "scout"]) {
+    const consumerAgent = join(agentDir, `${profile}.md`);
+    assert.equal(
+      readFileSync(consumerAgent, "utf8"),
+      readFileSync(join(packageRoot, ".pi", "agents", `${profile}.md`), "utf8"),
+      `bootstrap must materialize the packed ${profile}.md profile`,
+    );
   }
+  for (const template of [
+    "AGENTS.md",
+    "adr.md",
+    "agent-run-report.md",
+    "prd.md",
+    "skill-config.md",
+    "skill-tooled.md",
+    "sprint-design.md",
+    "sprint-state.json",
+  ]) {
+    assert.equal(
+      readFileSync(join(consumerRoot, ".pi", "templates", template), "utf8"),
+      readFileSync(join(packageRoot, ".pi", "templates", template), "utf8"),
+      `bootstrap must materialize the packed ${template} template`,
+    );
+  }
+  assert.equal(
+    readFileSync(join(consumerRoot, ".pi", "ANTI_PATTERNS.md"), "utf8"),
+    readFileSync(join(packageRoot, ".pi", "ANTI_PATTERNS.md"), "utf8"),
+    "bootstrap must materialize the packed anti-pattern catalog",
+  );
+  const packageManifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8"));
+  const consumerSettings = JSON.parse(readFileSync(join(consumerRoot, ".pi", "settings.json"), "utf8"));
+  assert.ok(
+    consumerSettings.packages.includes(`npm:${packageManifest.name}@${packageManifest.version}`),
+    "bootstrap must pin the exact packed harness version in project settings",
+  );
+  assert.equal(consumerSettings["pi-harness"]?.profile, "full");
+  const ownership = JSON.parse(readFileSync(join(consumerRoot, ".pi", "pi-harness.lock.json"), "utf8"));
+  assert.deepEqual(ownership.harness, { name: packageManifest.name, version: packageManifest.version });
+  assert.ok(ownership.files[".pi/APPEND_SYSTEM.md#managed-policy"]);
+  assert.ok(ownership.files[".gitignore#pi-harness-runtime"]);
+
+  // A packed clean-consumer rerun is a no-op rather than a rewrite.
+  const lockBeforeRerun = readFileSync(join(consumerRoot, ".pi", "pi-harness.lock.json"), "utf8");
+  execFileSync(process.execPath, [join(packageRoot, "scripts", "init-consumer.mjs"), consumerRoot], {
+    cwd: consumerRoot,
+    stdio: "inherit",
+  });
+  assert.equal(
+    readFileSync(join(consumerRoot, ".pi", "pi-harness.lock.json"), "utf8"),
+    lockBeforeRerun,
+  );
 
   const helpersPath = join(
     consumerRoot,

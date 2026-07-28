@@ -1,6 +1,6 @@
 {
   "name": "@minhduydev/pi-harness",
-  "version": "1.2.0",
+  "version": "2.0.0",
   "private": false,
   "bin": {
     "pi-harness-init": "./scripts/init-consumer.mjs"
@@ -74,6 +74,8 @@
     ".pi/DESIGN.md",
     ".pi/README.md",
     ".pi/settings.json",
+    ".pi/APPEND_SYSTEM.md",
+    ".pi/ANTI_PATTERNS.md",
     ".pi/agents",
     ".pi/extensions",
     ".pi/prompts",

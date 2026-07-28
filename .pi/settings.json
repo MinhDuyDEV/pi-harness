@@ -1,7 +1,7 @@
 {
   "packages": [
     "npm:@minhduydev/pi-core@0.2.0",
-    "npm:@minhduydev/pi-subagents@0.10.0",
+    "npm:@minhduydev/pi-subagents@0.10.1",
     "npm:@minhduydev/pi-todo@0.4.0",
     "npm:@minhduydev/pi-learning@0.4.0"
   ],
@@ -55,12 +55,22 @@
     "superpi": true,
     "gptPersonality": true,
     "extensions": {
-      "deepseek": true,
-      "mimo": true,
-      "xai": true,
+      "safety": true,
+      "herdrState": true,
+      "shortcutContinue": true,
+      "checkpoint": true,
+      "rewind": true,
+      "learningCoordinator": true,
+      "workflowState": true,
+      "dcp": true,
+      "tui": true,
+      "tps": true,
       "diagnostics": true,
       "integration": true,
-      "usageTracker": true
+      "usageTracker": true,
+      "deepseek": true,
+      "mimo": true,
+      "xai": true
     }
   }
 }

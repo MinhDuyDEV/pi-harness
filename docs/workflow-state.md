@@ -1,6 +1,6 @@
 # Typed workflow state
 
-The standard and full harness profiles register `workflow_state`. It persists
+The Full consumer bootstrap registers `workflow_state`. It persists
 three versioned records owned by `@minhduydev/pi-core/workflow`:
 
 - a foundation verdict before implementation is committed;

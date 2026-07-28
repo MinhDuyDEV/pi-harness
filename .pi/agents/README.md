@@ -6,7 +6,7 @@ The **session agent** is always the parent. Task agents match **OpenCode-style**
 
 Routing: `~/.pi/agent/APPEND_SYSTEM.md` (Delegation). Rules: `AGENTS.md` / project `.pi/AGENTS.md`.
 
-Models are **runtime-selected**: agent files carry no `model:` pin and inherit the session `defaultModel`. Only `thinking:` is tuned per agent.
+Canonical agents intentionally carry a reproducible `model:` seat so delegation behavior is stable across consumer repositories. Consumers may change a seat explicitly; lock-aware upgrades preserve that change. `thinking:` is tuned per agent as well.
 
 ## Agent file template
 
@@ -30,7 +30,7 @@ tools:
 | `description` | Yes — task tool catalog |
 | `tools` / `disallowed_tools` | Yes |
 | `hidden` / `proactive` / `readonly` | Yes |
-| `thinking` | Yes — passed to child `pi`; model inherits `defaultModel` |
+| `model` | Yes — passed to child `pi`; canonical seat is pinned |\n| `thinking` | Yes — passed to child `pi` |
 
 ## Task agents (`task` tool)
 

@@ -1,251 +1,394 @@
 #!/usr/bin/env node
-/**
- * Bootstrap a consumer repository with the minimal pi-harness settings.
- *
- * Usage:
- *   node scripts/init-consumer.mjs <target-repo> [--dry-run] [--no-agents]
- *
- * Behavior:
- *   - Validates templates/consumer-settings.json (must parse as JSON) before writing.
- *   - Copies the template to <target>/.pi/settings.json, or deep-merges only
- *     missing object keys / array entries into an existing valid JSON file.
- *     Existing consumer values are never overwritten.
- *   - Copies missing canonical task profiles to <target>/.pi/agents/ (never
- *     overwrites consumer-owned profiles; use --no-agents to opt out).
- *   - Creates <target>/.pi/artifacts/.gitignore containing "*" so runtime
- *     artifacts stay out of version control.
- *   - Prints next steps. Zero dependencies; writes are atomic (temp + rename).
- */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import process from "node:process";
+import {
+  atomicWrite,
+  planManagedFile,
+  planManagedRegion,
+  planStaleManagedDeletes,
+  sha256,
+} from "./lib/consumer-ownership.mjs";
 
-const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_PATH = resolve(SCRIPT_DIR, "..", "templates", "consumer-settings.json");
-const BUNDLED_AGENTS_DIR = resolve(SCRIPT_DIR, "..", ".pi", "agents");
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const PACKAGE_JSON = readJson(join(PACKAGE_ROOT, "package.json"), "package manifest");
+const SETTINGS_TEMPLATE = readJson(
+  join(PACKAGE_ROOT, "templates", "consumer-settings.json"),
+  "consumer settings template",
+);
+const POLICY_SOURCE = readFileSync(join(PACKAGE_ROOT, ".pi", "APPEND_SYSTEM.md"), "utf8").trimEnd();
+const POLICY_START = "<!-- pi-harness managed policy:start -->";
+const POLICY_END = "<!-- pi-harness managed policy:end -->";
+const IGNORE_START = "# pi-harness managed runtime state:start";
+const IGNORE_END = "# pi-harness managed runtime state:end";
+const LOCK_PATH = ".pi/pi-harness.lock.json";
+const LOCK_SCHEMA_VERSION = 1;
+const CANONICAL_AGENTS = [
+  "explore.md",
+  "general.md",
+  "implementer.md",
+  "peer.md",
+  "proof-auditor.md",
+  "reviewer.md",
+  "scout.md",
+];
+const RUNTIME_IGNORES = [
+  ".pi/artifacts/",
+  ".pi/git/",
+  ".pi/npm/",
+  ".pi/cache/",
+  ".pi/checkpoints/",
+  ".pi/dcp-state/",
+  ".pi/harness-runs/",
+  ".pi/sessions/",
+  ".pi/tasks/",
+  ".pi/extensions/node_modules/",
+  ".pi/extensions/**/node_modules/",
+  ".pi/skills/**/node_modules/",
+  ".pi/skills/opensrc/.repos/",
+  ".pi/task-registry.json",
+  ".pi/task-session-history.json",
+  ".pi/.terminal-sessions/",
+  ".pi/task-context-packs/",
+  ".pi/task-evidence/",
+  ".pi/quality-ratchet/",
+  ".pi/usage/",
+  ".pi/context-usage.jsonl",
+  ".pi/ralph-loop.local.md",
+  ".pi/.agent-safety-audit.jsonl",
+  ".pi/MEMORY.md",
+  ".pi/memory/project/user.md",
+  ".pi/herdr/",
+  ".pi/tmp/",
+  ".pi/DECISIONS.md",
+  ".pi/git-commit/",
+  ".pi/decision-log.jsonl",
+  ".pi/trust.json",
+  ".pi/auth.json",
+  ".pi/models.json",
+  ".pi/mcp.json",
+  ".pi/mcp-cache.json",
+  ".pi/mcp-npx-cache.json",
+  ".pi/bash-mode-history",
+  ".pi/pi-crash.log",
+  ".pi/*.bak",
+  ".pi/*.backup",
+  ".pi/*.orig",
+];
 
-function fail(message) {
-  console.error(`init-consumer: ${message}`);
-  process.exit(1);
-}
-
-function atomicWrite(path, content) {
-  const temp = `${path}.tmp-${process.pid}-${Date.now()}`;
-  writeFileSync(temp, content, { encoding: "utf8", mode: 0o644 });
-  renameSync(temp, path);
+function readJson(path, description) {
+  try {
+    return JSON.parse(readFileSync(path, "utf8"));
+  } catch (error) {
+    throw new Error(`Cannot read ${description} at ${path}: ${error.message}`);
+  }
 }
 
 function parseArgs(argv) {
-  const positional = [];
   let dryRun = false;
-  let installAgents = true;
+  let target;
   for (const arg of argv) {
     if (arg === "--dry-run") dryRun = true;
-    else if (arg === "--no-agents") installAgents = false;
-    else if (arg.startsWith("--")) fail(`unknown flag: ${arg}`);
-    else positional.push(arg);
+    else if (arg === "--help" || arg === "-h") {
+      console.log("Usage: pi-harness-init [--dry-run] [target-directory]");
+      process.exit(0);
+    } else if (arg.startsWith("-")) {
+      throw new Error(`Unknown option: ${arg}`);
+    } else if (target) {
+      throw new Error(`Unexpected second target directory: ${arg}`);
+    } else target = arg;
   }
-  if (positional.length !== 1) {
-    fail("usage: node scripts/init-consumer.mjs <target-repo> [--dry-run] [--no-agents]");
-  }
-  return { target: resolve(positional[0]), dryRun, installAgents };
+  return { dryRun, targetRoot: resolve(target ?? process.cwd()) };
 }
 
-function loadTemplate() {
-  if (!existsSync(TEMPLATE_PATH)) fail(`template not found: ${TEMPLATE_PATH}`);
-  const raw = readFileSync(TEMPLATE_PATH, "utf8");
-  let parsed;
+function lstatOrNull(path) {
   try {
-    parsed = JSON.parse(raw);
+    return lstatSync(path);
   } catch (error) {
-    fail(`template is not valid JSON (${TEMPLATE_PATH}): ${error.message}`);
+    if (error.code === "ENOENT") return null;
+    throw error;
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    fail(`template must be a JSON object: ${TEMPLATE_PATH}`);
+}
+
+function validateTargetDirectory(targetRoot) {
+  const stat = lstatOrNull(targetRoot);
+  if (!stat || !stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error(`target must be an existing, non-symlink directory: ${targetRoot}`);
   }
-  return { raw, parsed };
 }
 
-function isRecord(value) {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function sameJsonValue(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function npmPackageIdentity(value) {
-  if (typeof value !== "string" || !value.startsWith("npm:")) return undefined;
-  const spec = value.slice(4);
-  const versionSeparator = spec.lastIndexOf("@");
-  if (versionSeparator <= 0) return `npm:${spec}`;
-  return `npm:${spec.slice(0, versionSeparator)}`;
-}
-
-function mergeMissing(template, current, prefix, additions, conflicts) {
-  if (Array.isArray(template)) {
-    if (!Array.isArray(current)) {
-      conflicts.push(prefix);
-      return current;
-    }
-    const merged = [...current];
-    const absent = template.filter((candidate) => {
-      if (merged.some((entry) => sameJsonValue(entry, candidate))) return false;
-      if (prefix !== "packages") return true;
-      const identity = npmPackageIdentity(candidate);
-      if (!identity) return true;
-      if (merged.some((entry) => npmPackageIdentity(entry) === identity)) {
-        conflicts.push(`${prefix}[${identity}]`);
-        return false;
-      }
-      return true;
-    });
-    if (absent.length > 0) {
-      additions.push([`${prefix} (appended missing values)`, absent]);
-      merged.push(...structuredClone(absent));
-    }
-    return merged;
+function validateManagedPath(targetRoot, consumerPath) {
+  const parts = consumerPath.split("/");
+  if (consumerPath.startsWith("/") || parts.some((part) => part === "" || part === "..")) {
+    throw new Error(`invalid managed path: ${consumerPath}`);
   }
-  if (isRecord(template)) {
-    if (!isRecord(current)) {
-      conflicts.push(prefix);
-      return current;
+  let current = targetRoot;
+  for (const [index, part] of parts.entries()) {
+    current = join(current, part);
+    const stat = lstatOrNull(current);
+    if (!stat) break;
+    if (stat.isSymbolicLink()) throw new Error(`managed path contains a symbolic link: ${consumerPath}`);
+    if (index < parts.length - 1 && !stat.isDirectory()) {
+      throw new Error(`managed path ancestor is not a directory: ${consumerPath}`);
     }
-    const merged = { ...current };
-    for (const [key, child] of Object.entries(template)) {
-      const childPath = prefix ? `${prefix}.${key}` : key;
-      if (!Object.hasOwn(current, key)) {
-        additions.push([childPath, child]);
-        merged[key] = structuredClone(child);
-      } else {
-        merged[key] = mergeMissing(child, current[key], childPath, additions, conflicts);
-      }
-    }
-    return merged;
   }
-  return current;
 }
 
-function mergeExistingSettings(existingRaw, template, settingsPath, dryRun) {
-  let existing;
+function isObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeDefaults(defaults, existing) {
+  if (!isObject(defaults) || !isObject(existing)) return existing === undefined ? defaults : existing;
+  const result = { ...defaults };
+  for (const [key, value] of Object.entries(existing)) {
+    result[key] = key in defaults ? mergeDefaults(defaults[key], value) : value;
+  }
+  return result;
+}
+
+function packageName(specifier) {
+  if (typeof specifier !== "string") return null;
+  const value = specifier.startsWith("npm:") ? specifier.slice(4) : specifier;
+  if (value.startsWith("@")) {
+    const versionAt = value.lastIndexOf("@");
+    return versionAt > value.indexOf("/") ? value.slice(0, versionAt) : value;
+  }
+  const versionAt = value.lastIndexOf("@");
+  return versionAt > 0 ? value.slice(0, versionAt) : value;
+}
+
+function isManagedPackageSpecifier(specifier, managedName) {
+  if (packageName(specifier) === managedName) return true;
+  if (typeof specifier !== "string") return false;
+  const repositoryName = managedName.startsWith("@") ? managedName.slice(1) : managedName;
+  const escapedName = repositoryName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[:/])${escapedName}(?:\\.git)?(?:[?#]|$)`, "i").test(specifier);
+}
+
+function managedPackageSpecs() {
+  const companions = SETTINGS_TEMPLATE.packages;
+  if (!Array.isArray(companions) || companions.some((entry) => typeof entry !== "string")) {
+    throw new Error("Consumer settings template packages must be an array of package specifiers");
+  }
+  const specs = [`npm:${PACKAGE_JSON.name}@${PACKAGE_JSON.version}`, ...companions];
+  for (const specifier of specs) {
+    if (!/^npm:@[^/]+\/[^@]+@\d+\.\d+\.\d+$/.test(specifier)) {
+      throw new Error(`Harness package is not pinned to an exact version: ${specifier}`);
+    }
+  }
+  return specs;
+}
+
+function mergeSettings(existing) {
+  const managedPackages = managedPackageSpecs();
+  const managedNames = managedPackages.map(packageName).filter(Boolean);
+  const currentPackages = Array.isArray(existing.packages) ? existing.packages : [];
+  const consumerPackages = currentPackages.filter(
+    (specifier) => !managedNames.some((name) => isManagedPackageSpecifier(specifier, name)),
+  );
+  const merged = mergeDefaults(SETTINGS_TEMPLATE, existing);
+  merged.packages = [...managedPackages, ...consumerPackages];
+  // Known Full gates are harness-owned. Preserve only consumer extensions that
+  // are not part of the portable contract; stale standard/disabled values must
+  // not silently turn a Full bootstrap back into a partial one.
+  const consumerHarness = isObject(existing["pi-harness"]) ? existing["pi-harness"] : {};
+  const fullHarness = structuredClone(SETTINGS_TEMPLATE["pi-harness"]);
+  if (isObject(consumerHarness.extensions)) {
+    fullHarness.extensions = { ...consumerHarness.extensions, ...fullHarness.extensions };
+  }
+  merged["pi-harness"] = { ...consumerHarness, ...fullHarness, profile: "full" };
+  return merged;
+}
+
+function listFiles(root) {
+  const result = [];
+  const visit = (directory) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) visit(path);
+      else if (entry.isFile()) result.push(path);
+      else throw new Error(`Managed resource must be a regular file: ${path}`);
+    }
+  };
+  visit(root);
+  return result;
+}
+
+function managedResources() {
+  const resources = new Map();
+  const add = (consumerPath, sourcePath) => {
+    resources.set(consumerPath, readFileSync(sourcePath, "utf8"));
+  };
+  add(".pi/ANTI_PATTERNS.md", join(PACKAGE_ROOT, ".pi", "ANTI_PATTERNS.md"));
+  resources.set(".pi/artifacts/.gitignore", "*\n");
+  for (const file of CANONICAL_AGENTS) {
+    add(`.pi/agents/${file}`, join(PACKAGE_ROOT, ".pi", "agents", file));
+  }
+  const templatesRoot = join(PACKAGE_ROOT, ".pi", "templates");
+  for (const path of listFiles(templatesRoot)) {
+    add(`.pi/templates/${relative(templatesRoot, path).replaceAll("\\", "/")}`, path);
+  }
+  return resources;
+}
+
+function parseLock(targetRoot, conflicts) {
+  const path = join(targetRoot, LOCK_PATH);
+  if (!existsSync(path)) return null;
   try {
-    existing = JSON.parse(existingRaw);
-  } catch {
-    console.log("  Existing settings file is not valid JSON; left untouched. Fix it, then compare");
-    console.log(`  against the template: ${TEMPLATE_PATH}`);
-    return;
-  }
-  if (!isRecord(existing)) {
-    console.log("  Existing settings JSON is not an object; left untouched.");
-    return;
-  }
-  const additions = [];
-  const conflicts = [];
-  const merged = mergeMissing(template, existing, "", additions, conflicts);
-  if (additions.length === 0) {
-    console.log(
-      conflicts.length === 0
-        ? `Skip (already contains every portable setting): ${settingsPath}`
-        : `Skip (consumer-owned incompatible settings retained): ${settingsPath}`,
-    );
-    if (conflicts.length > 0) {
-      console.log(`  Incompatible template paths: ${conflicts.join(", ")}`);
+    const lock = JSON.parse(readFileSync(path, "utf8"));
+    if (lock.schemaVersion !== LOCK_SCHEMA_VERSION || !isObject(lock.files)) {
+      conflicts.push(`${LOCK_PATH}: unsupported or invalid lock schema`);
+      return null;
     }
-    return;
+    return lock;
+  } catch (error) {
+    conflicts.push(`${LOCK_PATH}: cannot parse ownership record (${error.message})`);
+    return null;
   }
-  if (dryRun) {
-    console.log(`[dry-run] would merge missing portable settings into ${settingsPath}`);
-  } else {
-    atomicWrite(settingsPath, `${JSON.stringify(merged, null, 2)}\n`);
-    console.log(`Merged missing portable settings into ${settingsPath}`);
+}
+
+function planSettings(plans, conflicts, targetRoot) {
+  const consumerPath = ".pi/settings.json";
+  const path = join(targetRoot, consumerPath);
+  let existing = {};
+  if (existsSync(path)) {
+    if (!lstatSync(path).isFile()) {
+      conflicts.push(`${consumerPath}: expected a regular file`);
+      return;
+    }
+    try {
+      existing = JSON.parse(readFileSync(path, "utf8"));
+      if (!isObject(existing)) throw new Error("top-level value must be an object");
+      if (
+        existing.packages !== undefined &&
+        (!Array.isArray(existing.packages) || existing.packages.some((entry) => typeof entry !== "string"))
+      ) {
+        throw new Error("packages must be an array of package specifier strings when present");
+      }
+    } catch (error) {
+      conflicts.push(`${consumerPath}: cannot safely merge settings (${error.message})`);
+      return;
+    }
   }
-  console.log("  Added settings paths:");
-  for (const [path, value] of additions) {
-    console.log(`    ${path} = ${JSON.stringify(value)}`);
+  const desired = `${JSON.stringify(mergeSettings(existing), null, 2)}\n`;
+  const current = existsSync(path) ? readFileSync(path, "utf8") : null;
+  if (current !== desired) {
+    plans.push({ consumerPath, path, content: desired, operation: current === null ? "create" : "update" });
+  }
+}
+
+function desiredLock(resources, policyBody, ignoreBody) {
+  const files = {};
+  for (const [consumerPath, content] of [...resources.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    files[consumerPath] = { sha256: sha256(content) };
+  }
+  files[".pi/APPEND_SYSTEM.md#managed-policy"] = { sha256: sha256(policyBody) };
+  files[".gitignore#pi-harness-runtime"] = { sha256: sha256(ignoreBody) };
+  return {
+    schemaVersion: LOCK_SCHEMA_VERSION,
+    harness: { name: PACKAGE_JSON.name, version: PACKAGE_JSON.version },
+    packages: managedPackageSpecs(),
+    files,
+  };
+}
+
+function buildPlan(targetRoot) {
+  validateTargetDirectory(targetRoot);
+  for (const managedPath of [".pi", ".pi/settings.json", LOCK_PATH, ".gitignore"]) {
+    validateManagedPath(targetRoot, managedPath);
+  }
+  const plans = [];
+  const conflicts = [];
+  const lock = parseLock(targetRoot, conflicts);
+  const resources = managedResources();
+  const ignoreBody = RUNTIME_IGNORES.join("\n");
+
+  planSettings(plans, conflicts, targetRoot);
+  for (const [consumerPath, desired] of resources) {
+    planManagedFile(plans, conflicts, lock, targetRoot, consumerPath, desired);
+  }
+  planManagedRegion({
+    plans, conflicts, lock, targetRoot,
+    consumerPath: ".pi/APPEND_SYSTEM.md",
+    lockKey: ".pi/APPEND_SYSTEM.md#managed-policy",
+    startMarker: POLICY_START,
+    endMarker: POLICY_END,
+    desiredBody: POLICY_SOURCE,
+  });
+  planManagedRegion({
+    plans, conflicts, lock, targetRoot,
+    consumerPath: ".gitignore",
+    lockKey: ".gitignore#pi-harness-runtime",
+    startMarker: IGNORE_START,
+    endMarker: IGNORE_END,
+    desiredBody: ignoreBody,
+  });
+  planStaleManagedDeletes(plans, conflicts, lock, targetRoot, new Set(resources.keys()));
+
+  const runtimeDirectory = join(targetRoot, ".pi", "artifacts");
+  if (!existsSync(runtimeDirectory)) {
+    plans.push({ consumerPath: ".pi/artifacts/", path: runtimeDirectory, operation: "create-directory" });
+  } else if (!lstatSync(runtimeDirectory).isDirectory()) {
+    conflicts.push(".pi/artifacts/: runtime state path must be a directory");
+  }
+
+  const nextLock = `${JSON.stringify(desiredLock(resources, POLICY_SOURCE, ignoreBody), null, 2)}\n`;
+  const lockFile = join(targetRoot, LOCK_PATH);
+  const currentLock = existsSync(lockFile) ? readFileSync(lockFile, "utf8") : null;
+  if (currentLock !== nextLock) {
+    plans.push({
+      consumerPath: LOCK_PATH,
+      path: lockFile,
+      content: nextLock,
+      operation: currentLock === null ? "create" : "update",
+    });
+  }
+  return { plans, conflicts };
+}
+
+function applyPlans(plans, dryRun) {
+  for (const plan of plans) {
+    if (dryRun) console.log(`[dry-run] would ${plan.operation} ${plan.consumerPath}`);
+    else if (plan.operation === "delete") {
+      rmSync(plan.path);
+      console.log(`Deleted obsolete managed file ${plan.consumerPath}`);
+    } else if (plan.operation === "create-directory") {
+      mkdirSync(plan.path, { recursive: true });
+      console.log(`Created runtime directory ${plan.consumerPath}`);
+    } else {
+      atomicWrite(plan.path, plan.content);
+      console.log(`${plan.operation === "create" ? "Created" : "Updated"} ${plan.consumerPath}`);
+    }
+  }
+}
+
+function run() {
+  const { dryRun, targetRoot } = parseArgs(process.argv.slice(2));
+  const { plans, conflicts } = buildPlan(targetRoot);
+  for (const plan of plans) {
+    validateManagedPath(targetRoot, plan.consumerPath.endsWith("/") ? plan.consumerPath.slice(0, -1) : plan.consumerPath);
   }
   if (conflicts.length > 0) {
-    console.log(`  Consumer-owned incompatible paths retained: ${conflicts.join(", ")}`);
-  }
-}
-
-function bundledAgentFiles() {
-  if (!existsSync(BUNDLED_AGENTS_DIR)) return [];
-  return readdirSync(BUNDLED_AGENTS_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".md") && entry.name !== "README.md")
-    .map((entry) => entry.name)
-    .sort();
-}
-
-function installBundledAgents(target, dryRun) {
-  const agentDir = join(target, ".pi", "agents");
-  const files = bundledAgentFiles();
-  if (files.length === 0) {
-    console.log("  No bundled canonical agents found in the harness payload.");
-    return;
-  }
-  for (const file of files) {
-    const destination = join(agentDir, file);
-    if (existsSync(destination)) {
-      console.log(`Skip (exists, not overwriting): ${destination}`);
-    } else if (dryRun) {
-      console.log(`[dry-run] would write ${destination}`);
-    } else {
-      mkdirSync(agentDir, { recursive: true });
-      atomicWrite(destination, readFileSync(join(BUNDLED_AGENTS_DIR, file), "utf8"));
-      console.log(`Wrote ${destination}`);
+    for (const conflict of conflicts) console.error(`Conflict: ${conflict}`);
+    console.error("No files were changed. Restore the recorded baseline, delete the conflicting managed file to recreate it, or merge the new harness content manually.");
+    process.exitCode = 2;
+  } else if (plans.length === 0) {
+    console.log(`pi-harness ${PACKAGE_JSON.version}: ${targetRoot} is already current.`);
+  } else {
+    applyPlans(plans, dryRun);
+    if (!dryRun) {
+      console.log(`\nFull pi-harness ${PACKAGE_JSON.version} bootstrap is ready.`);
+      console.log("Start Pi in this repository. Run Pi /init separately when you want Pi to generate or refresh project context.");
+      console.log("Full provider adapters are enabled without selecting credentials; missing optional tools are reported by /integration, not installed by init.");
     }
   }
 }
 
-function main() {
-  const { target, dryRun, installAgents } = parseArgs(process.argv.slice(2));
-  if (!existsSync(target) || !statSync(target).isDirectory()) {
-    fail(`target repo is not a directory: ${target}`);
-  }
-
-  const { raw, parsed } = loadTemplate();
-  const piDir = join(target, ".pi");
-  const settingsPath = join(piDir, "settings.json");
-  const artifactsDir = join(piDir, "artifacts");
-  const gitignorePath = join(artifactsDir, ".gitignore");
-  const prefix = dryRun ? "[dry-run] would" : "";
-
-  // 1. Settings
-  if (existsSync(settingsPath)) {
-    mergeExistingSettings(readFileSync(settingsPath, "utf8"), parsed, settingsPath, dryRun);
-  } else if (dryRun) {
-    console.log(`${prefix} write ${settingsPath}`);
-  } else {
-    mkdirSync(piDir, { recursive: true });
-    atomicWrite(settingsPath, raw);
-    console.log(`Wrote ${settingsPath}`);
-  }
-
-  // 2. Artifacts gitignore
-  if (existsSync(gitignorePath)) {
-    console.log(`Skip (exists): ${gitignorePath}`);
-  } else if (dryRun) {
-    console.log(`${prefix} write ${gitignorePath}`);
-  } else {
-    mkdirSync(artifactsDir, { recursive: true });
-    atomicWrite(gitignorePath, "*\n");
-    console.log(`Wrote ${gitignorePath}`);
-  }
-
-  // Pi's package manifest does not discover `.pi/agents`; pi-subagents
-  // discovers project-local profiles. Copy only missing canonical profiles.
-  if (installAgents) installBundledAgents(target, dryRun);
-
-  // 4. Next steps
-  console.log("");
-  console.log("Next steps:");
-  console.log("  1. cd into the target repo and install the harness:");
-  console.log("       pi install npm:@minhduydev/pi-harness");
-  console.log("  2. Start pi and run /init to generate the project context file.");
-  console.log("  3. Canonical agents were added only when missing under .pi/agents/;");
-  console.log("     use --no-agents if this repository owns its profiles.");
+try {
+  run();
+} catch (error) {
+  console.error(`pi-harness-init: ${error.message}`);
+  process.exitCode = 1;
 }
-
-main();

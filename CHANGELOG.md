@@ -4,6 +4,29 @@ All notable changes to `@minhduydev/pi-harness` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-07-28
+
+A breaking consumer-bootstrap release: `pi-harness-init` now has one Full contract and materializes the complete portable harness policy/resources into each consumer repository with exact project-local package pins and lock-aware upgrades.
+
+### Added
+- Full-only consumer bootstrap with exact `@minhduydev/pi-harness@2.0.0` and coherent companion pins; consumers no longer depend on a manual/global harness installation.
+- Sentinel-managed `.pi/APPEND_SYSTEM.md`, separate managed `.pi/ANTI_PATTERNS.md`, all canonical agents, every `.pi/templates/` file, artifact ignore state, root runtime-state ignores, and `.pi/pi-harness.lock.json` SHA-256 ownership baselines.
+- Convergent reruns, dry-run previews, update/delete baselines, consumer-prose preservation, and explicit non-destructive conflicts for modified managed resources.
+- Clean packed-consumer checks covering Full settings, self-pins, policy/catalog/agent/template materialization, idempotent reruns, and durable task completion.
+
+### Changed
+- `pi-harness-init` supports one capability mode: Full. The incomplete `--no-agents` path is removed, Full-owned extension gates are repaired on rerun, and the target must be an existing non-symlink directory.
+- Canonical agent seats intentionally keep explicit model pins for reproducible delegation; consumers may customize them and lock-aware upgrades preserve the changes.
+- Suite integration moves to `@minhduydev/pi-subagents@0.10.1`; package version advances to `2.0.0`.
+- Full profile, lifecycle, package payload, release validation, and consumer documentation now share one contract.
+
+### Fixed
+- Ownership-lock stale paths can no longer traverse outside managed agent/template roots.
+- Symlinked managed ancestors are rejected before reads or writes, preventing bootstrap writes from escaping the target repository.
+- Git/npm package identity migration replaces stale harness pins without deleting similarly named consumer packages.
+- The Auto-safe fail-open E2E now captures and asserts its deliberate synthetic listener error instead of printing a misleading stack trace.
+- Package release validation now agrees with the intentional canonical agent model-pin contract.
+
 ## [1.2.0] - 2026-07-27
 
 A new typed workflow-state extension, a consolidated skill set, and release

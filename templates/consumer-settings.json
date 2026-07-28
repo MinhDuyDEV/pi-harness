@@ -1,33 +1,17 @@
 {
   "packages": [
     "npm:@minhduydev/pi-core@0.2.0",
-    "npm:@minhduydev/pi-subagents@0.9.0",
+    "npm:@minhduydev/pi-subagents@0.10.1",
     "npm:@minhduydev/pi-todo@0.4.0",
     "npm:@minhduydev/pi-learning@0.4.0"
   ],
-  "compaction": {
-    "enabled": true,
-    "reserveTokens": 16384,
-    "keepRecentTokens": 20000
-  },
-  "retry": {
-    "enabled": true,
-    "maxRetries": 3,
-    "baseDelayMs": 2000,
-    "provider": {
-      "maxRetryDelayMs": 60000
-    }
-  },
   "pi-learning": {
     "enabled": true,
     "mode": "auto-safe",
     "autoActivate": true,
     "autoActivation": {
       "enabled": true,
-      "allowedKinds": [
-        "pattern",
-        "discovery"
-      ],
+      "allowedKinds": ["pattern", "discovery"],
       "minEvidenceTrust": "verified-command"
     },
     "retrieval": {
@@ -41,7 +25,52 @@
     "widget": true,
     "reminderTurns": 6
   },
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "branchSummary": {
+    "reserveTokens": 16384
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "provider": {
+      "maxRetryDelayMs": 60000
+    }
+  },
+  "steeringMode": "all",
+  "followUpMode": "all",
+  "enableSkillCommands": true,
+  "piTui": {
+    "todosWidget": false,
+    "fixedEditor": {
+      "enabled": true
+    }
+  },
   "pi-harness": {
-    "profile": "standard"
+    "profile": "full",
+    "superpi": true,
+    "gptPersonality": true,
+    "extensions": {
+      "safety": true,
+      "herdrState": true,
+      "shortcutContinue": true,
+      "checkpoint": true,
+      "rewind": true,
+      "learningCoordinator": true,
+      "workflowState": true,
+      "dcp": true,
+      "tui": true,
+      "tps": true,
+      "diagnostics": true,
+      "integration": true,
+      "usageTracker": true,
+      "deepseek": true,
+      "mimo": true,
+      "xai": true
+    }
   }
 }

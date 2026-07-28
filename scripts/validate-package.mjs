@@ -90,6 +90,55 @@ for (const source of settings.packages ?? []) {
   if (source.startsWith("git:") && !/#[0-9a-f]{40}$/i.test(source)) errors.push(`git package must use an immutable 40-character commit: ${source}`);
 }
 
+const consumerSettings = JSON.parse(readFileSync("templates/consumer-settings.json", "utf8"));
+if (JSON.stringify(consumerSettings) !== JSON.stringify(settings)) {
+  errors.push("templates/consumer-settings.json must exactly match the portable source .pi/settings.json contract");
+}
+if (consumerSettings["pi-harness"]?.profile !== "full") {
+  errors.push("consumer settings must select the single Full harness profile");
+}
+for (const key of [
+  "safety",
+  "herdrState",
+  "shortcutContinue",
+  "checkpoint",
+  "rewind",
+  "learningCoordinator",
+  "workflowState",
+  "dcp",
+  "tui",
+  "tps",
+  "diagnostics",
+  "integration",
+  "usageTracker",
+  "deepseek",
+  "mimo",
+  "xai",
+]) {
+  if (consumerSettings["pi-harness"]?.extensions?.[key] !== true) {
+    errors.push(`consumer settings must force the Full ${key} extension gate on`);
+  }
+}
+for (const key of ["defaultModel", "defaultProvider", "theme"]) {
+  if (consumerSettings[key] !== undefined) errors.push(`consumer settings must not select ${key}`);
+}
+
+const canonicalAgents = [
+  "explore.md",
+  "general.md",
+  "implementer.md",
+  "peer.md",
+  "proof-auditor.md",
+  "reviewer.md",
+  "scout.md",
+];
+for (const file of canonicalAgents) {
+  const content = readFileSync(`.pi/agents/${file}`, "utf8");
+  if (!/^model:\s*\S+/m.test(content)) {
+    errors.push(`canonical agent must declare its reproducible model seat: .pi/agents/${file}`);
+  }
+}
+
 if (errors.length > 0) {
   console.error(errors.map((error) => `✗ ${error}`).join("\n"));
   process.exit(1);
