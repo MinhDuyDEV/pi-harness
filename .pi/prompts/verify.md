@@ -107,6 +107,8 @@ Delegate to the `proof-auditor` agent with the diff, the spec requirements, and 
 
 ## 5. Update Blocks
 
+Close a work session only when the Result is `READY TO SHIP`: completeness is 100%, every required gate passed, and no blocking issue remains. `--quick` and `--gate-only` must not close the session because they omit completeness evidence.
+
 ### `.pi/artifacts/PROGRESS.md`
 
 Add or update the `#### Verification` subsection of the work session block:
@@ -123,11 +125,11 @@ status: done | updated: YYYY-MM-DD
 - Blocking issues: <list, or "none">
 ```
 
-If `--review` or `--ui-review` is set, add their subsections too.
+If `--review` or `--ui-review` is set, add their subsections too. If Result is `NEEDS WORK` or `BLOCKED`, keep TODO and PLAN active, retain PROGRESS as `awaiting-verification`, record the blockers, and do not close pending verification work.
 
-### Update `status: done` in `.pi/artifacts/TODO.md` and `.pi/artifacts/PLAN.md`
+### Close verified work
 
-For `TODO.md` prefer the `todo` tool: `todo done "<title>"` (closes the phase, completes remaining items, sets `status: done`). `PLAN.md` has no `todo` tool — edit its `status:` line to `done` in place. Do not move or hide the block.
+Only for `READY TO SHIP`, prefer the `todo` tool: `todo done "<title>"` to close TODO, then set the matching PLAN and PROGRESS status to `done`. Do not move or hide any block.
 
 ## 6. Output
 

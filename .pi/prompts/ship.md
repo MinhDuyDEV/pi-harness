@@ -63,31 +63,33 @@ Fix Critical and Important before completion. Minor can ship and be cleaned up l
 
 ## 7. Update Blocks
 
+Shipping records implementation evidence but does not complete the work session. Independent verification owns the transition to `done`.
+
 ### `.pi/artifacts/TODO.md`
 
-Mark the phase done — prefer the `todo` tool: `todo done "<title>"` (sets every remaining item `[x]` and `status: done`, promotes the next active phase); otherwise set each checkbox `[x]` and the `status:` line to `done` in place. Add the run report reference. Keep the block in place.
+Keep the phase active. Mark implementation steps complete, but ensure `/verify <title>` is a pending item. Do not close the phase with the todo tool, do not set the phase to `done`, and do not mark verification complete during `/ship`. Add the run report reference and keep the block in place.
 
 ```markdown
 ### YYYY-MM-DD - <title>
-status: done | updated: YYYY-MM-DD
+status: active | updated: YYYY-MM-DD
 
 - [x] Step 1: <name>
 - [x] Step 2: <name>
-- [x] /verify
+- [ ] /verify <title> (pending)
 
 See: `PROGRESS.md#YYYY-MM-DD--<slug>`
 ```
 
 ### `.pi/artifacts/PROGRESS.md`
 
-Append or update the work session block with run report and review:
+Append or update the work session block with the run report and self-review:
 
 ```markdown
 ### YYYY-MM-DD - <title>
-status: done | updated: YYYY-MM-DD
+status: awaiting-verification | updated: YYYY-MM-DD
 
 #### Run Report
-- Steps: N/M done
+- Steps: N/M implementation steps done
 - Gates: `<exact discovered command>` PASS/FAIL/SKIPPED (repeat per gate)
 - Files changed: <list, or "see git diff">
 
@@ -97,12 +99,12 @@ status: done | updated: YYYY-MM-DD
 - Minor: N (<list>)
 ```
 
-If the block already exists (continuation), merge — keep earlier content, append or update subsections.
+When `--no-verify` is used, record every omitted final gate as `SKIPPED`; the session still remains `awaiting-verification`. If the block already exists, merge it: keep earlier content and append or update subsections.
 
 ## 8. Output
 
 Report:
-1. Status: done / blocked
+1. Status: awaiting-verification / blocked
 2. Gates: exact discovered commands (PASS / FAIL / SKIPPED with details)
 3. Review findings by severity
 4. Files changed (count + list, or `git diff --stat`)

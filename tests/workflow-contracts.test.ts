@@ -62,3 +62,21 @@ test("checkpoint runtime imports the public pi-todo parser and has no local Mark
   assert.doesNotMatch(content, /line\.match\(\^?\/\^###/);
   assert.doesNotMatch(content, /parseActiveBlocks/);
 });
+
+test("ship leaves the session open until independent verification succeeds", () => {
+  const content = prompt("ship.md");
+  assert.doesNotMatch(content, /todo done ["`]<title>["`]/);
+  assert.doesNotMatch(content, /status:\s*done/);
+  assert.doesNotMatch(content, /\[x\]\s*\/verify/);
+  assert.match(content, /status:\s*awaiting-verification/);
+  assert.match(content, /\/verify.*pending/is);
+  assert.match(content, /SKIPPED.*awaiting-verification/is);
+});
+
+test("verify is the only workflow prompt that may close a successfully verified session", () => {
+  const content = prompt("verify.md");
+  assert.match(content, /only when.*READY TO SHIP/is);
+  assert.match(content, /NEEDS WORK.*BLOCKED.*keep.*active/is);
+  assert.match(content, /--quick.*--gate-only.*must not close/is);
+  assert.match(content, /todo done ["`]<title>["`]/);
+});

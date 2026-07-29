@@ -12,7 +12,7 @@
   },
   "packageManager": "npm@11.12.1",
   "scripts": {
-    "check": "npm run validate:skills && npm run package:check && npm run smoke:resources && npm run typecheck && npm run typecheck:extensions && npm run typecheck:extension-tests && npm run quality && npm run test:all",
+    "check": "npm run validate:skills && npm run package:check && npm run smoke:resources && npm run smoke:packed && npm run typecheck && npm run typecheck:extensions && npm run typecheck:extension-tests && npm run quality && npm run test:all",
     "test": "npm run test:all",
     "test:all": "npm run test:extensions && npm run test:skills",
     "test:extensions": "node scripts/run-extension-tests.mjs .pi/extensions",

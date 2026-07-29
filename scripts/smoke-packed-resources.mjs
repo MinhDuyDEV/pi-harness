@@ -189,6 +189,9 @@ try {
   );
 
   const packageRoot = join(consumerRoot, "node_modules", "@minhduydev", "pi-harness");
+  const packedPolicy = readFileSync(join(packageRoot, ".pi", "APPEND_SYSTEM.md"), "utf8");
+  assert.match(packedPolicy, /missing srcwalk|srcwalk.*ENOENT/i);
+  assert.match(packedPolicy, /fall back.*read.*grep.*find.*ls/is);
   for (const leak of [".pi/artifacts", ".pi/MEMORY.md", ".pi/npm"]) {
     if (existsSync(join(packageRoot, leak))) {
       throw new Error(`local runtime path leaked into packed package: ${leak}`);
@@ -276,6 +279,7 @@ try {
     settingsManager: settings,
   });
   await loader.reload();
+
 
   const summary = assertPackageResourcesLoad(loader, { packageRoot });
   console.error(

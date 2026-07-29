@@ -5,7 +5,7 @@
 ## What's new in 2.1.0
 
 - Global srcwalk-first navigation policy for the parent session and every standalone subagent.
-- Exact `@sting8k/pi-srcwalk@1.2.8` integration with the installed binary's version-matched guide.
+- Exact `@sting8k/pi-srcwalk@1.2.8` integration with capability-checked navigation policy and an explicit built-in fallback when its optional CLI is unavailable.
 - Pi 0.81.1-compatible Snap Edit port with guarded atomic `quick_edit` and `target_edit` tools.
 - Full-profile activation, read-output line numbering, focused regression coverage, and documented upstream provenance.
 
@@ -34,10 +34,12 @@ ignoring trackable settings, agents, policy, or templates. The auditable
 and hashes of every harness-owned file or region.
 
 The initializer does not choose a provider, model, theme, or credentials, and
-it does not install optional system tools. Full settings enable the portable
-provider adapters, but they do not require credentials at startup; credentials
-are needed only when that provider is selected. Loaded integrations report
-missing optional tools through `/integration` rather than making startup
+it does not install global system tools. Srcwalk semantic tools are preferred when
+the optional CLI is available; the managed parent and subagent policies explicitly
+fall back to built-in repository navigation when it is absent. Full settings enable
+the portable provider adapters, but they do not require credentials at startup;
+credentials are needed only when that provider is selected. Loaded integrations
+report missing optional tools through `/integration` rather than making startup
 depend on them.
 
 ### Rerun, preview, and upgrade

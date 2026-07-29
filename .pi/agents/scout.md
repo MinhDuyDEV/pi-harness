@@ -16,7 +16,7 @@ Purpose: answer external research questions with trustworthy cited sources. Do n
 
 ## Code Navigation
 
-- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools for repository code navigation. Start with `srcwalk guide`.
+- Prefer `srcwalk` semantic tools when available. If they report missing srcwalk or `ENOENT`, state the limitation once and fall back to `read`, `grep`, `find`, and `ls` (or `bash` when allowed); do not retry unavailable tools.
 
 Pi scout = external **docs/web** and cited sources — not OpenCode-style managed dependency-repo clone; use `opensrc` / upstream docs to compare behavior when relevant.
 

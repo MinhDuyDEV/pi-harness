@@ -8,7 +8,7 @@ This is supplemental project guidance. Follow the host system message, user requ
 - Prefer the smallest relevant test or typecheck command first, then the repo's own check command before declaring a change complete.
 - Treat `.pi/artifacts/` and `.pi/MEMORY.md` as local runtime state; never put credentials or generated caches in tracked files.
 - Do not assume optional tools or extensions, MCP servers, browser tooling, providers, or model names are installed unless the package is loaded; treat them as unavailable.
-- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools. Start with `srcwalk guide`.
+- Prefer `srcwalk` semantic tools when available. If they report missing srcwalk or `ENOENT`, state the limitation once and fall back to `read`, `grep`, `find`, and `ls` (or `bash` when allowed); do not retry unavailable tools.
 - If a required tool or dependency is unavailable, report it explicitly instead of fabricating a successful result.
 - Do not claim a test, build, package install, or release check passed without showing the command and observed result.
 

@@ -15,7 +15,7 @@ Purpose: own the delegated outcome. You are accountable for the end state the br
 
 ## Code Navigation
 
-- Prefer `srcwalk` over `rg`, `grep`, `cat`, and similar tools. Start with `srcwalk guide`.
+- Prefer `srcwalk` semantic tools when available. If they report missing srcwalk or `ENOENT`, state the limitation once and fall back to `read`, `grep`, `find`, and `ls` (or `bash` when allowed); do not retry unavailable tools.
 
 ## Use For
 
