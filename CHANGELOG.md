@@ -4,6 +4,18 @@ All notable changes to `@minhduydev/pi-harness` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Added the exact `@mrclrchtr/supi-ask-user@4.0.0` Full-profile companion and clean packed-consumer coverage for tool registration, sequential execution, and the non-TUI guard.
+- Lifecycle prompts now use focused `ask_user` decision forms with numbered plain-text fallbacks.
+
+### Fixed
+
+- Removed retired prompt/tool names, invalid brownfield next steps, inert agent skill metadata, and the nonexistent `multi_grep` contract.
+- Reconciled canonical model-seat policy, APPEND_SYSTEM delivery, disabled-by-default TUI behavior, bootstrap preconditions, and skill authoring templates with the implemented runtime.
+
 ## [2.1.0] - 2026-07-28
 
 ### Added

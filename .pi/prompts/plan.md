@@ -26,7 +26,7 @@ If not found: "Run `/create <title>` first."
 
 ## 3. Read Spec
 
-Read the `#### Spec` subsection of the work session block in `PLAN.md`. Run `memory-search` for related prior work (1 call, 3-5 results). Read the relevant codebase.
+Read the `#### Spec` subsection of the work session block in `PLAN.md`. If DCP is loaded, use `dcp_recall` once for related prior work; otherwise inspect the current artifact files directly. Read the relevant codebase.
 
 ## 4. Generate Plan
 
@@ -62,7 +62,7 @@ the typed checkpoint is missing rather than treating prose as equivalent.
 
 ## 6. Confirm (skip with `--quick`)
 
-Show the plan and confirm.
+Show the plan, then use `ask_user` for one focused choice: accept, adjust (text), or cancel. If `ask_user` is unavailable or the session is non-TUI, ask the same choices as a numbered plain-text question and wait. Skip this interaction only with `--quick`.
 
 ## 7. Update Blocks
 

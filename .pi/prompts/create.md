@@ -18,11 +18,11 @@ Generate a work session spec for the given title. The spec lives as a `### YYYY-
 ## 2. Gather Context
 
 - Read the user's request from the conversation
-- `memory-search` for related prior work (1 call, 3-5 results)
-- Check `notes/{ISO-week}.md` for any in-flight context
+- If DCP is loaded, use `dcp_recall` once for related prior work; otherwise inspect the current artifact files directly
+- Check `.pi/artifacts/{PLAN,PROGRESS,DECISIONS}.md` for in-flight context
 - If a work session with this title already exists, redirect: "Edit `PLAN.md` instead"
 
-If the request is ambiguous and `--ask` is not set, ask 1-2 focused questions before generating. Do not pad with 5+ questions.
+If the request is ambiguous or `--ask` is set, use one `ask_user` form containing only the 1–2 questions that change the spec, then wait for its result. If `ask_user` is unavailable or the session is non-TUI, ask the same questions in one numbered plain-text message and wait. Do not ask for facts that repository inspection can answer.
 
 ## 3. Generate Spec
 
@@ -62,7 +62,7 @@ was not persisted; do not claim the foundation gate is durable.
 
 ## 5. Confirm (skip with `--quick`)
 
-Show the spec summary in 5-10 lines and ask: "Looks right, or adjust?"
+Show the spec summary in 5–10 lines, then use `ask_user` for one focused choice: accept, adjust (text), or cancel. If `ask_user` is unavailable or the session is non-TUI, ask the same choices as a numbered plain-text question and wait. Skip this interaction only with `--quick`.
 
 ## 6. Write Work Session Blocks
 

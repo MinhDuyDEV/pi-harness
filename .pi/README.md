@@ -11,14 +11,14 @@ Pi package discovery loads:
 - `prompts/`
 - `themes/`
 
-The `.pi/APPEND_SYSTEM.md` supplement is the author's local runtime policy for developing this repo. It is **not shipped** and **not injected** into consumers — a consuming repository owns its own `.pi/APPEND_SYSTEM.md`. The package kernel is additive: the `harness-policy` injection extension was removed; delegation uses `@minhduydev/pi-subagents`, an additive runtime that never injects policy into a consumer's system prompt.
+The `.pi/APPEND_SYSTEM.md` supplement is shipped as initializer input but is not auto-injected by package discovery. `pi-harness-init` materializes its sentinel-managed region into a consumer's project-local `.pi/APPEND_SYSTEM.md` while preserving consumer prose. The package kernel remains additive: no extension injects this policy implicitly.
 
 ## Source-checkout profile
 
 These resources are active when this repository is used directly but are not automatically applied by package installation:
 
 - `settings.json` — pinned project packages and extension settings.
-- `agents/` — project agent profiles (`explore`, `general`, `reviewer`, `scout`) for the `@minhduydev/pi-subagents` delegation runtime. The `model:` frontmatter is omitted so agents inherit your `defaultModel`; set `model:` to a specific provider/model only if you want a per-agent override.
+- `agents/` — seven canonical profiles for `@minhduydev/pi-subagents`. Each intentionally pins a reproducible model seat; consumers may customize these files, and unavailable seats fail preflight instead of silently switching models.
 - `APPEND_SYSTEM.md` — project-level runtime supplement; extensions, skills, and prompts layer below it without duplicating it.
 - `../AGENTS.md` — package maintenance instructions loaded by Pi project-context discovery.
 

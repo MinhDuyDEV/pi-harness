@@ -21,7 +21,6 @@ const supportedKeys = new Set([
 	"proactive",
 	"tools",
 	"disallowed_tools",
-	"skills",
 	"prompt_mode",
 ]);
 

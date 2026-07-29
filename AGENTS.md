@@ -14,8 +14,8 @@ This repository is a reusable Pi Coding Agent package. Follow host system, devel
 - Inspect the current repository state before editing and preserve unrelated user changes.
 - Prefer small, reversible changes. Do not modify global Pi configuration or install unpinned packages as part of normal work.
 - Use Pi-native resource conventions and exact tool names. Treat optional package tools as unavailable unless installed and loaded.
-- Keep settings, agents, and prompts provider- and model-portable; do not commit credentials, personal paths, private endpoints, or machine-specific defaults.
-- Subagents under `.pi/agents/` must have explicit write boundaries, structured output contracts, and runtime-selected models rather than provider pins.
+- Keep provider selection and model availability handling portable in project settings and prompts; do not commit credentials, personal paths, private endpoints, or machine-specific defaults. Canonical agent profiles may pin documented model seats for reproducibility, but the runtime must fail clearly when a requested seat is unavailable.
+- Subagents under `.pi/agents/` must have explicit write boundaries, structured output contracts, and intentional model selection documented for consumers.
 - Prompt frontmatter must use fields supported by Pi. Prompt bodies must not emit fabricated tool-call syntax or assume commands from this repository will exist in a consumer repository.
 - When changing behavior, update the closest focused test and observe it fail before implementing the fix when practical.
 - Preserve public contracts and package payload intentionally; do not add compatibility shims or new dependencies without evidence.

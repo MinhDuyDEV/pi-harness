@@ -17,13 +17,9 @@ Gather information before implementation. Standalone research (no work session) 
 | `--alternatives` | false | Generate 2-3 structured options with tradeoffs |
 | `--into=<title>` | none | Append `#### Research` subsection to the work session with this title in `PROGRESS.md` |
 
-## 2. Memory Search (mandatory, 1 call)
+## 2. Prior Context (one bounded pass)
 
-```typescript
-memory-search({ query: "$ARGUMENTS", limit: 5 });
-```
-
-If results are relevant, cite them. Don't repeat what's already known.
+If DCP is loaded, use `dcp_recall` once with the topic. Otherwise inspect relevant `.pi/artifacts/` files and the current conversation. Cite relevant prior evidence and do not repeat what is already known.
 
 ## 3. Research (depth by flag)
 

@@ -93,7 +93,7 @@ Run when `--reconcile` is set, or proactively after every 3-4 completed tasks. R
 2. **Absorbed issues** — which issues were absorbed by larger work? Close only with evidence that the original issue's acceptance criteria are met; "the bigger change probably covers it" is not evidence.
 3. **Foundation ordering** — which foundation tasks should move ahead of feature tasks? Order by structural dependency, not by label, tag, or recency (no priority-by-label).
 
-Propose closures and reorderings with the evidence for each; apply after confirmation.
+Propose closures and reorderings with evidence, then use one `ask_user` form to confirm the selected changes before applying them. Use stable values for each proposal and allow multi-select when proposals are independent. If `ask_user` is unavailable or the session is non-TUI, present the same proposals as a numbered plain-text question and wait.
 After applying the confirmed changes, append a `#### Reconcile` subsection to
 the matching `PROGRESS.md` block with trigger, completed-since-last count,
 proposals, and evidence. Then persist the exact result with

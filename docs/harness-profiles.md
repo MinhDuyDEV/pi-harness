@@ -13,9 +13,11 @@ The Full profile enables the complete harness workflow surface:
 - checkpoints and DCP
 - diagnostics and integration hooks
 - learning coordination and workflow state
-- TUI, TPS, and usage tracking
+- TUI capability, TPS, and usage tracking (the harness compositor is disabled by default for terminal portability)
 - SuperPi and GPT personality prompt shaping
 - packaged extensions, skills, prompts, themes, agents, and artifact templates
+
+The TUI capability ships in Full, but `pi-harness.extensions.tui` is disabled by default to avoid competing compositor ownership. Consumers may enable it deliberately after confirming no other TUI package owns that surface.
 
 Provider adapters for DeepSeek, Mimo, and xAI are registered by the portable Full settings. Init does not set a global default provider/model or install credentials; canonical agent seats intentionally carry explicit model pins so delegation is reproducible. Network access occurs only when a consumer chooses and invokes a credentialed provider.
 

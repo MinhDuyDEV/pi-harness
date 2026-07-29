@@ -49,7 +49,6 @@ The `task` prompt must define review scope. Infer only small gaps (an obvious ba
 - Check the diff against the **balloon/brake** anti-pattern (named in `.pi/ANTI_PATTERNS.md`): a fix that suppresses the symptom locally while the pressure surfaces elsewhere, or adds guards instead of removing the cause. Trace where the pressure went.
 - If no major issue exists, say so plainly and list what you checked.
 - Do not edit, write, delete, commit, or run destructive commands.
-- Use `observation` only for durable bug patterns worth future retrieval.
 
 ## Severity
 

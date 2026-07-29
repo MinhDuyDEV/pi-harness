@@ -21,6 +21,7 @@ One command installs the complete project-local **Full** harness contract; no
 separate global or manual `pi install` is required:
 
 ```bash
+mkdir -p ./my-repo
 npx --yes --package @minhduydev/pi-harness@2.1.0 pi-harness-init ./my-repo
 ```
 
@@ -41,6 +42,11 @@ the portable provider adapters, but they do not require credentials at startup;
 credentials are needed only when that provider is selected. Loaded integrations
 report missing optional tools through `/integration` rather than making startup
 depend on them.
+
+The Full package set also pins `@mrclrchtr/supi-ask-user@4.0.0`, which provides
+the interactive TUI-only `ask_user` decision form used by lifecycle prompts.
+Those prompts include a numbered plain-text fallback for non-TUI or degraded
+sessions.
 
 ### Rerun, preview, and upgrade
 

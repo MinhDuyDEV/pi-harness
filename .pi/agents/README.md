@@ -1,10 +1,10 @@
 # Agent roster
 
-Specialist agents for the `task` tool. Each file is a **standalone system prompt** — no `AGENTS.md` / `APPEND_SYSTEM.md` inheritance unless the parent passes rules in the task `prompt`.
+Specialist profiles for the `task` tool. Terminal children load Pi's normal project context; the SDK fallback uses Pi's resource loader but disables extensions. The task brief must still carry outcome-specific constraints instead of assuming ambient policy is sufficient.
 
 The **session agent** is always the parent. Task agents match **OpenCode-style** builtins where applicable: `explore`, `scout`, `general`, `reviewer`, plus `proof-auditor`.
 
-Routing: `~/.pi/agent/APPEND_SYSTEM.md` (Delegation). Rules: `AGENTS.md` / project `.pi/AGENTS.md`.
+Routing lives in the active project `.pi/APPEND_SYSTEM.md`; project rules live in the root or nearest supported `AGENTS.md` discovered by Pi.
 
 Canonical agents intentionally carry a reproducible `model:` seat so delegation behavior is stable across consumer repositories. Consumers may change a seat explicitly; lock-aware upgrades preserve that change. `thinking:` is tuned per agent as well.
 
@@ -23,14 +23,15 @@ tools:
 ---
 ```
 
-### What pi-task implements
+### What pi-subagents implements
 
 | Field | Enforced? |
 | ----- | --------- |
 | `description` | Yes — task tool catalog |
 | `tools` / `disallowed_tools` | Yes |
 | `hidden` / `proactive` / `readonly` | Yes |
-| `model` | Yes — passed to child `pi`; canonical seat is pinned |\n| `thinking` | Yes — passed to child `pi` |
+| `model` | Yes — passed to the child; canonical seat is pinned and unavailable seats fail clearly |
+| `thinking` | Yes — passed to the child |
 
 ## Task agents (`task` tool)
 

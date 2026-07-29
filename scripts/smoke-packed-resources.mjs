@@ -170,7 +170,14 @@ try {
   ).trim().split("\n").at(-1);
   assert.ok(harnessTarball, "npm pack must return the harness tarball name");
 
+  const sourceSettings = JSON.parse(
+    readFileSync(join(repoRoot, ".pi", "settings.json"), "utf8"),
+  );
   const pins = readSuitePins(join(repoRoot, ".pi", "settings.json"));
+  const askUserSource = sourceSettings.packages.find((source) =>
+    /^npm:@mrclrchtr\/supi-ask-user@\d+\.\d+\.\d+$/.test(source),
+  );
+  assert.ok(askUserSource, "source settings must pin supi-ask-user exactly");
   const suiteSpecs = process.env.PI_E2E_SIBLINGS === "local"
     ? SUITE_PACKAGE_NAMES.map((name) => packLocalSibling(name, consumerRoot))
     : SUITE_PACKAGE_NAMES.map((name) => pins[name].spec);
@@ -183,6 +190,7 @@ try {
       "--no-fund",
       "--save-exact",
       ...suiteSpecs,
+      askUserSource.slice("npm:".length),
       join(consumerRoot, harnessTarball),
     ],
     { cwd: consumerRoot, stdio: "inherit" },
@@ -280,8 +288,59 @@ try {
   });
   await loader.reload();
 
-
   const summary = assertPackageResourcesLoad(loader, { packageRoot });
+  const askUserRoot = join(
+    consumerRoot,
+    "node_modules",
+    "@mrclrchtr",
+    "supi-ask-user",
+  );
+  const askUserLoader = new DefaultResourceLoader({
+    cwd: consumerRoot,
+    agentDir: join(consumerRoot, ".pi"),
+    settingsManager: SettingsManager.inMemory({ packages: [askUserRoot] }),
+  });
+  await askUserLoader.reload();
+  const askUserExtensions = askUserLoader.getExtensions();
+  assert.deepEqual(askUserExtensions.errors, []);
+  const askUserExtension = askUserExtensions.extensions.find((extension) =>
+    extension.path.startsWith(askUserRoot),
+  );
+  assert.ok(askUserExtension, "packed consumer must load the pinned supi ask-user extension");
+  const askUserTool = askUserExtension.tools.get("ask_user")?.definition;
+  assert.ok(askUserTool, "supi ask-user extension must register the ask_user tool");
+  assert.equal(askUserTool.executionMode, "sequential");
+  await assert.rejects(
+    () =>
+      askUserTool.execute(
+        "packed-ask-user",
+        {
+          title: "Packed smoke",
+          questions: [
+            {
+              type: "choice",
+              id: "proceed",
+              header: "Proceed",
+              prompt: "Continue?",
+              options: [
+                { value: "yes", label: "Yes" },
+                { value: "no", label: "No" },
+              ],
+            },
+          ],
+        },
+        new AbortController().signal,
+        undefined,
+        {
+          cwd: consumerRoot,
+          hasUI: false,
+          mode: "rpc",
+          abort() {},
+          ui: {},
+        },
+      ),
+    /requires an interactive TUI session/i,
+  );
   console.error(
     `✓ packed package smoke: ${JSON.stringify(summary)}; ${discovered.length} task agents discovered; delegated task ${delegatedTaskId} completed`,
   );

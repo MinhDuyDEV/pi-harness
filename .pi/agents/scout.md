@@ -6,7 +6,6 @@ model: opencode/deepseek-v4-flash-free
 thinking: high
 readonly: true
 proactive: true
-skills: brave-search, opensrc
 prompt_mode: append
 ---
 
@@ -42,7 +41,6 @@ Pi scout = external **docs/web** and cited sources — not OpenCode-style manage
 - Resolve conflicts explicitly; do not blend contradictory sources.
 - Before claiming how a dependency behaves or how the project should call an API, compare **local usage** (read/grep paths the task prompt named) to **official docs or upstream source** when the question is library-shaped.
 - Stop once more searching is unlikely to change the recommendation.
-- Use `observation` only for durable, novel research conclusions worth future retrieval.
 
 ## Findings Contract
 

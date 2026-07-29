@@ -10,7 +10,7 @@ Initialize project setup. Run once per project.
 > **AGENTS.md is the most important context file for AI agents** (Pocock). Getting init right reduces every future ambiguity error.
 >
 > **Next step for fresh projects:** `/create "first feature"` to start building.
-> **Next step for existing codebases:** `/verify --review` for code review, or `/verify --test` to add test coverage.
+> **Next step for existing codebases:** `/create "review-existing-code"`, then `/plan review-existing-code`; `/verify` is only valid after that work session has been shipped.
 
 ## Load Skills
 
@@ -80,22 +80,7 @@ With `--deep`:
 
 After detecting project, show summary and ask for confirmation:
 
-```typescript
-ask_user_question({
-  questions: [
-    {
-      header: "Preview",
-      question: `Detected: {tech stack summary}. Create AGENTS.md and tech-stack.md?`,
-      options: [
-        { label: "Yes, create both (Recommended)" },
-        { label: "AGENTS.md only — skip tech-stack.md" },
-        { label: "Cancel — don't write anything" },
-      ],
-      multiSelect: false,
-    },
-  ],
-});
-```
+Use the loaded `ask_user` tool for one choice question: create both files (recommended), create only `AGENTS.md`, or cancel. Include the detected stack in the form intro and wait for the answer before writing. If `ask_user` is unavailable or the session is non-TUI, ask the same choices as a numbered plain-text question and wait.
 
 ### Phase 3: Create AGENTS.md
 
@@ -194,16 +179,7 @@ Ask user before creating nested files.
 
 ### Phase 9: Persist to Memory
 
-```typescript
-observation({
-  type: "decision",
-  title: "Project init — [tech stack summary]",
-  narrative: "Core setup completed: AGENTS.md, tech-stack.md created for [language/framework] project. Vocabulary established: [key terms]. Git conventions set: [convention].",
-  concepts: "project-init, tech-stack, [framework], [language]",
-  confidence: "high",
-  files_modified: "AGENTS.md, .pi/memory/project/tech-stack.md",
-});
-```
+Record the verified stack, vocabulary, conventions, and modified paths in the files created by this workflow. If the loaded learning runtime captures verified file and workflow signals, let those hooks observe the work; do not fabricate a memory tool call.
 
 ---
 
@@ -225,39 +201,7 @@ Search memory for prior decisions, roadmap items, known constraints.
 
 ### Phase 2: Requirements Gathering
 
-```typescript
-ask_user_question({
-  questions: [
-    {
-      header: "Project vision",
-      question: "What is the project vision? (1-2 sentences)",
-      options: [{ label: "Let me type it", description: "I'll provide custom input" }],
-      multiSelect: false,
-    },
-    {
-      header: "Target users",
-      question: "Who are the primary users?",
-      options: [
-        { label: "Developers", description: "Tooling, libraries, CLI" },
-        { label: "End users", description: "Consumer-facing application" },
-        { label: "Internal team", description: "Internal tool or service" },
-      ],
-      multiSelect: true,
-    },
-    {
-      header: "Success criteria",
-      question: "What defines success? (select all that apply)",
-      options: [
-        { label: "Stability", description: "Reliability and correctness first" },
-        { label: "Speed", description: "Performance and low latency" },
-        { label: "UX", description: "User experience and polish" },
-        { label: "Maintainability", description: "Code quality and extensibility" },
-      ],
-      multiSelect: true,
-    },
-  ],
-});
-```
+Use one `ask_user` form with three related questions: a text question for the 1–2 sentence vision, a multi-choice question for target users (developers, end users, internal team), and a multi-choice question for success criteria (stability, speed, UX, maintainability). Use stable ids/values, explain trade-offs in option details where useful, and wait for the complete result. If `ask_user` is unavailable or the session is non-TUI, ask the same questions in one numbered plain-text message and wait.
 
 ### Phase 3: Create Files
 
@@ -299,37 +243,7 @@ Create personalized user profile at `.pi/memory/project/user.md`.
 
 ### Phase 1: Gather Preferences
 
-```typescript
-ask_user_question({
-  questions: [
-    {
-      header: "Identity",
-      question: "What is your name and role?",
-      options: [{ label: "Set name and role", description: "Tell me your details" }],
-      multiSelect: false,
-    },
-    {
-      header: "Communication",
-      question: "How detailed should responses be?",
-      options: [
-        { label: "Concise (Recommended)", description: "Short, direct answers" },
-        { label: "Detailed", description: "Full explanations and reasoning" },
-        { label: "Mixed", description: "Depends on context" },
-      ],
-      multiSelect: false,
-    },
-    {
-      header: "Git workflow",
-      question: "How should git commits be handled?",
-      options: [
-        { label: "Ask first (Recommended)", description: "Always confirm before commit/push" },
-        { label: "Auto-commit", description: "Commit directly after completion" },
-      ],
-      multiSelect: false,
-    },
-  ],
-});
-```
+Use one `ask_user` form with a text question for name/role, a single-choice communication preference (concise recommended, detailed, mixed), and a single-choice git preference (ask first recommended, auto-commit). Use stable ids/values and wait before writing `user.md`. If `ask_user` is unavailable or the session is non-TUI, ask the same questions in one numbered plain-text message and wait.
 
 ### Phase 2: Create user.md
 
@@ -368,6 +282,5 @@ Output:
 5. Git conventions set
 6. Broken windows flagged (if any)
 7. Suggested next steps:
-   - `/verify --review` — Code review
-   - `/verify --test` — Test coverage
-   - `/create "first feature"` — Start building with a spec
+   - `/create "review-existing-code"` then `/plan review-existing-code` — Review or add coverage in a valid work session
+   - `/create "first-feature"` — Start building with a spec

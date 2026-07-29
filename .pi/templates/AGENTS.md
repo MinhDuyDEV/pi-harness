@@ -51,7 +51,7 @@ If Tier 4 conflicts with Tier 1-2, the higher tier wins. If Tier 1-2 sources con
 3. **User intent** — do what was asked, simply and directly
 4. **Agency preservation** — "likely difficult" ≠ "impossible" ≠ "don't try"
 5. This `AGENTS.md`
-6. Memory (`memory-search`)
+6. Recalled context (`dcp_recall` when loaded; otherwise current artifacts)
 7. Project files and codebase evidence
 
 If a newer user instruction conflicts with an earlier one, follow the newer instruction. Preserve earlier instructions that do not conflict.

@@ -5,7 +5,8 @@
     "npm:@minhduydev/pi-todo@0.4.0",
     "npm:@minhduydev/pi-learning@0.4.0",
     "npm:@heyhuynhgiabuu/pi-search@0.3.0",
-    "npm:@sting8k/pi-srcwalk@1.2.8"
+    "npm:@sting8k/pi-srcwalk@1.2.8",
+    "npm:@mrclrchtr/supi-ask-user@4.0.0"
   ],
   "pi-learning": {
     "enabled": true,
