@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.2] - 2026-07-29
+
+### Fixed
+
+- Correct package author metadata to `minhduydev <minhduy.dev@gmail.com>` before npm publication.
+
 ## [2.3.1] - 2026-07-29
 
 ### Fixed

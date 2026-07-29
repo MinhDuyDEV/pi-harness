@@ -1,6 +1,6 @@
 {
   "name": "@minhduydev/pi-harness",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "private": false,
   "bin": {
     "pi-harness-init": "./scripts/init-consumer.mjs"
@@ -57,7 +57,7 @@
     "extensions",
     "skills"
   ],
-  "author": "Huynh Gia Buu",
+  "author": "minhduydev <minhduy.dev@gmail.com>",
   "license": "MIT",
   "publishConfig": {
     "access": "public"
