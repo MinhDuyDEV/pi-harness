@@ -2,7 +2,7 @@
   "packages": [
     "npm:@minhduydev/pi-core@0.3.0",
     "npm:@minhduydev/pi-subagents@0.11.0",
-    "npm:@minhduydev/pi-todo@0.4.1",
+    "npm:@minhduydev/pi-todo@0.4.2",
     "npm:@minhduydev/pi-learning@0.5.0",
     "npm:@heyhuynhgiabuu/pi-search@0.3.0",
     "npm:@sting8k/pi-srcwalk@1.2.8",

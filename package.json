@@ -1,6 +1,6 @@
 {
   "name": "@minhduydev/pi-harness",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "private": false,
   "bin": {
     "pi-harness-init": "./scripts/init-consumer.mjs"

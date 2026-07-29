@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.1] - 2026-07-29
+
+### Fixed
+
+- Pin `@minhduydev/pi-todo@0.4.2`, whose README install example now matches its supported pi-core range and passes the package publish gate.
+
 ## [2.3.0] - 2026-07-29
 
 ### Added
