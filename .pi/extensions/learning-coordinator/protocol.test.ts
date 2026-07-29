@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   makeContextRequestPayload,
+  makeContextRequestPayloadV2,
   makeLearningClaim,
+  makeLearningClaimIntent,
   makeProofVerifiedPayload,
   taggedDigest,
 } from "@minhduydev/pi-core";
@@ -48,6 +50,21 @@ function request(claims = [claim("Use bounded evidence")]) {
   );
 }
 
+function requestV2(statement = "Use completion-bound evidence") {
+  return makeContextRequestPayloadV2(
+    "task-v2",
+    "general",
+    "task description",
+    "corr-v2",
+    [makeLearningClaimIntent({
+      version: 2,
+      kind: "pattern",
+      statement,
+      applicability: "bounded protocol tests",
+    })],
+  );
+}
+
 function proof(
   input: ReturnType<typeof request>,
   supportedClaims: unknown[],
@@ -83,6 +100,33 @@ test("the producer's raw payload parses — no coordinator injection required", 
   const parsed = parseContextRequest(request());
   assert.ok(parsed);
   assert.equal(parsed.confidence, "high");
+});
+
+test("accepts V2 launch intents and binds verifier-produced evidence at completion", () => {
+  const rawRequest = requestV2();
+  const parsedRequest = parseContextRequest(rawRequest);
+  assert.ok(parsedRequest);
+  assert.equal(parsedRequest.protocolVersion, 2);
+  const intent = rawRequest.learningIntents[0]!;
+  const parsedProof = parseProof(makeProofVerifiedPayload({
+    taskId: "canonical-task-v2",
+    verificationPassed: true,
+    issues: [],
+    evidenceDigests: [evidenceDigest],
+    correlationId: rawRequest.correlationId,
+    requestDigest: rawRequest.requestDigest,
+    supportedClaims: [{
+      claimId: intent.claimId,
+      supported: true,
+      evidenceDigests: [evidenceDigest],
+    }],
+    timestamp: "2026-08-06T00:00:00.000Z",
+  }));
+  assert.ok(parsedProof);
+  const observations = createObservations(parsedRequest, parsedProof, binding, "/project");
+  assert.equal(observations.length, 1);
+  assert.equal(observations[0]!.content, intent.statement);
+  assert.equal(observations[0]!.evidenceRefs[0]!.digest, evidenceDigest.slice("sha256:v1:".length));
 });
 
 test("accepts only claim-specific support and fans out independently", () => {

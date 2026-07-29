@@ -1,6 +1,6 @@
 {
   "name": "@minhduydev/pi-harness",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "private": false,
   "bin": {
     "pi-harness-init": "./scripts/init-consumer.mjs"
@@ -113,11 +113,11 @@
     "@earendil-works/pi-ai": ">=0.81.1 <0.82.0",
     "@earendil-works/pi-coding-agent": ">=0.81.1 <0.82.0",
     "@earendil-works/pi-tui": ">=0.81.1 <0.82.0",
-    "typebox": "1.1.38",
-    "@minhduydev/pi-core": "^0.2.0",
-    "@minhduydev/pi-subagents": ">=0.10.0 <0.11.0",
-    "@minhduydev/pi-learning": ">=0.4.0 <0.5.0",
-    "@minhduydev/pi-todo": ">=0.4.0 <0.5.0"
+    "@minhduydev/pi-core": "^0.3.0",
+    "@minhduydev/pi-learning": ">=0.5.0 <0.6.0",
+    "@minhduydev/pi-subagents": ">=0.11.0 <0.12.0",
+    "@minhduydev/pi-todo": ">=0.4.0 <0.5.0",
+    "typebox": "1.1.38"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.81.1",

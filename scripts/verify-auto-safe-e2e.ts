@@ -3,14 +3,21 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { createEventBus } from "@earendil-works/pi-coding-agent";
+
 import {
-  makeContextRequestPayload,
+  makeContextRequestPayloadV2,
   makeProofVerifiedPayload,
 } from "@minhduydev/pi-core";
 import { readSuitePins } from "./lib/suite-pins.mjs";
 import { learningContextResponse, waitForBinding } from "./lib/auto-safe-e2e-helpers.ts";
+import {
+  createPackedRuntime,
+  exercisePackedTaskReuse,
+  injectedContext as injected,
+  loadPackageModule,
+  recordPackedUsageAndOutcome,
+  type PackedRuntime as Runtime,
+} from "./lib/auto-safe-runtime-e2e.ts";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 
@@ -79,7 +86,7 @@ function piCoreSpec(packDestination: string): string {
   return process.env.PI_CORE_SPEC ?? readSuitePins(join(REPO_ROOT, ".pi", "settings.json"))["@minhduydev/pi-core"].spec;
 }
 const LEARNING_OBSERVATION_EVENT = "pi-learning:observation:v1";
-const SUBAGENT_CONTEXT_REQUEST_EVENT = "pi-subagents:v1:context-request";
+const SUBAGENT_CONTEXT_REQUEST_EVENT = "pi-subagents:v2:context-request";
 const SUBAGENT_PROOF_EVENT = "pi-subagents:v1:proof-verified";
 const DIGEST = "a".repeat(64);
 const SETTINGS = {
@@ -98,24 +105,6 @@ const SETTINGS = {
   },
 };
 
-type LifecycleHandler = (event: unknown, context: RuntimeContext) => unknown | Promise<unknown>;
-
-interface RuntimeContext {
-  cwd: string;
-  hasUI: boolean;
-  isProjectTrusted: () => boolean;
-  ui: {
-    confirm: () => Promise<boolean>;
-    input: () => Promise<string | undefined>;
-    notify: () => void;
-  };
-}
-
-interface Runtime {
-  root: string;
-  events: ReturnType<typeof createEventBus>;
-  dispatch(name: string, event?: unknown): Promise<unknown[]>;
-}
 
 interface Consumer {
   path: string;
@@ -125,6 +114,7 @@ interface Consumer {
 interface LearningContext {
   version: 1;
   facts: Array<{ domain: string; summary: string; confidence: string; evidenceDigest?: string }>;
+  usageReceipts?: Array<{ learningId: string }>;
 }
 
 async function installConsumer(root: string): Promise<Consumer> {
@@ -161,44 +151,18 @@ async function installConsumer(root: string): Promise<Consumer> {
   };
 }
 
-async function loadPackageModule(consumer: string, relativePath: string): Promise<Record<string, unknown>> {
-  const modulePath = resolve(consumer, "node_modules", relativePath);
-  return import(pathToFileURL(modulePath).href) as Promise<Record<string, unknown>>;
-}
-
-async function createRuntime(consumer: Consumer, root: string, trusted: boolean): Promise<Runtime> {
-  mkdirSync(join(root, ".pi"), { recursive: true });
-  writeFileSync(join(root, ".pi", "settings.json"), JSON.stringify(SETTINGS));
-  const events = createEventBus();
-  const handlers = new Map<string, LifecycleHandler[]>();
-  const pi = {
-    events,
-    on(name: string, handler: LifecycleHandler): void {
-      handlers.set(name, [...(handlers.get(name) ?? []), handler]);
-    },
-    registerCommand(): void {},
-  };
-  consumer.installCoordinator(pi);
-  const learningModule = await loadPackageModule(consumer.path, "@minhduydev/pi-learning/dist/index.js");
-  const installLearning = learningModule.default as (api: unknown) => void;
-  installLearning(pi);
-  const context: RuntimeContext = {
-    cwd: root,
-    hasUI: false,
-    isProjectTrusted: () => trusted,
-    ui: {
-      confirm: async () => false,
-      input: async () => undefined,
-      notify: () => undefined,
-    },
-  };
-  const dispatch = async (name: string, event: unknown = {}): Promise<unknown[]> => {
-    const results: unknown[] = [];
-    for (const handler of handlers.get(name) ?? []) results.push(await handler(event, context));
-    return results;
-  };
-  await dispatch("session_start");
-  return { root, events, dispatch };
+async function createRuntime(
+  consumer: Consumer,
+  root: string,
+  trusted: boolean,
+): Promise<Runtime> {
+  return createPackedRuntime({
+    consumerPath: consumer.path,
+    root,
+    trusted,
+    settings: SETTINGS,
+    installCoordinator: consumer.installCoordinator,
+  });
 }
 
 // Payloads come from pi-core's REAL constructors — this script used to
@@ -211,18 +175,12 @@ function request(id: string, description: string): Record<string, unknown> {
   // dropped from the emitted request rather than thrown here — the "secret"
   // scenario depends on that.
   const claimInput = {
-    version: 1,
+    version: 2,
     kind: "pattern",
     statement: description,
     applicability: "verified task execution",
-    support: {
-      mode: "task-outcome",
-      evidenceRefs: [
-        { kind: "evidence-receipt", ref: "e2e-receipt", digest: `sha256:v1:${DIGEST}` },
-      ],
-    },
   };
-  return makeContextRequestPayload(
+  return makeContextRequestPayloadV2(
     `invocation-${id}`,
     "reviewer",
     description,
@@ -239,7 +197,7 @@ function proof(
 ): Record<string, unknown> {
   const contextRequest = request(id, description) as {
     requestDigest: `sha256:v1:${string}`;
-    learningClaims: Array<{ claimId: string }>;
+    learningIntents: Array<{ claimId: string }>;
   };
   return makeProofVerifiedPayload({
     taskId: `canonical-${id}`,
@@ -250,7 +208,7 @@ function proof(
     requestDigest: contextRequest.requestDigest,
     // A request whose claim was dropped at construction (e.g. it carried a
     // secret) has nothing to support — the proof mirrors that.
-    supportedClaims: contextRequest.learningClaims.slice(0, 1).map((claim) => ({
+    supportedClaims: contextRequest.learningIntents.slice(0, 1).map((claim) => ({
       claimId: claim.claimId,
       supported: passed,
       evidenceDigests: passed && evidenceDigests.every((item) => /^[a-f0-9]{64}$/.test(item))
@@ -283,20 +241,6 @@ async function emitProof(runtime: Runtime, id: string, description: string, opti
   );
 }
 
-async function injected(runtime: Runtime, query: string): Promise<Record<string, unknown> | undefined> {
-  const deadline = Date.now() + 4_000;
-  while (Date.now() < deadline) {
-    const results = await runtime.dispatch("before_agent_start", { prompt: query });
-    const match = results.find((result) => {
-      if (!result || typeof result !== "object") return false;
-      const message = (result as { message?: unknown }).message;
-      return !!message && typeof message === "object" && (message as { customType?: unknown }).customType === "pi-learning-context";
-    });
-    if (match) return match as Record<string, unknown>;
-    await new Promise((resolve) => setTimeout(resolve, 20));
-  }
-  return undefined;
-}
 
 function learningEvents(root: string): string {
   const path = join(root, ".pi", "artifacts", "learning", "v1", "events.jsonl");
@@ -307,8 +251,9 @@ function learningEvents(root: string): string {
   }
 }
 
+
 async function positiveAndContext(consumer: Consumer, root: string): Promise<void> {
-  const runtime = await createRuntime(consumer, root, true);
+  let runtime = await createRuntime(consumer, root, true);
   const observations: unknown[] = [];
   runtime.events.on(LEARNING_OBSERVATION_EVENT, (payload) => {
     observations.push(payload);
@@ -327,6 +272,7 @@ async function positiveAndContext(consumer: Consumer, root: string): Promise<voi
   // The description doubles as the retrieval query, and retrieval matches the
   // whole query as a substring of the learned title/guidance — so query with
   // the phrase the learned statement actually contains.
+  runtime = await createRuntime(consumer, root, true);
   const contextRequest = request("context", "focused alpha verification");
   runtime.events.emit(SUBAGENT_CONTEXT_REQUEST_EVENT, contextRequest);
   const response = await learningContextResponse(runtime.events, "correlation-context");
@@ -334,10 +280,29 @@ async function positiveAndContext(consumer: Consumer, root: string): Promise<voi
   assert.equal(response?.facts.length, 1);
   assert.equal(response?.facts[0]?.confidence, "high");
   assert.equal(response?.facts[0]?.evidenceDigest, DIGEST);
+  const activeRecord = learningEvents(root)
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .find((event) => event.type === "activated");
+  assert.equal(
+    response?.usageReceipts?.[0]?.learningId,
+    activeRecord?.recordId,
+    "served usage receipt must identify the persisted active learning",
+  );
 
   const eventsModule = await loadPackageModule(consumer.path, "@minhduydev/pi-subagents/dist/events.js");
   const validate = eventsModule.validateLearningContext as (value: unknown) => LearningContext | undefined;
   assert.equal(validate(response)?.facts.length, 1, "real subagent validator must accept injected facts");
+
+  const reuseRequest = request("runtime-reuse", description) as { learningIntents: unknown[] };
+  await exercisePackedTaskReuse({
+    runtime,
+    consumerPath: consumer.path,
+    description,
+    learningIntents: reuseRequest.learningIntents,
+  });
+  await recordPackedUsageAndOutcome(runtime, root);
 }
 
 async function rejectedInputs(consumer: Consumer, root: string): Promise<void> {

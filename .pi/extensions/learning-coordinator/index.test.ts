@@ -4,7 +4,9 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   bindingDigestFor,
   makeContextRequestPayload,
+  makeContextRequestPayloadV2,
   makeLearningClaim,
+  makeLearningClaimIntent,
   makeProofVerifiedPayload,
   taggedDigest,
 } from "@minhduydev/pi-core";
@@ -12,6 +14,7 @@ import register, {
   CONTEXT_SERVED_EVENT,
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
+  SUBAGENT_CONTEXT_REQUEST_EVENT_V2,
   SUBAGENT_PROOF_EVENT,
   createObservation,
   parseProof,
@@ -87,7 +90,11 @@ const request = makeContextRequestPayload(
   [claim],
 );
 
-function servedFor(target: typeof request) {
+function servedFor(target: {
+  taskId: string;
+  correlationId: string;
+  requestDigest: `sha256:v1:${string}`;
+}) {
   return {
     version: 1,
     taskId: target.taskId,
@@ -138,6 +145,48 @@ test("emits a supported explicit claim instead of the task description", async (
   assert.equal(observation.content, claim.statement);
   assert.notEqual(observation.content, request.description);
   assert.equal(observation.projectKey, binding.projectId);
+});
+
+test("accepts the V2 request channel and learns verifier-bound completion evidence", async () => {
+  const bus = new HarnessEventBus();
+  install(bus);
+  const intent = makeLearningClaimIntent({
+    version: 2,
+    kind: "discovery",
+    statement: "Bind evidence only after runtime verification",
+    applicability: "Learning claim production flow",
+  });
+  const requestV2 = makeContextRequestPayloadV2(
+    "task-v2",
+    "general",
+    "Verify completion-bound learning",
+    "corr-v2",
+    [intent],
+  );
+  const proofV2 = makeProofVerifiedPayload({
+    taskId: "task-v2",
+    verificationPassed: true,
+    issues: [],
+    evidenceDigests: [EVIDENCE_DIGEST],
+    correlationId: requestV2.correlationId,
+    requestDigest: requestV2.requestDigest,
+    ...binding,
+    supportedClaims: [{
+      claimId: intent.claimId,
+      supported: true,
+      evidenceDigests: [EVIDENCE_DIGEST],
+    }],
+    timestamp: "2026-08-06T00:00:00.000Z",
+  });
+
+  await bus.emit(SUBAGENT_CONTEXT_REQUEST_EVENT_V2, requestV2);
+  await bus.emit(CONTEXT_SERVED_EVENT, servedFor(requestV2));
+  await bus.emit(SUBAGENT_PROOF_EVENT, proofV2);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+
+  const observations = bus.emitted.filter(({ event }) => event === LEARNING_OBSERVATION_EVENT);
+  assert.equal(observations.length, 1);
+  assert.equal((observations[0]!.payload as { content: string }).content, intent.statement);
 });
 
 test("no observation without pi-learning's served binding", async () => {

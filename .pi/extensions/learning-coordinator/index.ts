@@ -1,5 +1,8 @@
 import { join } from "node:path";
-import { assertPiCoreProtocolVersion } from "@minhduydev/pi-core";
+import {
+  assertPiCoreProtocolVersion,
+  PI_CORE_PROTOCOL_VERSION,
+} from "@minhduydev/pi-core";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { EventBusPort } from "./delivery.js";
 import { readExtensionGate } from "../lib/harness-settings.js";
@@ -9,20 +12,21 @@ import {
   CONTEXT_SERVED_EVENT,
   LEARNING_OBSERVATION_EVENT,
   SUBAGENT_CONTEXT_REQUEST_EVENT,
+  SUBAGENT_CONTEXT_REQUEST_EVENT_V2,
   SUBAGENT_PROOF_EVENT,
   parseContextRequest,
   parseContextServed,
   parseProof,
   createObservations,
   type ContextBindingV1,
-  type ContextRequestV1,
+  type ContextRequest,
 } from "./protocol.js";
 
 const REQUEST_TTL_MS = 30 * 60 * 1000;
 const MAX_PENDING_REQUESTS = 128;
 
 interface PendingRequest {
-  request: ContextRequestV1;
+  request: ContextRequest;
   /** Set when pi-learning announces the served binding for this request. */
   binding?: ContextBindingV1;
   expiresAt: number;
@@ -38,7 +42,7 @@ export default function register(pi: ExtensionAPI): void {
   if (!readExtensionGate(undefined, "learningCoordinator", false)) return;
   // Two pi-core copies with different canonicalization rules would recreate
   // the digest divergence the shared package exists to end.
-  assertPiCoreProtocolVersion(1);
+  assertPiCoreProtocolVersion(PI_CORE_PROTOCOL_VERSION);
   const pending = new Map<string, PendingRequest>();
   const bus: EventBusPort = {
     on(event, handler) {
@@ -109,7 +113,7 @@ export default function register(pi: ExtensionAPI): void {
     }
   });
 
-  const remember = (request: ContextRequestV1): void => {
+  const remember = (request: ContextRequest): void => {
     const now = Date.now();
     for (const [correlationId, entry] of pending) {
       if (entry.expiresAt <= now) pending.delete(correlationId);
@@ -126,10 +130,12 @@ export default function register(pi: ExtensionAPI): void {
   // dependency on listener ordering nobody declared. The request is now
   // remembered as the producer signed it, and the binding arrives on
   // pi-learning's own event below.
-  pi.events.on(SUBAGENT_CONTEXT_REQUEST_EVENT, (payload: unknown) => {
+  const onContextRequest = (payload: unknown): void => {
     const request = parseContextRequest(payload);
     if (request) remember(request);
-  });
+  };
+  pi.events.on(SUBAGENT_CONTEXT_REQUEST_EVENT, onContextRequest);
+  pi.events.on(SUBAGENT_CONTEXT_REQUEST_EVENT_V2, onContextRequest);
 
   pi.events.on(CONTEXT_SERVED_EVENT, (payload: unknown) => {
     const served = parseContextServed(payload);

@@ -2,12 +2,12 @@
 
 `pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## What's new in 2.2.0
+## What's new in 2.3.0
 
-- Fail-closed read-only subagents with terminal/SDK tool-capability parity via `@minhduydev/pi-subagents@0.10.2`.
-- Verified lifecycle closure, Ask User integration, canonical agent result envelopes, and normalized optional-integration metadata.
-- Atomic Snap Edit regression coverage, offline/network release-check separation, and startup/context/polling benchmark baselines.
-- A portable Full consumer profile with tighter capability boundaries and release evidence.
+- V2 learning intents separate launch-time claims from completion-time evidence and bind reviewer support to the exact claim and artifact.
+- The asynchronous context handshake reliably injects restart-safe learning into real subagent tasks and records durable usage and outcomes.
+- Privacy-safe telemetry exposes bounded operational result codes without prompt text, learning content, paths, raw errors, or caller-controlled IDs.
+- Packed production E2E proves persistence, restart, retrieval, injection, usage receipts, and positive outcomes across package boundaries.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ separate global or manual `pi install` is required:
 
 ```bash
 mkdir -p ./my-repo
-npx --yes --package @minhduydev/pi-harness@2.2.0 pi-harness-init ./my-repo
+npx --yes --package @minhduydev/pi-harness@2.3.0 pi-harness-init ./my-repo
 ```
 
 The bootstrap writes exact project package pins for the executing harness and
@@ -55,7 +55,7 @@ rerun performs no content or timestamp writes. Preview a first install or
 upgrade with:
 
 ```bash
-npx --yes --package @minhduydev/pi-harness@2.2.0 pi-harness-init --dry-run ./my-repo
+npx --yes --package @minhduydev/pi-harness@2.3.0 pi-harness-init --dry-run ./my-repo
 ```
 
 To upgrade, change only the exact harness version in the `npx` command and run
@@ -159,11 +159,11 @@ publishing once network access is available.
 
 The owner-controlled publish order is:
 
-1. [`@minhduydev/pi-core@0.2.0`](https://www.npmjs.com/package/@minhduydev/pi-core/v/0.2.0)
-2. [`@minhduydev/pi-subagents@0.10.2`](https://www.npmjs.com/package/@minhduydev/pi-subagents/v/0.10.2)
-3. [`@minhduydev/pi-learning@0.4.0`](https://www.npmjs.com/package/@minhduydev/pi-learning/v/0.4.0)
-4. [`@minhduydev/pi-todo@0.4.0`](https://www.npmjs.com/package/@minhduydev/pi-todo/v/0.4.0)
-5. [`@minhduydev/pi-harness@2.2.0`](https://www.npmjs.com/package/@minhduydev/pi-harness/v/2.2.0)
+1. [`@minhduydev/pi-core@0.3.0`](https://www.npmjs.com/package/@minhduydev/pi-core/v/0.3.0)
+2. [`@minhduydev/pi-subagents@0.11.0`](https://www.npmjs.com/package/@minhduydev/pi-subagents/v/0.11.0)
+3. [`@minhduydev/pi-learning@0.5.0`](https://www.npmjs.com/package/@minhduydev/pi-learning/v/0.5.0)
+4. [`@minhduydev/pi-todo@0.4.1`](https://www.npmjs.com/package/@minhduydev/pi-todo/v/0.4.1)
+5. [`@minhduydev/pi-harness@2.3.0`](https://www.npmjs.com/package/@minhduydev/pi-harness/v/2.3.0)
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:

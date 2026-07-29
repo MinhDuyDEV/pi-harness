@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-07-29
+
+### Added
+
+- Add V2 launch-time learning intents and completion-time verifier evidence binding across the suite.
+- Extend the packed Auto-safe E2E through learning persistence, restart-safe retrieval, real task injection, durable usage receipts, and positive outcome recording.
+
+### Fixed
+
+- Await the correlated asynchronous learning context handshake so production subagents receive matching ContextPacks instead of racing a synchronous listener check.
+- Use the shared pi-core protocol constant and privacy-safe retrieval telemetry without exposing prompt text, learning content, paths, raw errors, or caller-controlled correlation IDs.
+
+### Changed
+
+- Pin `@minhduydev/pi-core@0.3.0`, `@minhduydev/pi-subagents@0.11.0`, `@minhduydev/pi-learning@0.5.0`, and the pi-core-compatible `@minhduydev/pi-todo@0.4.1`; widen the matching peer ranges.
+
 ## [2.2.0] - 2026-07-29
 
 ### Security

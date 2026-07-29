@@ -11,11 +11,14 @@
 import {
   bindingDigestFor,
   parseContextRequest as coreParseContextRequest,
+  parseContextRequestV2 as coreParseContextRequestV2,
   parseProofVerified,
   sha256Hex,
   taggedDigest,
   PI_EVENTS_V1,
+  PI_EVENTS_V2,
   type ContextRequestPayloadV1,
+  type ContextRequestPayloadV2,
   type ProofVerifiedPayloadV1,
   type SupportedLearningClaimV1,
 } from "@minhduydev/pi-core";
@@ -23,15 +26,20 @@ import {
 export const PROTOCOL_VERSION = 1 as const;
 export const LEARNING_OBSERVATION_EVENT = PI_EVENTS_V1.LEARNING_OBSERVATION;
 export const SUBAGENT_CONTEXT_REQUEST_EVENT = PI_EVENTS_V1.SUBAGENT_CONTEXT_REQUEST;
+export const SUBAGENT_CONTEXT_REQUEST_EVENT_V2 = PI_EVENTS_V2.SUBAGENT_CONTEXT_REQUEST;
 export const SUBAGENT_PROOF_EVENT = PI_EVENTS_V1.SUBAGENT_PROOF_VERIFIED;
 /** pi-learning announces the project binding for a served request here. */
 export const CONTEXT_SERVED_EVENT = "pi-learning:v1:context-served";
 export const DCP_TELEMETRY_EVENT = "dcp:telemetry";
 
 export type ContextRequestV1 = ContextRequestPayloadV1;
+export type ContextRequestV2 = ContextRequestPayloadV2;
+export type ContextRequest = ContextRequestV1 | ContextRequestV2;
 export type ProofVerifiedV1 = ProofVerifiedPayloadV1;
 
-export const parseContextRequest = coreParseContextRequest;
+export function parseContextRequest(value: unknown): ContextRequest | undefined {
+  return coreParseContextRequestV2(value) ?? coreParseContextRequest(value);
+}
 export const parseProof = parseProofVerified;
 
 /** The project identity pi-learning binds a served request to. */
@@ -125,17 +133,9 @@ function sameDigestSet(left: readonly string[], right: readonly string[]): boole
   );
 }
 
-/**
- * Turn a verified (request, proof, binding) triple into learning observations.
- *
- * The binding is an explicit parameter, verified by {@link parseContextServed}
- * before it gets here. It used to be read off the request and the proof —
- * fields another package had written into payloads it did not own — and the
- * requirement that BOTH carried it silently dropped every observation when
- * the listener order changed.
- */
+/** Convert a verified, project-bound request and proof into learning observations. */
 export function createObservations(
-  request: ContextRequestV1,
+  request: ContextRequest,
   proof: ProofVerifiedV1,
   binding: ContextBindingV1,
   _cwd: string,
@@ -158,14 +158,20 @@ export function createObservations(
     if (supportByClaim.has(support.claimId)) return [];
     supportByClaim.set(support.claimId, support);
   }
-  return request.learningClaims.flatMap((claim) => {
+  const claims = request.protocolVersion === 2
+    ? request.learningIntents.map((claim) => ({ claim, expectedDigests: undefined }))
+    : request.learningClaims.map((claim) => ({
+        claim,
+        expectedDigests: claim.support.evidenceRefs.map((reference) => reference.digest),
+      }));
+  return claims.flatMap(({ claim, expectedDigests }) => {
     const support = supportByClaim.get(claim.claimId);
-    const expectedDigests = claim.support.evidenceRefs.map((reference) => reference.digest);
     const content = boundedIdentifier(claim.statement, 400);
-    if (!support?.supported || !content || !sameDigestSet(expectedDigests, support.evidenceDigests)) return [];
-    const evidenceRefs = claim.support.evidenceRefs.map((reference, index) => ({
+    if (!support?.supported || !content || support.evidenceDigests.length === 0) return [];
+    if (expectedDigests && !sameDigestSet(expectedDigests, support.evidenceDigests)) return [];
+    const evidenceRefs = support.evidenceDigests.map((digest, index) => ({
       id: `task:${request.taskId}:claim:${claim.claimId}:evidence:${index}`,
-      digest: reference.digest.slice("sha256:v1:".length),
+      digest: digest.slice("sha256:v1:".length),
       trust: "verified-command" as const,
       description: "Claim-bound verified task evidence",
     }));
@@ -183,7 +189,7 @@ export function createObservations(
 }
 
 export function createObservation(
-  request: ContextRequestV1,
+  request: ContextRequest,
   proof: ProofVerifiedV1,
   binding: ContextBindingV1,
   cwd: string,

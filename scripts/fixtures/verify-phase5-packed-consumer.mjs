@@ -14,10 +14,10 @@ import {
 } from "@minhduydev/pi-todo/events";
 import { createTodoReplayPort } from "@minhduydev/pi-todo/replay";
 import {
-  makeContextRequestPayload,
-  makeLearningClaim,
+  makeContextRequestPayloadV2,
+  makeLearningClaimIntent,
   makeProofVerifiedPayload,
-  parseContextRequest,
+  parseContextRequestV2,
 } from "@minhduydev/pi-subagents/events";
 import { createOrchestrationReplayPort } from "@minhduydev/pi-subagents/replay";
 
@@ -95,14 +95,13 @@ const signal = {
 const ack = await inbox.ingest({ version: 1, requestId: taggedDigest({ signal: signalDigest(signal) }), signal });
 assert.equal(ack.status, "committed-applied");
 assert.equal(applied, 1);
-const claim = makeLearningClaim({
-  version: 1,
+const claim = makeLearningClaimIntent({
+  version: 2,
   kind: "pattern",
   statement: "Run focused parser tests before the complete suite",
   applicability: "parser changes",
-  support: { mode: "task-outcome", evidenceRefs: [{ kind: "evidence-receipt", ref: "receipt-1", digest: tagged("9") }] },
 });
-const context = makeContextRequestPayload(
+const context = makeContextRequestPayloadV2(
   "task-1",
   "general",
   "description only",
@@ -110,11 +109,11 @@ const context = makeContextRequestPayload(
   [claim],
 );
 assert.deepEqual(
-  parseContextRequest(context),
+  parseContextRequestV2(context),
   context,
-  "the packed producer must emit a context request accepted by the packed parser",
+  "the packed producer must emit a V2 context request accepted by the packed parser",
 );
-assert.equal(context.learningClaims[0].claimId, claim.claimId);
+assert.equal(context.learningIntents[0].claimId, claim.claimId);
 const proof = makeProofVerifiedPayload("task-final", true, [], [], "corr-1", {
   requestDigest: context.requestDigest,
   projectId: "project-1", trustEpoch: "trust-1", sessionGeneration: "session-1",
