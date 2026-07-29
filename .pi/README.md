@@ -13,6 +13,15 @@ Pi package discovery loads:
 
 The `.pi/APPEND_SYSTEM.md` supplement is shipped as initializer input but is not auto-injected by package discovery. `pi-harness-init` materializes its sentinel-managed region into a consumer's project-local `.pi/APPEND_SYSTEM.md` while preserving consumer prose. The package kernel remains additive: no extension injects this policy implicitly.
 
+## Template roots
+
+The repository has two intentional template roots with different owners:
+
+- `../templates/` (repository path `templates/`) contains package initializer inputs. `pi-harness-init` copies or merges these portable project files into consumer repositories; Pi does not discover this directory as runtime prompt content.
+- `.pi/templates/` contains harness workflow state templates used by local workflow tooling. They are package resources for the workflow contract, not initializer inputs and not Pi prompt templates.
+
+Keep initializer delivery changes in `templates/`; keep workflow record schemas and examples in `.pi/templates/`. Do not mirror files between the roots.
+
 ## Source-checkout profile
 
 These resources are active when this repository is used directly but are not automatically applied by package installation:

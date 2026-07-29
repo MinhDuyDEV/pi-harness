@@ -134,3 +134,20 @@ test("no skill description summarizes a multi-step process with a colon-list", (
 		assert.fail(`${offenders.length} descriptions include a multi-step process summary:\n${msg}`);
 	}
 });
+
+test("brave-search uses the generic hidden-integration metadata shape", () => {
+  const content = readFileSync(join(SKILLS_DIR, "brave-search", "SKILL.md"), "utf8");
+  const frontmatter = content.match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "";
+  assert.doesNotMatch(frontmatter, /^\s+category:/m);
+  assert.doesNotMatch(frontmatter, /^\s+runtime:/m);
+  assert.match(frontmatter, /^\s+version:\s*\S+/m);
+  assert.match(frontmatter, /^\s+tags:/m);
+  assert.match(frontmatter, /^\s+dependencies:\s*\[\]/m);
+});
+
+test("resource documentation distinguishes package and workflow template roots", () => {
+  const docs = readFileSync(join(SKILLS_DIR, "..", "README.md"), "utf8");
+  assert.match(docs, /`\.\.\/templates\/`[\s\S]*initializer/i);
+  assert.match(docs, /`templates\/`[\s\S]*`\.pi\/templates\/`/i);
+  assert.match(docs, /`\.pi\/templates\/`[\s\S]*workflow/i);
+});

@@ -36,11 +36,13 @@
     "quality:aislop": "aislop ci --changes --human",
     "smoke:resources": "node scripts/smoke-resources.mjs",
     "smoke:packed": "node scripts/smoke-packed-resources.mjs",
+    "benchmark:full": "node scripts/benchmark-full-profile.mjs",
     "validate:package-payload": "node scripts/validate-package-payload.mjs",
     "pack:check": "npm run validate:package-payload",
     "registry:preflight": "node scripts/registry-preflight.mjs",
     "release:check": "npm run release:check:local",
     "release:check:local": "node scripts/release-check.mjs --mode=local",
+    "release:check:offline": "node scripts/release-check.mjs --mode=local --offline",
     "release:check:registry": "node scripts/release-check.mjs --mode=registry",
     "prepublishOnly": "npm run release:check:registry"
   },

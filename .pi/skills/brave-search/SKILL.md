@@ -7,8 +7,11 @@ description: >-
   workflow is explicitly needed.
 disable-model-invocation: true
 metadata:
-  category: optional-integration
-  runtime: node
+  version: 1.0.0
+  tags:
+  - research
+  - integration
+  dependencies: []
 ---
 
 # Brave Search (optional)

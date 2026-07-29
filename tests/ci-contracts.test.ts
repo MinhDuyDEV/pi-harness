@@ -40,6 +40,7 @@ test("publish uses the single non-recursive release gate", async () => {
 
   assert.equal(packageJson.scripts.prepublishOnly, "npm run release:check:registry");
   assert.equal(packageJson.scripts["release:check"], "npm run release:check:local");
+  assert.match(packageJson.scripts["release:check:offline"], /--mode=local --offline/);
   assert.match(packageJson.scripts["release:check:registry"], /--mode=registry/);
   assert.equal(packageJson.scripts["pack:check"], "npm run validate:package-payload");
   const releaseCommands = [

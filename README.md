@@ -118,6 +118,20 @@ restrictions are documented in `docs/harness-profiles.md`.
 
 Prompt frontmatter uses only Pi-supported fields. Prompt bodies declare skill dependencies as `skill: name`; they do not assume a dedicated skill tool or hard-code this repository's commands into consumer workflows.
 
+## Performance baseline
+
+Run the optional Full-profile baseline without network or provider calls:
+
+```bash
+npm run benchmark:full
+```
+
+The JSON report records local resource-loader startup timings, the byte size and
+labelled token estimate for portable policy plus discovered skill descriptions,
+and sequential Todo-file stat timings as a periodic-update I/O proxy. These are
+descriptive measurements, not CI thresholds. The report lists its environment
+and limitations; collect comparable runs before proposing an optimization.
+
 ## Verification
 
 ```bash
@@ -129,12 +143,19 @@ npm run package:check
 npm run pack:check
 npm run smoke:resources
 npm run release:check:local
+npm run release:check:offline
 npm run check
 ```
 
 `release:check:local` builds and packs the four sibling checkouts next to this
 repository, so it does not depend on unpublished suite versions. None of the
 release scripts runs `npm publish`.
+
+`release:check:offline` runs the same local deterministic gates but skips
+`npm audit`, which requires registry access. It is intended for air-gapped or
+temporarily disconnected environments and **does not** make a dependency-audit
+or supply-chain freshness claim. Use the normal local or registry gate before
+publishing once network access is available.
 
 The owner-controlled publish order is:
 

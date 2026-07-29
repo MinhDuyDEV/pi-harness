@@ -4,17 +4,18 @@
  *   local    — build/pack sibling checkouts; hermetic pre-publish CI.
  *   registry — require every exact suite pin to exist on npm; final owner gate.
  *
+ * Add `--offline` to local mode to run every deterministic local gate without
+ * the network-dependent dependency audit. Offline success is not an audit claim.
+ *
  * Steps (stop on first failure):
  *   1. npm run check            — validate:skills, package:check, smoke:resources,
  *                                  typechecks, quality, full test suite
  *   2. verify:auto-safe         — Auto-safe E2E against a packed harness plus the
  *                                  sibling versions pinned in .pi/settings.json
  *   3. verify:phase5-packed     — the Phase 5 chain against those same pins
- *   4. npm audit                — security audit (all deps, not --omit=dev)
+ *   4. npm audit                — security audit unless `--offline`
  *   5. validate:package-payload — deterministic packed-manifest contract
- *                                  (npm pack --dry-run --json --ignore-scripts)
- *   6. smoke:packed             — clean-consumer native Pi resource load from an
- *                                  installed tarball with its required runtime peer
+ *   6. smoke:packed             — clean-consumer native Pi resource load
  *
  * No recursion: package steps use `--ignore-scripts`, and this script never invokes
  * `npm publish`/`npm pack` without that flag, so `prepack`/`prepublishOnly`
@@ -55,21 +56,29 @@ export function releaseEnvironment(mode, baseEnvironment = process.env) {
   return environment;
 }
 
-function main() {
-  const mode = parseMode(process.argv.slice(2));
-  const steps = [
+export function releaseSteps(mode, { audit = true } = {}) {
+  return [
     ...(mode === "registry"
       ? [{ name: "registry:preflight", cmd: "npm", args: ["run", "registry:preflight"] }]
       : []),
     { name: "check", cmd: "npm", args: ["run", "check"] },
     { name: "verify:auto-safe", cmd: "npm", args: ["run", "verify:auto-safe"] },
-    // The only gate that reads the real pins end-to-end. It was defined in
-    // package.json but wired into nothing, so it never ran.
     { name: "verify:phase5-packed", cmd: "npm", args: ["run", "verify:phase5-packed"] },
-    { name: "audit", cmd: "npm", args: ["audit"] },
+    ...(audit ? [{ name: "audit", cmd: "npm", args: ["audit"] }] : []),
     { name: "pack:check", cmd: "npm", args: ["run", "pack:check"] },
     { name: "smoke:packed", cmd: "npm", args: ["run", "smoke:packed"] },
   ];
+}
+
+function main() {
+  const argv = process.argv.slice(2);
+  const mode = parseMode(argv);
+  const offline = argv.includes("--offline");
+  if (offline && mode !== "local") {
+    process.stderr.write("release:check: --offline is only valid with --mode=local\n");
+    process.exit(2);
+  }
+  const steps = releaseSteps(mode, { audit: !offline });
 
   let failed = null;
   const environment = releaseEnvironment(mode);
@@ -91,8 +100,9 @@ function main() {
     process.exit(failed.status);
   }
 
+  const auditClaim = offline ? "audit skipped (offline mode)" : "audit passed";
   process.stderr.write(
-    `\nrelease:check[${mode}]: OK — full check, Auto-safe E2E, Phase 5 packed E2E, audit, and package validation passed\n`,
+    `\nrelease:check[${mode}${offline ? ":offline" : ""}]: OK — full check, Auto-safe E2E, Phase 5 packed E2E, ${auditClaim}, and package validation passed\n`,
   );
   process.exit(0);
 }

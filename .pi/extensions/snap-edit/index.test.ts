@@ -180,6 +180,68 @@ test("a valid target_edit replaces the selected occurrence", async () => {
   });
 });
 
+test("quick_edit rolls back an earlier valid operation when a later operation fails", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const quickEdit = api.tools.get("quick_edit");
+    assert.ok(quickEdit, "quick_edit tool must be registered");
+
+    const file = path.join(cwd, "quick-batch.txt");
+    const original = "alpha\nbeta\ngamma\n";
+    await writeFile(file, original, "utf8");
+
+    await assert.rejects(() =>
+      quickEdit.execute(
+        "call-quick-batch",
+        {
+          path: file,
+          edits: [
+            { start: 1, expectedStartLine: "alpha", lines: ["changed"] },
+            { start: 3, expectedStartLine: "WRONG", lines: ["never-written"] },
+          ],
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    );
+
+    assert.equal(await readFile(file, "utf8"), original);
+  });
+});
+
+test("target_edit rolls back an earlier valid operation when a later operation fails", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const targetEdit = api.tools.get("target_edit");
+    assert.ok(targetEdit, "target_edit tool must be registered");
+
+    const file = path.join(cwd, "target-batch.txt");
+    const original = "alpha\nbeta\ngamma\n";
+    await writeFile(file, original, "utf8");
+
+    await assert.rejects(() =>
+      targetEdit.execute(
+        "call-target-batch",
+        {
+          path: file,
+          ops: [
+            { type: "replace", target: "alpha", replacement: "changed" },
+            { type: "replace", target: "missing", replacement: "never-written" },
+          ],
+        },
+        undefined,
+        undefined,
+        { cwd },
+      ),
+    );
+
+    assert.equal(await readFile(file, "utf8"), original);
+  });
+});
+
 test("an invalid quick_edit throws and leaves the file untouched (atomic)", async () => {
   await withIsolatedCwd(true, async (cwd) => {
     const api = new StubApi();

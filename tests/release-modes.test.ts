@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { checkRegistryPins, renderRegistryReport } from "../scripts/registry-preflight.mjs";
 import { parseSuitePins, SUITE_PUBLISH_ORDER } from "../scripts/lib/suite-pins.mjs";
-import { releaseEnvironment } from "../scripts/release-check.mjs";
+import { releaseEnvironment, releaseSteps } from "../scripts/release-check.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const SETTINGS = JSON.parse(readFileSync(resolve(ROOT, ".pi/settings.json"), "utf8"));
@@ -109,9 +109,11 @@ test("cross-package workflow reports branch source and exact sibling SHAs", () =
   assert.doesNotMatch(workflow, /if ! git clone --depth 1 --branch/);
 });
 
-test("release documentation pins the owner-controlled order and both gate modes", () => {
+test("release documentation pins the owner-controlled order and all gate modes", () => {
   const docs = readFileSync(resolve(ROOT, "README.md"), "utf8");
   assert.match(docs, /release:check:local/);
+  assert.match(docs, /release:check:offline/);
+  assert.match(docs, /offline[\s\S]*does not[\s\S]*audit/i);
   assert.match(docs, /release:check:registry/);
   let cursor = -1;
   for (const name of SUITE_PUBLISH_ORDER) {
@@ -121,4 +123,12 @@ test("release documentation pins the owner-controlled order and both gate modes"
   }
   const releaseScript = readFileSync(resolve(ROOT, "scripts/release-check.mjs"), "utf8");
   assert.doesNotMatch(releaseScript, /["']publish["']/);
+});
+
+test("offline release steps preserve local gates but omit the network audit", () => {
+  const normal = releaseSteps("local", { audit: true }).map((step) => step.name);
+  const offline = releaseSteps("local", { audit: false }).map((step) => step.name);
+  assert.ok(normal.includes("audit"));
+  assert.ok(!offline.includes("audit"));
+  assert.deepEqual(offline, normal.filter((name) => name !== "audit"));
 });
