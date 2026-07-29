@@ -6,15 +6,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-07-29
+
+### Security
+
+- Enforce fail-closed read-only subagent capability boundaries and terminal/SDK effective-tool parity through `@minhduydev/pi-subagents@0.10.2`.
+- Require verified lifecycle evidence before work-session closure and preserve explicit degraded-mode behavior for unavailable integrations.
+
 ### Added
 
-- Added the exact `@mrclrchtr/supi-ask-user@4.0.0` Full-profile companion and clean packed-consumer coverage for tool registration, sequential execution, and the non-TUI guard.
+- Integrate `@mrclrchtr/supi-ask-user@4.0.0` into the Full profile with clean packed-consumer coverage for registration, sequential execution, and the non-TUI guard.
+- Add canonical standalone-agent result envelopes, Snap Edit multi-operation atomicity coverage, and startup/context/polling benchmark baselines.
+
+### Changed
+
 - Lifecycle prompts now use focused `ask_user` decision forms with numbered plain-text fallbacks.
+- Normalize optional integration metadata and template-root documentation across source and initialized consumers.
+- Separate deterministic offline release verification from the network-dependent audit gate.
 
 ### Fixed
 
-- Removed retired prompt/tool names, invalid brownfield next steps, inert agent skill metadata, and the nonexistent `multi_grep` contract.
-- Reconciled canonical model-seat policy, APPEND_SYSTEM delivery, disabled-by-default TUI behavior, bootstrap preconditions, and skill authoring templates with the implemented runtime.
+- Remove retired prompt/tool names, invalid brownfield next steps, inert agent skill metadata, and the nonexistent `multi_grep` contract.
+- Reconcile canonical model-seat policy, APPEND_SYSTEM delivery, disabled-by-default TUI behavior, bootstrap preconditions, and skill authoring templates with the implemented runtime.
 
 ## [2.1.0] - 2026-07-28
 

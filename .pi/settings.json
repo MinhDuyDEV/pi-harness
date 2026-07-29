@@ -1,7 +1,7 @@
 {
   "packages": [
     "npm:@minhduydev/pi-core@0.2.0",
-    "npm:@minhduydev/pi-subagents@0.10.1",
+    "npm:@minhduydev/pi-subagents@0.10.2",
     "npm:@minhduydev/pi-todo@0.4.0",
     "npm:@minhduydev/pi-learning@0.4.0",
     "npm:@heyhuynhgiabuu/pi-search@0.3.0",
