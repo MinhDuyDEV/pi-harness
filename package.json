@@ -1,6 +1,6 @@
 {
   "name": "@minhduydev/pi-harness",
-  "version": "2.3.2",
+  "version": "2.4.0",
   "private": false,
   "bin": {
     "pi-harness-init": "./scripts/init-consumer.mjs"
@@ -118,7 +118,7 @@
     "@minhduydev/pi-core": "^0.3.0",
     "@minhduydev/pi-learning": ">=0.5.0 <0.6.0",
     "@minhduydev/pi-subagents": ">=0.11.0 <0.12.0",
-    "@minhduydev/pi-todo": ">=0.4.0 <0.5.0",
+    "@minhduydev/pi-todo": ">=0.5.0 <0.6.0",
     "typebox": "1.1.38"
   },
   "devDependencies": {

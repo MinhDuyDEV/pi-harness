@@ -1,6 +1,6 @@
 
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   KnowledgeSignalInbox,
@@ -57,8 +57,8 @@ const page = await todoPort.replay(undefined, 10);
 assert.equal(page.events.length, 1);
 assert.equal(page.events[0].usageBindings[0].usageId, receipt.usageId);
 assert.deepEqual(await todoPort.replay(page.next, 10), { events: [] });
-let applied = 0;
-const inbox = new KnowledgeSignalInbox(phase5Root, {
+const appliedOutcomesPath = join(phase5Root, "applied-outcomes.jsonl");
+const inboxOptions = {
   receipts: receiptStore,
   activeBinding: () => ({
     trusted: true,
@@ -66,8 +66,16 @@ const inbox = new KnowledgeSignalInbox(phase5Root, {
     trustEpoch: "trust-1",
     sessionGeneration: "session-1",
   }),
-  applySignal: async () => { applied += 1; return ["ledger-1"]; },
-});
+  applySignal: async (signal) => {
+    await appendFile(appliedOutcomesPath, `${JSON.stringify({
+      usageId: signal.usage.usageId,
+      eventId: signal.eventId,
+      outcome: signal.outcome,
+    })}\n`, "utf8");
+    return [`outcome:${signal.eventId}:${signal.usage.usageId}`];
+  },
+};
+const inbox = new KnowledgeSignalInbox(phase5Root, inboxOptions);
 const event = page.events[0];
 const signal = {
   version: 1,
@@ -94,7 +102,21 @@ const signal = {
 };
 const ack = await inbox.ingest({ version: 1, requestId: taggedDigest({ signal: signalDigest(signal) }), signal });
 assert.equal(ack.status, "committed-applied");
-assert.equal(applied, 1);
+const restartedInbox = new KnowledgeSignalInbox(phase5Root, inboxOptions);
+const replayAck = await restartedInbox.ingest({
+  version: 1,
+  requestId: taggedDigest({ replay: signalDigest(signal) }),
+  signal,
+});
+assert.equal(replayAck.status, "duplicate");
+const appliedOutcomes = (await readFile(appliedOutcomesPath, "utf8")).trim().split("\n");
+assert.equal(appliedOutcomes.length, 1, "applySignal must remain exactly-once after restart");
+assert.deepEqual(JSON.parse(appliedOutcomes[0]), {
+  usageId: receipt.usageId,
+  eventId: signal.eventId,
+  outcome: "completed",
+});
+assert.equal(await restartedInbox.getOutcome(receipt.usageId), "completed");
 const claim = makeLearningClaimIntent({
   version: 2,
   kind: "pattern",

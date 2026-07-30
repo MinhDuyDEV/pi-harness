@@ -6,6 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-07-29
+
+### Added
+
+- Add a generated stage/domain SuperPi router, visible-skill coverage validation, and model-seat preflight with explicit consumer remap guidance.
+- Add provenance and third-party notice contracts to the package payload and release validation.
+- Extend the packed Phase 5 gate with a file-backed `applySignal` outcome sink and restart replay assertion, proving durable exactly-once application instead of only counting an in-memory callback.
+
+### Changed
+
+- Consolidate architecture guidance, demote natural user-invoked workflows from automatic routing, and enforce one lifecycle stage plus at most one domain overlay.
+- Thin lifecycle prompts around single ownership, preserve research status, and use portable repository lookup and verification wording.
+- Pin `@minhduydev/pi-core@0.3.1` and `@minhduydev/pi-todo@0.5.0`; the Todo package now provides filtered views, lossless terminal-phase archives, and explicit canonical-format migration.
+
+### Fixed
+
+- Normalize legacy DCP state during load and keep canonical bootstrap commands executable in documentation smoke tests.
+
 ## [2.3.2] - 2026-07-29
 
 ### Fixed
