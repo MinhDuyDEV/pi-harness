@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /** Generate the superpi route table from its checked-in route metadata. */
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const skillRoot = resolve(".pi/skills");
@@ -30,8 +30,11 @@ function render(metadata) {
   }
   if (!Array.isArray(metadata.routes) || metadata.routes.length === 0) fail("routes must be a non-empty array");
   const seenTasks = new Set();
+  const routed = new Set();
   const rows = metadata.routes.map((route) => {
-    if (!route || typeof route.task !== "string" || !Array.isArray(route.skills)) fail("route shape is invalid");
+    if (!route || !["stage", "domain"].includes(route.axis) || typeof route.task !== "string" || !Array.isArray(route.skills)) {
+      fail("route shape is invalid; axis must be stage or domain");
+    }
     if (seenTasks.has(route.task)) fail(`duplicate task ${route.task}`);
     seenTasks.add(route.task);
     if (route.skills.length === 0 || route.skills.length > metadata.maxSkillsPerRoute) {
@@ -40,17 +43,26 @@ function render(metadata) {
     for (const name of route.skills) {
       if (typeof name !== "string") fail(`${route.task} contains a non-string skill`);
       if (isHidden(readSkill(name))) fail(`${route.task} routes to hidden skill ${name}; make it visible or remove it`);
+      routed.add(name);
     }
-    return `| ${route.task} | ${route.skills.map((name) => `\`${name}\``).join(" → ")} |`;
+    return `| ${route.axis} | ${route.task} | ${route.skills.map((name) => `\`${name}\``).join(" → ")} |`;
   });
+  const exemptions = new Set(metadata.exemptions ?? []);
+  const visible = new Set();
+  for (const name of readdirSync(skillRoot)) {
+    const path = resolve(skillRoot, name, "SKILL.md");
+    if (existsSync(path) && !isHidden(readFileSync(path, "utf8"))) visible.add(name);
+  }
+  for (const name of visible) if (!routed.has(name) && !exemptions.has(name)) fail(`visible skill ${name} is neither routed nor explicitly exempted`);
+  for (const name of exemptions) if (!visible.has(name)) fail(`exemption references missing or hidden skill ${name}`);
   return [
     start,
     "## Routing table",
     "",
-    "Match the task to a row, then load the listed skills in order. A parenthesized condition in a skill is optional; the route itself is never more than three skills.",
+    "Select one stage route, then add at most one matching domain overlay. Every model-visible skill is routed below or listed in `exemptions` in `route-metadata.json`.",
     "",
-    "| Task type | Skill chain (load order) |",
-    "| --- | --- |",
+    "| Axis | Task type | Skill chain (load order) |",
+    "| --- | --- | --- |",
     ...rows,
     "",
     end,

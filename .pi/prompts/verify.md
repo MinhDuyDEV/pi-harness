@@ -20,12 +20,12 @@ Check the implementation against the spec, run gates, write tests, and review co
 | `--audit` | false | Invoke the `proof-auditor` agent to verify evidence actually proves each claim (fake-green/fake-red/coverage gaps) |
 | `--reconcile` | false | Reconcile the backlog against reality (see Reconcile section) |
 
+## Ownership boundary
+- This prompt owns verification evidence, status transitions, and the next command. Load `verification-before-completion` for the evidence standard and `code-review-and-quality` when review is requested; do not duplicate their detailed methods.
+
 ## 2. Find Work Session
 
-```bash
-rg "^### .* - <title>$" .pi/artifacts/TODO.md
-rg "^### .* - <title>$" .pi/artifacts/PROGRESS.md
-```
+Use the available repository text/semantic search tool to locate the exact `### ... - <title>` blocks in `.pi/artifacts/TODO.md` and `.pi/artifacts/PROGRESS.md`; do not assume `rg` is installed.
 
 If not found: "Run `/create <title>` and `/ship <title>` first."
 
@@ -53,9 +53,7 @@ Discover the project's real gates before running them: read the nearest
 manifests, lockfiles, and CI workflows. Prefer the repository's aggregate
 check command when one exists; otherwise select the smallest commands that
 cover type/build, lint/static analysis, and tests. Do not infer npm, JavaScript,
-or command names from this prompt. Use the same evidence and ambiguity rules as
-`scripts/lib/discover-gates.mjs`: wrappers take precedence, conflicting
-lockfiles block execution, and a missing runner is not guessed. Record every selected command, cwd, exit
+or command names from this prompt. Use the repository's gate-discovery semantics: wrappers take precedence, conflicting lockfiles block execution, and a missing runner is not guessed. If the harness package is installed, consult its documented behavior; do not assume `scripts/lib/discover-gates.mjs` exists in the consumer. Record every selected command, cwd, exit
 status, and why it is authoritative; report each PASS/FAIL/SKIPPED.
 
 ### `--gate-only`

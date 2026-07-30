@@ -26,6 +26,7 @@
     "typecheck:extension-tests": "tsc --noEmit -p .pi/extensions/tsconfig.tests.json",
     "validate:skills": "node scripts/generate-superpi-router.mjs --check && node scripts/validate-skills.mjs",
     "generate:superpi": "node scripts/generate-superpi-router.mjs",
+    "model:preflight": "node scripts/model-seat-preflight.mjs",
     "regen:skills": "node scripts/validate-skills.mjs --update",
     "validate:skills:ci": "npm run validate:skills",
     "package:check": "node scripts/validate-package.mjs",

@@ -24,18 +24,28 @@ Pi discovers skill descriptions automatically and loads a full `SKILL.md` only w
 <!-- GENERATED ROUTES:START -->
 ## Routing table
 
-Match the task to a row, then load the listed skills in order. A parenthesized condition in a skill is optional; the route itself is never more than three skills.
+Select one stage route, then add at most one matching domain overlay. Every model-visible skill is routed below or listed in `exemptions` in `route-metadata.json`.
 
-| Task type | Skill chain (load order) |
-| --- | --- |
-| New feature | `spec-driven-development` → `planning-and-task-breakdown` → `test-driven-development` |
-| Bug fix | `debugging-and-error-recovery` → `test-driven-development` → `verification-before-completion` |
-| Refactor / architecture | `improve-codebase-architecture` → `deep-module-design` → `code-cleanup` |
-| Frontend / UI | `frontend-design` → `react-best-practices` → `playwright` |
-| Testing | `test-driven-development` → `testing-anti-patterns` |
-| Review / ship | `code-review-and-quality` → `verification-before-completion` → `shipping-and-launch` |
-| Research | `context-engineering` → `opensrc` |
-| Docs | `artifact-format` |
+| Axis | Task type | Skill chain (load order) |
+| --- | --- | --- |
+| stage | discover / research | `context-engineering` → `opensrc` |
+| stage | create / specify | `spec-driven-development` → `brainstorming` |
+| stage | plan / model | `planning-and-task-breakdown` → `domain-modeling` |
+| stage | implement / test | `incremental-implementation` → `test-driven-development` → `testing-anti-patterns` |
+| stage | debug / recover | `debugging-and-error-recovery` → `doubt-driven-development` |
+| stage | review / verify | `code-review-and-quality` → `verification-before-completion` → `aislop` |
+| stage | ship / release | `shipping-and-launch` → `code-cleanup` |
+| domain | security-sensitive | `security-and-hardening` |
+| domain | frontend / browser UI | `frontend-design` → `react-best-practices` → `playwright` |
+| domain | TypeScript / domain-heavy | `typescript-coding-standards` → `deep-module-design` |
+| domain | operations / external I/O | `observability-and-instrumentation` → `ci-cd-and-automation` |
+| domain | migration / API change | `deprecation-and-migration` → `improve-codebase-architecture` |
+| domain | documentation / ADR | `documentation-and-adrs` → `artifact-format` |
+| domain | skill / tooling maintenance | `writing-skills` → `diagnostics` → `fallow` |
+| domain | code search / transformation | `ast-grep` |
+| domain | prototype / experiment | `prototype` |
+| domain | grill / adversarial design | `grill-me` |
+| domain | worktree / isolated change | `using-git-worktrees` |
 
 <!-- GENERATED ROUTES:END -->
 

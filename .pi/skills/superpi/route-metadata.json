@@ -1,14 +1,24 @@
 {
-  "version": 1,
   "maxSkillsPerRoute": 3,
+  "exemptions": [],
   "routes": [
-    { "task": "New feature", "skills": ["spec-driven-development", "planning-and-task-breakdown", "test-driven-development"] },
-    { "task": "Bug fix", "skills": ["debugging-and-error-recovery", "test-driven-development", "verification-before-completion"] },
-    { "task": "Refactor / architecture", "skills": ["improve-codebase-architecture", "deep-module-design", "code-cleanup"] },
-    { "task": "Frontend / UI", "skills": ["frontend-design", "react-best-practices", "playwright"] },
-    { "task": "Testing", "skills": ["test-driven-development", "testing-anti-patterns"] },
-    { "task": "Review / ship", "skills": ["code-review-and-quality", "verification-before-completion", "shipping-and-launch"] },
-    { "task": "Research", "skills": ["context-engineering", "opensrc"] },
-    { "task": "Docs", "skills": ["artifact-format"] }
+    { "axis": "stage", "task": "discover / research", "skills": ["context-engineering", "opensrc"] },
+    { "axis": "stage", "task": "create / specify", "skills": ["spec-driven-development", "brainstorming"] },
+    { "axis": "stage", "task": "plan / model", "skills": ["planning-and-task-breakdown", "domain-modeling"] },
+    { "axis": "stage", "task": "implement / test", "skills": ["incremental-implementation", "test-driven-development", "testing-anti-patterns"] },
+    { "axis": "stage", "task": "debug / recover", "skills": ["debugging-and-error-recovery", "doubt-driven-development"] },
+    { "axis": "stage", "task": "review / verify", "skills": ["code-review-and-quality", "verification-before-completion", "aislop"] },
+    { "axis": "stage", "task": "ship / release", "skills": ["shipping-and-launch", "code-cleanup"] },
+    { "axis": "domain", "task": "security-sensitive", "skills": ["security-and-hardening"] },
+    { "axis": "domain", "task": "frontend / browser UI", "skills": ["frontend-design", "react-best-practices", "playwright"] },
+    { "axis": "domain", "task": "TypeScript / domain-heavy", "skills": ["typescript-coding-standards", "deep-module-design"] },
+    { "axis": "domain", "task": "operations / external I/O", "skills": ["observability-and-instrumentation", "ci-cd-and-automation"] },
+    { "axis": "domain", "task": "migration / API change", "skills": ["deprecation-and-migration", "improve-codebase-architecture"] },
+    { "axis": "domain", "task": "documentation / ADR", "skills": ["documentation-and-adrs", "artifact-format"] },
+    { "axis": "domain", "task": "skill / tooling maintenance", "skills": ["writing-skills", "diagnostics", "fallow"] },
+    { "axis": "domain", "task": "code search / transformation", "skills": ["ast-grep"] },
+    { "axis": "domain", "task": "prototype / experiment", "skills": ["prototype"] },
+    { "axis": "domain", "task": "grill / adversarial design", "skills": ["grill-me"] },
+    { "axis": "domain", "task": "worktree / isolated change", "skills": ["using-git-worktrees"] }
   ]
 }

@@ -15,6 +15,9 @@ Generate a work session spec for the given title. The spec lives as a `### YYYY-
 | `--quick` | false | Skip the confirmation step; write directly |
 | `--ask` | false | Ask 1-2 targeted questions even if the request seems clear |
 
+## Ownership boundary
+- This prompt owns slash arguments, the foundation checkpoint, artifact block creation, and the next command. Load `spec-driven-development` for requirement discovery and acceptance-criteria method; do not duplicate that skill's detailed workflow.
+
 ## 2. Gather Context
 
 - Read the user's request from the conversation

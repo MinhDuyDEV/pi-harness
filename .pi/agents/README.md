@@ -8,6 +8,11 @@ Routing lives in the active project `.pi/APPEND_SYSTEM.md`; project rules live i
 
 Canonical agents intentionally carry a reproducible `model:` seat so delegation behavior is stable across consumer repositories. Consumers may change a seat explicitly; lock-aware upgrades preserve that change. `thinking:` is tuned per agent as well.
 
+### Model-seat preflight and remapping
+- Run `npm run model:preflight` after initialization to list every canonical seat.
+- For a host-specific availability check, set `PI_HARNESS_AVAILABLE_MODELS` to a comma-separated list of provider/model IDs and rerun with `--strict`.
+- Remap explicitly with `PI_HARNESS_MODEL_MAP='{"provider/model":"provider/available-model"}'`; the preflight never silently substitutes a model. Copy the resulting model fields into consumer agent profiles when the package is not installed.
+
 ## Agent file template
 
 ```yaml

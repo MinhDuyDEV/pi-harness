@@ -16,12 +16,12 @@ Implement the work session plan.
 | `--no-verify` | false | Skip the final repository-defined gate run |
 | `--dry-run` | false | Show the planned file changes without writing them |
 
+## Ownership boundary
+- This prompt owns ship gating, artifact transitions, and the next command. Load `shipping-and-launch` for release safety and `verification-before-completion` for evidence rules; do not duplicate their detailed checklists.
+
 ## 2. Find Work Session
 
-```bash
-rg "^### .* - <title>$" .pi/artifacts/TODO.md
-rg "^### .* - <title>$" .pi/artifacts/PLAN.md
-```
+Use the available repository text/semantic search tool to locate the exact `### ... - <title>` blocks in `.pi/artifacts/TODO.md` and `.pi/artifacts/PLAN.md`; do not assume `rg` is installed.
 
 If not found: "Run `/create <title>` and `/plan <title>` first."
 
@@ -44,8 +44,7 @@ Discover the project's authoritative gates from the nearest project
 instructions, checked-in wrappers, build/package manifests, lockfiles, and CI.
 Prefer one repository aggregate check when available; otherwise choose the
 smallest build/type, lint/static, and test commands supported by evidence in
-the repo. Apply `scripts/lib/discover-gates.mjs` semantics: a checked-in wrapper
-wins, conflicting lockfiles are a blocker, and no package runner is guessed.
+the repo. Apply the repository's gate-discovery semantics: checked-in wrappers win, conflicting lockfiles are a blocker, and no package runner is guessed. If the harness package is installed, consult its documented gate-discovery behavior; do not assume `scripts/lib/discover-gates.mjs` exists in the consumer.
 Do not assume npm or even a JavaScript project. Record the exact
 command, cwd, exit status, and discovery source. If any required gate fails,
 stop and report.

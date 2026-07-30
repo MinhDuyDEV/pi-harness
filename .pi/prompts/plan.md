@@ -16,11 +16,12 @@ Generate an implementation plan for the work session.
 | `--no-adrs` | false | Skip ADR generation even if architectural decisions appear |
 | `--quick` | false | Skip the confirmation step |
 
+## Ownership boundary
+- This prompt owns slash arguments, artifact transitions, and the next command. Load `planning-and-task-breakdown` for planning method, risk ordering, and dependency reasoning; do not duplicate that skill's detailed workflow here.
+
 ## 2. Find Work Session
 
-```bash
-rg "^### .* - <title>$" .pi/artifacts/TODO.md
-```
+Use the available repository text/semantic search tool to locate the exact `### ... - <title>` block in `.pi/artifacts/TODO.md`; do not assume `rg` is installed.
 
 If not found: "Run `/create <title>` first."
 

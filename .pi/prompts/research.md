@@ -46,7 +46,11 @@ Generate 2-3 options. For each:
 
 End with a recommendation and reasoning.
 
-## 5. Output
+## 5. Portable artifact lookup
+
+Use the harness semantic search tool when available (`semantic_grep`/`semantic_query`). Otherwise use the host repository's available text search. Do not assume `rg`, npm, a JavaScript repository, or package-relative script paths exist in the consumer.
+
+## 6. Output
 
 ### Standalone (no `--into`)
 
@@ -61,17 +65,11 @@ Report inline:
 
 ### With `--into=<title>`
 
-Append to the work session block in `PROGRESS.md`:
+Update the work session block in `PROGRESS.md`:
 
-```markdown
-### YYYY-MM-DD - <title>
-status: active | updated: YYYY-MM-DD
-
-#### Research
-<findings in the format above>
-```
-
-If the block doesn't exist yet, create it. Report the same items as above plus the anchor.
+- If the block exists, append or update only its `#### Research` subsection. Preserve the existing `status:` exactly; never downgrade `awaiting-verification` or `done` to `active`.
+- If the block does not exist, create one with `status: active | updated: YYYY-MM-DD`, then add `#### Research`.
+- Do not create a second block with the same date/title. Report the anchor and whether the block was appended or created.
 
 ## Related Commands
 
