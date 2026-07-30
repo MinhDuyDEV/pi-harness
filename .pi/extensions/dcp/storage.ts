@@ -94,8 +94,16 @@ function migrateDurableSessionState(value: unknown): DurableSessionState | undef
   const knowledgeReferences = isDcpKnowledgeReferences(parsed.knowledgeReferences)
     ? parsed.knowledgeReferences
     : emptyDcpKnowledgeReferences();
+  const blocks = parsed.blocks.map((block) => ({
+    ...block,
+    filesRead: Array.isArray(block.filesRead) ? block.filesRead : [],
+    filesModified: Array.isArray(block.filesModified) ? block.filesModified : [],
+    decisions: Array.isArray(block.decisions) ? block.decisions : [],
+    nextSteps: Array.isArray(block.nextSteps) ? block.nextSteps : [],
+  }));
   return {
     ...parsed,
+    blocks,
     version: 2,
     knowledgeReferences,
   } as DurableSessionState;

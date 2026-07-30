@@ -37,6 +37,7 @@ const VALID_BASE = [
   "docs/workflow-state.md",
   "quality/aislop-debt-baseline.json",
   "skills-lock.json",
+  "THIRD_PARTY_NOTICES.md",
   ".pi/settings.json",
   ".pi/APPEND_SYSTEM.md",
   ".pi/ANTI_PATTERNS.md",

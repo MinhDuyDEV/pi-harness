@@ -5,6 +5,7 @@ import { test, expect } from "bun:test";
 import {
   deleteDurableSessionState,
   getSessionKey,
+  loadDurableSessionStateFromPath,
   saveDurableSessionState,
 } from "./storage";
 import { searchDcpRecall } from "./recall";
@@ -59,6 +60,28 @@ test("durable DCP state is searchable through dcp_recall", () => {
     expect(expanded.rendered).toContain("Refresh auth tokens");
   } finally {
     deleteDurableSessionState(sessionId);
+  }
+});
+
+test("legacy durable blocks normalize missing recall arrays", () => {
+  const dir = mkdtempSync(join(tmpdir(), "dcp-legacy-state-"));
+  const path = join(dir, "legacy.json");
+  try {
+    writeFileSync(path, JSON.stringify({
+      version: 1,
+      sessionId: "legacy",
+      sessionKey: "legacy",
+      blocks: [{ id: "b1", topic: "legacy", summary: "old state", createdAt: 1 }],
+    }));
+    const state = loadDurableSessionStateFromPath(path);
+    expect(state?.blocks[0]).toMatchObject({
+      filesRead: [],
+      filesModified: [],
+      decisions: [],
+      nextSteps: [],
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

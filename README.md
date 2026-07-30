@@ -22,7 +22,7 @@ separate global or manual `pi install` is required:
 
 ```bash
 mkdir -p ./my-repo
-npx --yes --package @minhduydev/pi-harness@2.3.2 pi-harness-init ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.3.2 -- pi-harness-init ./my-repo
 ```
 
 The bootstrap writes exact project package pins for the executing harness and
@@ -55,7 +55,7 @@ rerun performs no content or timestamp writes. Preview a first install or
 upgrade with:
 
 ```bash
-npx --yes --package @minhduydev/pi-harness@2.3.2 pi-harness-init --dry-run ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.3.2 -- pi-harness-init --dry-run ./my-repo
 ```
 
 To upgrade, change only the exact harness version in the `npx` command and run

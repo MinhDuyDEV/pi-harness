@@ -65,6 +65,7 @@
   "files": [
     "AGENTS.md",
     "README.md",
+    "THIRD_PARTY_NOTICES.md",
     "PROJECT.md",
     "quality",
     "skills-lock.json",

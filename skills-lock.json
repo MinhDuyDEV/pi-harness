@@ -1017,5 +1017,20 @@
         "SKILL.md": "21e985aa6267f662efa96b72f16fe47de97251d4014693ed0abb6dcca431f44c"
       }
     }
+  },
+  "provenance": {
+    "updatePolicy": "Record upstream commit, license, and adaptation status before importing or materially adapting external skill content.",
+    "mattpocock/skills": {
+      "origin": "https://github.com/mattpocock/skills",
+      "upstreamCommit": "2ab958093e83e0ec752e6c1c5932da465bf23e0c",
+      "license": "MIT",
+      "notice": "THIRD_PARTY_NOTICES.md",
+      "skills": {
+        "improve-codebase-architecture": "adapted",
+        "prototype": "adapted",
+        "grill-me": "adapted",
+        "deep-module-design": "inspired"
+      }
+    }
   }
 }
