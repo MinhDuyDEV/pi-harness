@@ -67,7 +67,7 @@ test("mutation: a real fix.md with one skill name corrupted is rejected", () => 
     knownSkill,
     "verification-before-completion",
     "code-cleanup",
-    "deep-module-design",
+    "improve-codebase-architecture",
   ]);
   const hit = result.errors.find((error) => error.includes("definitely-not-a-skill"));
   assert.ok(hit, `validator should reject the corrupted skill ref; got: ${JSON.stringify(result.errors)}`);

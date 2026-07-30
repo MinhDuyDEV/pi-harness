@@ -418,16 +418,6 @@
         "SKILL.md": "dd8f28b250fc7db06ec1886666313a309956536e4e4b1969d76ce6ecee64df5b"
       }
     },
-    "deep-module-design": {
-      "source": "local",
-      "sourceType": "local",
-      "skillPath": ".pi/skills/deep-module-design/SKILL.md",
-      "trust": "local",
-      "files": {
-        "references/api-interface-design.md": "3a210b2cdb99ab3df3dd75ff0533abaad19b0820692409d58cb954846017ec4a",
-        "SKILL.md": "9f9f9ec5106fe64a4801d952daeddf0b32ff431e5c5146d716eb2758c33cf3cb"
-      }
-    },
     "deprecation-and-migration": {
       "source": "local",
       "sourceType": "local",
@@ -583,7 +573,7 @@
       "trust": "local",
       "files": {
         "references/CONTEXT-FORMAT.md": "b8cc318f2a4285b530e908b6bc43901c3c5cd11100362636bbc4216639bef597",
-        "SKILL.md": "75060c4c9fc3871efad4f73b72af60cb698ab5e85fe1724ffa1a2c2e41956ee7"
+        "SKILL.md": "6a96901034c7ded10d604fb511ffffa5572104303c60e27bf9718fcac3f9bfa6"
       }
     },
     "high-end-visual-design": {
@@ -605,7 +595,9 @@
         "HTML-REPORT.md": "8a8bcdbb578066271efe6ff675c831a6a4c4c7fd2081d6b5c9bc2e5fabc741d5",
         "INTERFACE-DESIGN.md": "678c3e34f1339015053212b3316bf0b676c70aa251050a0613667d4e755fb35e",
         "LANGUAGE.md": "6feca2140439c54a774749e8367f18350899ff69c777144ed2248cd4407949fa",
-        "SKILL.md": "6ab0832730b7573d3275ce8a1a55753d3e0d800cbd65985c4516351e1b287a29"
+        "references/api-interface-design.md": "3a210b2cdb99ab3df3dd75ff0533abaad19b0820692409d58cb954846017ec4a",
+        "references/deep-module-design.md": "03185284afd41d691fadfcd061200a328d6bd1b30eb9c32641697efaf7dfbc72",
+        "SKILL.md": "709868353740069ea4eb3032329c7e42b4be0b46cf3ba51ef76fe8d74b7c2185"
       }
     },
     "incremental-implementation": {
@@ -728,7 +720,7 @@
       "trust": "local",
       "files": {
         "LOGIC.md": "da91dc92195c00d5dc33863b8c1a030998025a0f8583ebf2babd770825b7f70c",
-        "SKILL.md": "bf8d201c8b3c1db2737646e75c7cf5c3f7bdfd22e4bad5caf6a55aea60457898",
+        "SKILL.md": "65d041145d90431c813433ace75fca6c09aa0a0ece95d69595771cedf5207bfa",
         "UI.md": "d76d565149ee50456c5ddc5e29c27fec8737637874fe5c37d970db085a200b27"
       }
     },
@@ -890,9 +882,9 @@
       "skillPath": ".pi/skills/superpi/SKILL.md",
       "trust": "local",
       "files": {
-        "MIGRATIONS.md": "bddc91184f7039ea8909e983664d2c1caf82742290c982eb52e4ccb875714357",
-        "route-metadata.json": "3dfa85e44bc4c795a8b982a489d4f89e9b0c1a02102846e04ec4526f8bd77def",
-        "SKILL.md": "baf9a4afad56d1e58624e3b4c4c70cc75f55738173e2ab37cd753105a563bd6f"
+        "MIGRATIONS.md": "f878db8d442ee15e7bbd07eea02328ee41cc75a84ce60ef5cba43b736765936d",
+        "route-metadata.json": "b10e5660f8e2aaa1307d353234d7e72d2b93f8da19ff89e41b994fdb825bdb61",
+        "SKILL.md": "cee1b83675db6219d12de737af114b011a8244b0b6ac82755ef012dbf2b03ce2"
       }
     },
     "swift-concurrency": {
@@ -975,7 +967,7 @@
       "skillPath": ".pi/skills/using-git-worktrees/SKILL.md",
       "trust": "local",
       "files": {
-        "SKILL.md": "c78645ccf0408663ef3e054e5b2674b436ceb9e6ee5be8805298bf0200cffd26"
+        "SKILL.md": "28a9bb47011baf4bcef6f91f4575811fc0f557d86aa7a1241d980b4e253ee6fa"
       }
     },
     "vercel-deploy-claimable": {

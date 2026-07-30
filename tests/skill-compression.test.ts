@@ -188,11 +188,6 @@ const TARGETS: SkillSpec[] = [
     markers: ["pattern", "ast-grep", "structural", "rule", "rewrite"],
   },
   {
-    name: "deep-module-design",
-    maxWords: TARGET_WORD_CAP,
-    markers: ["interface", "deep", "shallow", "module", "test seam"],
-  },
-  {
     name: "swift-concurrency",
     maxWords: TARGET_WORD_CAP,
     markers: ["actor", "Sendable", "Task", "isolation", "MainActor"],

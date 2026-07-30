@@ -37,15 +37,12 @@ Select one stage route, then add at most one matching domain overlay. Every mode
 | stage | ship / release | `shipping-and-launch` → `code-cleanup` |
 | domain | security-sensitive | `security-and-hardening` |
 | domain | frontend / browser UI | `frontend-design` → `react-best-practices` → `playwright` |
-| domain | TypeScript / domain-heavy | `typescript-coding-standards` → `deep-module-design` |
+| domain | TypeScript / domain-heavy | `typescript-coding-standards` → `improve-codebase-architecture` |
 | domain | operations / external I/O | `observability-and-instrumentation` → `ci-cd-and-automation` |
 | domain | migration / API change | `deprecation-and-migration` → `improve-codebase-architecture` |
 | domain | documentation / ADR | `documentation-and-adrs` → `artifact-format` |
 | domain | skill / tooling maintenance | `writing-skills` → `diagnostics` → `fallow` |
 | domain | code search / transformation | `ast-grep` |
-| domain | prototype / experiment | `prototype` |
-| domain | grill / adversarial design | `grill-me` |
-| domain | worktree / isolated change | `using-git-worktrees` |
 
 <!-- GENERATED ROUTES:END -->
 

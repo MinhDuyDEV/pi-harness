@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Behavior-preserving architecture refactoring — risk-ordered ladder, code-smell table, strangler fig. Use when modules are tightly coupled, tests are hard to write, or one change touches many files.
+description: Behavior-preserving architecture refactoring and deep-module design — risk-ordered ladder, interface depth, code-smell table, strangler fig. Use when modules are tightly coupled, interfaces are shallow, tests are hard to write, or one change touches many files.
 metadata:
   version: 1.0.0
 ---
@@ -78,11 +78,17 @@ For larger refactors:
 3. **Remove old path.** Once 100% on new.
 4. **One piece at a time.** Module by module.
 
+## Module-depth check
+
+When a slice changes a public boundary, evaluate whether the module hides substantially more complexity than its callers must learn. Use `references/deep-module-design.md` for the Depth Metric, interface alternatives, and warning signs. Keep a boundary shallow when independent ownership, security, or failure isolation requires it.
+
 ## References
 
 - See [LANGUAGE.md](LANGUAGE.md) for the shared vocabulary (module, interface, seam, adapter, leverage) — use these terms exactly.
 - See [DEEPENING.md](DEEPENING.md) for deepening a cluster of shallow modules safely, by dependency category.
 - See [INTERFACE-DESIGN.md](INTERFACE-DESIGN.md) for the design-it-twice parallel sub-agent pattern when exploring alternative interfaces.
+- See [references/deep-module-design.md](references/deep-module-design.md) for focused interface-depth analysis.
+- See [references/api-interface-design.md](references/api-interface-design.md) for API compatibility, errors, and evolution.
 - See [HTML-REPORT.md](HTML-REPORT.md) for rendering an architectural review as a self-contained HTML report.
 - ADR format is owned by `documentation-and-adrs`; CONTEXT.md format by `grill-me` (each under `references/`).
 

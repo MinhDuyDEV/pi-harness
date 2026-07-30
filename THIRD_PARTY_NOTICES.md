@@ -6,11 +6,11 @@ The skills listed below contain copied or adapted material from the MIT-licensed
 repository [`mattpocock/skills`](https://github.com/mattpocock/skills), pinned at
 commit `2ab958093e83e0ec752e6c1c5932da465bf23e0c`.
 
-- `improve-codebase-architecture`: copied/adapted from `codebase-design` and
-  includes the upstream HTML report.
+- `improve-codebase-architecture`: copied/adapted from `codebase-design`,
+  includes the upstream HTML report, and absorbs the former
+  `deep-module-design` workflow inspired by `DESIGN-IT-TWICE.md`.
 - `prototype`: adapted from the upstream `prototype` references.
 - `grill-me`: adapted from the upstream `domain-modeling/CONTEXT-FORMAT.md`.
-- `deep-module-design`: inspired by the upstream `DESIGN-IT-TWICE.md` pattern.
 
 Copyright (c) 2026 Matt Pocock.
 

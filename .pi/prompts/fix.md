@@ -17,7 +17,7 @@ Load these available skills using the current session's skill-loading instructio
 - skill: `debugging-and-error-recovery`
 - skill: `verification-before-completion`
 - skill: `code-cleanup`
-- skill: `deep-module-design`
+- skill: `improve-codebase-architecture`
 
 ## Determine Input Type
 

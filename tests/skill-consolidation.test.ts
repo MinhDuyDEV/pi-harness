@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import test from "node:test";
 
 const skills = resolve(import.meta.dirname, "../.pi/skills");
@@ -13,7 +15,8 @@ const merges = [
   ["accessibility-audit", "frontend-design", "references/shadcn/accessibility.md", "Manual WCAG AA Audit"],
   ["design-system-audit", "frontend-design", "references/design-system-audit.md", "Five audit layers"],
   ["mockup-to-code", "frontend-design", "references/mockup-to-code.md", "Mockup-to-code workflow"],
-  ["api-and-interface-design", "deep-module-design", "references/api-interface-design.md", "Error contract"],
+  ["api-and-interface-design", "improve-codebase-architecture", "references/api-interface-design.md", "Error contract"],
+  ["deep-module-design", "improve-codebase-architecture", "references/deep-module-design.md", "Depth Metric"],
   ["git-workflow-and-versioning", "shipping-and-launch", "references/git-hygiene.md", "Atomic workflow"],
   ["browser-testing-with-devtools", "playwright", "references/browser-devtools.md", "tool routing"],
   ["performance-optimization", "observability-and-instrumentation", "references/performance.md", "Measure-first performance"],
@@ -44,3 +47,46 @@ test("development lifecycle remains a hidden user-invoked artifact workflow", ()
   assert.match(body, /\/create[\s\S]*\/plan[\s\S]*\/ship[\s\S]*\/verify[\s\S]*\/research/u);
 });
 
+test("absorbed deep-module guidance retains its decision substance", () => {
+  const reference = readFileSync(
+    join(skills, "improve-codebase-architecture", "references", "deep-module-design.md"),
+    "utf8",
+  );
+  for (const marker of ["Depth Metric", "Design at least two", "Warning signs", "When not to deepen"]) {
+    assert.match(reference, new RegExp(marker, "i"), `missing deep-module guidance: ${marker}`);
+  }
+});
+
+test("natural operator workflows remain available but are never auto-routed", () => {
+  const router = JSON.parse(readFileSync(join(skills, "superpi", "route-metadata.json"), "utf8")) as {
+    routes: Array<{ skills: string[] }>;
+  };
+  const routed = new Set(router.routes.flatMap((route) => route.skills));
+
+  for (const name of ["prototype", "grill-me", "using-git-worktrees"]) {
+    const body = readFileSync(join(skills, name, "SKILL.md"), "utf8");
+    assert.match(body, /^disable-model-invocation:\s*true\s*$/m, `${name} must be hidden`);
+    assert.match(body, new RegExp(`User-invoked.*\\/skill:${name}`), `${name} must disclose its manual route`);
+    assert.equal(routed.has(name), false, `${name} must not be auto-routed`);
+  }
+});
+
+test("skill lock regeneration preserves top-level provenance", () => {
+  const root = resolve(import.meta.dirname, "..");
+  const sandbox = mkdtempSync(join(tmpdir(), "pi-harness-skill-lock-"));
+  try {
+    cpSync(join(root, ".pi", "skills"), join(sandbox, ".pi", "skills"), { recursive: true });
+    writeFileSync(
+      join(sandbox, "skills-lock.json"),
+      `${JSON.stringify({ version: 2, provenance: { sentinel: true }, skills: {} }, null, 2)}\n`,
+    );
+    execFileSync(process.execPath, [join(root, "scripts", "validate-skills.mjs"), "--update"], {
+      cwd: sandbox,
+      stdio: "pipe",
+    });
+    const lock = JSON.parse(readFileSync(join(sandbox, "skills-lock.json"), "utf8"));
+    assert.deepEqual(lock.provenance, { sentinel: true });
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+});

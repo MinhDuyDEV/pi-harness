@@ -7,10 +7,11 @@ the skill that now owns the decision point and verification loop.
 | Removed skill | Load instead | Why |
 | --- | --- | --- |
 | `accessibility-audit` | `frontend-design` | UI implementation and accessibility review share the same component, semantic, and interaction evidence. |
-| `api-and-interface-design` | `deep-module-design` | Public API shape is an interface-depth and information-hiding decision. |
+| `api-and-interface-design` | `improve-codebase-architecture` | Public API shape, interface depth, and information hiding are owned by one architecture workflow. |
 | `browser-testing-with-devtools` | `playwright` | Browser validation, DOM inspection, console/network debugging, and screenshots now live in one test workflow. |
 | `defense-in-depth` | `security-and-hardening` | Boundary validation, authorization, secret handling, and layered mitigation are one security review surface. |
 | `development-lifecycle` | `development-lifecycle` (retained hidden skill) | The four artifact files and lifecycle hooks are a distinct user-invoked workflow; `superpi` only routes task types. |
+| `deep-module-design` | `improve-codebase-architecture` | Interface-depth analysis is now a focused reference inside the broader behavior-preserving architecture workflow. |
 | `design-system-audit` | `frontend-design` | Token/component audits are part of the frontend design workflow. |
 | `git-workflow-and-versioning` | `shipping-and-launch` | Branch, release, changelog, and rollback decisions are shipping concerns. |
 | `memory` | `context-engineering` | Durable/retrieved context is governed by the context budget and source hierarchy. |
@@ -23,3 +24,7 @@ the skill that now owns the decision point and verification loop.
 Use the destination name in new prompts and automation. Removed names are not
 Pi aliases, deliberately: a stale `/skill:<old-name>` must fail visibly rather
 than silently loading a different workflow.
+
+`prototype`, `grill-me`, and `using-git-worktrees` remain installed but hidden
+from automatic model routing. Invoke them explicitly with `/skill:<name>` when
+the operator wants those deliberate workflows.

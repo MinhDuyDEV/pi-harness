@@ -1,6 +1,7 @@
 ---
 name: grill-me
-description: Stress-tests a plan, spec, ADR, or architecture by interviewing the author one material question at a time. Use when an idea needs scrutiny before code, or when the user asks to be grilled on a design.
+description: User-invoked via /skill:grill-me. Stress-tests a plan, spec, ADR, or architecture by interviewing the author one material question at a time.
+disable-model-invocation: true
 metadata:
   version: 2.0.0
   tags:

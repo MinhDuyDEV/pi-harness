@@ -11,14 +11,11 @@
     { "axis": "stage", "task": "ship / release", "skills": ["shipping-and-launch", "code-cleanup"] },
     { "axis": "domain", "task": "security-sensitive", "skills": ["security-and-hardening"] },
     { "axis": "domain", "task": "frontend / browser UI", "skills": ["frontend-design", "react-best-practices", "playwright"] },
-    { "axis": "domain", "task": "TypeScript / domain-heavy", "skills": ["typescript-coding-standards", "deep-module-design"] },
+    { "axis": "domain", "task": "TypeScript / domain-heavy", "skills": ["typescript-coding-standards", "improve-codebase-architecture"] },
     { "axis": "domain", "task": "operations / external I/O", "skills": ["observability-and-instrumentation", "ci-cd-and-automation"] },
     { "axis": "domain", "task": "migration / API change", "skills": ["deprecation-and-migration", "improve-codebase-architecture"] },
     { "axis": "domain", "task": "documentation / ADR", "skills": ["documentation-and-adrs", "artifact-format"] },
     { "axis": "domain", "task": "skill / tooling maintenance", "skills": ["writing-skills", "diagnostics", "fallow"] },
-    { "axis": "domain", "task": "code search / transformation", "skills": ["ast-grep"] },
-    { "axis": "domain", "task": "prototype / experiment", "skills": ["prototype"] },
-    { "axis": "domain", "task": "grill / adversarial design", "skills": ["grill-me"] },
-    { "axis": "domain", "task": "worktree / isolated change", "skills": ["using-git-worktrees"] }
+    { "axis": "domain", "task": "code search / transformation", "skills": ["ast-grep"] }
   ]
 }

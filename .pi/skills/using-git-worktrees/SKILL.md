@@ -1,6 +1,7 @@
 ---
 name: using-git-worktrees
-description: Git worktree workflow — isolated sibling working copies per branch, PR review in detached worktrees, cleanup via prune. Use when work needs isolation, or when testing a PR without disrupting the working copy.
+description: User-invoked via /skill:using-git-worktrees. Git worktree workflow for isolated sibling working copies, detached PR review, and cleanup.
+disable-model-invocation: true
 metadata:
   version: 1.0.0
   tags:

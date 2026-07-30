@@ -130,10 +130,13 @@ for (const skill of skills) {
 
 if (process.argv.includes("--update")) {
   let existing = {};
-  let version = 2;
+  let lockMetadata = {};
+  const version = 2;
   try {
     const prev = JSON.parse(readFileSync("skills-lock.json", "utf8"));
     existing = prev.skills ?? {};
+    const { skills: _skills, version: _version, ...metadata } = prev;
+    lockMetadata = metadata;
   } catch {
     // No previous lock (or unparseable): regenerate from scratch.
   }
@@ -148,7 +151,7 @@ if (process.argv.includes("--update")) {
       files: skill.files,
     };
   }
-  writeFileSync("skills-lock.json", JSON.stringify({ version, skills: next }, null, 2) + "\n");
+  writeFileSync("skills-lock.json", JSON.stringify({ version, skills: next, ...lockMetadata }, null, 2) + "\n");
   const fileCount = skills.reduce((total, skill) => total + Object.keys(skill.files).length, 0);
   console.log(`✓ regenerated skills-lock.json (${skills.length} skills, ${fileCount} files)`);
   if (errors.length > 0) {

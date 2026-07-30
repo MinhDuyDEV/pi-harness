@@ -1,6 +1,7 @@
 ---
 name: prototype
-description: Builds throwaway prototypes that answer one question — a terminal harness for logic checks, or switchable UI variants on one route. Use when the user wants to prototype, play with variants, or test a direction.
+description: User-invoked via /skill:prototype. Builds throwaway prototypes that answer one question — a terminal harness for logic checks, or switchable UI variants on one route.
+disable-model-invocation: true
 metadata:
   version: 1.0.0
 ---
