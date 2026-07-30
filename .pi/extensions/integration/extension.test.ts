@@ -17,6 +17,15 @@ test("the matrix covers exactly the four suite packages", () => {
   ]);
 });
 
+test("the matrix matches the current suite generation", () => {
+  assert.deepEqual(COMPATIBILITY, {
+    "@minhduydev/pi-core": { range: ">=0.3.0 <0.4.0", protocol: 1 },
+    "@minhduydev/pi-subagents": { range: ">=0.11.0 <0.12.0" },
+    "@minhduydev/pi-learning": { range: ">=0.5.0 <0.6.0" },
+    "@minhduydev/pi-todo": { range: ">=0.4.0 <0.5.0" },
+  });
+});
+
 test("a dev checkout reports its own installed siblings as compatible", () => {
   // This repo has pi-core installed (a devDependency); the report must find
   // it through the module graph and judge it against the matrix.

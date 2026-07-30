@@ -28,9 +28,9 @@ import { readExtensionGate } from "../lib/harness-settings.js";
  * that drifts from reality fails loudly there.
  */
 export const COMPATIBILITY = {
-  "@minhduydev/pi-core": { range: ">=0.2.0 <0.3.0", protocol: PI_CORE_PROTOCOL_VERSION },
-  "@minhduydev/pi-subagents": { range: ">=0.10.0 <0.11.0" },
-  "@minhduydev/pi-learning": { range: ">=0.4.0 <0.5.0" },
+  "@minhduydev/pi-core": { range: ">=0.3.0 <0.4.0", protocol: PI_CORE_PROTOCOL_VERSION },
+  "@minhduydev/pi-subagents": { range: ">=0.11.0 <0.12.0" },
+  "@minhduydev/pi-learning": { range: ">=0.5.0 <0.6.0" },
   "@minhduydev/pi-todo": { range: ">=0.4.0 <0.5.0" },
 } as const;
 
