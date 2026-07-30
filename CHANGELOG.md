@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-07-29
+
+### Fixed
+
+- Accept `@minhduydev/pi-todo@0.5.x` in the integration compatibility matrix so the pinned suite no longer reports false version drift.
+- Expose `workflow_state` as a root JSON Schema object while retaining discriminated variant validation, fixing OpenAI-compatible subagent providers that reject root-level unions.
+
 ## [2.4.0] - 2026-07-29
 
 ### Added

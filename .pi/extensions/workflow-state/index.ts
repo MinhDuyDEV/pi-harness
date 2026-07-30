@@ -101,11 +101,22 @@ const handoffParameters = Type.Object({
   resume_conversation_id: Type.Optional(boundedId()),
 });
 
-export const workflowStateParameters = Type.Union([
-  foundationParameters,
-  reconcileParameters,
-  handoffParameters,
-]);
+export const workflowStateParameters = Type.Object(
+  {
+    action: Type.Union([
+      Type.Literal("record_foundation"),
+      Type.Literal("record_reconcile"),
+      Type.Literal("record_handoff"),
+    ]),
+    record_id: boundedId(),
+  },
+  {
+    // Some OpenAI-compatible providers reject a tool schema whose root is an
+    // `anyOf` without `type: "object"`. Keep the discriminated variants for
+    // validation while exposing an object at the provider boundary.
+    anyOf: [foundationParameters, reconcileParameters, handoffParameters],
+  },
+);
 
 type WorkflowToolInput =
   | {

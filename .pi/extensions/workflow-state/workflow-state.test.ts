@@ -18,6 +18,7 @@ import {
 } from "@minhduydev/pi-core/workflow";
 import workflowStateExtension, {
   checkpointFromToolInput,
+  workflowStateParameters,
 } from "./index.ts";
 import {
   consumeReconcileTrigger,
@@ -60,6 +61,13 @@ function foundation(recordId = "foundation-1", rationale = "The base is sound") 
     "session-1",
   );
 }
+
+test("workflow_state exposes a provider-compatible root object schema", () => {
+  assert.equal(
+    (workflowStateParameters as unknown as { type?: string }).type,
+    "object",
+  );
+});
 
 test("tool mappings round-trip through the shared pi-core workflow parser", () => {
   const handoff = checkpointFromToolInput(
