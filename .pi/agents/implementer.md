@@ -6,7 +6,7 @@ description: >
   NOT for read-only questions (explore/scout), diff verdicts (reviewer), or loosely-scoped
   research-plus-edit errands (general).
 model: commandcode/deepseek/deepseek-v4-flash
-thinking: max
+thinking: xhigh
 prompt_mode: append
 ---
 
