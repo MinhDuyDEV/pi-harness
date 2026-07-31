@@ -4,7 +4,7 @@ description: >
   Read-only codebase cartographer (files, symbols, call paths). Set thoroughness in the task prompt: quick, medium, or very thorough.
   NOT for external docs (scout), multi-step implementation (general), or a single known path (read/grep).
 model: commandcode/deepseek/deepseek-v4-flash
-thinking: low
+thinking: high
 readonly: true
 proactive: true
 tools: semantic_query, semantic_grep, read, grep, find, ls

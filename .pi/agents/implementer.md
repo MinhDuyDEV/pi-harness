@@ -5,8 +5,8 @@ description: >
   itself, runs its own proof, and reports provenance-tagged evidence.
   NOT for read-only questions (explore/scout), diff verdicts (reviewer), or loosely-scoped
   research-plus-edit errands (general).
-model: ollama-cloud/glm-5.2
-thinking: high
+model: commandcode/deepseek/deepseek-v4-flash
+thinking: max
 prompt_mode: append
 ---
 

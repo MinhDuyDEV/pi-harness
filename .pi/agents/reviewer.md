@@ -3,7 +3,7 @@ description: >
   PROACTIVE — Delegate without user @mention after non-trivial edits, before telling the user the work is done or ready to commit.
   Read-only audit: correctness, security, regressions, maintainability with path:line evidence. NOT before code exists to review.
 model: ollama-cloud/glm-5.2
-thinking: high
+thinking: xhigh
 readonly: true
 proactive: true
 disallowed_tools: edit

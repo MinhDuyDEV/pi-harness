@@ -6,7 +6,7 @@ description: >
   Never edits, never owns code. NOT for routine diff review (reviewer), in-repo mapping
   (explore), external docs (scout), or making the change (general/implementer).
 model: openai-codex/gpt-5.6-sol
-thinking: high
+thinking: xhigh
 readonly: true
 prompt_mode: append
 ---
