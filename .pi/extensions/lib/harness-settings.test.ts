@@ -101,16 +101,15 @@ test("readExtensionGate: accepts already-parsed settings as the source", () => {
   assert.equal(readExtensionGate({}, "xai", true), false);
 });
 
-test("profiles provide minimal, standard and full consumer bundles without enabling providers", () => {
-  assert.equal(readExtensionGate({ profile: "minimal" }, "safety", false), true);
-  assert.equal(readExtensionGate({ profile: "minimal" }, "dcp", true), false);
-  assert.equal(readExtensionGate({ profile: "standard" }, "checkpoint", false), true);
-  assert.equal(readExtensionGate({ profile: "standard" }, "workflowState", false), true);
-  assert.equal(readExtensionGate({ profile: "standard" }, "tui", true), false);
+test("the full profile provides the consumer extension bundle without enabling providers", () => {
+  assert.equal(readExtensionGate({ profile: "full" }, "safety", false), true);
+  assert.equal(readExtensionGate({ profile: "full" }, "dcp", false), true);
+  assert.equal(readExtensionGate({ profile: "full" }, "checkpoint", false), true);
+  assert.equal(readExtensionGate({ profile: "full" }, "workflowState", false), true);
   assert.equal(readExtensionGate({ profile: "full" }, "tui", false), true);
   assert.equal(readExtensionGate({ profile: "full" }, "deepseek", true), false);
   assert.equal(
-    readExtensionGate({ profile: "minimal", extensions: { dcp: true } }, "dcp", false),
+    readExtensionGate({ profile: "full", extensions: { dcp: true } }, "dcp", false),
     true,
     "an explicit per-key setting overrides the profile",
   );
@@ -124,8 +123,8 @@ test("worker seat mode disables prompt shaping and all write-heavy extensions", 
     assert.equal(promptShapingAllowed(), false);
     assert.equal(readExtensionGate({ profile: "full" }, "dcp", true), false);
     assert.equal(readExtensionGate({ extensions: { tui: true } }, "tui", true), false);
-    assert.equal(readExtensionGate({ profile: "minimal" }, "safety", false), true);
-    assert.equal(readExtensionGate({ profile: "minimal" }, "herdrState", false), true);
+    assert.equal(readExtensionGate({ profile: "full" }, "safety", false), true);
+    assert.equal(readExtensionGate({ profile: "full" }, "herdrState", false), true);
 
     process.env.PI_HARNESS_SEAT_ROLE = "typo";
     assert.equal(readHarnessSeatRole(), "unknown");
@@ -136,8 +135,24 @@ test("worker seat mode disables prompt shaping and all write-heavy extensions", 
   }
 });
 
-test("minimal profile entries return before touching disabled extension APIs", () => {
-  inProjectCwd({ "pi-harness": { profile: "minimal" } }, () => {
+test("profile-gated entries return before touching disabled extension APIs", () => {
+  inProjectCwd(
+    {
+      "pi-harness": {
+        profile: "full",
+        extensions: {
+          checkpoint: false,
+          dcp: false,
+          learningCoordinator: false,
+          rewind: false,
+          shortcutContinue: false,
+          tps: false,
+          tui: false,
+          workflowState: false,
+        },
+      },
+    },
+    () => {
     for (const entry of [
       checkpoint,
       dcp,

@@ -48,7 +48,7 @@ let parserPromise: Promise<TodoMarkdownModule | null> | undefined;
 
 /**
  * Load the one canonical artifact Markdown parser. pi-todo is optional for a
- * minimal harness consumer, so absence is explicit rather than falling back to
+ * consumer without it, so absence is explicit rather than falling back to
  * a second regex grammar that can drift.
  */
 export function loadCanonicalArtifactParser(): Promise<TodoMarkdownModule | null> {

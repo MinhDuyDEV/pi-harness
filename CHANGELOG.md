@@ -6,6 +6,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-08-02
+
+### Changed
+
+- Collapse the harness to a single Full profile: `minimal` and `standard` are
+  removed, and any legacy `pi-harness.profile` value converges to `full` on
+  the next init so consumer settings stay compatible.
+- Enable the learning coordinator by default (previously Full-profile only
+  when explicitly turned on), so `learningCoordinator` now ships ON without
+  extra settings.
+- Default the safety extension (destructive-command guards) to **off**
+  package-wide; consumers opt in explicitly with
+  `pi-harness.extensions.safety: true`.
+- Raise canonical agent thinking levels: `implementer` and `proof-auditor` to
+  `xhigh`, with `explore`, `peer`, and `reviewer` aligned to their role.
+
 ## [2.4.1] - 2026-07-29
 
 ### Fixed

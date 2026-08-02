@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export interface HarnessSettings {
-  /** Consumer extension bundle. Missing means each entry uses its minimal legacy default. */
+  /** Consumer extension bundle. Missing defaults to the `full` profile. */
   profile?: HarnessProfile;
   /** Inject the superpi routing bootstrap into sessions. Default false. */
   superpi?: boolean;
@@ -29,21 +29,11 @@ export interface HarnessSettings {
   extensions?: Record<string, boolean>;
 }
 
-export type HarnessProfile = "minimal" | "standard" | "full";
+export type HarnessProfile = "full";
 export type HarnessSeatRole = "root" | "implementer" | "peer" | "unknown";
 
-const PROFILES = new Set<HarnessProfile>(["minimal", "standard", "full"]);
+const PROFILES = new Set<HarnessProfile>(["full"]);
 const PROFILE_EXTENSIONS: Record<HarnessProfile, ReadonlySet<string>> = {
-  minimal: new Set(["safety", "herdrState"]),
-  standard: new Set([
-    "safety",
-    "herdrState",
-    "shortcutContinue",
-    "checkpoint",
-    "rewind",
-    "learningCoordinator",
-    "workflowState",
-  ]),
   full: new Set([
     "safety",
     "herdrState",
@@ -113,7 +103,7 @@ export function readExtensionGate(
   const gate = settings.extensions?.[extensionKey];
   if (typeof gate === "boolean") return gate;
   if (PROVIDER_KEYS.has(extensionKey)) return false;
-  if (settings.profile) return PROFILE_EXTENSIONS[settings.profile].has(extensionKey);
+  if (settings.profile) return PROFILE_EXTENSIONS[settings.profile]?.has(extensionKey) ?? defaultValue;
   return defaultValue;
 }
 

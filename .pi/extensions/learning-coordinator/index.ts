@@ -39,7 +39,7 @@ function emitAtLeastOnce(pi: ExtensionAPI, event: string, payload: unknown): voi
 }
 
 export default function register(pi: ExtensionAPI): void {
-  if (!readExtensionGate(undefined, "learningCoordinator", false)) return;
+  if (!readExtensionGate(undefined, "learningCoordinator", true)) return;
   // Two pi-core copies with different canonicalization rules would recreate
   // the digest divergence the shared package exists to end.
   assertPiCoreProtocolVersion(PI_CORE_PROTOCOL_VERSION);

@@ -307,13 +307,13 @@ test("malformed reconcile trigger state is quarantined instead of trusted", asyn
   }
 });
 
-test("standard profile registers the tool and emits a typed persisted signal", async () => {
+test("full profile registers the tool and emits a typed persisted signal", async () => {
   const root = await temporaryProject();
   const previous = process.cwd();
   try {
     await writeFile(
       path.join(root, ".pi", "settings.json"),
-      '{"pi-harness":{"profile":"standard"}}\n',
+      '{"pi-harness":{"profile":"full"}}\n',
     );
     process.chdir(root);
     let tool: any;
@@ -366,7 +366,7 @@ test("reconcile writes must match the durable completion trigger before it is re
   try {
     await writeFile(
       path.join(root, ".pi", "settings.json"),
-      '{"pi-harness":{"profile":"standard"}}\n',
+      '{"pi-harness":{"profile":"full"}}\n',
     );
     process.chdir(root);
     let tool: any;
