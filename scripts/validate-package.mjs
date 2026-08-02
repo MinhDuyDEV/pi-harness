@@ -97,12 +97,11 @@ if (JSON.stringify(consumerSettings) !== JSON.stringify(settings)) {
 if (consumerSettings["pi-harness"]?.profile !== "full") {
   errors.push("consumer settings must select the single Full harness profile");
 }
-// Full enables every harness capability by default, but the TUI gate is an
-// intentional portability opt-out: consumer terminals may load another TUI
-// package (for example pi-droid-styling), so registering a second compositor
-// would be a known runtime conflict.
+// Full enables every harness capability by default, except two intentional
+// opt-outs: the TUI gate (consumer terminals may load another TUI package,
+// for example pi-droid-styling, so a second compositor would conflict) and
+// the safety gate (off by default; opt in with extensions.safety: true).
 for (const key of [
-  "safety",
   "herdrState",
   "shortcutContinue",
   "checkpoint",

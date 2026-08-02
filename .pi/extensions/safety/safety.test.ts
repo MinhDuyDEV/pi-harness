@@ -17,6 +17,10 @@ import { VerificationTracker, verificationRules } from "./rules/verification.js"
 import { workspaceRules } from "./rules/workspace.js";
 import type { RuleSet, ToolCallContext } from "./types.js";
 
+// The package defaults the safety gate to off; tests opt back in explicitly
+// so they never depend on the working-tree .pi/settings.json on disk.
+const GATE_ON = { extensions: { safety: true } } as const;
+
 function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 	return evaluate(rules, ctx, "highest-severity").verdict;
 }
@@ -55,7 +59,7 @@ function verdictFor(rules: RuleSet, ctx: ToolCallContext) {
 		},
 	};
 
-	safetyExtension(fakePi as never);
+	safetyExtension(fakePi as never, GATE_ON);
 	assert.equal(handlers.has("tool_call"), true, t + ": hook registered");
 	assert.equal(handlers.has("before_tool_call"), false, t + ": stale hook not used");
 
@@ -179,7 +183,7 @@ async function testConfirmationAllowsConfirmRules(): Promise<void> {
 			},
 		},
 	};
-	safetyExtension(fakePi as never);
+	safetyExtension(fakePi as never, GATE_ON);
 	const result = await handler?.({
 		type: "tool_call",
 		toolCallId: "tc-confirm",
@@ -208,7 +212,7 @@ async function testDisabledRulesPosture(): Promise<void> {
 				commands.set(name, options);
 			},
 		};
-		safetyExtension(fakePi as never);
+		safetyExtension(fakePi as never, GATE_ON);
 		let notification = "";
 		const output = await commands.get("safety")?.handler({}, {
 			ui: {
@@ -241,7 +245,7 @@ async function testUnknownToolsAreEvaluated(): Promise<void> {
 		registerCommand() {},
 		events: { emit() {} },
 	};
-	safetyExtension(fakePi as never);
+	safetyExtension(fakePi as never, GATE_ON);
 
 	const blocked = await handler?.({
 		type: "tool_call",
@@ -277,7 +281,7 @@ async function testUrlAllowlistIsNarrow(): Promise<void> {
 			registerCommand() {},
 			events: { emit() {} },
 		};
-		safetyExtension(fakePi as never);
+		safetyExtension(fakePi as never, GATE_ON);
 
 		const allowed = await handler?.({
 			type: "tool_call",
@@ -326,7 +330,7 @@ async function testCriticalRulesCannotBeDisabled(): Promise<void> {
 			},
 			events: { emit() {} },
 		};
-		safetyExtension(fakePi as never);
+		safetyExtension(fakePi as never, GATE_ON);
 
 		const blocked = await handler?.({
 			type: "tool_call",
@@ -398,7 +402,7 @@ async function testAuditIsPersisted(): Promise<void> {
 				},
 			},
 		};
-		safetyExtension(fakePi as never);
+		safetyExtension(fakePi as never, GATE_ON);
 		await handler?.({
 			type: "tool_call",
 			toolCallId: "tc-audit",

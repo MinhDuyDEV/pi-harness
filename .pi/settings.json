@@ -58,7 +58,7 @@
     "superpi": true,
     "gptPersonality": true,
     "extensions": {
-      "safety": true,
+      "safety": false,
       "herdrState": true,
       "shortcutContinue": true,
       "checkpoint": true,

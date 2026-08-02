@@ -34,7 +34,7 @@ import { evaluate } from "./evaluate.js";
 import type { RuleSet, Verdict } from "./types.js";
 import { defaultRules } from "./rules/presets.js";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { readExtensionGate } from "../lib/harness-settings.js";
+import { readExtensionGate, type HarnessSettings } from "../lib/harness-settings.js";
 
 /**
  * Durable audit trail. The in-memory ring holds 500 entries and dies with the
@@ -102,8 +102,11 @@ function confirmVerdict(
 		});
 }
 
-export default function safetyExtension(pi: ExtensionAPI): void {
-	if (!readExtensionGate(undefined, "safety", true)) return;
+export default function safetyExtension(
+	pi: ExtensionAPI,
+	settingsSource?: string | HarnessSettings,
+): void {
+	if (!readExtensionGate(settingsSource, "safety", true)) return;
 	const cwd = process.cwd();
 	const audit = new AuditLog();
 	// PI_SAFETY_AUDIT_DIR relocates the durable audit (tests point it at a temp

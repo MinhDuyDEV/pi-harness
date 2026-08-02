@@ -8,7 +8,7 @@ A successful init materializes the project-local policy and managed resources, w
 
 The Full profile enables the complete harness workflow surface:
 
-- Herdr state and safety controls
+- Herdr state and safety controls (the safety gate itself is off by default; see below)
 - shortcut and rewind
 - checkpoints and DCP
 - diagnostics and integration hooks
@@ -18,6 +18,8 @@ The Full profile enables the complete harness workflow surface:
 - packaged extensions, skills, prompts, themes, agents, and artifact templates
 
 The TUI capability ships in Full, but `pi-harness.extensions.tui` is disabled by default to avoid competing compositor ownership. Consumers may enable it deliberately after confirming no other TUI package owns that surface.
+
+The safety extension ships in Full but is disabled by default: `pi-harness.extensions.safety` starts `false`, so destructive-command guards (for example catastrophic `rm`, pipe-to-shell, force-push checks) are not active until a consumer explicitly sets `extensions.safety: true`. This preserves the package's trust boundary — safety is a per-consumer opt-in, not an assumption about the environment.
 
 Provider adapters for DeepSeek, Mimo, and xAI are registered by the portable Full settings. Init does not set a global default provider/model or install credentials; canonical agent seats intentionally carry explicit model pins so delegation is reproducible. Network access occurs only when a consumer chooses and invokes a credentialed provider.
 
