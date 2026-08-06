@@ -21,6 +21,7 @@ Use `task` when isolation, repo discovery, parallelism, or independent verificat
 - `blocked` and `needs_decision` are valid, expected outcomes. Answer them with a decision or unblocking context; never treat them as failure or silently relaunch.
 - The parent verifies artifacts — diffs, logs, test output on disk — before shipping. Never ship on a subagent summary alone.
 - Independent tasks go in one message as parallel `task` calls. Do not edit files owned by a running task.
+- For work in another checkout, pass its canonical absolute path through `task.cwd`; do not rely on prompt text to change repositories. Reuse the same `cwd` when resuming a `task_id` or `conversation_id`, and use a new durable identity to switch repositories.
 - Load `/skill:pi-subagents` for detailed recipes (execution patterns, scheduling, evidence and review, recovery); do not copy those recipes here.
 
 Name delegation and review failure modes using the shared vocabulary in `.pi/ANTI_PATTERNS.md` (pre-solve, balloon, fake-green, ...).

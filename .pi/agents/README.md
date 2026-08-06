@@ -71,7 +71,9 @@ Delegate a **governed outcome**, not a recipe:
 
 Do not hand the agent a verification recipe or pre-named acceptance criteria unless genuinely locked.
 
-**Resume:** `task_id` / `conversation_id` from a prior run.
+**Multi-repo:** set `cwd` to the target checkout's canonical absolute path. The harness repository remains the control root for profiles and durable orchestration state; relative context references, claims, worktrees and verification paths belong to the selected repository. Prompting an agent to `cd` is not a substitute for `cwd`.
+
+**Resume:** `task_id` / `conversation_id` from a prior run. A durable identity is bound to its original `cwd`; use a new identity to switch repositories.
 
 ## Answering a challenge
 

@@ -29,7 +29,7 @@ import { readExtensionGate } from "../lib/harness-settings.js";
  */
 export const COMPATIBILITY = {
   "@minhduydev/pi-core": { range: ">=0.3.0 <0.4.0", protocol: PI_CORE_PROTOCOL_VERSION },
-  "@minhduydev/pi-subagents": { range: ">=0.11.0 <0.12.0" },
+  "@minhduydev/pi-subagents": { range: ">=0.11.0 <0.13.0" },
   "@minhduydev/pi-learning": { range: ">=0.5.0 <0.6.0" },
   "@minhduydev/pi-todo": { range: ">=0.5.0 <0.6.0" },
 } as const;
