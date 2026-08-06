@@ -31,25 +31,11 @@ export const QuickEditParams = Type.Object({
   ),
 });
 
-export const SubstituteEditParams = Type.Object({
-  path: Type.String({ description: "Path to the file to edit." }),
-  start: Type.Integer({ minimum: 1, description: "1-indexed inclusive start line." }),
-  end: Type.Integer({ minimum: 1, description: "1-indexed inclusive end line. Must be within the current file." }),
-  substitutions: Type.Array(
-    Type.Object({
-      old: Type.String({ description: "Exact literal substring to replace. Must be single-line and non-empty." }),
-      new: Type.String({ description: "Literal replacement substring. Must be single-line." }),
-      count: Type.Integer({ minimum: 1, description: "Required number of replacements for this substitution." }),
-    }),
-    { minItems: 1, description: "Ordered literal substitutions. Applied sequentially; count is checked before each substitution." },
-  ),
-});
-
 const TargetBase = {
   target: Type.String({ minLength: 1, description: "Exact literal target text to find. Use \\n for multi-line targets." }),
   matchMode: Type.Optional(Type.Union([Type.Literal("exact"), Type.Literal("trim")], {
     default: "exact",
-    description: "Match mode. exact (default) requires exact whitespace and matches substrings. trim compares whole lines after trimming leading/trailing whitespace; the occurrence is bounded to the trimmed content so original indentation is preserved, and replacement leading/trailing whitespace is stripped before writing.",
+    description: "Match mode. exact (default) tries exact substring matching, then the unescaped target, then falls back to whole-line trim matching only if both miss, so an exact hit is never diluted. trim forces trim-only matching and ignores exact substring hits, which helps when the target text also occurs inside an indented line. On a trim match, replace stays bounded to the trimmed content so the original indentation is preserved and replacement leading/trailing whitespace is stripped, while delete removes the whole matched line(s).",
   })),
 };
 
@@ -92,12 +78,6 @@ export const TargetEditParams = Type.Object({
     { minItems: 1, description: "Ordered exact-target operations. Atomic: any invalid operation rejects the whole batch." },
   ),
 });
-
-export type Substitution = {
-  old: string;
-  new: string;
-  count: number;
-};
 
 export type TargetReplaceOp = {
   type: "replace";

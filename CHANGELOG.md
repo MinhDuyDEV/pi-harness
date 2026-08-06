@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Update the vendored `pi-snap-edit` integration from 4.2.2 to 5.0.0. The
+  `target_edit` tool now cascades through exact, unescaped, and trim matching,
+  reports non-exact match tiers, and removes whole lines for trim deletions.
+  Remove the retired `substitute_edit` engine/schema/export while retaining
+  legacy active-tool cleanup.
+
 ## [2.5.0] - 2026-08-02
 
 ### Changed

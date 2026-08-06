@@ -180,6 +180,57 @@ test("a valid target_edit replaces the selected occurrence", async () => {
   });
 });
 
+test("target_edit cascades to trim matching and reports the resolved tier", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const targetEdit = api.tools.get("target_edit");
+    assert.ok(targetEdit, "target_edit tool must be registered");
+
+    const file = path.join(cwd, "target-trim.txt");
+    await writeFile(file, "before\n  old value  \nafter\n", "utf8");
+
+    const result = (await targetEdit.execute(
+      "call-target-trim",
+      {
+        path: file,
+        ops: [{ type: "replace", target: "    old value", replacement: "new value" }],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    )) as { content?: Array<{ type: string; text: string }> };
+
+    assert.equal(await readFile(file, "utf8"), "before\n  new value  \nafter\n");
+    assert.match(result.content?.[0]?.text ?? "", /matched via trim/);
+  });
+});
+
+test("target_edit trim delete removes the whole matched line", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const targetEdit = api.tools.get("target_edit");
+    assert.ok(targetEdit, "target_edit tool must be registered");
+
+    const file = path.join(cwd, "target-trim-delete.txt");
+    await writeFile(file, "before\n  remove me  \nafter\n", "utf8");
+
+    await targetEdit.execute(
+      "call-target-trim-delete",
+      {
+        path: file,
+        ops: [{ type: "delete", target: "remove me", matchMode: "trim" }],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+
+    assert.equal(await readFile(file, "utf8"), "before\nafter\n");
+  });
+});
+
 test("quick_edit rolls back an earlier valid operation when a later operation fails", async () => {
   await withIsolatedCwd(true, async (cwd) => {
     const api = new StubApi();

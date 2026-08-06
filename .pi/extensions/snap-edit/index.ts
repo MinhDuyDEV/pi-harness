@@ -3,7 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readExtensionGate } from "../lib/harness-settings.js";
 
 // The snap-edit extension is a faithful, vendored port of sting8k/pi-snap-edit
-// 4.2.2. Upstream peers `@earendil-works/pi-coding-agent`/`pi-tui` at ^0.78.0,
+// 5.0.0. Upstream peers `@earendil-works/pi-coding-agent`/`pi-tui` at ^0.78.0,
 // which ERESOLVEs against Pi 0.81.1, so the source is vendored here and bound
 // to the host's installed 0.81.1 packages instead. The only adaptation is the
 // typebox import name in schemas.ts; every editing routine is unchanged.

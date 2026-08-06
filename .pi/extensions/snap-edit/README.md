@@ -1,17 +1,16 @@
 # snap-edit
 
 Vendored port of [`sting8k/pi-snap-edit`](https://www.npmjs.com/package/pi-snap-edit)
-@ **4.2.2** providing the `quick_edit` and `target_edit` tools with atomic,
-guard-checked editing semantics.
+@ **5.0.0** (upstream commit `db95928`) providing the `quick_edit` and
+`target_edit` tools with atomic, guard-checked editing semantics.
 
 ## Why this is vendored (not npm-pinned)
 
-Upstream `pi-snap-edit@4.2.2` declares peer dependencies
+Upstream `pi-snap-edit@5.0.0` declares peer dependencies
 `@earendil-works/pi-coding-agent@^0.78.0` and `@earendil-works/pi-tui@^0.78.0`.
 On a 0.x range, `^0.78.0` resolves to `>=0.78.0 <0.79.0`, so it **ERESOLVEs**
-against this harness's pinned Pi **0.81.1** host. Every published 4.x release
-carries the same `^0.78.0` peer range, and 1.x–3.x releases reference the
-obsolete `@mariozechner/pi-*` namespace, so no compatible npm pin exists.
+against this harness's pinned Pi **0.81.1** host. The 5.0.0 release retains the
+same incompatible peer range as 4.x, so no compatible npm pin exists.
 
 The runtime API the package needs (`ExtensionAPI.registerTool/getActiveTools/
 setActiveTools/on`, `withFileMutationQueue`, `keyHint`, and `pi-tui`'s `Text`)
@@ -33,8 +32,8 @@ The only change to the vendored source is in `schemas.ts`:
 `@sinclair/typebox` was renamed to `typebox`; the host pins `typebox@1.1.38`,
 whose `Type` builder API is compatible with the schema shapes used here
 (`Object`, `String`, `Integer`, `Optional`, `Union`, `Literal`, `Array` with
-options). Every editing routine (`quick-edit.ts`, `target-edit.ts`,
-`substitute-edit.ts`, `fuzzy.ts`, `anchors.ts`, `diff.ts`, …) is unchanged.
+options). Every editing routine (`quick-edit.ts`, `target-edit.ts`, `fuzzy.ts`,
+`anchors.ts`, `diff.ts`, …) is unchanged.
 
 ## Layout
 
@@ -45,6 +44,15 @@ options). Every editing routine (`quick-edit.ts`, `target-edit.ts`,
 - `index.ts` — a thin harness wrapper that honors the
   `pi-harness.extensions.snapEdit` gate (default off except in the `full`
   profile) before delegating to `extension.ts`.
+
+## Upstream 5.0 behavior
+
+- `target_edit` cascades through exact, unescaped, then whole-line trim
+  matching. Non-exact successes report the resolved tier.
+- A trim replacement preserves the file's indentation; a trim deletion removes
+  the whole matched line instead of leaving an indentation-only line.
+- The previously unregistered `substitute_edit` engine/schema/export has been
+  removed. Its active-tool filter remains to clean legacy saved session state.
 
 ## Activation
 
@@ -60,7 +68,9 @@ or by using the `full` profile. `pi-harness-init` owns Full-profile gates and re
 
 ## Re-vendoring
 
-To update from a future upstream release: extract the new `src/*.ts` over this
-directory, re-apply the `typebox` import swap in `schemas.ts`, and keep
-`index.ts` as the gated wrapper. Re-run `npm run test:extensions` and
+To update from a future upstream release: replace the vendored files with the
+new `src/*.ts`, rename upstream `src/index.ts` to `extension.ts`, remove source
+files deleted upstream, re-apply the `typebox` import swap in `schemas.ts`, and
+keep `index.ts` plus `index.test.ts` as harness-owned files. Re-run
+`npm run test:extensions`, `npm run typecheck:extensions`, and
 `npm run typecheck:extension-tests`.
