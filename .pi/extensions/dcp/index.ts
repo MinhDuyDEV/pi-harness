@@ -67,6 +67,7 @@ import {
   type DCPTelemetryEvent,
 } from "./telemetry.js";
 import { readExtensionGate } from "../lib/harness-settings.js";
+import { registerCompactionContinuation } from "./compaction-continuation.js";
 
 export default function dcpExtension(pi: ExtensionAPI): void {
   if (!readExtensionGate(undefined, "dcp", false)) return;
@@ -76,6 +77,13 @@ export default function dcpExtension(pi: ExtensionAPI): void {
   const nudge = new NudgeManager(config);
   const usageReceipts = new Map<string, DcpUsageReference>();
   let initialized = false;
+
+  registerCompactionContinuation(pi, {
+    ...config.continuation,
+    enabled:
+      config.continuation.enabled &&
+      readExtensionGate(undefined, "continueAfterCompaction", true),
+  });
 
   if (pi.events) {
     pi.events.on("pi-learning:v1:usage-receipts-issued", (payload: unknown) => {

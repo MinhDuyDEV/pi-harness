@@ -6,16 +6,19 @@ import { buildRecallEntries } from "./recall-sources.js";
 import { isBrowseEntry, rankRecallEntries } from "./recall-ranking.js";
 import { renderExpanded, renderRecall } from "./recall-render.js";
 import { PAGE_SIZE, type RecallOptions, type RecallResult } from "./recall-types.js";
+import {
+  loadTaskProvenanceRecall,
+  type TaskProvenanceRecallLoad,
+} from "./task-provenance-source.js";
 
-// Re-export the public result types so external importers of `recall.js` keep
-// access after the types were moved to recall-types.js.
+/** Public recall contracts exported from the runtime entry module. */
 export type { RecallOptions, RecallResult } from "./recall-types.js";
 
 export function registerRecallTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: "dcp_recall",
     label: "DCP Recall",
-    description: "Search durable DCP blocks and persisted Pi session JSONL history. Supports regex queries, pagination, expand, and scope:'all'.",
+    description: "Search durable DCP blocks, persisted Pi session JSONL history, and scope:'all' task provenance. Supports regex queries, pagination, and expand.",
     promptSnippet: "Search exact durable DCP history when compacted context may have omitted details.",
     promptGuidelines: [
       "Use dcp_recall before guessing about old compacted context.",
@@ -37,23 +40,43 @@ export function registerRecallTool(pi: ExtensionAPI): void {
       _onUpdate: unknown,
       ctx: ExtensionContext,
     ) {
+      const scope = params.scope ?? "active";
+      const taskSource = scope === "all"
+        ? await loadTaskProvenanceRecall(ctx.cwd)
+        : undefined;
       const result = searchDcpRecall({
         sessionId: getDcpSessionId(ctx),
         sessionFile: ctx.sessionManager.getSessionFile() ?? undefined,
         ...params,
-      });
+      }, taskSource);
       return {
         content: [{ type: "text" as const, text: result.rendered }],
-        details: { total: result.total, entries: result.entries },
+        details: { total: result.total, entries: result.entries, warnings: result.warnings ?? [] },
       };
     },
   });
 }
 
-export function searchDcpRecall(options: RecallOptions): RecallResult {
-  const entries = buildRecallEntries(options.sessionId, options.scope ?? "active", options.sessionFile);
+export function searchDcpRecall(
+  options: RecallOptions,
+  taskSource?: TaskProvenanceRecallLoad,
+): RecallResult {
+  const warnings = taskSource?.warning ? [taskSource.warning] : [];
+  const entries = buildRecallEntries(
+    options.sessionId,
+    options.scope ?? "active",
+    options.sessionFile,
+    taskSource?.entries,
+  );
   const expanded = options.expand?.length ? entries.filter((entry) => options.expand?.includes(entry.index)) : undefined;
-  if (expanded) return { entries: expanded, total: expanded.length, rendered: renderExpanded(expanded) };
+  if (expanded) {
+    return {
+      entries: expanded,
+      total: expanded.length,
+      rendered: withWarnings(renderExpanded(expanded), warnings),
+      ...(warnings.length ? { warnings } : {}),
+    };
+  }
 
   const queried = options.query?.trim()
     ? rankRecallEntries(entries, options.query.trim())
@@ -65,6 +88,11 @@ export function searchDcpRecall(options: RecallOptions): RecallResult {
   return {
     entries: pageEntries,
     total: queried.length,
-    rendered: renderRecall(pageEntries, queried.length, page, options.query),
+    rendered: withWarnings(renderRecall(pageEntries, queried.length, page, options.query), warnings),
+    ...(warnings.length ? { warnings } : {}),
   };
+}
+
+function withWarnings(rendered: string, warnings: string[]): string {
+  return warnings.length ? `${rendered}\n\nSource warning: ${warnings.join("; ")}` : rendered;
 }

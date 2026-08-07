@@ -57,17 +57,17 @@ if (existsSync(".pi/extensions/herdr-agent-state.ts")) errors.push("machine-mana
 // nothing, and pi-learning's caret range excluded 0.82 while the others
 // accepted it — the peer conflict would have appeared only at install time.
 for (const [dependency, version] of Object.entries({
-  "@earendil-works/pi-ai": ">=0.81.1 <0.82.0",
-  "@earendil-works/pi-coding-agent": ">=0.81.1 <0.82.0",
-  "@earendil-works/pi-tui": ">=0.81.1 <0.82.0",
-  typebox: "1.1.38",
+  "@earendil-works/pi-ai": ">=0.84.0 <0.85.0",
+  "@earendil-works/pi-coding-agent": ">=0.84.0 <0.85.0",
+  "@earendil-works/pi-tui": ">=0.84.0 <0.85.0",
+  typebox: "1.3.7",
 })) {
   if (packageJson.peerDependencies?.[dependency] !== version) errors.push(`${dependency} peer version must be ${version}`);
 }
 for (const dependency of ["@earendil-works/pi-ai", "@earendil-works/pi-coding-agent", "@earendil-works/pi-tui"]) {
-  if (packageJson.devDependencies?.[dependency] !== "0.81.1") errors.push(`${dependency} development version must be 0.81.1`);
+  if (packageJson.devDependencies?.[dependency] !== "0.84.0") errors.push(`${dependency} development version must be 0.84.0`);
 }
-if (packageJson.devDependencies?.typebox !== "1.1.38") errors.push("typebox development version must match the Pi 0.81.1 host");
+if (packageJson.devDependencies?.typebox !== "1.3.7") errors.push("typebox development version must match the Pi 0.84.0 host");
 if (packageJson.engines?.node !== ">=22.19.0") errors.push("package.json must declare Node >=22.19.0");
 if (packageJson.packageManager !== "npm@11.12.1") errors.push("package.json must declare npm@11.12.1 as the package manager");
 
@@ -97,10 +97,9 @@ if (JSON.stringify(consumerSettings) !== JSON.stringify(settings)) {
 if (consumerSettings["pi-harness"]?.profile !== "full") {
   errors.push("consumer settings must select the single Full harness profile");
 }
-// Full enables every harness capability by default, except two intentional
-// opt-outs: the TUI gate (consumer terminals may load another TUI package,
-// for example pi-droid-styling, so a second compositor would conflict) and
-// the safety gate (off by default; opt in with extensions.safety: true).
+// Full enables every shipped harness capability by default except safety,
+// which remains an explicit opt-in. Provider and compositor replacements are
+// native in the supported Pi host and must not return as harness gates.
 for (const key of [
   "herdrState",
   "shortcutContinue",
@@ -109,17 +108,19 @@ for (const key of [
   "learningCoordinator",
   "workflowState",
   "dcp",
-  "tui",
+  "continueAfterCompaction",
   "tps",
   "diagnostics",
   "integration",
   "usageTracker",
-  "deepseek",
-  "mimo",
-  "xai",
 ]) {
-  if (key !== "tui" && consumerSettings["pi-harness"]?.extensions?.[key] !== true) {
+  if (consumerSettings["pi-harness"]?.extensions?.[key] !== true) {
     errors.push(`consumer settings must force the Full ${key} extension gate on`);
+  }
+}
+for (const retired of ["deepseek", "mimo", "xai", "tui"]) {
+  if (consumerSettings["pi-harness"]?.extensions?.[retired] !== undefined) {
+    errors.push(`consumer settings must not configure Pi-native ${retired}`);
   }
 }
 for (const key of ["defaultModel", "defaultProvider", "theme"]) {

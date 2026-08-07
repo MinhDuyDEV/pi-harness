@@ -89,7 +89,7 @@ test("skill templates use valid metadata and actual ask_user fallback contract",
   }
 });
 
-test("consumer documentation matches delivery, TUI defaults, model seats, and bootstrap preconditions", () => {
+test("consumer documentation matches delivery, native TUI ownership, model seats, and bootstrap preconditions", () => {
   const piReadme = read(".pi", "README.md");
   const profiles = read("docs", "harness-profiles.md");
   const rootReadme = read("README.md");
@@ -98,7 +98,9 @@ test("consumer documentation matches delivery, TUI defaults, model seats, and bo
   assert.doesNotMatch(piReadme, /APPEND_SYSTEM\.md[^\n]+not shipped/i);
   assert.match(piReadme, /initializer.*materialize/is);
   assert.match(piReadme, /canonical.*model.*pin/is);
-  assert.match(profiles, /TUI capability.*disabled by default/is);
+  assert.match(profiles, /Pi 0\.84 owns fullscreen compositor behavior/is);
+  assert.match(profiles, /former harness compositor was removed/is);
+  assert.doesNotMatch(profiles, /pi-harness\.extensions\.tui|TUI capability.*disabled by default/is);
   assert.match(rootReadme, /mkdir.*my-repo/);
   assert.doesNotMatch(agents, /\\n\|/);
   assert.doesNotMatch(agents, /project `\.pi\/AGENTS\.md`/);

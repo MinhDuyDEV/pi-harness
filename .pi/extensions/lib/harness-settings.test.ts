@@ -1,10 +1,8 @@
 /**
  * Binds the harness settings reader and the per-extension gates.
  *
- * Provider extensions (deepseek, mimo, xai) are opt-in: a consumer who
- * installs the harness must not get third-party model providers registered
- * until their settings.json says so. The prompt-shaping keys (superpi,
- * gptPersonality) keep their original shape — these tests pin both.
+ * Binds the harness settings reader and shipped per-extension gates. The
+ * prompt-shaping keys (superpi, gptPersonality) keep their original shape.
  */
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -12,16 +10,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import deepseekProvider from "../deepseek-provider.js";
-import mimoProvider from "../mimo-provider.js";
-import xaiOauth from "../xai-oauth.js";
 import checkpoint from "../checkpoint/index.js";
 import dcp from "../dcp/index.js";
 import learningCoordinator from "../learning-coordinator/index.js";
 import rewind from "../rewind/index.js";
 import shortcutContinue from "../shortcut-continue.js";
 import tps from "../tps.js";
-import tui from "../tui/index.js";
 import workflowState from "../workflow-state/index.js";
 import {
   promptShapingAllowed,
@@ -66,48 +60,34 @@ test("readHarnessSettings: superpi/gptPersonality parse exactly as before", () =
   }
 });
 
-test("readExtensionGate: provider keys default to FALSE when not configured", () => {
-  inProject({ "pi-harness": { superpi: true } }, (cwd) => {
-    for (const key of ["deepseek", "mimo", "xai"]) {
-      assert.equal(readExtensionGate(cwd, key, false), false, key);
-    }
-  });
-  inProject({}, (cwd) => {
-    assert.equal(readExtensionGate(cwd, "deepseek", false), false);
-  });
-});
-
 test("readExtensionGate: settings can turn a gate on or explicitly off", () => {
   inProject(
-    { "pi-harness": { extensions: { deepseek: true, mimo: false, xai: true } } },
+    { "pi-harness": { extensions: { dcp: true, checkpoint: false } } },
     (cwd) => {
-      assert.equal(readExtensionGate(cwd, "deepseek", false), true);
-      assert.equal(readExtensionGate(cwd, "mimo", false), false);
-      assert.equal(readExtensionGate(cwd, "xai", false), true);
+      assert.equal(readExtensionGate(cwd, "dcp", false), true);
+      assert.equal(readExtensionGate(cwd, "checkpoint", true), false);
     },
   );
 });
 
-test("readExtensionGate: providers remain opt-in when a malformed value would otherwise inherit true", () => {
-  inProject({ "pi-harness": { extensions: { deepseek: "on", mimo: 1 } } }, (cwd) => {
-    assert.equal(readExtensionGate(cwd, "deepseek", false), false);
-    assert.equal(readExtensionGate(cwd, "mimo", true), false);
+test("readExtensionGate: malformed values do not override a profile", () => {
+  inProject({ "pi-harness": { profile: "full", extensions: { dcp: "on" } } }, (cwd) => {
+    assert.equal(readExtensionGate(cwd, "dcp", false), true);
   });
 });
 
 test("readExtensionGate: accepts already-parsed settings as the source", () => {
-  assert.equal(readExtensionGate({ extensions: { xai: true } }, "xai", false), true);
-  assert.equal(readExtensionGate({ extensions: {} }, "xai", false), false);
-  assert.equal(readExtensionGate({}, "xai", true), false);
+  assert.equal(readExtensionGate({ extensions: { dcp: true } }, "dcp", false), true);
+  assert.equal(readExtensionGate({ extensions: {} }, "dcp", false), false);
+  assert.equal(readExtensionGate({}, "dcp", true), true);
 });
 
-test("the full profile provides the consumer extension bundle without enabling providers", () => {
+test("the full profile provides the shipped consumer extension bundle", () => {
   assert.equal(readExtensionGate({ profile: "full" }, "safety", false), true);
   assert.equal(readExtensionGate({ profile: "full" }, "dcp", false), true);
+  assert.equal(readExtensionGate({ profile: "full" }, "continueAfterCompaction", false), true);
   assert.equal(readExtensionGate({ profile: "full" }, "checkpoint", false), true);
   assert.equal(readExtensionGate({ profile: "full" }, "workflowState", false), true);
-  assert.equal(readExtensionGate({ profile: "full" }, "tui", false), true);
-  assert.equal(readExtensionGate({ profile: "full" }, "deepseek", true), false);
   assert.equal(
     readExtensionGate({ profile: "full", extensions: { dcp: true } }, "dcp", false),
     true,
@@ -122,7 +102,7 @@ test("worker seat mode disables prompt shaping and all write-heavy extensions", 
     assert.equal(readHarnessSeatRole(), "implementer");
     assert.equal(promptShapingAllowed(), false);
     assert.equal(readExtensionGate({ profile: "full" }, "dcp", true), false);
-    assert.equal(readExtensionGate({ extensions: { tui: true } }, "tui", true), false);
+    assert.equal(readExtensionGate({ extensions: { rewind: true } }, "rewind", true), false);
     assert.equal(readExtensionGate({ profile: "full" }, "safety", false), true);
     assert.equal(readExtensionGate({ profile: "full" }, "herdrState", false), true);
 
@@ -147,7 +127,6 @@ test("profile-gated entries return before touching disabled extension APIs", () 
           rewind: false,
           shortcutContinue: false,
           tps: false,
-          tui: false,
           workflowState: false,
         },
       },
@@ -160,7 +139,6 @@ test("profile-gated entries return before touching disabled extension APIs", () 
       rewind,
       shortcutContinue,
       tps,
-      tui,
       workflowState,
     ]) {
       const accesses: PropertyKey[] = [];
@@ -179,27 +157,7 @@ test("profile-gated entries return before touching disabled extension APIs", () 
   });
 });
 
-// --- Entry-level: the three provider extensions honor the gate ---
-
-interface Recorded {
-  providers: string[];
-  tools: string[];
-}
-
-function recordingPi(): { pi: ExtensionAPI; recorded: Recorded } {
-  const recorded: Recorded = { providers: [], tools: [] };
-  const pi = {
-    registerProvider(name: string) {
-      recorded.providers.push(name);
-    },
-    registerTool(tool: { name: string }) {
-      recorded.tools.push(tool.name);
-    },
-  } as unknown as ExtensionAPI;
-  return { pi, recorded };
-}
-
-/** The provider entries read the gate from process.cwd() at call time. */
+/** Extension entries read their gate from process.cwd() at call time. */
 function inProjectCwd(settings: unknown, body: () => void): void {
   const previous = process.cwd();
   const cwd = projectWithSettings(settings);
@@ -211,42 +169,3 @@ function inProjectCwd(settings: unknown, body: () => void): void {
     rmSync(cwd, { recursive: true, force: true });
   }
 }
-
-test("provider entries register nothing when the gate is off (the default)", () => {
-  inProjectCwd({ "pi-harness": { superpi: true } }, () => {
-    for (const entry of [deepseekProvider, mimoProvider, xaiOauth]) {
-      const { pi, recorded } = recordingPi();
-      entry(pi as never);
-      assert.deepEqual(recorded, { providers: [], tools: [] });
-    }
-  });
-});
-
-test("provider entries register their provider when the gate is on", () => {
-  inProjectCwd(
-    { "pi-harness": { extensions: { deepseek: true, mimo: true, xai: true } } },
-    () => {
-      const deepseek = recordingPi();
-      deepseekProvider(deepseek.pi as never);
-      assert.deepEqual(deepseek.recorded.providers, ["deepseek"]);
-
-      const mimo = recordingPi();
-      mimoProvider(mimo.pi);
-      assert.deepEqual(mimo.recorded.providers, ["xiaomi-mimo"]);
-
-      const xai = recordingPi();
-      xaiOauth(xai.pi);
-      assert.deepEqual(xai.recorded.providers, ["xai-auth"]);
-    },
-  );
-});
-
-test("each provider gate is independent", () => {
-  inProjectCwd({ "pi-harness": { extensions: { mimo: true } } }, () => {
-    const { pi, recorded } = recordingPi();
-    deepseekProvider(pi as never);
-    mimoProvider(pi);
-    xaiOauth(pi);
-    assert.deepEqual(recorded.providers, ["xiaomi-mimo"]);
-  });
-});

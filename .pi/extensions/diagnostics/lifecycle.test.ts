@@ -2,6 +2,13 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import diagnosticsExtension from "./extension.ts";
+import {
+  autoFallowEnabled,
+  autoFallowTimeoutMs,
+  fallowAvailable,
+  fallowHasFindings,
+  isAutoDiagnosticPath,
+} from "./auto-inject.ts";
 import { renderDiagnosticsCall } from "./tool-render.ts";
 
 const plainTheme = {
@@ -82,4 +89,51 @@ describe("Diagnostics extension lifecycle contract", () => {
 			);
 		}
 	});
+});
+
+describe("Auto-fallow gate", () => {
+  it("is enabled by default and only literal false disables it", () => {
+    const previous = process.env.PI_DIAGNOSTICS_AUTO_FALLOW;
+    delete process.env.PI_DIAGNOSTICS_AUTO_FALLOW;
+    try {
+      assert.equal(autoFallowEnabled(), true);
+      process.env.PI_DIAGNOSTICS_AUTO_FALLOW = "false";
+      assert.equal(autoFallowEnabled(), false);
+      process.env.PI_DIAGNOSTICS_AUTO_FALLOW = "true";
+      assert.equal(autoFallowEnabled(), true);
+    } finally {
+      if (previous === undefined) delete process.env.PI_DIAGNOSTICS_AUTO_FALLOW;
+      else process.env.PI_DIAGNOSTICS_AUTO_FALLOW = previous;
+    }
+  });
+
+  it("caps the auto-fallow timeout and project path boundary", () => {
+    const previous = process.env.PI_DIAGNOSTICS_AUTO_FALLOW_TIMEOUT_MS;
+    try {
+      process.env.PI_DIAGNOSTICS_AUTO_FALLOW_TIMEOUT_MS = "999999";
+      assert.equal(autoFallowTimeoutMs(), 30_000);
+      process.env.PI_DIAGNOSTICS_AUTO_FALLOW_TIMEOUT_MS = "10";
+      assert.equal(autoFallowTimeoutMs(), 1_000);
+      assert.equal(isAutoDiagnosticPath("/repo", "/repo", "src/a.ts"), true);
+      assert.equal(isAutoDiagnosticPath("/repo", "/repo", "/other/a.ts"), false);
+      assert.equal(isAutoDiagnosticPath("/repo", "/repo", "../other/a.ts"), false);
+    } finally {
+      if (previous === undefined) delete process.env.PI_DIAGNOSTICS_AUTO_FALLOW_TIMEOUT_MS;
+      else process.env.PI_DIAGNOSTICS_AUTO_FALLOW_TIMEOUT_MS = previous;
+    }
+  });
+
+  it("stays silent on clean metadata and recognizes configured Fallow", () => {
+    const previous = process.env.FALLOW_BIN;
+    process.env.FALLOW_BIN = "/local/fallow";
+    try {
+      assert.equal(fallowAvailable(), true);
+      assert.equal(fallowHasFindings(undefined), false);
+      assert.equal(fallowHasFindings({ ok: true } as never), false);
+      assert.equal(fallowHasFindings({ ok: false } as never), true);
+    } finally {
+      if (previous === undefined) delete process.env.FALLOW_BIN;
+      else process.env.FALLOW_BIN = previous;
+    }
+  });
 });

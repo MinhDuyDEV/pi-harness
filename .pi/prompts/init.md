@@ -5,6 +5,8 @@ argument-hint: "[--deep] [--context|--user|--all]"
 
 # Init: $ARGUMENTS
 
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
+
 Initialize project setup. Run once per project.
 
 > **AGENTS.md is the most important context file for AI agents** (Pocock). Getting init right reduces every future ambiguity error.
@@ -25,9 +27,9 @@ Load these available skills using the current session's skill-loading instructio
 | File | Rule |
 |---|---|
 | `AGENTS.md` | Improve in-place — never overwrite blindly |
-| `.pi/memory/project/tech-stack.md` | Overwrite with detected values (auto-regenerated) |
-| `.pi/memory/project/roadmap.md` | Skip if exists, ask before overwrite |
-| `.pi/memory/project/user.md` | Skip if exists, ask before overwrite |
+| `<repo-root>/.pi/memory/project/tech-stack.md` | Overwrite with detected values (auto-regenerated) |
+| `<repo-root>/.pi/memory/project/roadmap.md` | Skip if exists, ask before overwrite |
+| `<repo-root>/.pi/memory/project/user.md` | Skip if exists, ask before overwrite |
 
 ## Parse Arguments
 
@@ -102,7 +104,7 @@ If AGENTS.md exists, improve it — never overwrite blindly.
 
 ### Phase 4: Create tech-stack.md
 
-Write detected values to `.pi/memory/project/tech-stack.md`:
+Write detected values to `<repo-root>/.pi/memory/project/tech-stack.md`:
 
 ```markdown
 # Tech Stack
@@ -205,7 +207,7 @@ Use one `ask_user` form with three related questions: a text question for the 1�
 
 ### Phase 3: Create Files
 
-Create `.pi/memory/project/roadmap.md`:
+Create `<repo-root>/.pi/memory/project/roadmap.md`:
 
 ```markdown
 # Roadmap
@@ -220,7 +222,7 @@ Create `.pi/memory/project/roadmap.md`:
 - ...
 ```
 
-Create `.pi/memory/project/state.md`:
+Create `<repo-root>/.pi/memory/project/state.md`:
 
 ```markdown
 # State
@@ -239,7 +241,7 @@ Initial setup
 
 ## Mode 3: User Profile (`--user`)
 
-Create personalized user profile at `.pi/memory/project/user.md`.
+Create personalized user profile at `<repo-root>/.pi/memory/project/user.md`.
 
 ### Phase 1: Gather Preferences
 
@@ -247,7 +249,7 @@ Use one `ask_user` form with a text question for name/role, a single-choice comm
 
 ### Phase 2: Create user.md
 
-Write to `.pi/memory/project/user.md` with the captured preferences.
+Write to `<repo-root>/.pi/memory/project/user.md` with the captured preferences.
 
 ---
 

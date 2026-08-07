@@ -256,18 +256,46 @@ test("package metadata follows Pi's portable package conventions", () => {
     "@earendil-works/pi-coding-agent",
     "@earendil-works/pi-tui",
   ]) {
-    // One bounded range across the pi-* suite (audit X-C): "*" protected
-    // nothing — a Pi 0.82 host would have satisfied it while the code was
-    // only ever verified against 0.81.x.
+    // One bounded range across the pi-* suite (audit X-C): the package is
+    // verified against the 0.84 host line and must not silently float into a
+    // later breaking host release.
     assert.equal(
       manifest.peerDependencies?.[name],
-      ">=0.81.1 <0.82.0",
+      ">=0.84.0 <0.85.0",
       `${name} must pin the verified Pi host range`,
     );
   }
+  assert.equal(manifest.peerDependencies?.typebox, "1.3.7");
+  assert.equal(manifest.devDependencies?.typebox, "1.3.7");
   assert.equal(manifest.scripts?.prepublishOnly, "npm run release:check:registry");
   assert.equal(manifest.scripts?.["release:check"], "npm run release:check:local");
   assert.match(manifest.scripts?.["pack:check"] ?? "", /validate:package-payload/);
+});
+
+test("native Pi capabilities are not duplicated in the harness payload or settings", () => {
+  const manifest = JSON.parse(readFileSync("package.json", "utf8"));
+  const settings = JSON.parse(readFileSync(".pi/settings.json", "utf8"));
+  const extensionGates = settings["pi-harness"]?.extensions ?? {};
+
+  for (const retired of ["deepseek", "mimo", "xai", "tui"]) {
+    assert.equal(retired in extensionGates, false, `${retired} gate must be removed`);
+  }
+  assert.equal(manifest.scripts?.["test:tui"], undefined);
+
+  const out = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+    cwd: process.cwd(),
+  });
+  const files = (JSON.parse(out) as { files: { path: string }[] }[])[0].files.map((file) => file.path);
+  for (const pattern of [
+    /\.pi\/extensions\/deepseek(?:\/|-provider\.ts)/,
+    /\.pi\/extensions\/mimo-provider\.ts/,
+    /\.pi\/extensions\/xai(?:\/|-oauth\.ts)/,
+    /\.pi\/extensions\/tui\//,
+  ]) {
+    assert.equal(files.some((file) => pattern.test(file)), false, `retired payload matched ${pattern}`);
+  }
 });
 
 test("source reproducibility files are tracked even though npm excludes them from tarballs", () => {

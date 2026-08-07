@@ -1,9 +1,11 @@
 ---
-description: Generate a step-by-step plan for an existing work session — updates the work session block in `.pi/artifacts/PLAN.md`
+description: Generate a step-by-step plan for an existing work session — updates the work session block in `<repo-root>/.pi/artifacts/PLAN.md`
 argument-hint: "<title> [--split] [--no-adrs] [--quick]"
 ---
 
 # Plan: $ARGUMENTS
+
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
 
 Generate an implementation plan for the work session.
 
@@ -21,7 +23,7 @@ Generate an implementation plan for the work session.
 
 ## 2. Find Work Session
 
-Use the available repository text/semantic search tool to locate the exact `### ... - <title>` block in `.pi/artifacts/TODO.md`; do not assume `rg` is installed.
+Use the available repository text/semantic search tool to locate the exact `### ... - <title>` block in `<repo-root>/.pi/artifacts/TODO.md`; do not assume `rg` is installed.
 
 If not found: "Run `/create <title>` first."
 
@@ -67,13 +69,13 @@ Show the plan, then use `ask_user` for one focused choice: accept, adjust (text)
 
 ## 7. Update Blocks
 
-### `.pi/artifacts/PLAN.md`
+### `<repo-root>/.pi/artifacts/PLAN.md`
 
 Add a `#### Plan` subsection (and `#### Phases` if `--split`) to the work session block. If the block doesn't exist yet, create it with the Spec carried over.
 Add or replace `#### Foundation Verdict` with verdict, rationale, evidence,
 constraint classifications, and the immutable workflow record id/digest.
 
-### `.pi/artifacts/TODO.md`
+### `<repo-root>/.pi/artifacts/TODO.md`
 
 Replace the slash-command checkboxes with one checkbox per step. Keep `/verify` at the bottom.
 
@@ -86,7 +88,7 @@ status: active | updated: YYYY-MM-DD
 - [ ] /verify
 ```
 
-### `.pi/artifacts/DECISIONS.md`
+### `<repo-root>/.pi/artifacts/DECISIONS.md`
 
 If the plan involves real architectural choices (alternative considered, tradeoffs, why-this-not-that), append a block for this work session. Skip with `--no-adrs`.
 

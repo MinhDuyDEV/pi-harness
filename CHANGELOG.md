@@ -6,13 +6,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-08-07
+
+### Added
+
+- Resume queued work after manual, threshold, and non-retried overflow compaction by default, with coalescing and busy-session follow-up semantics.
+- Recall bounded, sanitized task provenance through the public `pi-subagents/replay` port when that companion is installed.
+- Validate automatic diagnostics baselines, bound Fallow runtime, and report analyzer/baseline failure without treating empty output as a clean result.
+- Bind skill-evaluation fixtures to the explicit model, prompt digest, harness digest/version, skill version, and response digest.
+
 ### Changed
 
+- Move the supported host generation to Pi `0.84.x` and TypeBox `1.3.7`.
+- Retire harness-owned DeepSeek, Xiaomi/MiMo, xAI, and fullscreen compositor implementations now provided natively by Pi 0.84. Stale consumer gates are removed during bootstrap upgrades.
+- Make prompt artifact paths repository-root-relative and require a complete independent verification pass before READY; quick or gate-only checks cannot close work.
+- Pin `pi-subagents@0.12.0`, `pi-learning@0.6.0`, and `pi-todo@0.6.0`; the harness itself moves to `2.6.0` because `2.5.0` already exists on npm.
 - Update the vendored `pi-snap-edit` integration from 4.2.2 to 5.0.0. The
   `target_edit` tool now cascades through exact, unescaped, and trim matching,
   reports non-exact match tiers, and removes whole lines for trim deletions.
   Remove the retired `substitute_edit` engine/schema/export while retaining
   legacy active-tool cleanup.
+
+### Fixed
+
+- Preserve Pi 0.84 provider-header deletion markers through DCP stream handling while filtering null values at the concrete compaction API boundary.
 
 ## [2.5.0] - 2026-08-02
 

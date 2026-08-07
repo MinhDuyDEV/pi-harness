@@ -20,6 +20,13 @@ const entries: RecallEntry[] = [
     role: "user",
     timestamp: Date.parse("2026-07-22T00:00:00.000Z"),
   },
+  {
+    index: 3,
+    source: "task",
+    title: "[task:auth-migration] Migrate authentication sessions",
+    text: "Execution: completed\nVerification: passed\nReview: accepted",
+    timestamp: Date.parse("2026-07-23T00:00:00.000Z"),
+  },
 ];
 
 describe("recall ranking", () => {
@@ -33,8 +40,13 @@ describe("recall ranking", () => {
     assert.equal(ranked[0]?.title, "Alpha decision");
   });
 
+  it("keeps exact durable task provenance above transcript chatter", () => {
+    const ranked = rankRecallEntries(entries, "auth migration");
+    assert.equal(ranked[0]?.source, "task");
+  });
+
   it("browses newest entries first with pagination", () => {
     const browsed = browseRecallEntries(entries, 1, 1);
-    assert.deepEqual(browsed, [entries[1]]);
+    assert.deepEqual(browsed, [entries[2]]);
   });
 });

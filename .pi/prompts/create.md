@@ -1,11 +1,13 @@
 ---
-description: Create a work session — captures goal, scope, and success criteria as a block in `.pi/artifacts/PLAN.md`
+description: Create a work session — captures goal, scope, and success criteria as a block in `<repo-root>/.pi/artifacts/PLAN.md`
 argument-hint: "<title> [--quick] [--ask]"
 ---
 
 # Create: $ARGUMENTS
 
-Generate a work session spec for the given title. The spec lives as a `### YYYY-MM-DD - <title>` block in `.pi/artifacts/PLAN.md`, with a work session entry in `.pi/artifacts/TODO.md`.
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
+
+Generate a work session spec for the given title. The spec lives as a `### YYYY-MM-DD - <title>` block in `<repo-root>/.pi/artifacts/PLAN.md`, with a work session entry in `<repo-root>/.pi/artifacts/TODO.md`.
 
 ## 1. Parse Arguments
 
@@ -22,7 +24,7 @@ Generate a work session spec for the given title. The spec lives as a `### YYYY-
 
 - Read the user's request from the conversation
 - If DCP is loaded, use `dcp_recall` once for related prior work; otherwise inspect the current artifact files directly
-- Check `.pi/artifacts/{PLAN,PROGRESS,DECISIONS}.md` for in-flight context
+- Check `<repo-root>/.pi/artifacts/{PLAN,PROGRESS,DECISIONS}.md` for in-flight context
 - If a work session with this title already exists, redirect: "Edit `PLAN.md` instead"
 
 If the request is ambiguous or `--ask` is set, use one `ask_user` form containing only the 1–2 questions that change the spec, then wait for its result. If `ask_user` is unavailable or the session is non-TUI, ask the same questions in one numbered plain-text message and wait. Do not ask for facts that repository inspection can answer.
@@ -69,7 +71,7 @@ Show the spec summary in 5–10 lines, then use `ask_user` for one focused choic
 
 ## 6. Write Work Session Blocks
 
-### `.pi/artifacts/TODO.md`
+### `<repo-root>/.pi/artifacts/TODO.md`
 
 If a block with this title exists, edit it. Otherwise, append a new block at the end:
 
@@ -83,7 +85,7 @@ status: active | updated: YYYY-MM-DD
 - [ ] /verify
 ```
 
-### `.pi/artifacts/PLAN.md`
+### `<repo-root>/.pi/artifacts/PLAN.md`
 
 If a block with this title exists, add or replace its `#### Spec` subsection. Otherwise, append a new block:
 

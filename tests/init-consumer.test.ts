@@ -380,6 +380,13 @@ test("settings migrate stale Full-owned values while preserving consumer package
     )) {
       assert.equal(settings["pi-harness"].extensions[key], value, `${key} is forced to the Full value`);
     }
+    for (const retired of ["deepseek", "mimo", "xai", "tui"]) {
+      assert.equal(
+        retired in settings["pi-harness"].extensions,
+        false,
+        `${retired} native capability must be pruned from stale consumer settings`,
+      );
+    }
     assert.equal(settings["pi-learning"].profile, "manual");
     assert.equal(settings["pi-learning"].consumerOption, true);
     assert.deepEqual(settings.consumerSetting, { keep: true });

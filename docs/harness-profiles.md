@@ -13,15 +13,15 @@ The Full profile enables the complete harness workflow surface:
 - checkpoints and DCP
 - diagnostics and integration hooks
 - learning coordination and workflow state
-- TUI capability, TPS, and usage tracking (the harness compositor is disabled by default for terminal portability)
+- TPS and usage tracking alongside Pi's native fullscreen TUI
 - SuperPi and GPT personality prompt shaping
 - packaged extensions, skills, prompts, themes, agents, and artifact templates
 
-The TUI capability ships in Full, but `pi-harness.extensions.tui` is disabled by default to avoid competing compositor ownership. Consumers may enable it deliberately after confirming no other TUI package owns that surface.
+Pi 0.84 owns fullscreen compositor behavior. The former harness compositor was removed to avoid competing terminal ownership and duplicated rendering state.
 
 The safety extension ships in Full but is disabled by default: `pi-harness.extensions.safety` starts `false`, so destructive-command guards (for example catastrophic `rm`, pipe-to-shell, force-push checks) are not active until a consumer explicitly sets `extensions.safety: true`. This preserves the package's trust boundary — safety is a per-consumer opt-in, not an assumption about the environment.
 
-Provider adapters for DeepSeek, Mimo, and xAI are registered by the portable Full settings. Init does not set a global default provider/model or install credentials; canonical agent seats intentionally carry explicit model pins so delegation is reproducible. Network access occurs only when a consumer chooses and invokes a credentialed provider.
+DeepSeek, Xiaomi/MiMo, and xAI use Pi 0.84's native provider registry and authentication flows. The harness does not register duplicate providers, set a global default provider/model, or install credentials; canonical agent seats may still carry explicit external model pins for reproducible delegation.
 
 The implementation may retain internal profile parsing for compatibility with existing settings, but it is not a second bootstrap contract: the next `pi-harness-init` run converges managed settings back to Full.
 
@@ -57,8 +57,8 @@ Runtime orchestration selects the available model. Consumers remain free to cust
 Full is the capability baseline, not a request to run every expensive operation eagerly. Extensions must remain lazy where possible:
 
 - no credential or network requirement at startup;
-- diagnostics and external tools run only when invoked;
-- provider adapters do not select themselves;
+- diagnostics run after eligible TypeScript tool results or when invoked, but only use a configured/already-installed analyzer and enforce a timeout;
+- Pi-native providers and authentication remain host-owned;
 - the anti-pattern catalog stays out of the always-on system prompt;
 - repeated init performs no writes when bytes already match.
 

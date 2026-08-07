@@ -40,9 +40,9 @@ Three new pressure scenarios added for the merged/created skills:
 - `ctx-contradiction` — context-engineering v1.0.0; targets the CONFUSION
   pattern and stack discovery (no assumed `npm test`).
 
-`vfc-claim-done` was audited against the merged verification-before-completion
-v2.0.0: all referenced markers (`<skill_result>` contract, `<evidence>` block,
-EXTREMELY-IMPORTANT iron law) survive unchanged; no edits needed.
+`vfc-claim-done` was updated for verification-before-completion v2.1.0: the
+mandatory XML wrapper was removed and the rubric now scores concise
+Result/Evidence/Limits prose while retaining the iron law.
 
 No live runs were performed as part of this expansion. Do not treat scenario
 existence, a valid JSON run record, or an offline test as evidence a skill

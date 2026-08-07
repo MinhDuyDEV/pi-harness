@@ -1,7 +1,7 @@
 import type { RecallEntry } from "./recall-types.js";
 
 export function isBrowseEntry(entry: RecallEntry): boolean {
-  if (entry.source === "dcp") return true;
+  if (entry.source === "dcp" || entry.source === "task") return true;
   if (isBrowseDiagnostic(entry.text) || isLowSignalAcknowledgement(entry.text)) return false;
   const role = entry.role?.toLowerCase() ?? "";
   if (role === "user") return true;
@@ -49,6 +49,7 @@ export function browseRecallEntries(entries: RecallEntry[], page = 1, pageSize =
 
 function recallRoleBoost(entry: RecallEntry): number {
   if (entry.source === "dcp") return 80;
+  if (entry.source === "task") return 70;
   const role = entry.role?.toLowerCase() ?? "";
   if (role === "user") return 45;
   if (role === "assistant") return /^tool call:/i.test(entry.text.trim()) ? -30 : 35;

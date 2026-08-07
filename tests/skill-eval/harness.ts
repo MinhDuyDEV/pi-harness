@@ -12,7 +12,11 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-export const EVAL_SCHEMA_VERSION = 1;
+export const EVAL_SCHEMA_VERSION = 2;
+const DIGEST_PATTERN = /^[0-9a-f]{64}$/u;
+const HARNESS_PACKAGE = JSON.parse(
+  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+) as { name?: string; version?: string };
 
 export interface Scenario {
   scenario: string;
@@ -38,6 +42,9 @@ export interface ScoredRun {
   scenario: string;
   skill: string;
   skillVersion: string;
+  model: string;
+  promptSha256: string;
+  harness: EvalHarnessProvenance;
   condition: "baseline" | "with-skill";
   responseFile: string;
   responseSha256: string;
@@ -46,7 +53,33 @@ export interface ScoredRun {
   score: Score;
 }
 
+export interface EvalHarnessProvenance {
+  name: string;
+  version: string;
+  sourceSha256: string;
+}
+
 export const SCENARIOS: Record<string, Scenario> = {};
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+export function createEvalProvenance(
+  scenario: Pick<Scenario, "prompt">,
+  model: string,
+): Pick<ScoredRun, "model" | "promptSha256" | "harness"> {
+  if (!model.trim() || model.length > 200) throw new Error("Evaluation model must be explicit and bounded.");
+  const harnessSource = readFileSync(fileURLToPath(import.meta.url), "utf8");
+  const name = HARNESS_PACKAGE.name;
+  const version = HARNESS_PACKAGE.version;
+  if (!name || !version) throw new Error("Evaluation harness package identity is unavailable.");
+  return {
+    model: model.trim(),
+    promptSha256: sha256(scenario.prompt),
+    harness: { name, version, sourceSha256: sha256(harnessSource) },
+  };
+}
 
 async function loadScenarios(): Promise<void> {
   const dir = resolve(__dirname, "scenarios");
@@ -97,10 +130,23 @@ function validateScoredRun(
   if (run.skillVersion !== scenario.skillVersion) {
     throw new Error("Run mismatch for skillVersion.");
   }
+  if (!run.model || run.model.length > 200) throw new Error("Invalid evaluation model provenance.");
+  if (!DIGEST_PATTERN.test(run.promptSha256) || run.promptSha256 !== sha256(scenario.prompt)) {
+    throw new Error("Run prompt digest does not match the versioned scenario prompt.");
+  }
+  if (
+    !run.harness ||
+    run.harness.name !== HARNESS_PACKAGE.name ||
+    typeof run.harness.version !== "string" ||
+    !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u.test(run.harness.version) ||
+    !DIGEST_PATTERN.test(run.harness.sourceSha256)
+  ) {
+    throw new Error("Invalid evaluation harness provenance.");
+  }
   if (
     typeof run.responseFile !== "string" ||
     run.responseFile.length === 0 ||
-    !/^[0-9a-f]{64}$/u.test(run.responseSha256) ||
+    !DIGEST_PATTERN.test(run.responseSha256) ||
     !Array.isArray(run.metCriteria)
   ) {
     throw new Error(`Invalid ${expectedCondition} response binding.`);
@@ -137,8 +183,11 @@ function validateScoredRun(
 export function compareRuns(baseline: ScoredRun, withSkill: ScoredRun) {
   const baselineScenario = validateScoredRun(baseline, "baseline");
   const withSkillScenario = validateScoredRun(withSkill, "with-skill");
-  for (const key of ["scenario", "skill", "skillVersion"] as const) {
+  for (const key of ["scenario", "skill", "skillVersion", "model", "promptSha256"] as const) {
     if (baseline[key] !== withSkill[key]) throw new Error(`Run mismatch for ${key}.`);
+  }
+  if (JSON.stringify(baseline.harness) !== JSON.stringify(withSkill.harness)) {
+    throw new Error("Run mismatch for harness provenance.");
   }
   if (baselineScenario !== withSkillScenario) throw new Error("Run mismatch for scenario.");
   if (baseline.score.max !== withSkill.score.max) throw new Error("Run mismatch for rubric maximum.");
@@ -165,6 +214,7 @@ interface RecordOptions {
   responseFile: string;
   outFile?: string;
   metCriteria: string[];
+  model: string;
 }
 
 function parseRecordArgs(argv: string[]): RecordOptions {
@@ -182,14 +232,16 @@ function parseRecordArgs(argv: string[]): RecordOptions {
   const scenario = values.get("scenario");
   const condition = values.get("condition");
   const responseFile = values.get("response-file");
-  if (!scenario || !responseFile || (condition !== "baseline" && condition !== "with-skill") || !supplied.has("met")) {
-    throw new Error("Usage: harness.ts --scenario <name> --condition baseline|with-skill --response-file <path> --met <criterion,...|none> [--out <path>]");
+  const model = values.get("model");
+  if (!scenario || !responseFile || !model || (condition !== "baseline" && condition !== "with-skill") || !supplied.has("met")) {
+    throw new Error("Usage: harness.ts --scenario <name> --condition baseline|with-skill --model <provider/model> --response-file <path> --met <criterion,...|none> [--out <path>]");
   }
   const rawMet = values.get("met")!;
   return {
     scenario,
     condition,
     responseFile,
+    model,
     outFile: values.get("out"),
     metCriteria: rawMet === "none" ? [] : rawMet.split(",").map((value) => value.trim()).filter(Boolean),
   };
@@ -205,6 +257,7 @@ export async function recordRun(options: RecordOptions): Promise<ScoredRun> {
     scenario: scenario.scenario,
     skill: scenario.skill,
     skillVersion: scenario.skillVersion,
+    ...createEvalProvenance(scenario, options.model),
     condition: options.condition,
     responseFile: responsePath,
     responseSha256: createHash("sha256").update(response).digest("hex"),

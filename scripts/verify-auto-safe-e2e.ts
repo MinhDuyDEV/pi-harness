@@ -130,9 +130,9 @@ async function installConsumer(root: string): Promise<Consumer> {
   const siblings = pinnedSiblingSpecs(root);
   process.stderr.write(`verify:auto-safe ► sibling pins: ${siblings.join(", ")}\n`);
   const packages = [
-    "@earendil-works/pi-coding-agent@0.81.1",
-    "@earendil-works/pi-tui@0.81.1",
-    "typebox@1.1.38",
+    "@earendil-works/pi-coding-agent@0.84.0",
+    "@earendil-works/pi-tui@0.84.0",
+    "typebox@1.3.7",
     piCoreSpec(root),
     ...siblings,
     join(root, packedName),

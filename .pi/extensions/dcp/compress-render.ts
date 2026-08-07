@@ -1,5 +1,5 @@
 /**
- * TUI render for DCP compress tool — collapsed preview + ctrl+o expand (Pi 0.81).
+ * TUI render for DCP compress tool — collapsed preview + ctrl+o expand (Pi 0.84).
  */
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Box, Markdown } from "@earendil-works/pi-tui";

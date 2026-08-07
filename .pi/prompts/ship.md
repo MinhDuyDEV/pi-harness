@@ -1,9 +1,11 @@
 ---
-description: Implement a planned work session — updates `.pi/artifacts/PROGRESS.md` with run report and review
+description: Implement a planned work session — updates `<repo-root>/.pi/artifacts/PROGRESS.md` with run report and review
 argument-hint: "<title> [--quick] [--no-verify] [--dry-run]"
 ---
 
 # Ship: $ARGUMENTS
+
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
 
 Implement the work session plan.
 
@@ -21,7 +23,7 @@ Implement the work session plan.
 
 ## 2. Find Work Session
 
-Use the available repository text/semantic search tool to locate the exact `### ... - <title>` blocks in `.pi/artifacts/TODO.md` and `.pi/artifacts/PLAN.md`; do not assume `rg` is installed.
+Use the available repository text/semantic search tool to locate the exact `### ... - <title>` blocks in `<repo-root>/.pi/artifacts/TODO.md` and `<repo-root>/.pi/artifacts/PLAN.md`; do not assume `rg` is installed.
 
 If not found: "Run `/create <title>` and `/plan <title>` first."
 
@@ -64,7 +66,7 @@ Fix Critical and Important before completion. Minor can ship and be cleaned up l
 
 Shipping records implementation evidence but does not complete the work session. Independent verification owns the transition to `done`.
 
-### `.pi/artifacts/TODO.md`
+### `<repo-root>/.pi/artifacts/TODO.md`
 
 Keep the phase active. Mark implementation steps complete, but ensure `/verify <title>` is a pending item. Do not close the phase with the todo tool, do not set the phase to `done`, and do not mark verification complete during `/ship`. Add the run report reference and keep the block in place.
 
@@ -79,7 +81,7 @@ status: active | updated: YYYY-MM-DD
 See: `PROGRESS.md#YYYY-MM-DD--<slug>`
 ```
 
-### `.pi/artifacts/PROGRESS.md`
+### `<repo-root>/.pi/artifacts/PROGRESS.md`
 
 Append or update the work session block with the run report and self-review:
 

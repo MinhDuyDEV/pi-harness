@@ -5,6 +5,8 @@ argument-hint: "<title> [--to <agent|session>] [--resume]"
 
 # Handoff: $ARGUMENTS
 
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
+
 Compress the current work into a handoff a fresh agent or session can pick up cold. Where DCP compress saves durable state, handoff adds the *transfer contract* — what the receiver must know to continue.
 
 ## 1. Parse arguments
@@ -16,11 +18,11 @@ Compress the current work into a handoff a fresh agent or session can pick up co
 
 ## 2. Gather state
 
-Read `.pi/artifacts/{TODO,PROGRESS,DECISIONS}.md` and `.pi/MEMORY.md` for current state, decisions, and evidence. Use `dcp_recall` if context was compacted.
+Read `<repo-root>/.pi/artifacts/{TODO,PROGRESS,DECISIONS}.md` and `<repo-root>/.pi/MEMORY.md` for current state, decisions, and evidence. Use `dcp_recall` if context was compacted.
 
 ## 3. Write the handoff
 
-Append to `.pi/artifacts/HANDOFF.md` (create if absent) a 14-field context pack. Empty fields stay in with "none" — an absent field is indistinguishable from a forgotten one.
+Append to `<repo-root>/.pi/artifacts/HANDOFF.md` (create if absent) a 14-field context pack. Empty fields stay in with "none" — an absent field is indistinguishable from a forgotten one.
 
 ```
 ## <title> — <date> — handoff to <receiver>

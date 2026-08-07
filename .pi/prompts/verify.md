@@ -1,9 +1,11 @@
 ---
-description: Verify completeness, correctness, and quality — appends a verification section to the work session block in `.pi/artifacts/PROGRESS.md`
+description: Verify completeness, correctness, and quality — appends a verification section to the work session block in `<repo-root>/.pi/artifacts/PROGRESS.md`
 argument-hint: "<title> [--quick] [--test] [--review] [--ui-review] [--gate-only] [--reconcile]"
 ---
 
 # Verify: $ARGUMENTS
+
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
 
 Check the implementation against the spec, run gates, write tests, and review code.
 
@@ -25,7 +27,7 @@ Check the implementation against the spec, run gates, write tests, and review co
 
 ## 2. Find Work Session
 
-Use the available repository text/semantic search tool to locate the exact `### ... - <title>` blocks in `.pi/artifacts/TODO.md` and `.pi/artifacts/PROGRESS.md`; do not assume `rg` is installed.
+Use the available repository text/semantic search tool to locate the exact `### ... - <title>` blocks in `<repo-root>/.pi/artifacts/TODO.md` and `<repo-root>/.pi/artifacts/PROGRESS.md`; do not assume `rg` is installed.
 
 If not found: "Run `/create <title>` and `/ship <title>` first."
 
@@ -35,6 +37,8 @@ Read all blocks for this work session:
 - `PLAN.md` — Spec, Plan, Phases
 - `PROGRESS.md` — Run Report, Review (if present)
 - `DECISIONS.md` — ADRs (if present)
+
+For a full verification, enumerate every checklist item in the matching TODO and PLAN blocks. Completion requires zero open checklist items (`- [ ]`). Any remaining item keeps the result `NEEDS WORK` or `BLOCKED`. `--quick` and `--gate-only` must not close the work session: they never close checklist items and never produce `READY TO SHIP`.
 
 ## 4. Run Verification
 
@@ -105,9 +109,9 @@ Delegate to the `proof-auditor` agent with the diff, the spec requirements, and 
 
 ## 5. Update Blocks
 
-Close a work session only when the Result is `READY TO SHIP`: completeness is 100%, every required gate passed, and no blocking issue remains. `--quick` and `--gate-only` must not close the session because they omit completeness evidence.
+Close a work session only when the Result is `READY TO SHIP`: completeness is 100%, every required gate passed, there are zero open checklist items, and an independent review has no unresolved Critical or Important finding. A self-review is not independent review. Missing independent review, `--quick`, or `--gate-only` keeps the result `NEEDS WORK` or `BLOCKED` because those modes omit completion evidence.
 
-### `.pi/artifacts/PROGRESS.md`
+### `<repo-root>/.pi/artifacts/PROGRESS.md`
 
 Add or update the `#### Verification` subsection of the work session block:
 
@@ -118,7 +122,7 @@ status: done | updated: YYYY-MM-DD
 #### Verification
 - Completeness: N/M (P%)
 - Gates: `<exact discovered command>` PASS/FAIL/SKIPPED (repeat per gate)
-- Review: Critical 0, Important N, Minor N
+- Review: independent reviewer and evidence; Critical 0, Important N, Minor N
 - Result: READY TO SHIP / NEEDS WORK / BLOCKED
 - Blocking issues: <list, or "none">
 ```
@@ -127,7 +131,7 @@ If `--review` or `--ui-review` is set, add their subsections too. If Result is `
 
 ### Close verified work
 
-Only for `READY TO SHIP`, prefer the `todo` tool: `todo done "<title>"` to close TODO, then set the matching PLAN and PROGRESS status to `done`. Do not move or hide any block.
+Only for `READY TO SHIP` with zero open checklist items and clean independent review, prefer the `todo` tool: `todo done "<title>"` to close TODO, then set the matching PLAN and PROGRESS status to `done`. Do not move or hide any block.
 
 ## 6. Output
 

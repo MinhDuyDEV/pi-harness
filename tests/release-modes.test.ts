@@ -89,7 +89,10 @@ test("release modes cannot inherit developer E2E overrides", () => {
     PI_PHASE5_PACKAGE_SPECS: "/tmp/forged-all.tgz",
   };
   const registry = releaseEnvironment("registry", poisoned);
-  for (const key of Object.keys(poisoned).filter((key) => key.startsWith("PI_"))) {
+  assert.equal(registry.PI_E2E_SIBLINGS, "registry");
+  for (const key of Object.keys(poisoned).filter(
+    (key) => key.startsWith("PI_") && key !== "PI_E2E_SIBLINGS",
+  )) {
     assert.equal(registry[key], undefined, `registry mode must sanitize ${key}`);
   }
   const local = releaseEnvironment("local", poisoned);

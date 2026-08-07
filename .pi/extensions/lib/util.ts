@@ -2,7 +2,7 @@
  * Shared Utilities — Cross-Extension Helpers
  *
  * Consolidates patterns duplicated across extensions:
- *   - isAbortError (shared by deepseek/retry.ts)
+ *   - isAbortError (shared cancellation classification)
  */
 
 /**

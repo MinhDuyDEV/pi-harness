@@ -11,6 +11,11 @@ import { readSuitePins, SUITE_PACKAGE_NAMES } from "./lib/suite-pins.mjs";
 
 const repoRoot = process.cwd();
 let consumerRoot;
+const siblingMode = process.env.PI_E2E_SIBLINGS ?? "local";
+assert.ok(
+  siblingMode === "local" || siblingMode === "registry",
+  "PI_E2E_SIBLINGS must be local or registry",
+);
 
 function packLocalSibling(packageName, destination) {
   const directoryName = packageName.slice("@minhduydev/".length);
@@ -178,7 +183,7 @@ try {
     /^npm:@mrclrchtr\/supi-ask-user@\d+\.\d+\.\d+$/.test(source),
   );
   assert.ok(askUserSource, "source settings must pin supi-ask-user exactly");
-  const suiteSpecs = process.env.PI_E2E_SIBLINGS === "local"
+  const suiteSpecs = siblingMode === "local"
     ? SUITE_PACKAGE_NAMES.map((name) => packLocalSibling(name, consumerRoot))
     : SUITE_PACKAGE_NAMES.map((name) => pins[name].spec);
   execFileSync(

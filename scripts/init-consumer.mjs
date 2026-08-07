@@ -24,6 +24,7 @@ const IGNORE_START = "# pi-harness managed runtime state:start";
 const IGNORE_END = "# pi-harness managed runtime state:end";
 const LOCK_PATH = ".pi/pi-harness.lock.json";
 const LOCK_SCHEMA_VERSION = 1;
+const RETIRED_EXTENSION_KEYS = new Set(["deepseek", "mimo", "xai", "tui"]);
 const CANONICAL_AGENTS = [
   "explore.md",
   "general.md",
@@ -196,7 +197,10 @@ function mergeSettings(existing) {
   const consumerHarness = isObject(existing["pi-harness"]) ? existing["pi-harness"] : {};
   const fullHarness = structuredClone(SETTINGS_TEMPLATE["pi-harness"]);
   if (isObject(consumerHarness.extensions)) {
-    fullHarness.extensions = { ...consumerHarness.extensions, ...fullHarness.extensions };
+    const consumerExtensions = Object.fromEntries(
+      Object.entries(consumerHarness.extensions).filter(([key]) => !RETIRED_EXTENSION_KEYS.has(key)),
+    );
+    fullHarness.extensions = { ...consumerExtensions, ...fullHarness.extensions };
   }
   merged["pi-harness"] = { ...consumerHarness, ...fullHarness, profile: "full" };
   return merged;
@@ -381,7 +385,7 @@ function run() {
     if (!dryRun) {
       console.log(`\nFull pi-harness ${PACKAGE_JSON.version} bootstrap is ready.`);
       console.log("Start Pi in this repository. Run Pi /init separately when you want Pi to generate or refresh project context.");
-      console.log("Full provider adapters are enabled without selecting credentials; missing optional tools are reported by /integration, not installed by init.");
+      console.log("Pi-native providers and TUI remain host-owned; missing optional harness tools are reported by /integration, not installed by init.");
     }
   }
 }

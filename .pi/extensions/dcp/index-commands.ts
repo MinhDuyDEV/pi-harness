@@ -21,6 +21,7 @@ import {
 } from "./compress.js";
 import { getSessionBranchMessages } from "./branch-messages.js";
 import { searchDcpRecall } from "./recall.js";
+import { loadTaskProvenanceRecall } from "./task-provenance-source.js";
 import { formatPressureSourceLabel } from "./pressure.js";
 import type { ContextMeterSnapshot } from "./context-meter.js";
 
@@ -286,6 +287,9 @@ export function registerDcpRecallCommand(
         .replace(/\bpage:\d+\b/gi, "")
         .replace(/\bexpand:[\d,\s]+\b/gi, "")
         .trim();
+      const taskSource = scope === "all"
+        ? await loadTaskProvenanceRecall(ctx.cwd)
+        : undefined;
       const result = searchDcpRecall({
         sessionId: getDcpSessionId(ctx),
         sessionFile: ctx.sessionManager.getSessionFile() ?? undefined,
@@ -293,7 +297,7 @@ export function registerDcpRecallCommand(
         expand,
         page,
         scope,
-      });
+      }, taskSource);
       if (ctx.hasUI) ctx.ui.notify(result.rendered);
     },
   });

@@ -5,6 +5,8 @@ argument-hint: <description of bug or path> [--refactor] [--scope minimal|modera
 
 # Fix: $ARGUMENTS
 
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
+
 Two tracks for improving code without adding features:
 
 - **Default (Bug Fix):** Systematically debug and fix a bug or failing test.

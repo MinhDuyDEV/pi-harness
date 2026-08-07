@@ -5,12 +5,13 @@ import type { DiagnosticsScope, ResolvedDiagnosticsParams } from "./types.ts";
 export const diagnosticsParamsSchema = Type.Object({
   scope: Type.Optional(
     Type.Union([Type.Literal("full"), Type.Literal("changed")], {
-      description: 'Use "changed" to scope Fallow to git diff since changedSince (default main).',
+      description: 'Use "changed" to scope Fallow to git diff since a verified changedSince baseline.',
     }),
   ),
   changedSince: Type.Optional(
     Type.String({
-      description: "Git ref for Fallow changed scope. Defaults to PI_DIAGNOSTICS_CHANGED_SINCE or main.",
+      maxLength: 200,
+      description: "Git ref for Fallow changed scope. Defaults to PI_DIAGNOSTICS_CHANGED_SINCE or a verified auto baseline.",
     }),
   ),
   languages: Type.Optional(
@@ -37,7 +38,7 @@ export const diagnosticsParamsSchema = Type.Object({
 export type DiagnosticsParams = Static<typeof diagnosticsParamsSchema>;
 
 export function defaultChangedSince(): string {
-  return process.env.PI_DIAGNOSTICS_CHANGED_SINCE || "main";
+  return process.env.PI_DIAGNOSTICS_CHANGED_SINCE || "auto";
 }
 
 export function defaultIncludeAislop(): boolean {

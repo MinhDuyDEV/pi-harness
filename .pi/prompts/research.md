@@ -1,9 +1,11 @@
 ---
-description: Research a topic — explore alternatives and gather evidence; optionally append findings to a work session block in `.pi/artifacts/PROGRESS.md`
+description: Research a topic — explore alternatives and gather evidence; optionally append findings to a work session block in `<repo-root>/.pi/artifacts/PROGRESS.md`
 argument-hint: "<topic> [--quick|--thorough] [--alternatives] [--into=<title>]"
 ---
 
 # Research: $ARGUMENTS
+
+Resolve `<repo-root>` before using any durable path below: prefer the Git top-level containing both `package.json` and `.pi`; if Git fails or validation fails, walk ancestors from the current directory for that pair. Stop if none exists, then use absolute `<repo-root>/.pi/...` paths.
 
 Gather information before implementation. Standalone research (no work session) reports inline.
 
@@ -19,7 +21,7 @@ Gather information before implementation. Standalone research (no work session) 
 
 ## 2. Prior Context (one bounded pass)
 
-If DCP is loaded, use `dcp_recall` once with the topic. Otherwise inspect relevant `.pi/artifacts/` files and the current conversation. Cite relevant prior evidence and do not repeat what is already known.
+If DCP is loaded, use `dcp_recall` once with the topic. Otherwise inspect relevant `<repo-root>/.pi/artifacts/` files and the current conversation. Cite relevant prior evidence and do not repeat what is already known.
 
 ## 3. Research (depth by flag)
 

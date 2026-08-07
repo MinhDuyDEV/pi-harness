@@ -7,7 +7,7 @@ Forked from <https://github.com/nicobailon/pi-rewind-hook> (upstream snapshot: 2
 | Change | Reason |
 | --- | --- |
 | Import from `@earendil-works/pi-coding-agent` | The original package scope is obsolete |
-| Pin development against Pi `0.81.1` | Match this repository's tested runtime while leaving the host as a peer dependency |
+| Pin development against Pi `0.84.0` | Match this repository's tested runtime while leaving the host as a peer dependency |
 | Return an unsubscribe function from the custom event-bus test mock | Match the current `EventBus` contract |
 | Treat `parentSession` as `string \| null \| undefined` | Session JSONL headers may omit it or store `null` |
 | Validate rewind custom-entry payloads before use | Older or malformed session lines must not corrupt reconstruction |

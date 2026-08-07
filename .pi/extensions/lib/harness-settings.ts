@@ -15,11 +15,7 @@ export interface HarnessSettings {
   gptPersonality?: boolean;
   /**
    * Per-extension gates: `{ "pi-harness": { "extensions": { "<key>": boolean } } }`.
-   * Provider extensions (deepseek, mimo, xai) default to OFF — a consumer who
-   * installs the harness should not get third-party model providers registered
-   * until they opt in. This repo's own settings.json turns them on.
-   *
-   * Core UX (dcp, tui, checkpoint, rewind, safety, shortcut-continue,
+   * Core UX (dcp, checkpoint, rewind, safety, shortcut-continue,
    * herdr-state, workflow-state) is profile-controlled. The snap-edit port
    * (quick_edit/target_edit) is profile-controlled and defaults to the `full`
    * profile. Developer/telemetry integrations (diagnostics, integration,
@@ -43,7 +39,7 @@ const PROFILE_EXTENSIONS: Record<HarnessProfile, ReadonlySet<string>> = {
     "learningCoordinator",
     "workflowState",
     "dcp",
-    "tui",
+    "continueAfterCompaction",
     "tps",
     "diagnostics",
     "integration",
@@ -51,7 +47,6 @@ const PROFILE_EXTENSIONS: Record<HarnessProfile, ReadonlySet<string>> = {
     "snapEdit",
   ]),
 };
-const PROVIDER_KEYS = new Set(["deepseek", "mimo", "xai"]);
 const WORKER_SAFE_EXTENSIONS = new Set(["safety", "herdrState"]);
 
 export function readHarnessSettings(cwd: string = process.cwd()): HarnessSettings {
@@ -102,7 +97,6 @@ export function readExtensionGate(
   if (seatRole !== "root" && !WORKER_SAFE_EXTENSIONS.has(extensionKey)) return false;
   const gate = settings.extensions?.[extensionKey];
   if (typeof gate === "boolean") return gate;
-  if (PROVIDER_KEYS.has(extensionKey)) return false;
   if (settings.profile) return PROFILE_EXTENSIONS[settings.profile]?.has(extensionKey) ?? defaultValue;
   return defaultValue;
 }

@@ -9,6 +9,7 @@ import {
 import { pathWhich } from "./path.ts";
 import { fallowTimeoutMs, runCli } from "./subprocess.ts";
 import { truncateForAgent } from "./truncate.ts";
+import { resolveChangedSince } from "./git-baseline.ts";
 import type { DiagnosticBlockMeta, DiagnosticsScope, RunBlockResult } from "./types.ts";
 
 export type FallowCommandKind = "check-changed" | "health" | "dead-code";
@@ -95,6 +96,7 @@ type FallowCommandRun = {
   truncated?: boolean;
   fullOutputPath?: string;
   unavailable?: boolean;
+  failure?: string;
 };
 
 async function runFallowCommand(
@@ -111,7 +113,15 @@ async function runFallowCommand(
 
   const formatted = formatStdout(command, exec.stdout);
   if (!formatted) {
-    return { body: "", exitCode: exec.exitCode, elapsedMs: exec.elapsedMs };
+    const failure = exec.exitCode !== 0 && exec.exitCode !== null
+      ? `Fallow ${command} failed (exit ${exec.exitCode})${exec.stderr ? `: ${exec.stderr.slice(0, 1_000)}` : " without output"}`
+      : undefined;
+    return {
+      body: failure ?? "",
+      exitCode: exec.exitCode,
+      elapsedMs: exec.elapsedMs,
+      ...(failure ? { failure } : {}),
+    };
   }
 
   const truncated = await truncateForAgent(formatted, `fallow-${command}`);
@@ -132,12 +142,28 @@ export async function runFallowAnalysis(
 ): Promise<RunBlockResult | null> {
   if (!fs.existsSync(path.join(root, "tsconfig.json"))) return null;
 
-  const opts = { changedSince };
+  const baseline = await resolveChangedSince(root, changedSince, signal);
+  if (!baseline.ok) {
+    const failure = `${baseline.reason}: ${baseline.requested}`;
+    return {
+      text: buildBlock("Fallow (code quality)", [`Baseline error: ${failure}`]),
+      meta: {
+        id: "fallow",
+        exitCode: 2,
+        ok: false,
+        elapsedMs: 0,
+        failure,
+      },
+    };
+  }
+
+  const opts = { changedSince: baseline.ref };
   const parts: string[] = [];
   let totalElapsed = 0;
   let exitCode: number | null = 0;
   let truncated: boolean | undefined;
   let fullOutputPath: string | undefined;
+  let failure: string | undefined;
 
   let sawUnavailable = false;
 
@@ -149,6 +175,7 @@ export async function runFallowAnalysis(
     exitCode = r.exitCode;
     truncated = r.truncated;
     fullOutputPath = r.fullOutputPath;
+    failure = r.failure;
   } else {
     const health = await runFallowCommand(root, "health", opts, signal);
     if (health.unavailable) sawUnavailable = true;
@@ -157,6 +184,7 @@ export async function runFallowAnalysis(
     exitCode = health.exitCode;
     truncated = health.truncated;
     fullOutputPath = health.fullOutputPath;
+    failure = health.failure;
 
     const dead = await runFallowCommand(root, "dead-code", opts, signal);
     if (dead.unavailable) sawUnavailable = true;
@@ -165,6 +193,7 @@ export async function runFallowAnalysis(
     if (dead.exitCode != null && dead.exitCode !== 0) exitCode = dead.exitCode;
     truncated = truncated || dead.truncated;
     fullOutputPath = fullOutputPath || dead.fullOutputPath;
+    failure = failure || dead.failure;
   }
 
   if (parts.length === 0 && sawUnavailable) {
@@ -174,6 +203,8 @@ export async function runFallowAnalysis(
       exitCode: 127,
       ok: false,
       elapsedMs: totalElapsed,
+      baseline: baseline.ref,
+      baselineSource: baseline.source,
     };
     return { text, meta };
   }
@@ -184,6 +215,8 @@ export async function runFallowAnalysis(
       exitCode: 0,
       ok: true,
       elapsedMs: totalElapsed,
+      baseline: baseline.ref,
+      baselineSource: baseline.source,
     };
     return { text: "", meta };
   }
@@ -204,6 +237,9 @@ export async function runFallowAnalysis(
     elapsedMs: totalElapsed,
     truncated,
     fullOutputPath,
+    baseline: baseline.ref,
+    baselineSource: baseline.source,
+    failure,
   };
 
   return { text, meta };

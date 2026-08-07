@@ -2,7 +2,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import dcpExtension from "./index.ts";
-import { handleSessionBeforeCompact } from "./index-compact-handler.ts";
+import {
+  handleSessionBeforeCompact,
+  withoutDeletedHeaders,
+} from "./index-compact-handler.ts";
 
 describe("DCP extension lifecycle contract", () => {
 	it("exports dcpExtension accepting ExtensionAPI", () => {
@@ -12,6 +15,14 @@ describe("DCP extension lifecycle contract", () => {
 
 	it("handleSessionBeforeCompact is a function", () => {
 		assert.strictEqual(typeof handleSessionBeforeCompact, "function");
+	});
+
+	it("converts Pi 0.84 header deletion markers before calling compact", () => {
+		assert.deepStrictEqual(
+			withoutDeletedHeaders({ authorization: "Bearer token", "x-delete": null }),
+			{ authorization: "Bearer token" },
+		);
+		assert.strictEqual(withoutDeletedHeaders({ "x-delete": null }), undefined);
 	});
 
 	it("dcpExtension registers expected lifecycle events when invoked", () => {
@@ -38,6 +49,7 @@ describe("DCP extension lifecycle contract", () => {
 			"session_before_tree",
 			"session_tree",
 			"session_shutdown",
+			"agent_settled",
 		];
 
 		for (const event of expectedEvents) {
@@ -70,6 +82,7 @@ describe("DCP extension lifecycle contract", () => {
 			"session_before_tree",
 			"session_tree",
 			"session_shutdown",
+			"agent_settled",
 		];
 
 		for (const event of registered) {

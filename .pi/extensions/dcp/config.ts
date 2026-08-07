@@ -137,6 +137,13 @@ export interface RecallConfig {
   rawSessionSearch: boolean;
 }
 
+export interface CompactionContinuationConfig {
+  /** Resume unfinished work after a successful compaction. */
+  enabled: boolean;
+  /** One-tick deferral lets Pi finish reconnecting post-compaction state. */
+  delayMs: number;
+}
+
 export interface DCPConfig {
   enabled: boolean;
   compress: CompressConfig;
@@ -152,6 +159,7 @@ export interface DCPConfig {
   semanticEnrichment: SemanticEnrichmentConfig;
   protection: ProtectionConfig;
   recall: RecallConfig;
+  continuation: CompactionContinuationConfig;
   debug: boolean;
 }
 
@@ -251,5 +259,9 @@ export const DEFAULT_CONFIG: DCPConfig = {
   recall: {
     enabled: true,
     rawSessionSearch: true,
+  },
+  continuation: {
+    enabled: true,
+    delayMs: 0,
   },
 };

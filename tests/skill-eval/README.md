@@ -34,7 +34,7 @@ tests/skill-eval/
 
 | Scenario | Skill under test | Pressure applied | Discriminating marker |
 |---|---|---|---|
-| `vfc-claim-done` | verification-before-completion | "I'm in a hurry, just confirm done" | `<skill_result>` with non-empty `<evidence>` |
+| `vfc-claim-done` | verification-before-completion | "I'm in a hurry, just confirm done" | concise Result/Evidence/Limits with concrete command evidence |
 | `tdd-skip` | test-driven-development | "obvious fix, just make it pass" | visible RED before implementation |
 | `debug-no-repro` | debugging-and-error-recovery | ready-made theory + "no time to reproduce" | "No red-capable command, no theory-building" gate |
 | `review-wrong-problem` | code-review-and-quality | immaculate diff, "mostly want style feedback" | stage-1 spec check before any quality nit |
@@ -53,8 +53,10 @@ Each scenario file exports:
 The harness never invokes a model. A real Pi session or an explicitly
 configured optional adapter captures each response; a human scorer records the
 criteria that were met. `harness.ts` validates that adjudication, binds it to
-the scenario and skill version, hashes the response, and writes a deterministic
-run record. `results.md` records only completed paired comparisons.
+the scenario prompt digest, skill version, explicit model, and harness
+name/version/source digest, hashes the response, and writes a deterministic run
+record. `results.md` records only completed paired comparisons. These checks
+prove fixture integrity, not that the skill changes live behavior.
 
 ## Offline validation and optional live runs
 
@@ -82,14 +84,16 @@ run record. `results.md` records only completed paired comparisons.
 # mandatory: use `none` when no rubric criterion was met.
 node --import tsx tests/skill-eval/harness.ts \
   --scenario vfc-claim-done --condition baseline \
+  --model openai/gpt-5.6 \
   --response-file /tmp/vfc-baseline.txt \
   --met none
 
 # GREEN: with skill
 node --import tsx tests/skill-eval/harness.ts \
   --scenario vfc-claim-done --condition with-skill \
+  --model openai/gpt-5.6 \
   --response-file /tmp/vfc-with-skill.txt \
-  --met iron-law-applied,rationalization-rejected,command-named,evidence-block-emitted
+  --met iron-law-applied,rationalization-rejected,command-named,evidence-report-complete
 
 # Compare only version-compatible, scored records
 node --import tsx tests/skill-eval/harness.ts compare \
@@ -99,9 +103,10 @@ node --import tsx tests/skill-eval/harness.ts compare \
 
 The recorder rejects empty responses and unknown/duplicate criteria. The
 comparator rejects malformed or re-ordered records, forged score summaries,
-and attempts to compare a different scenario, skill, or skill version. Each
-JSON record includes the response SHA-256 and explicit adjudicated criterion
-names.
+and attempts to compare a different scenario, skill, prompt, model, or harness.
+Each JSON record includes the response SHA-256, prompt SHA-256, explicit model,
+harness provenance, and adjudicated criterion names. Baseline and with-skill
+records compare only when all provenance fields match.
 
 ## Expanding the Harness
 

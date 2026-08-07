@@ -2,6 +2,7 @@ import path from "node:path";
 import { defaultChangedSince } from "./params.ts";
 import { EXT_TO_RUNNERS, runLanguages, type DiagnosticRunner } from "./lang-runners.ts";
 import { runFallowCheckChangedAuto } from "./fallow.ts";
+import { pathWhich } from "./path.ts";
 import { resolveDiagnosticsProjectRoot } from "./project-root.ts";
 import type { RunBlockResult } from "./types.ts";
 
@@ -55,6 +56,31 @@ export function activeRunnersForFile(cwd: string, filePath: string): DiagnosticR
   return matching.filter((r) => r.detect(projectRoot));
 }
 
+/** Enabled by default, but auto mode never installs or downloads Fallow. */
+export function autoFallowEnabled(): boolean {
+  return process.env.PI_DIAGNOSTICS_AUTO_FALLOW !== "false";
+}
+
+export function fallowAvailable(): boolean {
+  return Boolean(process.env.FALLOW_BIN) || Boolean(pathWhich("fallow"));
+}
+
+export function fallowHasFindings(meta: RunBlockResult["meta"] | undefined): boolean {
+  return Boolean(meta && !meta.ok);
+}
+
+export function autoFallowTimeoutMs(): number {
+  const parsed = Number.parseInt(process.env.PI_DIAGNOSTICS_AUTO_FALLOW_TIMEOUT_MS ?? "10000", 10);
+  if (!Number.isFinite(parsed)) return 10_000;
+  return Math.min(30_000, Math.max(1_000, parsed));
+}
+
+export function isAutoDiagnosticPath(projectRoot: string, cwd: string, filePath: string): boolean {
+  const absolute = path.resolve(cwd, filePath);
+  const relative = path.relative(projectRoot, absolute);
+  return relative.length > 0 && relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
 export async function runAutoInject(
   cwd: string,
   filePath: string,
@@ -66,11 +92,13 @@ export async function runAutoInject(
   const langResults = await runLanguages(projectRoot, { file: filePath, signal });
   blocks.push(...langResults.filter((b) => b.text));
 
-  if (process.env.PI_DIAGNOSTICS_AUTO_FALLOW === "true") {
+  if (autoFallowEnabled() && fallowAvailable() && isAutoDiagnosticPath(projectRoot, cwd, filePath)) {
     const ext = path.extname(filePath).toLowerCase();
     if (TS_JS_EXT.has(ext)) {
-      const fallow = await runFallowCheckChangedAuto(projectRoot, defaultChangedSince(), signal);
-      if (fallow?.text) blocks.push(fallow);
+      const timeoutSignal = AbortSignal.timeout(autoFallowTimeoutMs());
+      const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+      const fallow = await runFallowCheckChangedAuto(projectRoot, defaultChangedSince(), combinedSignal);
+      if (fallow?.text && fallowHasFindings(fallow.meta)) blocks.push(fallow);
     }
   }
 

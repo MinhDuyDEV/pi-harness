@@ -12,7 +12,7 @@ import {
   type ExtensionContext,
   type SessionBeforeCompactEvent,
 } from "@earendil-works/pi-coding-agent";
-import type { Message } from "@earendil-works/pi-ai";
+import type { Message, ProviderHeaders } from "@earendil-works/pi-ai";
 import type { DCPConfig } from "./config.js";
 import {
   getBlocks,
@@ -125,7 +125,7 @@ export async function handleSessionBeforeCompact(
     preparation,
     model,
     auth.apiKey,
-    auth.headers,
+    withoutDeletedHeaders(auth.headers),
     undefined,
     event.signal,
   );
@@ -144,6 +144,17 @@ export async function handleSessionBeforeCompact(
       preparation as Parameters<typeof enrichCompactionResult>[1],
     ),
   };
+}
+
+/** Pi's public compact helper accepts concrete fetch headers, not deletion markers. */
+export function withoutDeletedHeaders(
+  headers: ProviderHeaders | undefined,
+): Record<string, string> | undefined {
+  if (!headers) return undefined;
+  const concrete = Object.entries(headers).filter(
+    (entry): entry is [string, string] => entry[1] !== null,
+  );
+  return concrete.length > 0 ? Object.fromEntries(concrete) : undefined;
 }
 
 export async function handleSessionBeforeTree(

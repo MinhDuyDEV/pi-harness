@@ -2,18 +2,19 @@
 
 `pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## What's new in 2.4.0
+## What's new in 2.6.0
 
-- The generated SuperPi router now selects one lifecycle stage plus at most one domain overlay, with catalog coverage validation and model-seat preflight.
-- Skills and prompts have clearer ownership: architecture guidance is consolidated, natural user-invoked workflows stay hidden, and research/verification status is preserved.
-- Release contracts now ship provenance notices, canonical bootstrap examples, and DCP legacy-state normalization.
-- `@minhduydev/pi-todo@0.5.0` adds filtered views, lossless terminal-phase archives, and explicit format migration; the packed Phase 5 gate proves file-backed exactly-once outcomes across restart.
+- Pi 0.84 is the tested host. DeepSeek, Xiaomi/MiMo, xAI, and the fullscreen TUI are provided natively by Pi, so the harness no longer registers shadow providers or patches Pi's renderer.
+- DCP resumes queued work after manual, threshold, or terminal overflow compaction by default, while avoiding duplicate continuation during Pi's own retry path.
+- DCP recall can include bounded, path-free task provenance from `pi-subagents`; `pi-learning` injects only trusted, receipt-bearing context within a hard 2 KiB budget.
+- Diagnostics default to an already-installed/configured Fallow, validate their Git baseline, bound runtime, and report analyzer failures rather than treating missing output as clean.
+- `pi-todo` automatically archives terminal phases in trusted projects through its existing lossless, compare-and-set archive path.
 
 ## Requirements
 
 - Node.js `>=22.19.0`
 - npm `>=11.12.1`
-- Pi Coding Agent `0.81.1` (tested against Pi 0.81.1; the package uses the active host's Pi packages through peer dependencies)
+- Pi Coding Agent `0.84.x` (tested against `0.84.0`; the package uses the active host's Pi packages through peer dependencies)
 
 ## Bootstrap a consumer repository
 
@@ -22,7 +23,7 @@ separate global or manual `pi install` is required:
 
 ```bash
 mkdir -p ./my-repo
-npx --yes --package=@minhduydev/pi-harness@2.4.0 -- pi-harness-init ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.6.0 -- pi-harness-init ./my-repo
 ```
 
 The bootstrap writes exact project package pins for the executing harness and
@@ -37,9 +38,9 @@ and hashes of every harness-owned file or region.
 The initializer does not choose a provider, model, theme, or credentials, and
 it does not install global system tools. Srcwalk semantic tools are preferred when
 the optional CLI is available; the managed parent and subagent policies explicitly
-fall back to built-in repository navigation when it is absent. Full settings enable
-the portable provider adapters, but they do not require credentials at startup;
-credentials are needed only when that provider is selected. Loaded integrations
+fall back to built-in repository navigation when it is absent. Provider discovery,
+authentication, and the fullscreen TUI remain Pi-native; the harness neither
+selects a provider/model nor installs credentials. Loaded integrations
 report missing optional tools through `/integration` rather than making startup
 depend on them.
 
@@ -55,7 +56,7 @@ rerun performs no content or timestamp writes. Preview a first install or
 upgrade with:
 
 ```bash
-npx --yes --package=@minhduydev/pi-harness@2.4.0 -- pi-harness-init --dry-run ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.6.0 -- pi-harness-init --dry-run ./my-repo
 ```
 
 To upgrade, change only the exact harness version in the `npx` command and run
@@ -151,6 +152,11 @@ npm run check
 repository, so it does not depend on unpublished suite versions. None of the
 release scripts runs `npm publish`.
 
+The ordinary `npm run check` also defaults its packed-consumer smoke to local
+sibling tarballs, making it usable before publication. Registry release mode
+sets an explicit registry smoke mode after checking that every exact pin exists;
+it cannot inherit the local override.
+
 `release:check:offline` runs the same local deterministic gates but skips
 `npm audit`, which requires registry access. It is intended for air-gapped or
 temporarily disconnected environments and **does not** make a dependency-audit
@@ -160,10 +166,10 @@ publishing once network access is available.
 The owner-controlled publish order is:
 
 1. [`@minhduydev/pi-core@0.3.1`](https://www.npmjs.com/package/@minhduydev/pi-core/v/0.3.1)
-2. [`@minhduydev/pi-subagents@0.11.0`](https://www.npmjs.com/package/@minhduydev/pi-subagents/v/0.11.0)
-3. [`@minhduydev/pi-learning@0.5.0`](https://www.npmjs.com/package/@minhduydev/pi-learning/v/0.5.0)
-4. [`@minhduydev/pi-todo@0.5.0`](https://www.npmjs.com/package/@minhduydev/pi-todo/v/0.5.0)
-5. [`@minhduydev/pi-harness@2.4.0`](https://www.npmjs.com/package/@minhduydev/pi-harness/v/2.4.0)
+2. `@minhduydev/pi-subagents@0.12.0` — publish this companion before publishing the harness release that pins it
+3. `@minhduydev/pi-learning@0.6.0`
+4. `@minhduydev/pi-todo@0.6.0`
+5. `@minhduydev/pi-harness@2.6.0` (publish last, after the companion package versions pinned by its bootstrap contract)
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:

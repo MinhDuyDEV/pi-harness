@@ -7,6 +7,9 @@ export interface DiagnosticBlockMeta {
   truncated?: boolean;
   fullOutputPath?: string;
   elapsedMs?: number;
+  baseline?: string;
+  baselineSource?: "explicit" | "auto";
+  failure?: string;
 }
 
 export interface DiagnosticsDetails {

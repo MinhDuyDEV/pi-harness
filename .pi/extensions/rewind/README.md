@@ -1,10 +1,10 @@
-# pi-rewind (Pi SDK 0.81.1)
+# pi-rewind (Pi SDK 0.84.0)
 
 Operation-level working-tree snapshots for Pi's conversation fork/tree flows. The extension records exact git trees, maps session entries to snapshot commits, and lets users decide whether navigation should also restore files.
 
 ## Requirements
 
-- Pi Coding Agent `0.81.1` (the tested target)
+- Pi Coding Agent `0.84.0` (the tested target)
 - A git working tree
 - Node.js `>=22.19.0`
 

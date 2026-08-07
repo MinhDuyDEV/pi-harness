@@ -2,10 +2,16 @@ import { listDurableSessionStates, loadDurableSessionState, loadDurableSessionSt
 import { jsonlRole, jsonlText, jsonlTimestamp, listRawSessionFiles, rawSessionKey, readJsonlLines, safeStat, shouldIncludeJsonlEntry } from "./recall-jsonl.js";
 import type { RecallEntry } from "./recall-types.js";
 
-export function buildRecallEntries(sessionId: string, scope: "active" | "all", sessionFile?: string): RecallEntry[] {
+export function buildRecallEntries(
+  sessionId: string,
+  scope: "active" | "all",
+  sessionFile?: string,
+  taskEntries: Omit<RecallEntry, "index">[] = [],
+): RecallEntry[] {
   const entries = [
     ...buildDurableEntries(sessionId, scope),
     ...buildJsonlEntries(scope, sessionFile),
+    ...(scope === "all" ? taskEntries : []),
   ];
   return entries.map((entry, position) => ({ ...entry, index: position + 1 }));
 }

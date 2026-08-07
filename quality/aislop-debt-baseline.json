@@ -1,18 +1,18 @@
 {
   "version": 1,
-  "capturedAt": "2026-07-29T14:33:28.488Z",
+  "capturedAt": "2026-08-06T21:39:13.603Z",
   "tool": {
     "name": "aislop",
     "version": "0.13.1",
     "reportSchemaVersion": "1",
     "scope": "full-project"
   },
-  "minimumScore": 59,
-  "minimumSupportedFiles": 188,
-  "totalFindings": 32,
+  "minimumScore": 69,
+  "minimumSupportedFiles": 137,
+  "totalFindings": 18,
   "engines": {
-    "ai-slop": 10,
-    "code-quality": 20,
+    "ai-slop": 2,
+    "code-quality": 14,
     "lint": 2
   },
   "findings": {
@@ -32,22 +32,6 @@
       "severity": "warning",
       "message": "Duplicate code block — extract a shared helper"
     },
-    ".pi/extensions/dcp/recall.ts\u001fai-slop\u001fai-slop/meta-comment\u001fwarning\u001fMeta/plan comment (before/after state narration)": {
-      "count": 1,
-      "filePath": ".pi/extensions/dcp/recall.ts",
-      "engine": "ai-slop",
-      "rule": "ai-slop/meta-comment",
-      "severity": "warning",
-      "message": "Meta/plan comment (before/after state narration)"
-    },
-    ".pi/extensions/deepseek/stream.ts\u001fai-slop\u001fai-slop/hardcoded-url\u001fwarning\u001fHardcoded environment URL in production code": {
-      "count": 1,
-      "filePath": ".pi/extensions/deepseek/stream.ts",
-      "engine": "ai-slop",
-      "rule": "ai-slop/hardcoded-url",
-      "severity": "warning",
-      "message": "Hardcoded environment URL in production code"
-    },
     ".pi/extensions/learning-coordinator/source-ports.ts\u001fcode-quality\u001fcomplexity/deep-nesting\u001fwarning\u001fFunction nested too deeply (max: 5)": {
       "count": 1,
       "filePath": ".pi/extensions/learning-coordinator/source-ports.ts",
@@ -55,22 +39,6 @@
       "rule": "complexity/deep-nesting",
       "severity": "warning",
       "message": "Function nested too deeply (max: 5)"
-    },
-    ".pi/extensions/mimo-provider.ts\u001fai-slop\u001fai-slop/hardcoded-url\u001fwarning\u001fHardcoded environment URL in production code": {
-      "count": 1,
-      "filePath": ".pi/extensions/mimo-provider.ts",
-      "engine": "ai-slop",
-      "rule": "ai-slop/hardcoded-url",
-      "severity": "warning",
-      "message": "Hardcoded environment URL in production code"
-    },
-    ".pi/extensions/mimo-provider.ts\u001fcode-quality\u001fcode-quality/duplicate-block\u001fwarning\u001fDuplicate code block — extract a shared helper": {
-      "count": 4,
-      "filePath": ".pi/extensions/mimo-provider.ts",
-      "engine": "code-quality",
-      "rule": "code-quality/duplicate-block",
-      "severity": "warning",
-      "message": "Duplicate code block — extract a shared helper"
     },
     ".pi/extensions/safety/context.ts\u001fai-slop\u001fai-slop/meta-comment\u001fwarning\u001fMeta/plan comment (before/after state narration)": {
       "count": 1,
@@ -111,38 +79,6 @@
       "rule": "code-quality/duplicate-block",
       "severity": "warning",
       "message": "Duplicate code block — extract a shared helper"
-    },
-    ".pi/extensions/tui/fixed-editor/compositor.ts\u001fcode-quality\u001fcomplexity/file-too-large\u001fwarning\u001fFile too large (max: 400)": {
-      "count": 1,
-      "filePath": ".pi/extensions/tui/fixed-editor/compositor.ts",
-      "engine": "code-quality",
-      "rule": "complexity/file-too-large",
-      "severity": "warning",
-      "message": "File too large (max: 400)"
-    },
-    ".pi/extensions/tui/index.ts\u001fcode-quality\u001fcomplexity/file-too-large\u001fwarning\u001fFile too large (max: 400)": {
-      "count": 1,
-      "filePath": ".pi/extensions/tui/index.ts",
-      "engine": "code-quality",
-      "rule": "complexity/file-too-large",
-      "severity": "warning",
-      "message": "File too large (max: 400)"
-    },
-    ".pi/extensions/xai/constants.ts\u001fai-slop\u001fai-slop/hardcoded-url\u001fwarning\u001fHardcoded environment URL in production code": {
-      "count": 4,
-      "filePath": ".pi/extensions/xai/constants.ts",
-      "engine": "ai-slop",
-      "rule": "ai-slop/hardcoded-url",
-      "severity": "warning",
-      "message": "Hardcoded environment URL in production code"
-    },
-    ".pi/extensions/xai/oauth.ts\u001fai-slop\u001fai-slop/hardcoded-url\u001fwarning\u001fHardcoded environment URL in production code": {
-      "count": 1,
-      "filePath": ".pi/extensions/xai/oauth.ts",
-      "engine": "ai-slop",
-      "rule": "ai-slop/hardcoded-url",
-      "severity": "warning",
-      "message": "Hardcoded environment URL in production code"
     }
   }
 }

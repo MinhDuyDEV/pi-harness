@@ -9,14 +9,14 @@ Vendored port of [`sting8k/pi-snap-edit`](https://www.npmjs.com/package/pi-snap-
 Upstream `pi-snap-edit@5.0.0` declares peer dependencies
 `@earendil-works/pi-coding-agent@^0.78.0` and `@earendil-works/pi-tui@^0.78.0`.
 On a 0.x range, `^0.78.0` resolves to `>=0.78.0 <0.79.0`, so it **ERESOLVEs**
-against this harness's pinned Pi **0.81.1** host. The 5.0.0 release retains the
+against this harness's pinned Pi **0.84.0** host. The 5.0.0 release retains the
 same incompatible peer range as 4.x, so no compatible npm pin exists.
 
 The runtime API the package needs (`ExtensionAPI.registerTool/getActiveTools/
 setActiveTools/on`, `withFileMutationQueue`, `keyHint`, and `pi-tui`'s `Text`)
-is fully present in Pi 0.81.1 — the conflict is purely a solver/peer-range
+is fully present in Pi 0.84.0 — the conflict is purely a solver/peer-range
 issue. Vendoring the source here and binding it to the host's already-installed
-0.81.1 packages is the smallest maintainable boundary that preserves the
+0.84.0 packages is the smallest maintainable boundary that preserves the
 proven atomic editing logic without an incompatible npm pin or
 `--force`/`--legacy-peer-deps`.
 
@@ -29,7 +29,7 @@ The only change to the vendored source is in `schemas.ts`:
 +import { Type } from "typebox";
 ```
 
-`@sinclair/typebox` was renamed to `typebox`; the host pins `typebox@1.1.38`,
+`@sinclair/typebox` was renamed to `typebox`; the host pins `typebox@1.3.7`,
 whose `Type` builder API is compatible with the schema shapes used here
 (`Object`, `String`, `Integer`, `Optional`, `Union`, `Literal`, `Array` with
 options). Every editing routine (`quick-edit.ts`, `target-edit.ts`, `fuzzy.ts`,

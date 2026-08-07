@@ -1,6 +1,6 @@
 export interface RecallEntry {
   index: number;
-  source: "dcp" | "jsonl";
+  source: "dcp" | "jsonl" | "task";
   sessionKey?: string;
   role?: string;
   title: string;
@@ -23,6 +23,7 @@ export interface RecallResult {
   entries: RecallEntry[];
   rendered: string;
   total: number;
+  warnings?: string[];
 }
 
 export const PAGE_SIZE = 5;

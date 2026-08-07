@@ -52,7 +52,7 @@ export function releaseEnvironment(mode, baseEnvironment = process.env) {
   const environment = { ...baseEnvironment };
   delete environment.PI_E2E_SIBLINGS;
   for (const key of E2E_OVERRIDE_KEYS) delete environment[key];
-  if (mode === "local") environment.PI_E2E_SIBLINGS = "local";
+  environment.PI_E2E_SIBLINGS = mode;
   return environment;
 }
 

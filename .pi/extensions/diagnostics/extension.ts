@@ -2,12 +2,16 @@ import path from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   activeRunnersForFile,
+  autoFallowEnabled,
+  fallowAvailable,
+  isAutoDiagnosticPath,
   runAutoInject,
   shouldSkipAuto,
   touchDebounce,
 } from "./auto-inject.ts";
 import { diagnosticsParamsSchema, resolveParams } from "./params.ts";
 import { runFullDiagnostics } from "./run.ts";
+import { resolveDiagnosticsProjectRoot } from "./project-root.ts";
 import { renderDiagnosticsCall, renderDiagnosticsResult } from "./tool-render.ts";
 import { readExtensionGate } from "../lib/harness-settings.js";
 
@@ -67,7 +71,9 @@ export default function (pi: ExtensionAPI) {
     const runners = activeRunnersForFile(ctx.cwd, filePath);
     const autoFallowExt = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts"]);
     const autoFallow =
-      process.env.PI_DIAGNOSTICS_AUTO_FALLOW === "true" &&
+      autoFallowEnabled() &&
+      fallowAvailable() &&
+      isAutoDiagnosticPath(resolveDiagnosticsProjectRoot(ctx.cwd).projectRoot, ctx.cwd, filePath) &&
       autoFallowExt.has(path.extname(filePath).toLowerCase());
     if (!runners.length && !autoFallow) return;
 
