@@ -4,7 +4,7 @@ description: >
   Use for parallel units of work across multiple concurrent task runs. May edit when needed.
   NOT for in-repo-only mapping (explore) or docs-only external research (scout).
 model: commandcode/deepseek/deepseek-v4-flash
-thinking: high
+thinking: medium
 proactive: true
 prompt_mode: append
 ---
