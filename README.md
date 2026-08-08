@@ -48,6 +48,25 @@ the interactive TUI-only `ask_user` decision form used by lifecycle prompts.
 Those prompts include a numbered plain-text fallback for non-TUI or degraded
 sessions.
 
+### Optional peer advisor
+
+The hardened `MinhDuyDEV/pi-peer` fork is an optional same-machine/HerdR
+root-to-read-only-advisor channel. It is deliberately excluded from the Full
+package set and never owns task lifecycle, claims, evidence, review, or ship
+authority. Install it explicitly in a consumer that needs live peer consultation:
+
+```bash
+pi install git:github.com/MinhDuyDEV/pi-peer
+```
+
+Pi-subagents CLI children are excluded by `PI_TASK_TOOL_DISABLED=1`; explicit
+non-root harness seats fail closed as defense in depth. Root-to-root identity is
+still a same-user/HerdR trust assumption, and every peer message remains
+untrusted advice. Re-establish any relied-upon conclusion through canonical
+task context, repository evidence, or `task_control record_evidence`. The
+`/integration` report recognizes compatible `pi-peer` versions while treating
+its absence as healthy optional state.
+
 ### Rerun, preview, and upgrade
 
 Use the same exact-version command for first install and reruns. An unchanged

@@ -32,6 +32,7 @@ export const COMPATIBILITY = {
   "@minhduydev/pi-subagents": { range: ">=0.11.0 <0.13.0" },
   "@minhduydev/pi-learning": { range: ">=0.6.0 <0.7.0" },
   "@minhduydev/pi-todo": { range: ">=0.6.0 <0.7.0" },
+  "pi-peer": { range: ">=1.2.0 <1.3.0", optional: true },
 } as const;
 
 type PackageName = keyof typeof COMPATIBILITY;
@@ -105,18 +106,24 @@ function installedVersion(name: string, cwd: string): string | undefined {
   return undefined;
 }
 
-export function integrationReport(cwd: string): PackageStatus[] {
+export function integrationReport(
+  cwd: string,
+  resolveVersion: (name: string, cwd: string) => string | undefined = installedVersion,
+): PackageStatus[] {
   const statuses: PackageStatus[] = [];
   for (const [name, wanted] of Object.entries(COMPATIBILITY) as Array<
     [PackageName, (typeof COMPATIBILITY)[PackageName]]
   >) {
-    const installed = installedVersion(name, cwd);
+    const installed = resolveVersion(name, cwd);
     if (installed === undefined) {
+      const optional = "optional" in wanted && wanted.optional === true;
       statuses.push({
         name,
         wanted: wanted.range,
-        ok: false,
-        detail: "not installed — the integration it provides is inactive",
+        ok: optional,
+        detail: optional
+          ? "optional — not installed"
+          : "not installed — the integration it provides is inactive",
       });
       continue;
     }
@@ -169,7 +176,7 @@ export default function integrationExtension(pi: ExtensionAPI): void {
     const broken = integrationReport(context.cwd).filter((status) => !status.ok);
     const missingOnly = broken.every((status) => status.installed === undefined);
     if (broken.length === 0 || missingOnly) return; // absent siblings are a supported setup
-    context.ui.notify(
+    context.ui?.notify?.(
       `pi-* version drift: ${broken
         .filter((status) => status.installed !== undefined)
         .map((status) => `${status.name}@${status.installed} (verified: ${status.wanted})`)

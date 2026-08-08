@@ -80,3 +80,25 @@ test("verify is the only workflow prompt that may close a successfully verified 
   assert.match(content, /--quick.*--gate-only.*must not close/is);
   assert.match(content, /todo done ["`]<title>["`]/);
 });
+
+test("governed coordination policy keeps one control plane and a human trust boundary", () => {
+  const adr = readFileSync(
+    resolve(ROOT, "docs", "decisions", "0001-minimal-governed-coordination.md"),
+    "utf8",
+  );
+  const runtimePolicy = readFileSync(resolve(ROOT, ".pi", "APPEND_SYSTEM.md"), "utf8");
+
+  assert.match(adr, /Status:\*\* accepted/i);
+  assert.match(adr, /pi-subagents.*only lifecycle control plane/is);
+  assert.match(adr, /root.*readiness.*human.*irreversible/is);
+  assert.match(adr, /Agency Justification/i);
+  assert.match(adr, /fallible.*malicious/is);
+  assert.match(adr, /pre-write.*post-run/is);
+  assert.match(adr, /telemetry.*stop condition/is);
+  assert.match(adr, /pi-peer.*optional.*untrusted advice/is);
+  assert.match(adr, /Paseo.*reject/is);
+
+  assert.match(runtimePolicy, /Agency Justification/i);
+  assert.match(runtimePolicy, /human.*irreversible/is);
+  assert.match(runtimePolicy, /pre-write.*post-run/is);
+});

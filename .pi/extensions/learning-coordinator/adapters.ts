@@ -6,6 +6,14 @@ type Outcome = KnowledgeSignalV1["outcome"];
 type SubjectKind = KnowledgeSignalV1["subject"]["kind"];
 
 const TAGGED_DIGEST = /^sha256:v1:[0-9a-f]{64}$/;
+const LEGACY_ORCHESTRATION_DIGEST = /^sha256:([0-9a-f]{64})$/;
+
+function normalizeOrchestrationDigest(value: unknown): string | undefined {
+  const digest = String(value);
+  if (TAGGED_DIGEST.test(digest)) return digest;
+  const legacy = LEGACY_ORCHESTRATION_DIGEST.exec(digest);
+  return legacy ? `sha256:v1:${legacy[1]}` : undefined;
+}
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -98,16 +106,24 @@ function classify(producer: SourceProducer, event: Record<string, unknown>): {
   const type = bounded(event.type ?? event.kind, 100);
   if (!type) return undefined;
   if (producer === "pi-subagents") {
-    if (type === "review_completed") {
-      const status = event.reviewStatus;
-      if (!status) return undefined;
-      return {
-        subjectKind: "review",
-        subjectDigest: taggedDigest({ eventId: eventIdentity(event), reviewStatus: status }),
-        outcome: status === "approved" || status === "accepted" ? "passed" : status === "changes_requested" ? "changes-requested" : "failed",
-      };
+    if (type !== "review_completed" && type !== "task_reviewed") return undefined;
+    const status = bounded(type === "task_reviewed" ? event.verdict : event.reviewStatus, 40);
+    if (!status) return undefined;
+    const immutableSubjectDigest = normalizeOrchestrationDigest(event.subjectDigest);
+    const reviewerOutputDigest = normalizeOrchestrationDigest(event.reviewerOutputDigest);
+    if (type === "task_reviewed" && (!immutableSubjectDigest || !reviewerOutputDigest)) {
+      return undefined;
     }
-    return undefined;
+    return {
+      subjectKind: "review",
+      subjectDigest: immutableSubjectDigest
+        ?? taggedDigest({ eventId: eventIdentity(event), reviewStatus: status }),
+      outcome: status === "approved" || status === "accepted"
+        ? "passed"
+        : status === "changes_requested"
+          ? "changes-requested"
+          : "failed",
+    };
   }
   if (producer === "pi-todo") {
     const phase = type.includes("phase");

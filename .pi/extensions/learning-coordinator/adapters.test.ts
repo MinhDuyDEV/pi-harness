@@ -62,3 +62,23 @@ test("fans out independent usage bindings without candidate text", () => {
   assert.equal(JSON.stringify(signals).includes("TODO text"), false);
   assert.deepEqual(signals.map((signal) => signal.usage.usageId), ["usage-1", "usage-2"]);
 });
+
+test("uses immutable task_reviewed events as canonical review learning signals", () => {
+  const subjectDigest = `sha256:${"d".repeat(64)}`;
+  const signals = buildSignalsFromProducerEvent("pi-subagents", {
+    version: 1,
+    id: "event-task-reviewed",
+    sequence: 4,
+    timestamp: "2026-08-08T00:01:00.000Z",
+    type: "task_reviewed",
+    taskId: "task-1",
+    verdict: "approved",
+    subjectDigest,
+    reviewerOutputDigest: `sha256:${"e".repeat(64)}`,
+    usageBindings: [usage],
+  });
+
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0]?.outcome, "passed");
+  assert.equal(signals[0]?.subject.digest, digest("d"));
+});

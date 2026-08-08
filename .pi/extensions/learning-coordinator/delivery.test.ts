@@ -219,3 +219,28 @@ test("fanout advances only after every usage-bound signal is acknowledged", asyn
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("preserves the legacy knowledge-signal digest bytes", () => {
+  const vector = {
+    version: 1,
+    producer: "pi-todo",
+    streamId: "stream-a",
+    eventId: "event-1",
+    idempotencyKey: "idem-1",
+    occurredAt: "2026-08-08T00:00:00.000Z",
+    kind: "todo-item-completed",
+    payload: { z: 2, a: 1, skip: undefined, nested: { b: true, a: false } },
+  };
+
+  assert.equal(
+    knowledgeSignalDigest(vector),
+    "sha256:v1:dd270c6a87ce3c1a7b9fdbc84ac88dbd9ef97fa0b68094c973208eaab60130dc",
+  );
+});
+
+test("uses pi-core as the single canonical knowledge-signal digest implementation", async () => {
+  const source = await readFile(new URL("./delivery.ts", import.meta.url), "utf8");
+  assert.match(source, /@minhduydev\/pi-core\/digest/);
+  assert.doesNotMatch(source, /function canonical\(/);
+  assert.doesNotMatch(source, /createHash\(/);
+});

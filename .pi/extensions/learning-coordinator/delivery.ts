@@ -1,4 +1,5 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
+import { taggedDigest } from "@minhduydev/pi-core/digest";
 import { mkdir, open, readFile, rename } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
@@ -79,22 +80,7 @@ const ACK_STATUSES = new Set<KnowledgeSignalAckStatus>([
   "duplicate",
 ]);
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (!value || typeof value !== "object") return value;
-  const input = value as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.keys(input)
-      .sort()
-      .flatMap((key) => input[key] === undefined ? [] : [[key, canonical(input[key])]]),
-  );
-}
-
-export function knowledgeSignalDigest(value: unknown): string {
-  return `sha256:v1:${createHash("sha256")
-    .update(JSON.stringify(canonical(value)))
-    .digest("hex")}`;
-}
+export const knowledgeSignalDigest = taggedDigest;
 
 function requestFor(signal: KnowledgeSignalV1): KnowledgeSignalRequestV1 {
   const signalDigest = knowledgeSignalDigest(signal);
