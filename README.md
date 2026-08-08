@@ -2,12 +2,12 @@
 
 `pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## What's new in 2.7.0
+## What's new in 2.8.1
 
-- Pi-native `repo-refresh`, `test-proof-debt-audit`, `ultra-review`, and `ultra-review-receive` skills provide explicit cleanup, proof-audit, maximum-recall review, and report-remediation workflows.
-- `/ultra-review` uses an 8+2 cost-aware fan-out: eight DeepSeek V4 Flash `ultra-reviewer` slots and two stronger GLM `reviewer` slots for security and adversarial review.
-- Review reports preserve raw candidates under `.pi/artifacts/review/`; candidate collection remains separate from verification and authorized remediation.
-- Consumer initialization and package payload checks now install and enforce the dedicated read-only `ultra-reviewer` agent.
+- Governed coordination keeps `@minhduydev/pi-subagents` as the sole lifecycle control plane, with typed reason codes, bounded/redacted telemetry, durable evidence, and human authority over irreversible actions.
+- Optional `pi-peer` integration is advisory transport only; it cannot mutate lifecycle state, claims, proof, review, or audit truth.
+- Consumer bootstrap now pins `@minhduydev/pi-subagents@0.13.0`, which carries the matching lifecycle and telemetry contracts.
+- The vendored Snap Edit tool advances to 5.1.0 with corrected newline handling, trim indentation, occurrence reporting, byte-state notes, and post-edit diff coordinates.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ separate global or manual `pi install` is required:
 
 ```bash
 mkdir -p ./my-repo
-npx --yes --package=@minhduydev/pi-harness@2.7.0 -- pi-harness-init ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.8.1 -- pi-harness-init ./my-repo
 ```
 
 The bootstrap writes exact project package pins for the executing harness and
@@ -43,7 +43,7 @@ selects a provider/model nor installs credentials. Loaded integrations
 report missing optional tools through `/integration` rather than making startup
 depend on them.
 
-The Full package set also pins `@mrclrchtr/supi-ask-user@4.0.0`, which provides
+The Full package set also pins `@mrclrchtr/supi-ask-user@4.7.0`, which provides
 the interactive TUI-only `ask_user` decision form used by lifecycle prompts.
 Those prompts include a numbered plain-text fallback for non-TUI or degraded
 sessions.
@@ -56,7 +56,7 @@ package set and never owns task lifecycle, claims, evidence, review, or ship
 authority. Install it explicitly in a consumer that needs live peer consultation:
 
 ```bash
-pi install git:github.com/MinhDuyDEV/pi-peer
+pi install npm:pi-peer@1.2.1
 ```
 
 Pi-subagents CLI children are excluded by `PI_TASK_TOOL_DISABLED=1`; explicit
@@ -74,7 +74,7 @@ rerun performs no content or timestamp writes. Preview a first install or
 upgrade with:
 
 ```bash
-npx --yes --package=@minhduydev/pi-harness@2.7.0 -- pi-harness-init --dry-run ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.8.1 -- pi-harness-init --dry-run ./my-repo
 ```
 
 To upgrade, change only the exact harness version in the `npx` command and run
@@ -184,10 +184,11 @@ publishing once network access is available.
 The owner-controlled publish order is:
 
 1. [`@minhduydev/pi-core@0.3.1`](https://www.npmjs.com/package/@minhduydev/pi-core/v/0.3.1)
-2. `@minhduydev/pi-subagents@0.12.0` — publish this companion before publishing the harness release that pins it
+2. `@minhduydev/pi-subagents@0.13.0` — publish this companion before publishing the harness release that pins it
 3. `@minhduydev/pi-learning@0.6.0`
 4. `@minhduydev/pi-todo@0.6.0`
-5. `@minhduydev/pi-harness@2.7.0` (publish last, after the companion package versions pinned by its bootstrap contract)
+5. `pi-peer@1.2.1` (optional advisor; publish before the harness release that documents its exact pin)
+6. `@minhduydev/pi-harness@2.8.1` (publish last, after the companion package versions pinned by its bootstrap contract)
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:

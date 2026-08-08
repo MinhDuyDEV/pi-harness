@@ -11,7 +11,7 @@ const promptFiles = () =>
     .filter((name) => name.endsWith(".md"))
     .map((name) => [name, read(".pi", "prompts", name)] as const);
 
-const ASK_USER_PIN = "npm:@mrclrchtr/supi-ask-user@4.0.0";
+const ASK_USER_PIN = "npm:@mrclrchtr/supi-ask-user@4.7.0";
 
 function markdownFiles(relativeDirectory: string): string[] {
   const directory = join(ROOT, relativeDirectory);

@@ -20,7 +20,7 @@ for (const path of packageJson.files ?? []) {
 
 if (packageJson.bin) {
   const entries = Object.entries(packageJson.bin);
-  if (entries.length !== 1 || entries[0]?.[0] !== "pi-harness-init" || entries[0]?.[1] !== "./scripts/init-consumer.mjs") {
+  if (entries.length !== 1 || entries[0]?.[0] !== "pi-harness-init" || entries[0]?.[1] !== "scripts/init-consumer.mjs") {
     errors.push("package.json may expose only the portable pi-harness-init consumer bootstrap");
   }
 }

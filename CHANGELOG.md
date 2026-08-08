@@ -1,14 +1,27 @@
 # Changelog
 
 All notable changes to `@minhduydev/pi-harness` are documented here.
+
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-08-08
+
+### Added
+
+- Add governed coordination contracts while preserving `@minhduydev/pi-subagents` as the sole task lifecycle control plane.
+- Add optional, fail-soft `pi-peer` advisory integration with root-only eligibility and explicit untrusted-advice boundaries.
+- Add typed orchestration reason codes and bounded, redacted reason telemetry through `@minhduydev/pi-subagents@0.13.0`.
+
 ### Changed
 
-- Update the vendored `pi-snap-edit` integration from 5.0.0 to 5.1.0, adding stronger guard diagnostics, embedded-newline normalization, indentation-aware trim replacements, byte-state notes, corrected diff coordinates, and multi-occurrence reporting.
+- Pin consumer bootstrap to `@minhduydev/pi-subagents@0.13.0` and require the compatible `>=0.13.0 <0.14.0` peer range.
+- Pin optional peer installation and compatibility to `pi-peer@1.2.1`.
+- Update the Full-profile interactive decision form pin to `@mrclrchtr/supi-ask-user@4.7.0`.
+- Vendor Snap Edit 5.1.0, including newline, trim indentation, occurrence note, byte-state, and post-edit diff-coordinate fixes.
+- Advance the harness package version to `2.8.1` because npm versions `2.7.0` and `2.8.0` are immutable and already published.
 
 ## [2.7.0] - 2026-08-08
 

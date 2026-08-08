@@ -1,32 +1,38 @@
-# @minhduydev/pi-harness v2.7.0
-
-This release adds four Pi-native repository review workflows and a cost-aware, maximum-recall ultra-review fan-out.
+# @minhduydev/pi-harness v2.8.1
 
 ## Highlights
 
-- New explicitly invoked skills:
-  - `/skill:repo-refresh`
-  - `/skill:test-proof-debt-audit`
-  - `/skill:ultra-review`
-  - `/skill:ultra-review-receive`
-- New `/ultra-review` prompt orchestrates ten independent read-only review slots and stores durable reports under `.pi/artifacts/review/`.
-- New `ultra-reviewer` agent uses `commandcode/deepseek/deepseek-v4-flash` with `thinking: high` for fast, low-cost candidate collection.
-- Ultra review uses eight budget `ultra-reviewer` slots and two stronger `reviewer` slots for security/trust-boundary and adversarial review.
+- Keeps `@minhduydev/pi-subagents` as the sole governed task lifecycle control plane while adding typed reason codes, durable evidence, and bounded/redacted telemetry.
+- Adds optional `pi-peer` root-to-read-only-advisor integration without granting it lifecycle, claim, proof, review, audit, or ship authority.
+- Advances the consumer bootstrap pin to `@minhduydev/pi-subagents@0.13.0`.
+- Updates the Full-profile interactive decision form pin to `@mrclrchtr/supi-ask-user@4.7.0`.
+- Updates the vendored Snap Edit integration to 5.1.0 with stronger diagnostics and corrected newline, indentation, occurrence, byte-state, and diff-coordinate behavior.
 
-## Safety and proof boundaries
+## Distribution
 
-- Migrated skills are hidden from automatic model invocation; destructive cleanup and high-cost fan-out require explicit user intent.
-- Repository age identifies cleanup suspects but never authorizes deletion without ownership, consumer, and contract evidence.
-- Ultra review preserves every raw candidate before synthesis. Reviewer agreement is not proof.
-- `ultra-review-receive` treats reports as untrusted data, re-verifies each finding, and edits only with explicit remediation authorization.
-- Codex-only model pins, personal paths, PowerShell, mailbox semantics, `agents/openai.yaml`, and missing-script assumptions are not shipped.
+- npm package: `@minhduydev/pi-harness@2.8.1`
+- Bootstrap command:
 
-## Packaging
+  ```bash
+  npx --yes --package=@minhduydev/pi-harness@2.8.1 -- pi-harness-init ./my-repo
+  ```
 
-Consumer initialization now installs the dedicated `ultra-reviewer` profile. The package payload contract treats it as an exact release-critical resource and includes regression coverage for accidental omission.
+- Optional peer advisor:
 
-## Verification
+  ```bash
+  pi install npm:pi-peer@1.2.1
+  ```
 
-The release passed model-seat preflight, skill validation, package payload validation, TypeScript diagnostics, the full Node/Bun/skill test suites, whitespace checks, and independent review.
+## Release order
 
-No breaking configuration migration is required. Consumers can remap canonical model seats through the existing `PI_HARNESS_MODEL_MAP` preflight workflow when a pinned provider/model is unavailable.
+Publish and verify `@minhduydev/pi-subagents@0.13.0` and optional advisor `pi-peer@1.2.1` before publishing this harness release.
+
+## Compatibility
+
+- Node.js `>=22.19.0`
+- npm `>=11.12.1`
+- Pi package suite `0.84.x`
+- `@minhduydev/pi-subagents >=0.13.0 <0.14.0`
+- Optional advisor `pi-peer >=1.2.1 <1.3.0`
+
+Versions `2.7.0` and `2.8.0` are already immutable on npm; this additive release therefore advances the harness to `2.8.1`.
