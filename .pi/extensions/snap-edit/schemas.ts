@@ -5,7 +5,7 @@ export const FileStatParams = Type.Object({
 });
 
 const LineEditParams = Type.Object({
-  start: Type.Integer({ minimum: 1, description: "1-indexed start line number. Use lineCount + 1 with no end to insert at EOF (legacy; prefer start=\"eof\")." }),
+  start: Type.Integer({ minimum: 1, description: "1-indexed start line number. With \"lines\", REPLACES that line/range (there is no mid-file insert). Use lineCount + 1 with no end to append at EOF (legacy; prefer start=\"eof\")." }),
   end: Type.Optional(Type.Integer({ minimum: 1, description: "Optional 1-indexed inclusive end line number." })),
   expectedStartLine: Type.Optional(Type.String({ description: "Guard for the current start line (required except for an empty-file insert). Exact by default; use whitespace=\"indent_tolerant\" or expectedStartLineMatch=trim for whitespace-tolerant guards. JSON-style escape sequences (e.g. \\n, \\t) are unescaped before comparing." })),
   expectedStartLineMatch: Type.Optional(Type.Union([Type.Literal("exact"), Type.Literal("trim")], { description: "How to compare expectedStartLine/expectedEndLine. Defaults to exact unless whitespace is indent_tolerant (then trim). trim ignores leading/trailing whitespace." })),
@@ -15,8 +15,8 @@ const LineEditParams = Type.Object({
     description: "Whitespace policy. strict (default): exact guards, no indent rewrite. indent_tolerant: trim guards + preserveIndent for replacement lines. Explicit expectedStartLineMatch/preserveIndent override the matching parts of this shortcut.",
   })),
   preserveIndent: Type.Optional(Type.Boolean({ description: "When true, prefixes the current start line indentation to each non-empty replacement line. Use unindented replacement lines. Defaults true when whitespace is indent_tolerant." })),
-  lines: Type.Array(Type.String(), { description: "Replacement lines for the line/range. Empty array deletes it." }),
-}, { description: "Replace, insert, or delete by line number or inclusive line range." });
+  lines: Type.Array(Type.String(), { description: "Replacement lines for the line/range. Empty array deletes it. Entries containing real newlines are split into multiple lines." }),
+}, { description: "Replace or delete a line/range by line number; \"lines\" replaces the start..end span (there is no mid-file insert). EOF append is the only insert (start:\"eof\" or legacy lineCount+1). For mid-file insert use target_edit's insert_before/insert_after, or replace the line with [newLines..., originalLine]." });
 
 const EofEditParams = Type.Object({
   start: Type.Literal("eof", { description: "Append at end of file." }),
@@ -27,12 +27,12 @@ export const QuickEditParams = Type.Object({
   path: Type.String({ description: "Path to the file to edit." }),
   edits: Type.Array(
     Type.Union([EofEditParams, LineEditParams]),
-    { minItems: 1, description: 'Line-number edits or EOF appends to apply atomically. For EOF, use exactly { start: "eof", lines: [...] }.' },
+    { minItems: 1, description: 'Replace/delete line edits or EOF appends to apply atomically. Line edits replace their span (no mid-file insert); EOF append uses start:"eof". For EOF, use exactly { start: "eof", lines: [...] }.' },
   ),
 });
 
 const TargetBase = {
-  target: Type.String({ minLength: 1, description: "Exact literal target text to find. Use \\n for multi-line targets." }),
+  target: Type.String({ minLength: 1, description: "Exact literal target text to find. Use \\n for multi-line targets. Exact bytes are tried first; unescaping is only a fallback when exact misses, so literal backslash sequences in files are matched verbatim." }),
   matchMode: Type.Optional(Type.Union([Type.Literal("exact"), Type.Literal("trim")], {
     default: "exact",
     description: "Match mode. exact (default) tries exact substring matching, then the unescaped target, then falls back to whole-line trim matching only if both miss, so an exact hit is never diluted. trim forces trim-only matching and ignores exact substring hits, which helps when the target text also occurs inside an indented line. On a trim match, replace stays bounded to the trimmed content so the original indentation is preserved and replacement leading/trailing whitespace is stripped, while delete removes the whole matched line(s).",
@@ -51,7 +51,7 @@ export const TargetEditParams = Type.Object({
           startLine: Type.Integer({ minimum: 1, description: "1-indexed inclusive start line." }),
           endLine: Type.Integer({ minimum: 1, description: "1-indexed inclusive end line." }),
         }, { description: "Inclusive line range; replaces every occurrence fully inside the range. May be combined with line as a validation hint." })),
-        replacement: Type.String({ description: "Replacement text. Use \\n for multi-line replacements." }),
+        replacement: Type.String({ description: "Replacement text. Use \\n for multi-line replacements. When the target starts at the first non-whitespace character of a line, the line's indentation is preserved in front of the match - do not re-indent the replacement's first line." }),
       }),
       Type.Object({
         type: Type.Literal("delete", { description: "Delete exact target text." }),

@@ -7,10 +7,11 @@ import {
   lineContentMatches,
   matchingLineNumbers,
   trimMismatchHint,
+  unescapeLiteralSequences,
   type ExpectedStartLineMatch,
 } from "./match-helpers.js";
 import type { Edit } from "./schemas.js";
-import { detectLineEnding, joinBom, splitBom, splitLines } from "./text.js";
+import { bytePropertiesNote, detectLineEnding, joinBom, splitBom, splitLines } from "./text.js";
 
 type ResolvedEdit = {
   startLine: number;
@@ -144,7 +145,7 @@ function leadingIndent(line: string): string {
 }
 
 function withPreservedIndent(lines: string[], indent: string): string[] {
-  return lines.map((line) => line === "" ? line : `${indent}${line}`);
+  return lines.map((line) => line.trim() === "" ? line : `${indent}${line}`);
 }
 
 function formatExpectedLineMatches(lines: string[], matches: number[], label: string, hint?: string): string {
@@ -166,6 +167,47 @@ function candidateFromLines(lines: string[], lineNumbers: number[]): EditFailure
     line: lineNumber,
     text: (lines[lineNumber - 1] ?? "").slice(0, 200),
   }));
+}
+
+function copyPasteGuard(actual: string, mode: GuardMode): string {
+  // Guards are compared after unescapeLiteralSequences, so a literal backslash
+  // sequence in the actual line (e.g. "\t") could be mangled on a verbatim
+  // resend. Doubling backslashes makes the unescaper reconstruct the exact
+  // original bytes; the enabled line always round-trips (identity check).
+  if (/\\[ntr\\]/.test(actual)) {
+    const doubled = actual.replace(/\\/g, "\\\\");
+    if (lineContentMatches(actual, doubled, mode)) return doubled;
+  }
+  return actual;
+}
+
+function commonPrefixLength(a: string, b: string): number {
+  const max = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < max && a[i] === b[i]) i++;
+  return i;
+}
+
+function firstDifferenceHint(actual: string, expected: string): string | undefined {
+  if (actual.length === 0) return undefined;
+  const raw = expected;
+  const guard = unescapeLiteralSequences(expected);
+  // The matcher tries the raw guard first and only then the unescaped form, so
+  // report using whichever form is closest to accepting against the actual line
+  // (the one with the longest common prefix). The unescaped form can collapse
+  // "\\" to "\" and thus diverge earlier than the raw guard even when the
+  // backslashes are byte-correct.
+  const best = commonPrefixLength(raw, actual) >= commonPrefixLength(guard, actual) ? raw : guard;
+  if (best === actual) return undefined;
+  const i = commonPrefixLength(best, actual);
+  if (i === best.length && i < actual.length) {
+    return `guard matches the start of the line but the line continues with ${JSON.stringify(actual.slice(i))}`;
+  }
+  const column = i + 1;
+  const ctx = 12;
+  const from = Math.max(0, i - ctx);
+  const to = i + ctx;
+  return `first difference at column ${column}: expected ${JSON.stringify(best.slice(from, to + 1))} vs actual ${JSON.stringify(actual.slice(from, to + 1))}`;
 }
 
 function analyzeStartGuardFailure(
@@ -225,8 +267,11 @@ function analyzeStartGuardFailure(
 
   const close = closeLineMatches(lines, expectedStartLine);
   const closeMatches = formatCloseLineMatches(lines, expectedStartLine, "Close start-line matches");
-  const trimTail = trimMismatchHint(mode);
-  const sections = [closeMatches, escapeHint, trimTail].filter(Boolean) as string[];
+  const trimTail = mode === "exact" && matchingLineNumbers(lines, expectedStartLine, "trim").length > 0
+    ? trimMismatchHint(mode)
+    : "";
+  const sections = [closeMatches, escapeHint, firstDifferenceHint(actualAtStart, expectedStartLine), trimTail]
+    .filter(Boolean) as string[];
   if (close.length === 0) sections.push("Read the file to see current content.");
   const result: StartGuardFailure = {
     sections: sections.length > 0 ? sections : ["Read the file to see current content."],
@@ -236,7 +281,9 @@ function analyzeStartGuardFailure(
       score: Number(match.score.toFixed(3)),
     })),
   };
-  if (mode === "exact") result.suggested = { whitespace: "indent_tolerant" };
+  if (startLine >= 1 && startLine <= lines.length) {
+    result.suggested = { expectedStartLine: copyPasteGuard(actualAtStart, mode) };
+  }
   return result;
 }
 
@@ -248,10 +295,18 @@ export async function applyQuickEdits(absolutePath: string, edits: Edit[]): Prom
   const content = await fs.readFile(absolutePath, "utf8");
   const source = splitBom(content);
   const lines = splitLines(source.text);
-  const resolved = edits.map((edit, index) => validateLineRange(lines.length, edit, `edit[${index}]`, index));
+  // Split embedded real newlines (LF or CRLF) inside each replacement line into
+  // separate lines before any validation or resolution. Only real newline
+  // characters split; a literal backslash-n (the two characters backslash + n)
+  // is not a real newline and stays intact.
+  const normalizedEdits: Edit[] = edits.map((edit) => ({
+    ...edit,
+    lines: edit.lines.flatMap((entry) => entry.split(/\r?\n/)),
+  }));
+  const resolved = normalizedEdits.map((edit, index) => validateLineRange(lines.length, edit, `edit[${index}]`, index));
 
-  for (let index = 0; index < edits.length; index++) {
-    const edit = edits[index]!;
+  for (let index = 0; index < normalizedEdits.length; index++) {
+    const edit = normalizedEdits[index]!;
     const resolvedEdit = resolved[index]!;
     const matchMode = resolveMatchMode(edit, `edit[${index}]`, index);
     const preserveIndent = resolvePreserveIndent(edit);
@@ -316,26 +371,28 @@ export async function applyQuickEdits(absolutePath: string, edits: Edit[]): Prom
       const actualEnd = lines[resolvedEdit.endLine - 1] ?? "";
       if (!lineContentMatches(actualEnd, edit.expectedEndLine, matchMode)) {
         const endMatches = matchingLineNumbers(lines, edit.expectedEndLine, matchMode);
+        const trimEndMatches = matchMode === "exact"
+          ? matchingLineNumbers(lines, edit.expectedEndLine, "trim")
+          : [];
         const sections: string[] = [];
         if (endMatches.length > 0) {
           sections.push(formatExpectedLineMatches(lines, endMatches, "Expected end line found at line(s)"));
-        } else if (matchMode === "exact") {
-          const trimEndMatches = matchingLineNumbers(lines, edit.expectedEndLine, "trim");
-          if (trimEndMatches.length > 0) {
-            sections.push(
-              formatExpectedLineMatches(
-                lines,
-                trimEndMatches,
-                "Expected end line matched by trim at line(s)",
-                trimMismatchHint("exact"),
-              ),
-            );
-          }
+        } else if (trimEndMatches.length > 0) {
+          sections.push(
+            formatExpectedLineMatches(
+              lines,
+              trimEndMatches,
+              "Expected end line matched by trim at line(s)",
+              trimMismatchHint("exact"),
+            ),
+          );
         }
         if (sections.length === 0) {
           const close = formatCloseLineMatches(lines, edit.expectedEndLine, "Close end-line matches");
           if (close) sections.push(close);
         }
+        const endFirstDiff = firstDifferenceHint(actualEnd, edit.expectedEndLine);
+        if (endFirstDiff) sections.push(endFirstDiff);
         const endCandidates = endMatches.length > 0
           ? candidateFromLines(lines, endMatches)
           : closeLineMatches(lines, edit.expectedEndLine).map((match) => ({
@@ -345,9 +402,15 @@ export async function applyQuickEdits(absolutePath: string, edits: Edit[]): Prom
           }));
         let endSuggested: Record<string, unknown> | undefined;
         if (matchMode === "exact") {
-          endSuggested = { whitespace: "indent_tolerant" };
+          if (trimEndMatches.length > 0) {
+            endSuggested = { whitespace: "indent_tolerant" };
+          } else if (resolvedEdit.endLine >= 1 && resolvedEdit.endLine <= lines.length) {
+            endSuggested = { expectedEndLine: copyPasteGuard(actualEnd, matchMode) };
+          }
         } else if (endMatches.length === 1) {
           endSuggested = { end: endMatches[0]!, expectedEndLine: lines[endMatches[0]! - 1] ?? "" };
+        } else if (resolvedEdit.endLine >= 1 && resolvedEdit.endLine <= lines.length) {
+          endSuggested = { expectedEndLine: copyPasteGuard(actualEnd, matchMode) };
         }
         throwEditError(
           {
@@ -423,7 +486,9 @@ export async function applyQuickEdits(absolutePath: string, edits: Edit[]): Prom
     offset += newLines.length - oldCount;
   }
 
+  const byteNote = bytePropertiesNote(lineEnding, hasTrailingNewline);
   const parts: string[] = [];
+  if (byteNote) parts.push(byteNote);
   const diff = formatDiffs(diffs);
   if (diff) parts.push(diff);
   const contexts = formatContexts(updated, contextRanges);

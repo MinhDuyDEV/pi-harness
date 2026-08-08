@@ -107,7 +107,7 @@ test("read tool results receive absolute line numbers", async () => {
       {},
     )) as { content: Array<{ type: string; text: string }> };
 
-    assert.equal(result.content[0]?.text, "2| beta\n3| gamma");
+    assert.equal(result.content[0]?.text, "2| beta\n3| gamma\nnote: file has no trailing newline");
   });
 });
 
@@ -335,5 +335,132 @@ test("an invalid quick_edit throws and leaves the file untouched (atomic)", asyn
 
     const after = await readFile(file, "utf8");
     assert.equal(after, original, "file must be unchanged when a guarded edit fails");
+  });
+});
+
+test("read hook surfaces non-default byte state at the true EOF", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const readHandler = api.handlers.get("tool_result");
+    assert.ok(readHandler, "tool_result handler must be registered");
+
+    const file = path.join(cwd, "no-final-newline.txt");
+    await writeFile(file, "alpha\nbeta", "utf8");
+
+    const result = (await readHandler(
+      {
+        toolName: "read",
+        isError: false,
+        input: { path: file },
+        content: [{ type: "text", text: "alpha\nbeta" }],
+      },
+      {},
+    )) as { content: Array<{ type: string; text: string }> };
+
+    assert.equal(result.content[0]?.text, "1| alpha\n2| beta\nnote: file has no trailing newline");
+  });
+});
+
+test("quick_edit splits embedded replacement newlines without corrupting CRLF", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const quickEdit = api.tools.get("quick_edit");
+    assert.ok(quickEdit, "quick_edit tool must be registered");
+
+    const file = path.join(cwd, "crlf.txt");
+    await writeFile(file, "alpha\r\nbeta\r\n", "utf8");
+
+    await quickEdit.execute(
+      "call-crlf",
+      {
+        path: file,
+        edits: [{ start: 2, expectedStartLine: "beta", lines: ["one\ntwo"] }],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+
+    assert.equal(await readFile(file, "utf8"), "alpha\r\none\r\ntwo\r\n");
+  });
+});
+
+test("target_edit reports multi-occurrence replacements", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const targetEdit = api.tools.get("target_edit");
+    assert.ok(targetEdit, "target_edit tool must be registered");
+
+    const file = path.join(cwd, "occurrences.txt");
+    await writeFile(file, "old\nold\nold\n", "utf8");
+
+    const result = (await targetEdit.execute(
+      "call-occurrences",
+      {
+        path: file,
+        ops: [{ type: "replace", target: "old", range: { startLine: 1, endLine: 3 }, replacement: "new" }],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    )) as { content: Array<{ type: string; text: string }> };
+
+    assert.match(result.content[0]?.text ?? "", /replaced 3 occurrences/);
+  });
+});
+
+test("target_edit uniformly adjusts indentation for multi-line trim replacements", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const targetEdit = api.tools.get("target_edit");
+    assert.ok(targetEdit, "target_edit tool must be registered");
+
+    const file = path.join(cwd, "indent.ts");
+    await writeFile(file, "function run() {\n    setup();\n    teardown();\n}\n", "utf8");
+
+    await targetEdit.execute(
+      "call-indent",
+      {
+        path: file,
+        ops: [{
+          type: "replace",
+          target: "setup();\nteardown();",
+          matchMode: "trim",
+          replacement: "init();\ncleanup();",
+        }],
+      },
+      undefined,
+      undefined,
+      { cwd },
+    );
+
+    assert.equal(await readFile(file, "utf8"), "function run() {\n    init();\n    cleanup();\n}\n");
+  });
+});
+
+test("quick_edit reports post-edit coordinates when a replacement grows", async () => {
+  await withIsolatedCwd(true, async (cwd) => {
+    const api = new StubApi();
+    snapEditExtension(api as unknown as ExtensionAPI);
+    const quickEdit = api.tools.get("quick_edit");
+    assert.ok(quickEdit, "quick_edit tool must be registered");
+
+    const file = path.join(cwd, "coordinates.txt");
+    await writeFile(file, "one\ntwo\nthree\n", "utf8");
+
+    const result = (await quickEdit.execute(
+      "call-coordinates",
+      { path: file, edits: [{ start: 2, expectedStartLine: "two", lines: ["a", "b", "c"] }] },
+      undefined,
+      undefined,
+      { cwd },
+    )) as { content: Array<{ type: string; text: string }> };
+
+    assert.match(result.content[0]?.text ?? "", /^:2-4$/m);
+    assert.equal(await readFile(file, "utf8"), "one\na\nb\nc\nthree\n");
   });
 });

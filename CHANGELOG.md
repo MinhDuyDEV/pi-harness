@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Update the vendored `pi-snap-edit` integration from 5.0.0 to 5.1.0, adding stronger guard diagnostics, embedded-newline normalization, indentation-aware trim replacements, byte-state notes, corrected diff coordinates, and multi-occurrence reporting.
+
 ## [2.7.0] - 2026-08-08
 
 ### Added

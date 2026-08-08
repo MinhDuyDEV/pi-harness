@@ -1,15 +1,15 @@
 # snap-edit
 
 Vendored port of [`sting8k/pi-snap-edit`](https://www.npmjs.com/package/pi-snap-edit)
-@ **5.0.0** (upstream commit `db95928`) providing the `quick_edit` and
+@ **5.1.0** (upstream commit `f7df22e`) providing the `quick_edit` and
 `target_edit` tools with atomic, guard-checked editing semantics.
 
 ## Why this is vendored (not npm-pinned)
 
-Upstream `pi-snap-edit@5.0.0` declares peer dependencies
+Upstream `pi-snap-edit@5.1.0` declares peer dependencies
 `@earendil-works/pi-coding-agent@^0.78.0` and `@earendil-works/pi-tui@^0.78.0`.
 On a 0.x range, `^0.78.0` resolves to `>=0.78.0 <0.79.0`, so it **ERESOLVEs**
-against this harness's pinned Pi **0.84.0** host. The 5.0.0 release retains the
+against this harness's pinned Pi **0.84.0** host. The 5.1.0 release retains the
 same incompatible peer range as 4.x, so no compatible npm pin exists.
 
 The runtime API the package needs (`ExtensionAPI.registerTool/getActiveTools/
@@ -45,14 +45,22 @@ options). Every editing routine (`quick-edit.ts`, `target-edit.ts`, `fuzzy.ts`,
   `pi-harness.extensions.snapEdit` gate (default off except in the `full`
   profile) before delegating to `extension.ts`.
 
-## Upstream 5.0 behavior
+## Upstream 5.1 behavior
 
 - `target_edit` cascades through exact, unescaped, then whole-line trim
   matching. Non-exact successes report the resolved tier.
-- A trim replacement preserves the file's indentation; a trim deletion removes
-  the whole matched line instead of leaving an indentation-only line.
-- The previously unregistered `substitute_edit` engine/schema/export has been
-  removed. Its active-tool filter remains to clean legacy saved session state.
+- A trim replacement preserves the file's indentation and adjusts uniformly
+  shifted indentation in multi-line replacements; a trim deletion removes the
+  whole matched line.
+- `quick_edit` splits embedded real newlines before validation, preserving
+  consistent CRLF/LF output.
+- Read/edit output surfaces non-default byte state; success output uses
+  post-edit diff coordinates and reports multi-occurrence operation counts.
+- Guard failures provide copy-paste-safe retry values and precise
+  first-difference hints; risky substring replacements warn about doubled
+  indentation.
+- The previously unregistered `substitute_edit` engine/schema/export remains
+  removed. Its active-tool filter cleans legacy saved session state.
 
 ## Activation
 
