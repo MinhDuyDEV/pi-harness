@@ -29,6 +29,7 @@ const AGENTS = [
   "proof-auditor.md",
   "reviewer.md",
   "scout.md",
+  "ultra-reviewer.md",
 ];
 const START_POLICY = "<!-- pi-harness managed policy:start -->";
 const END_POLICY = "<!-- pi-harness managed policy:end -->";

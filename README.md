@@ -2,13 +2,12 @@
 
 `pi-harness` is a reusable Pi Coding Agent harness: curated extensions, skills, prompt templates, themes, runtime policy, and a tested source-checkout profile.
 
-## What's new in 2.6.0
+## What's new in 2.7.0
 
-- Pi 0.84 is the tested host. DeepSeek, Xiaomi/MiMo, xAI, and the fullscreen TUI are provided natively by Pi, so the harness no longer registers shadow providers or patches Pi's renderer.
-- DCP resumes queued work after manual, threshold, or terminal overflow compaction by default, while avoiding duplicate continuation during Pi's own retry path.
-- DCP recall can include bounded, path-free task provenance from `pi-subagents`; `pi-learning` injects only trusted, receipt-bearing context within a hard 2 KiB budget.
-- Diagnostics default to an already-installed/configured Fallow, validate their Git baseline, bound runtime, and report analyzer failures rather than treating missing output as clean.
-- `pi-todo` automatically archives terminal phases in trusted projects through its existing lossless, compare-and-set archive path.
+- Pi-native `repo-refresh`, `test-proof-debt-audit`, `ultra-review`, and `ultra-review-receive` skills provide explicit cleanup, proof-audit, maximum-recall review, and report-remediation workflows.
+- `/ultra-review` uses an 8+2 cost-aware fan-out: eight DeepSeek V4 Flash `ultra-reviewer` slots and two stronger GLM `reviewer` slots for security and adversarial review.
+- Review reports preserve raw candidates under `.pi/artifacts/review/`; candidate collection remains separate from verification and authorized remediation.
+- Consumer initialization and package payload checks now install and enforce the dedicated read-only `ultra-reviewer` agent.
 
 ## Requirements
 
@@ -23,11 +22,11 @@ separate global or manual `pi install` is required:
 
 ```bash
 mkdir -p ./my-repo
-npx --yes --package=@minhduydev/pi-harness@2.6.0 -- pi-harness-init ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.7.0 -- pi-harness-init ./my-repo
 ```
 
 The bootstrap writes exact project package pins for the executing harness and
-its companion packages, portable Full settings, all seven canonical agent
+its companion packages, portable Full settings, all eight canonical agent
 profiles, the complete `.pi/templates/` tree, `.pi/ANTI_PATTERNS.md`, and a
 sentinel-managed harness region in `.pi/APPEND_SYSTEM.md`. It also adds a
 sentinel-managed runtime-state block to the existing `.gitignore` without
@@ -56,7 +55,7 @@ rerun performs no content or timestamp writes. Preview a first install or
 upgrade with:
 
 ```bash
-npx --yes --package=@minhduydev/pi-harness@2.6.0 -- pi-harness-init --dry-run ./my-repo
+npx --yes --package=@minhduydev/pi-harness@2.7.0 -- pi-harness-init --dry-run ./my-repo
 ```
 
 To upgrade, change only the exact harness version in the `npx` command and run
@@ -169,7 +168,7 @@ The owner-controlled publish order is:
 2. `@minhduydev/pi-subagents@0.12.0` — publish this companion before publishing the harness release that pins it
 3. `@minhduydev/pi-learning@0.6.0`
 4. `@minhduydev/pi-todo@0.6.0`
-5. `@minhduydev/pi-harness@2.6.0` (publish last, after the companion package versions pinned by its bootstrap contract)
+5. `@minhduydev/pi-harness@2.7.0` (publish last, after the companion package versions pinned by its bootstrap contract)
 
 After the first four exact versions exist on npm, run the final registry gate
 before publishing the harness:

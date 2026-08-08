@@ -33,6 +33,7 @@ const CANONICAL_AGENTS = [
   "proof-auditor.md",
   "reviewer.md",
   "scout.md",
+  "ultra-reviewer.md",
 ];
 const RUNTIME_IGNORES = [
   ".pi/artifacts/",

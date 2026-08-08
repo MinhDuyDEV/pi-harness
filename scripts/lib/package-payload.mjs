@@ -27,6 +27,7 @@ export const defaultPayloadContract = {
     ".pi/agents/proof-auditor.md",
     ".pi/agents/reviewer.md",
     ".pi/agents/scout.md",
+    ".pi/agents/ultra-reviewer.md",
     ".pi/templates/AGENTS.md",
     ".pi/templates/adr.md",
     ".pi/templates/agent-run-report.md",

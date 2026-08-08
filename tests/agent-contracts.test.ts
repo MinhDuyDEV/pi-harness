@@ -10,6 +10,7 @@ const agents = [
 	"proof-auditor",
 	"reviewer",
 	"scout",
+	"ultra-reviewer",
 ] as const;
 // Keys Pi accepts in agent frontmatter. Canonical harness agents intentionally
 // pin models so delegation is reproducible across consumer repositories.
@@ -49,7 +50,7 @@ for (const name of agents) {
 }
 
 test("discovery, review, audit, and peer agents are read-only; writers are not", async () => {
-	for (const name of ["explore", "peer", "proof-auditor", "reviewer", "scout"]) {
+	for (const name of ["explore", "peer", "proof-auditor", "reviewer", "scout", "ultra-reviewer"]) {
 		const values = parseHeader(await readFile(`.pi/agents/${name}.md`, "utf8"));
 		assert.equal(values.get("readonly"), "true", `${name} must be read-only`);
 	}
@@ -64,6 +65,7 @@ test("specialist agent prompts require evidence and a structured result", async 
 	const reviewer = await readFile(".pi/agents/reviewer.md", "utf8");
 	const scout = await readFile(".pi/agents/scout.md", "utf8");
 	const proofAuditor = await readFile(".pi/agents/proof-auditor.md", "utf8");
+	const ultraReviewer = await readFile(".pi/agents/ultra-reviewer.md", "utf8");
 
 	assert.match(explore, /path:line/i);
 	assert.match(explore, /<result>/);
@@ -73,6 +75,19 @@ test("specialist agent prompts require evidence and a structured result", async 
 	assert.match(scout, /<result>/);
 	assert.match(proofAuditor, /fake-green/i);
 	assert.match(proofAuditor, /<result>/);
+	assert.match(ultraReviewer, /candidate/i);
+	assert.match(ultraReviewer, /path:line/i);
+	assert.match(ultraReviewer, /<result>/);
+});
+
+test("ultra review uses the cost-aware 8+2 profile mix", async () => {
+	const ultraReviewer = await readFile(".pi/agents/ultra-reviewer.md", "utf8");
+	const prompt = await readFile(".pi/prompts/ultra-review.md", "utf8");
+
+	assert.match(ultraReviewer, /model: commandcode\/deepseek\/deepseek-v4-flash/);
+	assert.match(ultraReviewer, /thinking: high/);
+	assert.match(prompt, /eight.*`ultra-reviewer`/is);
+	assert.match(prompt, /two.*`reviewer`/is);
 });
 
 test("agents own outcomes: challenge contracts and weak-scout guards present", async () => {

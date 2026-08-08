@@ -785,6 +785,16 @@
         "SKILL.md": "b718776e17b9220fb29f580aeafba6d2aa3c9037e3394c36e64b62f1705b2a16"
       }
     },
+    "repo-refresh": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": ".pi/skills/repo-refresh/SKILL.md",
+      "trust": "local",
+      "files": {
+        "references/refresh-standard.md": "ee693299fa6b09c100d572d972e37eaaee01695e954dec136662f09ae9cd63d0",
+        "SKILL.md": "9ae2c211b28659fe3da111debeffa31e8a711541577cb426f82258271d2758de"
+      }
+    },
     "resend": {
       "source": "local",
       "sourceType": "local",
@@ -942,6 +952,15 @@
         "SKILL.md": "711dd1e70f44d938ec239143809d14d6f306adda9f206bffea2f0e0ce6895c21"
       }
     },
+    "test-proof-debt-audit": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": ".pi/skills/test-proof-debt-audit/SKILL.md",
+      "trust": "local",
+      "files": {
+        "SKILL.md": "b72508db9fc0fa0e562d560411ab3378025182a8dc24b48e53db507d986ca827"
+      }
+    },
     "testing-anti-patterns": {
       "source": "local",
       "sourceType": "local",
@@ -959,6 +978,24 @@
       "files": {
         "references/package-authoring.md": "bdbcbb0b25119a272d6e0b1ba982b87c52da3e2c6fec9aa39b720284f362e0a0",
         "SKILL.md": "ae69cb2280df73a440a8fa90b651ac48147e10b790221629a04e29b2959e6703"
+      }
+    },
+    "ultra-review": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": ".pi/skills/ultra-review/SKILL.md",
+      "trust": "local",
+      "files": {
+        "SKILL.md": "90d907de7afda46f71e426ff27e954437879a5fc54f6a1d77d06de20fe7d9f73"
+      }
+    },
+    "ultra-review-receive": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": ".pi/skills/ultra-review-receive/SKILL.md",
+      "trust": "local",
+      "files": {
+        "SKILL.md": "c7201493227d03d9b40006f40682563fdaff0c4e635751e257d43dc8fba0a335"
       }
     },
     "using-git-worktrees": {

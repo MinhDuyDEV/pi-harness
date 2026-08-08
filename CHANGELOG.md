@@ -6,6 +6,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-08-08
+
+### Added
+
+- Add Pi-native `repo-refresh`, `test-proof-debt-audit`, `ultra-review`, and `ultra-review-receive` skills with explicit user invocation and durable local review artifacts.
+- Add the thin `/ultra-review` prompt for ten-slot maximum-recall orchestration.
+- Add the read-only `ultra-reviewer` agent on the DeepSeek V4 Flash budget seat for high-throughput candidate collection.
+
+### Changed
+
+- Run ultra review with an 8+2 profile mix: eight budget `ultra-reviewer` slots plus two stronger canonical `reviewer` slots for security/trust-boundary and adversarial review.
+- Install `ultra-reviewer` into consumer repositories and enforce it as an exact release-critical package resource.
+- Keep the four migrated skills hidden from automatic model invocation; destructive or high-cost workflows require explicit user intent.
+
+### Fixed
+
+- Remove Codex-only invocation syntax, provider/model pins, personal paths, PowerShell, mailbox assumptions, and missing-script dependencies from the migrated workflows.
+- Make repository refresh treat age as a suspect signal rather than deletion proof, preserve active work and live contracts, and stop when no candidate qualifies.
+- Preserve raw ultra-review candidates while separating candidate collection from verification and authorized remediation.
+
 ## [2.6.0] - 2026-08-07
 
 ### Added

@@ -47,6 +47,7 @@ const VALID_BASE = [
   ".pi/agents/proof-auditor.md",
   ".pi/agents/reviewer.md",
   ".pi/agents/scout.md",
+  ".pi/agents/ultra-reviewer.md",
   ".pi/templates/AGENTS.md",
   ".pi/templates/adr.md",
   ".pi/templates/agent-run-report.md",
@@ -124,6 +125,14 @@ test("a missing required exact file is reported", () => {
   const { errors } = validatePackagePayload(paths, defaultPayloadContract);
   assert.equal(errors.length, 1);
   assert.match(errors[0], /skills-lock\.json/);
+});
+
+test("ultra-reviewer is an exact release-critical resource", () => {
+  const path = ".pi/agents/ultra-reviewer.md";
+  assert.ok(defaultPayloadContract.requiredExact.includes(path));
+  const { errors } = validatePackagePayload(withBase([]).filter((entry) => entry !== path), defaultPayloadContract);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /ultra-reviewer\.md/);
 });
 
 test("missing every skill SKILL.md is reported as a missing required pattern", () => {

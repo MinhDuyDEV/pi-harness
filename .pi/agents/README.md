@@ -46,6 +46,7 @@ tools:
 | `explore` | Read-only code exploration, path:line | Single known file (`read`) |
 | `general` | Multi-step tasks, implementation, parallel tracks | Trivial 1–2 file parent work |
 | `reviewer` | Post-change audit, path:line evidence | Before code exists |
+| `ultra-reviewer` | High-throughput candidate collection for one ultra-review axis | Final verdicts or external research |
 | `proof-auditor` | Verify evidence proves the claim (fake-green/fake-red) | Before code exists, or diff-shape review (`reviewer`) |
 
 ## Pick by task
@@ -56,6 +57,7 @@ tools:
 | Best practice / docs for Y? | `scout` |
 | Implement or multi-step delegated work | `general` |
 | Review diff / changes | `reviewer` |
+| Collect one axis in a ten-slot ultra review | `ultra-reviewer` |
 | Does the evidence actually prove it's done? | `proof-auditor` |
 | Product from short prompt | Workflow-style orchestration with `task` |
 
